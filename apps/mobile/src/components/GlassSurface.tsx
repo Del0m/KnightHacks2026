@@ -13,7 +13,7 @@ export function GlassSurface({ tint = '#FFFFFF', radius = 24, colored = false }:
     const subscription = AccessibilityInfo.addEventListener('reduceTransparencyChanged', setOpaque);
     return () => { active = false; subscription.remove(); };
   }, []);
-  const style = [StyleSheet.absoluteFill, { borderRadius: radius }];
+  const style = [StyleSheet.absoluteFill, { borderRadius: radius, borderWidth: 1, borderColor: 'rgba(255,255,255,.88)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.9), 0 2px 8px rgba(52,118,163,.06)' }];
   let native = false;
   try { native = Platform.OS === 'ios' && !opaque && isGlassEffectAPIAvailable() && isLiquidGlassAvailable(); } catch { /* Older native builds retain the gradient. */ }
   if (native) return <GlassView pointerEvents="none" colorScheme="light" glassEffectStyle="regular" tintColor={tint} style={style} />;

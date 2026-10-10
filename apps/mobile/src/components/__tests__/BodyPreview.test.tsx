@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Native renderer test. */
 import React from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, PanResponder, type AppStateStatus } from 'react-native';
 import { BodyPreview } from '../BodyPreview';
 import { PageScroll } from '../PageScroll';
 const { act, create } = require('react-test-renderer');
@@ -63,4 +63,18 @@ test('rotation changes turn the figure without restarting its animation', () => 
   expect(commands).not.toContainEqual({ type: 'spotter:select', id: 'lunge' });
   act(() => screen.update(<BodyPreview selected="lunge" playing rotation={0} />));
   expect(commands).toContainEqual({ type: 'spotter:rotate', degrees: 0 });
+});
+
+test('native scrolling owns one finger while two fingers zoom the model', () => {
+  const createResponder = jest.spyOn(PanResponder, 'create');
+  act(() => { screen = create(<BodyPreview selected="curl" playing />); });
+  const pinch = createResponder.mock.calls[0][0];
+  const touches = (distance: number) => ({ nativeEvent: { touches: [{ pageX: 0, pageY: 0 }, { pageX: distance, pageY: 0 }] } });
+  expect(pinch.onStartShouldSetPanResponderCapture?.({ nativeEvent: { touches: [{ pageX: 0, pageY: 0 }] } } as never, {} as never)).toBe(false);
+  expect(pinch.onStartShouldSetPanResponderCapture?.(touches(100) as never, {} as never)).toBe(true);
+  act(() => {
+    pinch.onPanResponderGrant?.(touches(100) as never, {} as never);
+    pinch.onPanResponderMove?.(touches(200) as never, {} as never);
+  });
+  expect(commands).toContainEqual({ type: 'spotter:zoom', factor: .5 });
 });

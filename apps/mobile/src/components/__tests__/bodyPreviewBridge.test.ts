@@ -30,3 +30,8 @@ test('all five previews and bounded slider rotations use the native bridge', () 
   expect(modelCommand({ type: 'spotter:rotate', degrees: -180 })).toContain('-180');
   for (const degrees of [NaN, Infinity, 181, -181]) expect(() => modelCommand({ type: 'spotter:rotate', degrees })).toThrow();
 });
+
+test('pinch zoom rejects nonfinite or unbounded factors', () => {
+  expect(modelCommand({type:'spotter:zoom',factor: .5})).toContain('0.5');
+  for (const factor of [NaN, Infinity, 0, 2.1]) expect(() => modelCommand({type:'spotter:zoom',factor})).toThrow();
+});

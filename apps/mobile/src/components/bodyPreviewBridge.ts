@@ -4,13 +4,15 @@ type Command = { type: 'spotter:select'; id: ExerciseId | null }
   | { type: 'spotter:pause'; playing: boolean }
   | { type: 'spotter:active'; active: boolean }
   | { type: 'spotter:motion'; reduced: boolean }
-  | { type: 'spotter:rotate'; degrees: number };
+  | { type: 'spotter:rotate'; degrees: number }
+  | { type: 'spotter:zoom'; factor: number };
 
 export function modelCommand(command: Command): string {
   if (command.type === 'spotter:select' && ![null, 'curl', 'squat', 'press', 'push_up', 'lunge'].includes(command.id)) {
     throw new Error('Unknown model exercise');
   }
   if (command.type === 'spotter:rotate' && (!Number.isFinite(command.degrees) || Math.abs(command.degrees) > 180)) throw new Error('Invalid model rotation');
+  if (command.type === 'spotter:zoom' && (!Number.isFinite(command.factor) || command.factor < .5 || command.factor > 2)) throw new Error('Invalid model zoom');
   return `window.spotterNativeReceive?.(${JSON.stringify(command)});true;`;
 }
 

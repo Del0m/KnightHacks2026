@@ -61,30 +61,14 @@ const focusBounds=new THREE.Box3();let animation=null,selected=null,movement=nul
 function notify(type,data={}){const message={type,...data};if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(message));else parent.postMessage(message,location.origin);}
 function resize(){const{width,height}=stage.getBoundingClientRect();renderer.setSize(width,height);renderer.getDrawingBufferSize(bufferSize);depthTarget.setSize(Math.max(1,bufferSize.x),Math.max(1,bufferSize.y));camera.aspect=width/height;camera.updateProjectionMatrix()}new ResizeObserver(resize).observe(stage);resize();
 controls.addEventListener('start',()=>{if(animation)animation.cameraCancelled=true});
-// One finger scrolls the native page; two fingers only change viewing distance.
-if(native){
- controls.enabled=false;
- let previousPair=null,scrollY=null;
- const pair=event=>event.touches.length===2?[...event.touches].sort((a,b)=>a.identifier-b.identifier).map(t=>({x:t.clientX,y:t.clientY})):null;
- const distance=p=>Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);
- renderer.domElement.addEventListener('touchstart',event=>{event.preventDefault();previousPair=pair(event);scrollY=event.touches.length===1?event.touches[0].screenY:null;},{passive:false});
- renderer.domElement.addEventListener('touchmove',event=>{
-  event.preventDefault();
-  if(event.touches.length===1){
-   const y=event.touches[0].screenY;
-   if(scrollY!==null)notify('spotter:model-scroll',{delta:Math.max(-160,Math.min(160,scrollY-y))});
-   scrollY=y;previousPair=null;return;
-  }
-  scrollY=null;const current=pair(event);
-  if(current&&previousPair&&distance(current)>8&&distance(previousPair)>8){
-   if(animation)animation.cameraCancelled=true;
-   const offset=camera.position.clone().sub(controls.target),orbit=new THREE.Spherical().setFromVector3(offset);
-   orbit.radius=THREE.MathUtils.clamp(orbit.radius*distance(previousPair)/distance(current),controls.minDistance,controls.maxDistance);
-   camera.position.copy(controls.target).add(offset.setFromSpherical(orbit));controls.update();
-  }
-  previousPair=current;
- },{passive:false});
- for(const name of ['touchend','touchcancel'])renderer.domElement.addEventListener(name,event=>{previousPair=pair(event);scrollY=null;});
+// Native scroll gestures belong to the page; the React Native wrapper sends pinch zoom.
+if(native)controls.enabled=false;
+function zoom(factor){
+ if(typeof factor!=='number'||!Number.isFinite(factor)||factor<.5||factor>2)return;
+ if(animation)animation.cameraCancelled=true;
+ const offset=camera.position.clone().sub(controls.target);
+ offset.setLength(THREE.MathUtils.clamp(offset.length()*factor,controls.minDistance,controls.maxDistance));
+ camera.position.copy(controls.target).add(offset);controls.update();
 }
 let rotationBase=new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)).theta;
 function rotate(degrees){
@@ -147,6 +131,7 @@ renderer.setAnimationLoop(()=>{
 function receive(data){
  if(!movement)return;
  if(data?.type==='spotter:select'&&[null,'curl','squat','press','push_up','lunge'].includes(data.id))select(data.id);
+ if(data?.type==='spotter:zoom')zoom(data.factor);
  if(data?.type==='spotter:rotate')rotate(data.degrees);
  if(data?.type==='spotter:pause'&&typeof data.playing==='boolean'&&movement.playing!==data.playing)movement.pause();
  if(data?.type==='spotter:active'&&typeof data.active==='boolean'){active=data.active;if(!active&&movement.playing)movement.pause();}

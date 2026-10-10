@@ -2,19 +2,23 @@
 
 ## Behavior
 
-- The existing daily routine stays in place. Five exercise previews appear below it for testing: bicep curl, squat, shoulder press, push-up, and lunge.
+- The existing daily routine stays in place under Today’s Workout. The Practice selector beneath the figure lists five exercise previews: bicep curl, squat, shoulder press, push-up, and lunge.
 - All five use the existing rigged human model, with exercise-specific bone animation, camera framing, and muscle highlights. Dumbbells appear for curls and shoulder presses.
-- Selecting an exercise reveals a green Practice button. Practice uses the live camera and form engine, then shows good-rep feedback and advice. Practice again starts a fresh attempt; Return to Training exits. Practice does not save or upload workout sets.
+- Workout and Practice share the same selected exercise, playback and viewing angle; switching selectors leaves the figure running.
+- Selecting an exercise smoothly expands a indented green Practice Form subheading beneath the exercise row. Practice uses the live camera and form engine, then shows good-rep feedback and advice. Practice again starts a fresh attempt; Return to Training exits. Practice does not save or upload workout sets.
+- Completion checks occupy a fixed-width column at the far right, with a 12-point gap.
+- All five bottom tabs support dragging their glass highlight, with resisted overscroll and a spring return at either end. Shared glass surfaces have a light rim; shared pressable controls have a small spring response that respects Reduce Motion.
+- Single-finger drags over the figure reach the native page ScrollView directly. The native wrapper captures only two-finger pinch, so model scrolling uses the page’s native momentum and speed.
 - Pause is at the top left of the model. A rotation slider below the model replaces native finger rotation. Pinch still zooms; a single finger scrolls the page.
 - Onboarding Continue and Finish setup use the shared glass Action button.
 - The displayed product name is SteadyForum. Existing storage keys, URL scheme, database catalog, and package identifiers stay compatible with installed data and integrations.
 
 ## Validation
 
-- Mobile: 59 test suites, 607 tests pass; TypeScript passes; lint has no errors and eight existing warnings.
+- Mobile: 59 test suites, 610 tests pass; TypeScript passes; lint has no errors and eight existing warnings.
 - Animation tests load the actual skeleton assets and check movement, planted limbs, transitions, pause, and rotation bounds.
 - Practice tests cover feedback, a fresh retry, exiting, and avoiding workout history writes.
 - Web export succeeds, including the practice route.
-- iOS device build succeeds. The rebuilt app is installed and launched on the connected iPhone; owner confirmation of the new practice and slider flow is pending.
+- iOS device build succeeds. The rebuilt app is installed and launched on the connected iPhone; owner confirmed native figure scrolling now matches the page. The final Practice Form subheading follows the owner’s feedback.
 - Native-model browser inspection renders push-ups and lunges without shader errors.
-- Private environment-value scan: 42 changed/new files, zero matches.
+- Private environment-value scan for this refinement: 17 changed/new files, zero matches.

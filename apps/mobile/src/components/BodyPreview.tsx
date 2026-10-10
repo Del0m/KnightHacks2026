@@ -1,5 +1,5 @@
-import { useCallback, useContext, useEffect, useEffectEvent, useRef, useState } from 'react';
-import { AppState, Text, View } from 'react-native';
+import { useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useMemo } from 'react';
+import { AppState, PanResponder, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { TabSwipeBoundary } from './SwipeTabs';
@@ -18,7 +18,27 @@ export function BodyPreview({ selected, playing, height = 300, rotation = 0 }: {
   const rotationSent = useRef(0);
   const reduced = useReducedMotion();
   const scrollPage = useContext(PageScroll);
+  const pinchDistance = useRef(0);
   const send = useCallback((data: Parameters<typeof modelCommand>[0]) => frame.current?.injectJavaScript(modelCommand(data)), []);
+  // Reserve two-finger pinch only. One finger reaches the native page ScrollView.
+  /* eslint-disable react-hooks/refs, react-hooks/preserve-manual-memoization -- PanResponder stores callbacks; refs are accessed only during touch events. */
+  const pinch = useMemo(() => {
+    const distance = (touches: readonly { pageX: number; pageY: number }[]) => touches.length === 2 ? Math.hypot(touches[1].pageX - touches[0].pageX, touches[1].pageY - touches[0].pageY) : 0;
+    return PanResponder.create({
+      onStartShouldSetPanResponderCapture: event => event.nativeEvent.touches.length === 2,
+      onMoveShouldSetPanResponderCapture: event => event.nativeEvent.touches.length === 2,
+      onPanResponderGrant: event => { pinchDistance.current = distance(event.nativeEvent.touches); },
+      onPanResponderMove: event => {
+        const next = distance(event.nativeEvent.touches), previous = pinchDistance.current;
+        if (next > 8 && previous > 8) send({ type: 'spotter:zoom', factor: Math.max(.5, Math.min(2, previous / next)) });
+        pinchDistance.current = next;
+      },
+      onPanResponderRelease: () => { pinchDistance.current = 0; },
+      onPanResponderTerminate: () => { pinchDistance.current = 0; },
+      onPanResponderTerminationRequest: () => false,
+    });
+  }, [send]);
+  /* eslint-enable react-hooks/refs, react-hooks/preserve-manual-memoization */
   const syncPlayback = useCallback(() => {
     const active = focused.current && foreground.current;
     send({ type: 'spotter:active', active });
@@ -49,7 +69,8 @@ export function BodyPreview({ selected, playing, height = 300, rotation = 0 }: {
     const timer = setTimeout(() => setFailed(true), 20000);
     return () => clearTimeout(timer);
   }, [ready, failed, attempt]);
-  return <TabSwipeBoundary><View style={{ height, marginHorizontal: -12 }}>
+  return <TabSwipeBoundary><View {...pinch.panHandlers} style={{ height, marginHorizontal: -12 }}>
+    <View pointerEvents="none" style={{ flex: 1 }}>
     <WebView ref={frame} key={attempt} source={modelSource} originWhitelist={['*']}
       onShouldStartLoadWithRequest={request => modelNavigationAllowed(request.url)}
       onMessage={event => {
@@ -66,7 +87,7 @@ export function BodyPreview({ selected, playing, height = 300, rotation = 0 }: {
       javaScriptCanOpenWindowsAutomatically={false} allowFileAccess={false} allowUniversalAccessFromFileURLs={false}
       mixedContentMode="never" thirdPartyCookiesEnabled={false} sharedCookiesEnabled={false}
       accessibilityLabel="Interactive workout figure. Scroll the page with one finger. Use the rotation slider to turn the figure, and pinch with two fingers to zoom."
-      style={{ backgroundColor: 'transparent' }} containerStyle={{ backgroundColor: 'transparent' }} />
+      style={{ backgroundColor: 'transparent' }} containerStyle={{ backgroundColor: 'transparent' }} /></View>
     {(!ready || failed) && <View pointerEvents="box-none" style={{ position: 'absolute', left: 12, right: 12, bottom: 8, alignItems: 'center' }}>
       <Text style={{ color: colors.muted, fontFamily: typography.family, fontSize: 14 }}>{failed ? 'The figure couldn’t load. Your workout list is still available.' : 'Loading your workout figure…'}</Text>
       {failed && <PolishedPressable accessibilityRole="button" onPress={() => { setReady(false); setFailed(false); setAttempt(a => a + 1); }}><Text style={{ color: colors.primary, padding: 12 }}>Retry figure</Text></PolishedPressable>}
