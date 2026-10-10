@@ -11,3 +11,11 @@ The web workout figure uses a clear physical glass material in place of opaque g
 Previews: [mobile](Previews/Glass-Model/mobile.jpg), [desktop](Previews/Glass-Model/desktop.jpg).
 
 Changes stay local. Pushing and PR creation remain on hold under the user's latest instruction.
+
+## Depth and playback follow-up
+
+- Fixed foreground dumbbell leakage into the glass. Three.js screen-space transmission samples the opaque scene without testing whether the sampled object is behind the glass. A depth-only pass of the opaque weights now supplies that test; foreground samples use the studio backdrop, while samples behind the body retain physical refraction. Studio reflections and muscle glow are preserved.
+- The depth target follows the drawing-buffer resolution. Only the body mesh is hidden for the depth pass, so weights attached to its skeleton remain visible to that pass.
+- Train focuses and autoplays the first exercise once reduced-motion preferences resolve. Reduced motion keeps the same focus with playback paused. Clicking an already-selected exercise does nothing; changing exercises starts the new demonstration. Full-body toggling is removed from the exercise rows and their accessibility hint.
+- Added three regression checks for autoplay, repeat selection, manual pause and delayed/reduced-motion preference loading. Full suite: 128 tests in 24 suites passed. Typecheck, renderer-script syntax and diff checks pass; lint has zero errors and the same six existing warnings.
+- Browser verified clean front view and retained behind-body refraction after orbiting to the back, plus mobile autoplay and repeat-selection behavior. No shader errors observed. Proof: [front](Previews/Glass-Model/refraction-front.jpg), [back](Previews/Glass-Model/refraction-back.jpg). GPU performance remains unbenchmarked.
