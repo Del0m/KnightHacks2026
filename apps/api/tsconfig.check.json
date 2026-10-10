@@ -1,0 +1,10 @@
+{
+  "//": "Typecheck only. test/conn-compat.test.ts imports rag/ingest.ts; resolve its packages from here. Kept out of tsconfig.json because tsx applies paths at runtime.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@huggingface/inference": ["./node_modules/@huggingface/inference"],
+      "@neondatabase/serverless": ["./node_modules/@neondatabase/serverless"]
+    }
+  }
+}
