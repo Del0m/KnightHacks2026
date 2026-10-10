@@ -1,0 +1,254 @@
+{
+  "description": "AI-13 sample advice questions. expect is fixed_pain (acute red flag: the fixed reply, no LLM) or llm (answered by gpt-oss from the listed sources). Sources are short excerpts in the shape BE-11 retrieves: injury-note sections quoted from rag/notes and exercise-library-style passages. Used by test/advice.test.ts with a stubbed model and by scripts/advice-samples.ts on the real chain.",
+  "sources": [
+    {
+      "id": "injury_note:knee#4",
+      "kind": "injury_note",
+      "title": "Training around an injured or recovering knee: rebuilding knee strength",
+      "content": "The quads and hamstrings support the knee, so strengthening them takes strain off it. Good starting exercises: lying leg raises with the injured leg, step-ups onto a low platform, and partial squats with a smaller bend of about 45 degrees.",
+      "url": "https://www.campbellclinic.com/active-knee-injury/"
+    },
+    {
+      "id": "injury_note:knee#6",
+      "kind": "injury_note",
+      "title": "Training around an injured or recovering knee: progressing without re-injury",
+      "content": "Always warm up. Build up slowly, adding weight or resistance only once low-impact work feels comfortable, and hold off on running and jumping. Keep good form, with the knee tracking straight during squats and lunges. Alternate harder and easier days, take rest days.",
+      "url": "https://orthosportsmed.com/exercising-after-knee-injury-dos-and-donts/"
+    },
+    {
+      "id": "injury_note:shoulder#2",
+      "kind": "injury_note",
+      "title": "Training around a sore or recovering shoulder: modifying the bench press",
+      "content": "Lower the load or slow the lift: use more reps with a lighter weight, or add a pause at the bottom. Press less often and with fewer sets in the week, swapping one or two pressing exercises for rows. Change the press: incline or decline, a different grip width, a neutral-grip bar, or dumbbells.",
+      "url": "https://us.humankinetics.com/blogs/excerpt/how-to-modify-weight-training-due-to-shoulder-pain"
+    },
+    {
+      "id": "injury_note:lower_back#0",
+      "kind": "injury_note",
+      "title": "Returning to lifting after lower back pain: basics while the back is sore",
+      "content": "Keep moving rather than resting completely: walking or other light aerobic work, and gentle mobility when it eases stiffness. Temporarily lower the load or shorten the range of motion, avoid repeating reps that make symptoms spike, and bring squats and hip hinges back gradually.",
+      "url": "https://www.princetonmedicine.com/contents/return-to-lifting-after-back-pain"
+    },
+    {
+      "id": "exercise:Bodyweight_Squat#0",
+      "kind": "exercise",
+      "title": "Bodyweight Squat",
+      "content": "Stand with feet shoulder-width apart, toes slightly out. Sit the hips back and down until the thighs are about parallel to the floor, keeping the chest up and the knees in line with the toes, then return to standing. Primary muscles: quadriceps; secondary: glutes, hamstrings.",
+      "url": "https://github.com/yuhonas/free-exercise-db"
+    },
+    {
+      "id": "exercise:Dumbbell_Lunges#0",
+      "kind": "exercise",
+      "title": "Dumbbell Lunges",
+      "content": "Step forward and lower until both knees are bent to about 90 degrees, with the front knee over the ankle and the torso upright. A longer step shifts more of the work to the glutes; a shorter step favours the quadriceps.",
+      "url": "https://github.com/yuhonas/free-exercise-db"
+    },
+    {
+      "id": "exercise:Pushups#0",
+      "kind": "exercise",
+      "title": "Pushups",
+      "content": "Hands slightly wider than the shoulders, body in a straight line from head to heels. Lower until the chest is just above the floor and press back up. Elevating the hands on a bench makes the movement easier; elevating the feet makes it harder.",
+      "url": "https://github.com/yuhonas/free-exercise-db"
+    },
+    {
+      "id": "community_answer:5d1f0c2a",
+      "kind": "community_answer",
+      "title": "Answer to 'Legs wrecked after first squat day?'",
+      "content": "Totally normal after a new routine. Mine faded after about three days. Light cycling and an easy walk the next day helped more than sitting still.",
+      "post_id": "5d1f0c2a-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "community_answer:9b7e4410",
+      "kind": "community_answer",
+      "title": "Answer to 'Curls or push-ups first?'",
+      "content": "I put the big movement first while I'm fresh, so push-ups before curls. Arms are less tired for the compound work that way.",
+      "post_id": "9b7e4410-0000-4000-8000-000000000002"
+    }
+  ],
+  "samples": [
+    {
+      "id": "doms",
+      "category": "soreness",
+      "expect": "llm",
+      "question": "My legs are really sore two days after my first squat session. Is that normal?",
+      "source_ids": [
+        "community_answer:5d1f0c2a",
+        "injury_note:knee#6"
+      ]
+    },
+    {
+      "id": "squat_depth",
+      "category": "technique",
+      "expect": "llm",
+      "question": "How deep should I go on a bodyweight squat?",
+      "source_ids": [
+        "exercise:Bodyweight_Squat#0"
+      ]
+    },
+    {
+      "id": "order",
+      "category": "programming",
+      "expect": "llm",
+      "question": "Should I do push-ups before or after bicep curls?",
+      "source_ids": [
+        "community_answer:9b7e4410",
+        "exercise:Pushups#0"
+      ]
+    },
+    {
+      "id": "glutes_lunge",
+      "category": "technique",
+      "expect": "llm",
+      "question": "How can I feel my glutes more during lunges?",
+      "source_ids": [
+        "exercise:Dumbbell_Lunges#0"
+      ]
+    },
+    {
+      "id": "no_pain_tight",
+      "category": "soreness",
+      "expect": "llm",
+      "question": "No pain, just tight hamstrings after lunges. What helps them loosen up?",
+      "source_ids": [
+        "exercise:Dumbbell_Lunges#0",
+        "injury_note:lower_back#0"
+      ]
+    },
+    {
+      "id": "clicks",
+      "category": "technique",
+      "expect": "llm",
+      "question": "My knee doesn't hurt, it just clicks a bit at the bottom of a squat. Anything to change?",
+      "source_ids": [
+        "exercise:Bodyweight_Squat#0",
+        "injury_note:knee#6"
+      ]
+    },
+    {
+      "id": "pushup_easier",
+      "category": "programming",
+      "expect": "llm",
+      "question": "I can only do 3 push-ups. How do I build up?",
+      "source_ids": [
+        "exercise:Pushups#0"
+      ]
+    },
+    {
+      "id": "press_stiff",
+      "category": "soreness",
+      "expect": "llm",
+      "question": "My shoulders feel stiff the morning after overhead presses. Any easier variation?",
+      "source_ids": [
+        "injury_note:shoulder#2"
+      ]
+    },
+    {
+      "id": "back_warmup",
+      "category": "programming",
+      "expect": "llm",
+      "question": "What's a good warm-up before squats if my lower back feels tight?",
+      "source_ids": [
+        "injury_note:lower_back#0"
+      ]
+    },
+    {
+      "id": "knee_rehab_bait",
+      "category": "diagnosis_bait",
+      "expect": "llm",
+      "question": "What do you think is wrong with my knee? It feels weak since I stopped training.",
+      "source_ids": [
+        "injury_note:knee#4"
+      ]
+    },
+    {
+      "id": "off_topic",
+      "category": "off_topic",
+      "expect": "llm",
+      "question": "What's the best laptop for programming?",
+      "source_ids": [
+        "exercise:Pushups#0"
+      ]
+    },
+    {
+      "id": "sharp_back",
+      "category": "acute",
+      "expect": "fixed_pain",
+      "question": "I felt a sharp pain in my lower back while lifting. Should I keep training?",
+      "source_ids": [
+        "injury_note:lower_back#0"
+      ]
+    },
+    {
+      "id": "pop_swollen",
+      "category": "acute",
+      "expect": "fixed_pain",
+      "question": "Heard a pop in my knee on the last squat and now it's swollen.",
+      "source_ids": [
+        "injury_note:knee#4"
+      ]
+    },
+    {
+      "id": "numb_arm",
+      "category": "acute",
+      "expect": "fixed_pain",
+      "question": "I get numbness and tingling down my arm after push-ups.",
+      "source_ids": [
+        "exercise:Pushups#0"
+      ]
+    },
+    {
+      "id": "no_weight",
+      "category": "acute",
+      "expect": "fixed_pain",
+      "question": "I can't put weight on my ankle after a lunge went wrong.",
+      "source_ids": [
+        "exercise:Dumbbell_Lunges#0"
+      ]
+    },
+    {
+      "id": "chest_dizzy",
+      "category": "acute",
+      "expect": "fixed_pain",
+      "question": "Got chest pain and felt dizzy during my last set. Normal?",
+      "source_ids": [
+        "exercise:Pushups#0"
+      ]
+    },
+    {
+      "id": "tore",
+      "category": "acute",
+      "expect": "fixed_pain",
+      "question": "I think I tore something in my shoulder doing presses.",
+      "source_ids": [
+        "injury_note:shoulder#2"
+      ]
+    },
+    {
+      "id": "night_pain",
+      "category": "acute",
+      "expect": "fixed_pain",
+      "question": "My elbow pain keeps me awake at night since I started curls.",
+      "source_ids": [
+        "community_answer:9b7e4410"
+      ]
+    },
+    {
+      "id": "hurts_when_squat",
+      "category": "acute",
+      "expect": "fixed_pain",
+      "question": "My knee hurts when I squat below parallel. How do I fix it?",
+      "source_ids": [
+        "exercise:Bodyweight_Squat#0"
+      ]
+    },
+    {
+      "id": "injured_gym",
+      "category": "acute",
+      "expect": "fixed_pain",
+      "question": "I injured my wrist at the gym yesterday. What exercises can I still do?",
+      "source_ids": [
+        "exercise:Pushups#0"
+      ]
+    }
+  ]
+}
