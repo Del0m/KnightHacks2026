@@ -21,4 +21,13 @@ export {
 } from './rules';
 export { useFormRules, type FormRulesState } from './useFormRules';
 export { INJURY_ORDER, applyInjuries, applyOverride } from './overrides';
+export {
+  LEAD_IN_MS,
+  MAX_SET_FRAMES,
+  buildSetRecord,
+  createSetRecorder,
+  type SetRecord,
+  type SetRecordInput,
+  type SetRecorder,
+} from './setRecord';
 export * from './types';
