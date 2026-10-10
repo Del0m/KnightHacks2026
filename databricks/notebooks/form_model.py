@@ -15,9 +15,11 @@
 
 # COMMAND ----------
 
+import cloudpickle
 import mlflow
 import numpy as np
 import pandas as pd
+import sklearn
 from mlflow.models import ModelSignature
 from mlflow.types.schema import AnyType, ColSpec, Schema
 from mlflow.tracking import MlflowClient
@@ -206,7 +208,14 @@ with mlflow.start_run(run_name="form_quality_baseline") as run:
         python_model=model,
         input_example=example,
         signature=SIGNATURE,
-        pip_requirements=["scikit-learn", "pandas", "numpy"],
+        # Pinned to this notebook's versions: serving must unpickle the exact same objects.
+        pip_requirements=[
+            f"mlflow=={mlflow.__version__}",
+            f"cloudpickle=={cloudpickle.__version__}",
+            f"scikit-learn=={sklearn.__version__}",
+            f"pandas=={pd.__version__}",
+            f"numpy=={np.__version__}",
+        ],
         registered_model_name=MODEL_NAME,
     )
 
