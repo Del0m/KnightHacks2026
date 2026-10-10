@@ -2,14 +2,12 @@
 //
 //   const [vector] = await embed([profileText(profile)]);
 //
-// Same model as the RAG ingest (rag/ingest.ts): BAAI/bge-small-en-v1.5 on hf-inference, 384-d,
-// normalised. Profiles are compared with each other, so both sides are embedded as passages,
-// without bge's query prefix.
+// Same model as the RAG ingest and the planner's query embedder (embed.ts, whose test checks it
+// against rag/ingest.ts). Profiles are compared with each other, so both sides are embedded as
+// passages, without bge's query prefix.
 
 import { InferenceClient } from "@huggingface/inference";
-
-export const EMBED_MODEL = "BAAI/bge-small-en-v1.5";
-export const EMBED_DIM = 384;
+import { EMBED_DIM, EMBED_MODEL } from "./embed.js";
 
 export type Embed = (texts: string[]) => Promise<number[][]>;
 
