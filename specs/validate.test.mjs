@@ -326,6 +326,12 @@ describe('checkNote', () => {
     ok('{n} of {total} reps were clean. Nice work.');
   });
 
+  test('reads a word with a Unicode hyphen as one word', () => {
+    // Models often write push\u2011ups (non-breaking hyphen) or push\u2010ups (hyphen).
+    ok('Push\u2011ups were steady on every rep.');
+    ok('Push\u2010ups were steady on every rep.');
+  });
+
   test('rejects banned phrases', () => {
     bad('You should go deeper.');
     bad('Your form was bad on the last rep.');

@@ -216,6 +216,9 @@ describe("answer guard", () => {
   const accepted: Record<string, string> = {
     "'you have' that isn't a diagnosis":
       "You have a few options here: incline push-ups against a bench are an easier start, and lowering the incline over time builds strength.",
+    // The model often writes "push\u2011ups" with a non-breaking hyphen; it's one word, not "Push".
+    "a non-breaking hyphen in 'push\u2011ups'":
+      "Push\u2011ups are a big compound movement that many people place first while fresh.",
     "'strain' that isn't a diagnosis":
       "Partial squats with a smaller bend put less strain on the knee while the quads and hamstrings get stronger.",
   };
