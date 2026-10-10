@@ -6,6 +6,8 @@ The delivery target is 10 p.m. Eastern on October 10, 2026. The implemented tool
 
 ## Install and open
 
+Use only the primary Spotter project (Spotter 1): `apps/mobile/ios/Spotter.xcworkspace`, `Spotter.xcodeproj` and the `Spotter` scheme. `Spotter 2`, `Spotter 2.xcodeproj` and `Spotter 2.xcworkspace` are not build targets for this work. Do not select them as a fallback if automatic project discovery is ambiguous. The installed AI-09 Release build's Xcode log confirms it used `Spotter.xcworkspace` and `Spotter.xcodeproj`.
+
 The route is `spotter://labelling`. Dataset capture uses Core ML at 320 pixels and retains joints only. It does not create an image, audio or video recording. The camera buffers are processed on the phone. Confirm the selected exercise, camera view, side and standard/modified/prescribed context before starting. A modified movement remains a recorded context, not a medical diagnosis.
 
 Native sharing and checksum dependencies require rebuilding the installed app. From `apps/mobile`, use the project's Expo CLI through pnpm:
@@ -116,4 +118,4 @@ Actual check results belong in the delivery report. Passing automated checks ver
 
 Tests were added before the modules existed and failed with missing-module errors. Additional hardening regressions failed on existing behaviour before their fixes, including invalid consent, revision recovery/pruning, shared closure frames, confidence thresholds and impossible calendar dates. Mobile environment setup was corrected to simulate a foreground iPhone; expected capture/privacy outcomes were retained.
 
-The generated `ios/` checkout contained Finder/iCloud conflict copies of the Xcode project/workspace, causing CocoaPods to reject automatic project selection. Those copies were temporarily preserved separately for the build, without manually editing native project files, and restored to their original locations after installation. Subsequent builds must resolve or temporarily isolate duplicate generated projects if they remain present.
+The generated `ios/` checkout contained duplicate Xcode project/workspace files, causing CocoaPods to reject automatic project selection. The unused Spotter 2 copies were temporarily preserved separately for the build, without manually editing native project files, and restored to their original locations after installation. Subsequent builds must exclude those copies from automatic discovery and use only the primary Spotter workspace/project. Preserve the unused copies; they are not authorized targets for AI-09.
