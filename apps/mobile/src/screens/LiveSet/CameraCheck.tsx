@@ -29,7 +29,7 @@ function IPhoneCheck({ exercise, onContinue }: { exercise: string; onContinue: (
     <GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />
   </View>;
   // Unmounting the live check clears all detection/stability state when backgrounded or unfocused.
-  if (!foreground || !focused) return <Text style={s.text}>Camera paused. Return to Steady forum to check your framing.</Text>;
+  if (!foreground || !focused) return <Text style={s.text}>Camera paused. Return to SteadyForum to check your framing.</Text>;
   return <ModeCheck exercise={exercise} onContinue={onContinue} />;
 }
 function ModeCheck({ exercise, onContinue }: { exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {

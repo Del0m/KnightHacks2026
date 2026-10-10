@@ -58,41 +58,57 @@ export function createMovement(model, dumbbellModel) {
   orient('finger1-2.'+side,direction.toArray(),blend);
   orient('finger1-3.'+side,pos('finger3-3.'+side).sub(pos('finger1-3.'+side)).toArray(),blend);
  }
- function leg(side,blend){
-  const f=handFrames[side],hip=pos('upperleg01.'+side),ankle=f.foot;
-  const toward=ankle.clone().sub(hip),distance=Math.min(toward.length(),f.thigh+f.shin-.00001);toward.normalize();
-  const along=(f.thigh*f.thigh-f.shin*f.shin+distance*distance)/(2*distance);
-  const bend=new THREE.Vector3(0,0,1).addScaledVector(toward,-toward.z).normalize();
-  const knee=hip.clone().addScaledVector(toward,along).addScaledVector(bend,Math.sqrt(Math.max(0,f.thigh*f.thigh-along*along)));
+ function kneeTarget(hip,ankle,thigh,shin,bendDirection){
+  const toward=ankle.clone().sub(hip),distance=THREE.MathUtils.clamp(toward.length(),Math.abs(thigh-shin)+.00001,thigh+shin-.00001);toward.normalize();
+  const along=(thigh*thigh-shin*shin+distance*distance)/(2*distance);
+  const bend=bendDirection.clone().addScaledVector(toward,-bendDirection.dot(toward)).normalize();
+  return hip.clone().addScaledVector(toward,along).addScaledVector(bend,Math.sqrt(Math.max(0,thigh*thigh-along*along)));
+ }
+ function leg(side,blend,ankle=handFrames[side].foot,prone=false){
+  const f=handFrames[side],hip=pos('upperleg01.'+side);
+  const knee=kneeTarget(hip,ankle,f.thigh,f.shin,new THREE.Vector3(0,prone?-1:0,prone?0:1));
   orient('upperleg01.'+side,knee.clone().sub(hip).toArray(),blend);
   orient('lowerleg01.'+side,ankle.clone().sub(pos('lowerleg01.'+side)).toArray(),blend);
   // Preserve the original ankle orientation, keeping the soles level.
-  const bone=bones['foot.'+side],r=rest.get(bone);bone.parent.getWorldQuaternion(parent);desired.copy(parent.invert()).multiply(r.world);bone.quaternion.slerp(desired,blend);bone.updateWorldMatrix(false,true);
+  const bone=bones['foot.'+side],r=rest.get(bone);bone.parent.getWorldQuaternion(parent);desired.copy(r.world);if(prone)desired.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),.7));desired.premultiply(parent.invert());bone.quaternion.slerp(desired,blend);bone.updateWorldMatrix(false,true);
  }
  return {
   bones,weights,
-  select(id){selected=id;phase=0;playing=Boolean(id);weights.forEach(w=>w.visible=id==='curl'||id==='press');},
+  select(id){selected=['curl','squat','press','push_up','lunge'].includes(id)?id:null;phase=0;playing=Boolean(selected);for(const [bone,r] of rest){bone.quaternion.copy(r.q);bone.position.copy(r.p);}model.updateMatrixWorld(true);weights.forEach(w=>w.visible=selected==='curl'||selected==='press');},
   pause(){playing=!playing;return playing;},get playing(){return playing;},
   update(dt,reduced){
    if(playing&&!reduced)phase+=Math.min(dt,.05);
    const rep=(1-Math.cos(phase*Math.PI/2))/2,blend=1-Math.exp(-dt*18);
    if(!selected){for(const name of names){const b=bones[name],r=rest.get(b);b.quaternion.slerp(r.q,blend);b.position.lerp(r.p,blend);}model.updateMatrixWorld(true);return;}
-   const squat=selected==='squat',press=selected==='press',root=bones.root,r=rest.get(root);
-   const worldDelta=new THREE.Vector3(0,squat?-.48*rep:0,squat?-.22*rep:0);root.parent.getWorldQuaternion(parent);worldDelta.applyQuaternion(parent.invert());root.position.lerp(r.p.clone().add(worldDelta),blend);model.updateMatrixWorld(true);
-   orient('spine05',squat?[0,1,rep*.55]:[0,1,0],blend);
+   const squat=selected==='squat',press=selected==='press',pushUp=selected==='push_up',lunge=selected==='lunge',root=bones.root,r=rest.get(root);
+   const proneHeight=.42-.18*rep,footOffset=handFrames.L.foot.clone().sub(r.position);
+   // Pivot the straight body about the toes while the elbows flex.
+   const proneAngle=Math.acos((proneHeight-handFrames.L.foot.y)/Math.hypot(footOffset.y,footOffset.z))+Math.atan2(footOffset.z,-footOffset.y);
+   root.parent.getWorldQuaternion(parent);desired.copy(r.world);if(pushUp)desired.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),proneAngle));desired.premultiply(parent.clone().invert());root.quaternion.slerp(desired,blend);
+   const worldDelta=new THREE.Vector3(0,pushUp?proneHeight-r.position.y:squat?-.48*rep:lunge?-.13-.35*rep:0,squat?-.22*rep:0);worldDelta.applyQuaternion(parent.invert());root.position.lerp(r.p.clone().add(worldDelta),blend);model.updateMatrixWorld(true);
+   if(pushUp){bones.spine05.quaternion.slerp(rest.get(bones.spine05).q,blend);bones.spine05.updateWorldMatrix(false,true);}else orient('spine05',squat?[0,1,rep*.55]:[0,1,0],blend);
    for(const side of ['L','R']){
     const sign=side==='L'?1:-1;let forearm,palm;
-    if(press){
+    if(pushUp){
+     // Hands stay planted beside the chest; elbow flexion lowers a straight torso.
+     const shoulder=pos('upperarm01.'+side),hand=new THREE.Vector3(sign*.31,.045,.48);
+     const upper=original('upperarm01.'+side).distanceTo(original('lowerarm01.'+side)),lower=original('lowerarm01.'+side).distanceTo(original('wrist.'+side));
+     const elbow=kneeTarget(shoulder,hand,upper,lower,new THREE.Vector3(sign,0,-.65));
+     orient('upperarm01.'+side,elbow.sub(shoulder).toArray(),blend);forearm=hand.sub(pos('lowerarm01.'+side)).toArray();palm=[0,-1,0];
+    }else if(press){
      const a=rep*1.48;orient('upperarm01.'+side,[sign*Math.cos(a),Math.sin(a),.04],blend);forearm=[sign*.09,1,0];palm=[0,0,1];
     }else if(squat){
      orient('upperarm01.'+side,[sign*.08,-.05,1],blend);forearm=[0,.02,1];palm=[0,-1,0];
+    }else if(lunge){
+     orient('upperarm01.'+side,[sign*.07,-1,0],blend);forearm=[0,-1,.08];palm=[0,0,1];
     }else{
      const a=rep*2.35;orient('upperarm01.'+side,[sign*.04,-1,0],blend);forearm=[0,-Math.cos(a),Math.sin(a)];palm=[0,Math.sin(a),Math.cos(a)];
     }
-    orient('lowerarm01.'+side,forearm,blend,palm,.5);orient('lowerarm02.'+side,forearm,blend,palm);orient('wrist.'+side,forearm,blend,palm);
-    if(squat){for(let finger=1;finger<=5;finger++)for(let joint=1;joint<=3;joint++){const b=bones[`finger${finger}-${joint}.${side}`];if(b)b.quaternion.slerp(rest.get(b).q,blend);}}
+    orient('lowerarm01.'+side,forearm,blend,palm,.5);orient('lowerarm02.'+side,forearm,blend,palm);orient('wrist.'+side,pushUp?[0,0,1]:forearm,blend,palm);
+    if(squat||pushUp||lunge){for(let finger=1;finger<=5;finger++)for(let joint=1;joint<=3;joint++){const b=bones[`finger${finger}-${joint}.${side}`];if(b)b.quaternion.slerp(rest.get(b).q,blend);}}
     else grip(side,blend);
-    leg(side,blend);
+    const ankle=handFrames[side].foot.clone();if(lunge)ankle.z+=side==='L'?.43:-.43;if(pushUp)ankle.sub(r.position).applyAxisAngle(new THREE.Vector3(1,0,0),proneAngle).add(new THREE.Vector3(r.position.x,proneHeight,r.position.z));
+    leg(side,blend,ankle,pushUp);
    }
    model.updateMatrixWorld(true);
   }

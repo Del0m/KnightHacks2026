@@ -14,9 +14,9 @@ import { GlassChoice } from '@/components/GlassChoice';
 import { ui } from '@/components/AppPage';
 import { createSetCapture, setFeedback, type SetFeedback } from './setRecord';
 
-type Props = { initialPosition?: 'front' | 'back'; spec: ExerciseSpec; onComplete: (record: WorkoutSet, feedback: SetFeedback) => void; onManual: () => void; baseline: number };
+type Props = { manualLabel?: string; initialPosition?: 'front' | 'back'; spec: ExerciseSpec; onComplete: (record: WorkoutSet, feedback: SetFeedback) => void; onManual: () => void; baseline: number };
 export default function WorkoutCamera(props: Props) {
-  if (Platform.OS !== 'ios') return <Fallback onManual={props.onManual} message="Camera rep tracking is available in the iPhone app." />;
+  if (Platform.OS !== 'ios') return <Fallback label={props.manualLabel} onManual={props.onManual} message="Camera rep tracking is available in the iPhone app." />;
   return <PermissionCamera {...props} />;
 }
 function PermissionCamera(props: Props) {
@@ -24,13 +24,13 @@ function PermissionCamera(props: Props) {
   const mode = usePoseMode();
   useEffect(() => { void startPoseBenchmark(); }, []);
   const [error, setError] = useState(false);
-  if (!permission.hasPermission) return <View style={s.group}><Text style={ui.heading}>Allow camera access</Text>{error && <Text style={ui.muted}>Could not open camera access. Try again.</Text>}<GlassChoice primary label={permission.canRequestPermission ? 'Allow camera' : 'Open camera settings'} onPress={() => { void (permission.canRequestPermission ? permission.requestPermission() : Linking.openSettings()).catch(() => setError(true)); }} /><GlassChoice compact label="Track manually" onPress={props.onManual} /></View>;
+  if (!permission.hasPermission) return <View style={s.group}><Text style={ui.heading}>Allow camera access</Text>{error && <Text style={ui.muted}>Could not open camera access. Try again.</Text>}<GlassChoice primary label={permission.canRequestPermission ? 'Allow camera' : 'Open camera settings'} onPress={() => { void (permission.canRequestPermission ? permission.requestPermission() : Linking.openSettings()).catch(() => setError(true)); }} /><GlassChoice compact label={props.manualLabel ?? "Track manually"} onPress={props.onManual} /></View>;
   if (mode.mode === 'pending') return <Text style={ui.muted}>Preparing camera tracking…</Text>;
-  if (mode.mode !== 'coreml' && mode.mode !== 'vision') return <Fallback onManual={props.onManual} message="Camera tracking is unavailable on this device. You can still log your reps." />;
+  if (mode.mode !== 'coreml' && mode.mode !== 'vision') return <Fallback label={props.manualLabel} onManual={props.onManual} message="Camera tracking is unavailable on this device. You can still log your reps." />;
   return <TrackedCamera {...props} engine={mode.mode} size={mode.size} />;
 }
-function Fallback({ message, onManual }: { message: string; onManual: () => void }) { return <View style={s.group}><Text style={ui.muted}>{message}</Text><GlassChoice compact label="Track manually" onPress={onManual} /></View>; }
-function TrackedCamera({ spec, engine, size, onComplete, onManual, baseline, initialPosition }: Props & { engine: PoseEngine; size: 320 | 256 }) {
+function Fallback({ message, onManual, label = 'Track manually' }: { message: string; onManual: () => void; label?: string }) { return <View style={s.group}><Text style={ui.muted}>{message}</Text><GlassChoice compact label={label} onPress={onManual} /></View>; }
+function TrackedCamera({ spec, engine, size, onComplete, onManual, baseline, initialPosition, manualLabel = 'Track manually' }: Props & { engine: PoseEngine; size: 320 | 256 }) {
   const [position, setPosition] = useState<'front' | 'back'>(initialPosition ?? 'front');
   const device = useCameraDevice(position);
   const [detection, setDetection] = useState<PoseDetection | null>(null);
@@ -60,7 +60,7 @@ function TrackedCamera({ spec, engine, size, onComplete, onManual, baseline, ini
   useEffect(() => { if ((!active || !focused) && repCount > 0 && !completed.current) endSet(); }, [active, focused, repCount, endSet]);
   const [stale, setStale] = useState(false);
   useEffect(() => { const timer = setInterval(() => setStale(lastFrame.current > 0 && Date.now() - lastFrame.current > 1500), 500); return () => clearInterval(timer); }, []);
-  if (!device) return <Fallback message="This camera is unavailable." onManual={onManual} />;
+  if (!device) return <Fallback label={manualLabel} message="This camera is unavailable." onManual={onManual} />;
   const interrupted = cameraError || output.error || form.error || rules.error;
   return <View style={s.group}>
     <Text style={ui.muted}>{spec.recommended_view === 'side' ? 'Film from your side.' : 'Face the camera.'}</Text>
@@ -73,7 +73,7 @@ function TrackedCamera({ spec, engine, size, onComplete, onManual, baseline, ini
     {!interrupted && (!detection?.result || stale) && <Text style={ui.muted}>Keep your whole body in view.</Text>}
     <GlassChoice primary label="Done with set" disabled={form.repCount === 0} onPress={form.endSet} />
     {form.repCount === 0 && <GlassChoice compact label={position === 'front' ? 'Use back camera' : 'Use front camera'} onPress={() => { setPosition(p => p === 'front' ? 'back' : 'front'); setDetection(null); setImage(null); lastFrame.current = 0; setCameraError(false); form.reset(); rules.reset(); }} />}
-    <GlassChoice compact label="Track manually" onPress={onManual} />
+    <GlassChoice compact label={manualLabel} onPress={onManual} />
   </View>;
 }
 const s = StyleSheet.create({ group: { gap: 12 }, preview: { height: 430, borderRadius: 28, overflow: 'hidden', backgroundColor: '#153F58' }, counter: { position: 'absolute', top: 18, left: 18, minWidth: 96, alignItems: 'center', borderRadius: 24, padding: 14, backgroundColor: 'rgba(15,38,52,.65)' }, count: { color: '#FFFFFF', fontSize: 60, fontWeight: '700', fontVariant: ['tabular-nums'] }, label: { color: '#FFFFFF', fontSize: 13, letterSpacing: 2 } });

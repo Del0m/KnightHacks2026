@@ -4,8 +4,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { AppPage, Action, ui } from '@/components/AppPage';
 import { BodyPreview } from '@/components/BodyPreview';
+import { GlassSurface } from '@/components/GlassSurface';
+import { RotationSlider } from '@/components/RotationSlider';
 import { Streak } from '@/components/Streak';
-import { exercises, streak, completedToday, type ExerciseId } from '@/data/workout';
+import { exercises, practiceExercises, streak, completedToday, type ExerciseId } from '@/data/workout';
 import { useTraining } from '@/state/Training';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { cameraSpec } from '@/screens/LiveSet/exercises';
@@ -13,29 +15,35 @@ import { colors as c, typography as t } from '@/theme/tokens';
 export default function TrainScreen() {
   const { workouts } = useTraining(), reduced = useReducedMotion();
   const [selected, setSelected] = useState<ExerciseId | null>(exercises[0].id), [playing, setPlaying] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null), [rotation, setRotation] = useState(0);
   const navigation = useNavigation<{ addListener(event: 'tabPress', listener: () => void): () => void }>();
-  const resetPreview = useCallback(() => { setSelected(exercises[0].id); setPlaying(reduced === false); }, [reduced]);
+  const resetPreview = useCallback(() => { setSelected(exercises[0].id); setRotation(0); setExpanded(null); setPlaying(reduced === false); }, [reduced]);
   useFocusEffect(resetPreview);
   useEffect(() => navigation.addListener('tabPress', resetPreview), [navigation, resetPreview]);
-  function select(id: ExerciseId) { if (selected === id) return; setSelected(id); setPlaying(reduced === false); }
+  function select(id: ExerciseId, key: string) { setExpanded(current => current === key ? null : key); if (selected === id) return; setSelected(id); setRotation(0); setPlaying(reduced === false); }
+  const practice = (id: ExerciseId) => router.push({ pathname: '/practice', params: { exercise: id } });
+  const menu = (id: ExerciseId) => <View style={{ padding: 12, borderRadius: 22, marginVertical: 8 }}><GlassSurface radius={22} /><Action tone="green" onPress={() => practice(id)}>Practice</Action></View>;
   return <AppPage compact><Streak days={streak(workouts)} />
     <View style={styles.separator} />
     <View style={{ position: 'relative' }}>
-      <BodyPreview selected={selected} playing={playing} height={320} />
+      <BodyPreview selected={selected} playing={playing} height={320} rotation={rotation} />
       <PolishedPressable testID="glass-playback" accessibilityRole="button" accessibilityLabel={playing ? 'Pause movement' : 'Play movement'} accessibilityHint={selected ? 'Toggle the exercise demonstration' : 'Select an exercise first'} disabled={!selected} onPress={() => setPlaying(p => !p)} style={({ pressed }) => [styles.playback, { opacity: selected ? pressed ? .75 : 1 : .55, transform: [{ scale: pressed ? .97 : 1 }] }]}>
         {playing ? <View style={{ flexDirection: 'row', gap: 3 }}><View style={styles.pauseBar} /><View style={styles.pauseBar} /></View> : <View style={styles.playTriangle} />}
         <Text style={styles.play}>{playing ? 'Pause' : 'Play'}</Text>
       </PolishedPressable>
     </View>
+    <RotationSlider value={rotation} onChange={setRotation} />
     <View style={styles.separator} />
     <Text accessibilityRole="header" style={styles.agenda}>Today’s workout: <Text style={{ color: c.muted }}>Full body</Text></Text>
-    <View>{exercises.map((e, i) => <PolishedPressable key={e.id} testID={`exercise-${e.id}`} accessibilityRole="button" aria-pressed={selected === e.id} accessibilityHint="Select to focus and play this exercise." onPress={() => select(e.id)} style={({ pressed }) => [styles.row, { backgroundColor: selected === e.id || pressed ? 'rgba(255,255,255,0.65)' : 'transparent' }]}>
+    <View>{exercises.map((e, i) => <View key={e.id}><PolishedPressable testID={`exercise-${e.id}`} accessibilityRole="button" aria-pressed={selected === e.id} accessibilityHint="Select to focus and play this exercise." onPress={() => select(e.id, `routine-${e.id}`)} style={({ pressed }) => [styles.row, { backgroundColor: selected === e.id || pressed ? 'rgba(255,255,255,0.65)' : 'transparent' }]}>
       <Text style={[styles.number, selected === e.id && { color: c.primary }]}>{orderLabel(i + 1)}</Text>
       <Text style={[styles.name, selected === e.id && { color: c.primary }]}>{e.name}</Text>
       {completedToday(workouts, cameraSpec(e.id).id, e.sets) && <Text accessibilityLabel={`${e.name} completed`} style={{ color: c.primary, fontSize: 20 }}>✓</Text>}
       <View style={styles.details}><Text style={styles.reps}>{e.sets} × {e.reps} reps</Text><Text style={styles.detail}>{e.muscles}</Text></View>
-    </PolishedPressable>)}</View>
+    </PolishedPressable>{expanded === `routine-${e.id}` && menu(e.id)}</View>)}</View>
     <Action onPress={() => router.push({ pathname: '/camera-setup', params: { exercise: exercises[0].id } })}>Begin Workout</Action>
+    <Text accessibilityRole="header" style={styles.agenda}>Practice exercises</Text>
+    <View>{practiceExercises.map(e => <View key={e.id}><PolishedPressable testID={`practice-exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ expanded: expanded === `practice-${e.id}` }} onPress={() => select(e.id, `practice-${e.id}`)} style={styles.row}><Text style={styles.name}>{e.name}</Text><Text style={styles.detail}>{e.muscles}</Text><Text style={styles.detail}>{expanded === `practice-${e.id}` ? '−' : '+'}</Text></PolishedPressable>{expanded === `practice-${e.id}` && menu(e.id)}</View>)}</View>
     <PolishedPressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={ui.muted}>Set goals & workout days</Text></PolishedPressable>
     <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>Sample full-body routine</Text>
   </AppPage>;
@@ -47,7 +55,7 @@ const styles = StyleSheet.create({
   number: { width: 28, fontFamily: t.family, fontSize: 13, color: c.muted },
   name: { flex: 1, fontFamily: t.label, fontSize: 17, color: c.text },
   details: { alignItems: 'flex-end', gap: 2 }, reps: { fontFamily: t.label, fontSize: 13, color: c.text }, detail: { fontFamily: t.family, fontSize: 12, color: c.muted, textAlign: 'right' },
-  playback: { position: 'absolute', left: 0, bottom: 12, minHeight: 40, paddingHorizontal: 15, borderRadius: 22, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 14px rgba(49,92,120,0.12)' },
+  playback: { position: 'absolute', left: 0, top: 12, minHeight: 40, paddingHorizontal: 15, borderRadius: 22, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.7)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.95)', boxShadow: '0 4px 14px rgba(49,92,120,0.12)' },
   play: { color: c.text, fontFamily: t.label, fontSize: 14 }, pauseBar: { width: 3, height: 12, borderRadius: 1, backgroundColor: c.text }, playTriangle: { width: 0, height: 0, borderTopWidth: 6, borderBottomWidth: 6, borderLeftWidth: 9, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: c.text },
 });
 

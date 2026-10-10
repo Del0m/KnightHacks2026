@@ -11,10 +11,11 @@ import { modelCommand, modelEvent, modelNavigationAllowed, modelScroll } from '.
 import { PageScroll } from './PageScroll';
 import modelSource from './bodyModel.generated.json';
 
-export function BodyPreview({ selected, playing, height = 300 }: { selected: ExerciseId | null; playing: boolean; height?: number }) {
+export function BodyPreview({ selected, playing, height = 300, rotation = 0 }: { rotation?: number; selected: ExerciseId | null; playing: boolean; height?: number }) {
   const frame = useRef<WebView>(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false), [attempt, setAttempt] = useState(0);
   const focused = useRef(false), foreground = useRef(AppState.currentState === 'active');
+  const rotationSent = useRef(0);
   const reduced = useReducedMotion();
   const scrollPage = useContext(PageScroll);
   const send = useCallback((data: Parameters<typeof modelCommand>[0]) => frame.current?.injectJavaScript(modelCommand(data)), []);
@@ -26,9 +27,12 @@ export function BodyPreview({ selected, playing, height = 300 }: { selected: Exe
   const syncSelection = useEffectEvent(() => {
     send({ type: 'spotter:motion', reduced: reduced !== false });
     send({ type: 'spotter:select', id: selected });
+    rotationSent.current = rotation;
+    if (rotation) send({ type: 'spotter:rotate', degrees: rotation });
     syncPlayback();
   });
   useEffect(() => { if (ready) syncSelection(); }, [selected, ready]);
+  useEffect(() => { if (ready && rotation !== rotationSent.current) { send({ type: 'spotter:rotate', degrees: rotation }); rotationSent.current = rotation; } }, [rotation, ready, send]);
   useEffect(() => { if (ready) syncPlayback(); }, [playing, ready, syncPlayback]);
   useEffect(() => { if (ready) send({ type: 'spotter:motion', reduced: reduced !== false }); }, [reduced, ready, send]);
   useFocusEffect(useCallback(() => {
@@ -61,7 +65,7 @@ export function BodyPreview({ selected, playing, height = 300 }: { selected: Exe
       scrollEnabled={false} bounces={false} overScrollMode="never" setBuiltInZoomControls={false}
       javaScriptCanOpenWindowsAutomatically={false} allowFileAccess={false} allowUniversalAccessFromFileURLs={false}
       mixedContentMode="never" thirdPartyCookiesEnabled={false} sharedCookiesEnabled={false}
-      accessibilityLabel="Interactive workout figure. Scroll the page with one finger. Twist two fingers to rotate, move them together to pan, and pinch to zoom."
+      accessibilityLabel="Interactive workout figure. Scroll the page with one finger. Use the rotation slider to turn the figure, and pinch with two fingers to zoom."
       style={{ backgroundColor: 'transparent' }} containerStyle={{ backgroundColor: 'transparent' }} />
     {(!ready || failed) && <View pointerEvents="box-none" style={{ position: 'absolute', left: 12, right: 12, bottom: 8, alignItems: 'center' }}>
       <Text style={{ color: colors.muted, fontFamily: typography.family, fontSize: 14 }}>{failed ? 'The figure couldn’t load. Your workout list is still available.' : 'Loading your workout figure…'}</Text>

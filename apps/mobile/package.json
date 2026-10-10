@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@better-auth/expo": "^1.7.7",
+    "@react-native-community/slider": "5.2.0",
     "better-auth": "^1.7.7",
     "expo": "~57.0.27",
     "expo-build-properties": "~57.0.22",

@@ -45,7 +45,7 @@ function AuthenticatedApp() {
       <StatusBar style="dark" />
       <OnboardingEntry /><WorkoutSync />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
-        <Stack.Screen name="(tabs)" /><Stack.Screen name="workout" />
+        <Stack.Screen name="(tabs)" /><Stack.Screen name="workout" /><Stack.Screen name="practice" />
         <Stack.Screen name="onboarding" /><Stack.Screen name="camera-setup" />
         <Stack.Protected guard={!auth.user}>
           <Stack.Screen name="login" /><Stack.Screen name="signup" />

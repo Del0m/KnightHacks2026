@@ -24,3 +24,9 @@ test('scroll messages must contain a bounded numeric delta', () => {
   expect(modelScroll('{"type":"spotter:model-scroll","delta":-40}')).toBe(-40);
   for (const message of ['null', '{', '{"type":"spotter:model-scroll","delta":"40"}', '{"type":"spotter:model-scroll","delta":9000}', '{"type":"spotter:model-ready","delta":40}']) expect(modelScroll(message)).toBe(null);
 });
+
+test('all five previews and bounded slider rotations use the native bridge', () => {
+  for (const id of ['curl', 'squat', 'press', 'push_up', 'lunge'] as const) expect(modelCommand({ type: 'spotter:select', id })).toContain(id);
+  expect(modelCommand({ type: 'spotter:rotate', degrees: -180 })).toContain('-180');
+  for (const degrees of [NaN, Infinity, 181, -181]) expect(() => modelCommand({ type: 'spotter:rotate', degrees })).toThrow();
+});

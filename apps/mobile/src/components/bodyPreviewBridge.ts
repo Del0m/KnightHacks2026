@@ -3,12 +3,14 @@ import type { ExerciseId } from '@/data/workout';
 type Command = { type: 'spotter:select'; id: ExerciseId | null }
   | { type: 'spotter:pause'; playing: boolean }
   | { type: 'spotter:active'; active: boolean }
-  | { type: 'spotter:motion'; reduced: boolean };
+  | { type: 'spotter:motion'; reduced: boolean }
+  | { type: 'spotter:rotate'; degrees: number };
 
 export function modelCommand(command: Command): string {
-  if (command.type === 'spotter:select' && ![null, 'curl', 'squat', 'press'].includes(command.id)) {
+  if (command.type === 'spotter:select' && ![null, 'curl', 'squat', 'press', 'push_up', 'lunge'].includes(command.id)) {
     throw new Error('Unknown model exercise');
   }
+  if (command.type === 'spotter:rotate' && (!Number.isFinite(command.degrees) || Math.abs(command.degrees) > 180)) throw new Error('Invalid model rotation');
   return `window.spotterNativeReceive?.(${JSON.stringify(command)});true;`;
 }
 

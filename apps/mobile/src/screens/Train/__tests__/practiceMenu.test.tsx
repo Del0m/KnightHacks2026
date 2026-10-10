@@ -1,0 +1,32 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Native renderer test. */
+import React from 'react';
+import { router } from 'expo-router';
+import TrainScreen from '../index';
+const { act, create } = require('react-test-renderer');
+jest.mock('expo-router', () => ({ router: { push: jest.fn() }, useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]), useNavigation: () => ({ addListener: () => () => {} }) }));
+jest.mock('@/state/Training', () => ({ useTraining: () => ({ workouts: [] }) }));
+jest.mock('@/hooks/useReducedMotion', () => ({ useReducedMotion: () => false }));
+jest.mock('@/components/AppPage', () => ({ ui: {}, AppPage: (props: object) => require('react').createElement('Page', props), Action: 'Action' }));
+jest.mock('@/components/PolishedPressable', () => ({ PolishedPressable: 'Button' }));
+jest.mock('@/components/BodyPreview', () => ({ BodyPreview: 'Body' }));
+jest.mock('@/components/GlassSurface', () => ({ GlassSurface: 'Glass' }));
+jest.mock('@/components/RotationSlider', () => ({ RotationSlider: 'Rotation' }));
+jest.mock('@/components/Streak', () => ({ Streak: 'Streak' }));
+test('five testing exercises expand a green practice action; repeated selection preserves the model', () => {
+  let screen: ReturnType<typeof create>;
+  act(() => { screen = create(<TrainScreen />); });
+  expect(screen.root.findAllByType('Button').filter((button: { props: { testID?: string } }) => button.props.testID?.startsWith('practice-exercise-'))).toHaveLength(5);
+  const button = screen.root.findByProps({ testID: 'practice-exercise-push_up' });
+  act(() => button.props.onPress());
+  expect(screen.root.findByType('Body').props.selected).toBe('push_up');
+  const practice = screen.root.findAllByType('Action').find((action: { props: { children: string } }) => action.props.children === 'Practice');
+  expect(practice.props.tone).toBe('green');
+  act(() => practice.props.onPress());
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/practice', params: { exercise: 'push_up' } });
+  act(() => button.props.onPress());
+  expect(screen.root.findByType('Body').props.selected).toBe('push_up');
+  expect(screen.root.findAllByType('Action').some((action: { props: { children: string } }) => action.props.children === 'Practice')).toBe(false);
+  act(() => screen.root.findByType('Rotation').props.onChange(45));
+  expect(screen.root.findByType('Body').props.rotation).toBe(45);
+  act(() => screen.unmount());
+});

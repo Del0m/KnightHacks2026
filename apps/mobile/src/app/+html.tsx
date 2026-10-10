@@ -9,7 +9,7 @@ export default function Html({ children }: { children: ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content={colors.background} />
-        <meta name="description" content="Steady forum. Workout tracking and community." />
+        <meta name="description" content="SteadyForum. Workout tracking and community." />
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: `
           :root { --spotter-background: ${colors.background}; --spotter-surface: ${colors.surface};

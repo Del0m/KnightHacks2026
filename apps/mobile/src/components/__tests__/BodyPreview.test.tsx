@@ -52,3 +52,15 @@ test('single-finger drag messages scroll the parent page without changing the mo
   expect(scroll).toHaveBeenCalledWith(40);
   expect(commands).toEqual([]);
 });
+
+test('rotation changes turn the figure without restarting its animation', () => {
+  act(() => { screen = create(<BodyPreview selected="lunge" playing rotation={0} />); });
+  act(() => screen.root.findByType('NativePreview').props.onMessage({ nativeEvent: { data: '{"type":"spotter:model-ready"}' } }));
+  expect(commands).not.toContainEqual({ type: 'spotter:rotate', degrees: 0 });
+  commands.length = 0;
+  act(() => screen.update(<BodyPreview selected="lunge" playing rotation={45} />));
+  expect(commands).toContainEqual({ type: 'spotter:rotate', degrees: 45 });
+  expect(commands).not.toContainEqual({ type: 'spotter:select', id: 'lunge' });
+  act(() => screen.update(<BodyPreview selected="lunge" playing rotation={0} />));
+  expect(commands).toContainEqual({ type: 'spotter:rotate', degrees: 0 });
+});

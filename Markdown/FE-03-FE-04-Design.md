@@ -4,7 +4,7 @@ Updated October 10, 2026. This records the requested design before implementatio
 
 ## FE-03: Simple onboarding
 
-Four screens, one decision per screen, compact progress indicator, Back and Continue controls. Keep answers while navigating and after a failed save. Use the existing Spotter white/light-blue palette and Barlow typography.
+Four screens, one decision per screen, compact progress indicator, Back and Continue controls. Keep answers while navigating and after a failed save. Use the existing SteadyForum white/light-blue palette and Barlow typography.
 
 ### 1. Goals
 

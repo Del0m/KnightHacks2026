@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#stage{height:100%;width:100%;margin:0;overflow:hidden;background:transparent}canvas{display:block;touch-action:none;opacity:0;transition:opacity .6s ease;mask-image:linear-gradient(to bottom,transparent,#000 14px,#000 calc(100% - 14px),transparent),linear-gradient(to right,transparent,#000 14px,#000 calc(100% - 14px),transparent);mask-composite:intersect;-webkit-mask-composite:source-in}body.ready canvas{opacity:1}body.ready #status{display:none}#status{position:absolute;bottom:0;font:14px sans-serif;color:#4e6c7e}#pause{display:none}@media(prefers-reduced-motion:reduce){canvas{transition:none}}</style><script type="importmap">{"imports":{"three":"./three.module.js"}}</script></head><body><div id="stage"></div><div id="status" role="status">Loading figure…</div><button id="pause" hidden></button><script type="module">
-import * as THREE from 'three';import{OrbitControls}from'./OrbitControls.js';import{GLTFLoader}from'./GLTFLoader.js';import{createMovement}from'./movement.js';import{twistDelta,gestureKind}from'./twist.js';
+import * as THREE from 'three';import{OrbitControls}from'./OrbitControls.js';import{GLTFLoader}from'./GLTFLoader.js';import{createMovement}from'./movement.js';
 const native=Boolean(window.ReactNativeWebView);
 const stage=document.querySelector('#stage'),status=document.querySelector('#status'),buttons=[],pauseButton=document.querySelector('#pause');
 const scene=new THREE.Scene();
@@ -61,40 +61,38 @@ const focusBounds=new THREE.Box3();let animation=null,selected=null,movement=nul
 function notify(type,data={}){const message={type,...data};if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(message));else parent.postMessage(message,location.origin);}
 function resize(){const{width,height}=stage.getBoundingClientRect();renderer.setSize(width,height);renderer.getDrawingBufferSize(bufferSize);depthTarget.setSize(Math.max(1,bufferSize.x),Math.max(1,bufferSize.y));camera.aspect=width/height;camera.updateProjectionMatrix()}new ResizeObserver(resize).observe(stage);resize();
 controls.addEventListener('start',()=>{if(animation)animation.cameraCancelled=true});
-// Native model gestures use two fingers only. Lock the dominant gesture until
-// fingers lift so rotating cannot also pan or zoom due to touch jitter.
+// One finger scrolls the native page; two fingers only change viewing distance.
 if(native){
  controls.enabled=false;
- let start=null,previous=null,kind=null,scrollY=null;
+ let previousPair=null,scrollY=null;
  const pair=event=>event.touches.length===2?[...event.touches].sort((a,b)=>a.identifier-b.identifier).map(t=>({x:t.clientX,y:t.clientY})):null;
  const distance=p=>Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);
- renderer.domElement.addEventListener('touchstart',event=>{event.preventDefault();start=previous=pair(event);kind=null;scrollY=event.touches.length===1?event.touches[0].screenY:null;},{passive:false});
+ renderer.domElement.addEventListener('touchstart',event=>{event.preventDefault();previousPair=pair(event);scrollY=event.touches.length===1?event.touches[0].screenY:null;},{passive:false});
  renderer.domElement.addEventListener('touchmove',event=>{
   event.preventDefault();
   if(event.touches.length===1){
    const y=event.touches[0].screenY;
    if(scrollY!==null)notify('spotter:model-scroll',{delta:Math.max(-160,Math.min(160,scrollY-y))});
-   scrollY=y;return;
+   scrollY=y;previousPair=null;return;
   }
   scrollY=null;const current=pair(event);
-  if(!current||!previous){start=previous=current;kind=null;return;}
-  kind??=gestureKind(start,current);
-  if(kind){
+  if(current&&previousPair&&distance(current)>8&&distance(previousPair)>8){
    if(animation)animation.cameraCancelled=true;
    const offset=camera.position.clone().sub(controls.target),orbit=new THREE.Spherical().setFromVector3(offset);
-   if(kind==='rotate')orbit.theta-=twistDelta(previous,current);
-   if(kind==='zoom')orbit.radius=THREE.MathUtils.clamp(orbit.radius*distance(previous)/distance(current),controls.minDistance,controls.maxDistance);
-   if(kind==='pan'){
-    const dx=(current[0].x+current[1].x-previous[0].x-previous[1].x)/2,dy=(current[0].y+current[1].y-previous[0].y-previous[1].y)/2;
-    const scale=2*orbit.radius*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/Math.max(1,renderer.domElement.clientHeight);
-    const pan=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0).multiplyScalar(-dx*scale).addScaledVector(new THREE.Vector3().setFromMatrixColumn(camera.matrix,1),dy*scale);
-    controls.target.add(pan);
-   }
+   orbit.radius=THREE.MathUtils.clamp(orbit.radius*distance(previousPair)/distance(current),controls.minDistance,controls.maxDistance);
    camera.position.copy(controls.target).add(offset.setFromSpherical(orbit));controls.update();
   }
-  previous=current;
+  previousPair=current;
  },{passive:false});
- for(const name of ['touchend','touchcancel'])renderer.domElement.addEventListener(name,event=>{start=previous=pair(event);kind=null;scrollY=null;});
+ for(const name of ['touchend','touchcancel'])renderer.domElement.addEventListener(name,event=>{previousPair=pair(event);scrollY=null;});
+}
+let rotationBase=new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)).theta;
+function rotate(degrees){
+ if(typeof degrees!=='number'||!Number.isFinite(degrees))return;
+ if(animation)animation.cameraCancelled=true;
+ const offset=camera.position.clone().sub(controls.target),orbit=new THREE.Spherical().setFromVector3(offset);
+ orbit.theta=rotationBase+THREE.MathUtils.degToRad(THREE.MathUtils.clamp(degrees,-180,180));
+ camera.position.copy(controls.target).add(offset.setFromSpherical(orbit));controls.update();
 }
 let statusMotion=null;
 function updateStatus(text){status.textContent=text;if(reduce.matches)return;statusMotion?.cancel();statusMotion=status.animate([{opacity:.3,transform:'translateY(3px)'},{opacity:1,transform:'translateY(0)'}],{duration:260,easing:'ease-out'});}
@@ -103,16 +101,17 @@ function select(id){
  buttons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.exercise===id)));
  pauseButton.hidden=!focus;pauseButton.textContent=reduce.matches?'Play movement':'Pause movement';
  if(reduce.matches&&movement.playing)movement.pause();
- const target=id==='curl'?new THREE.Vector3(.12,1.22,.08):id==='press'?new THREE.Vector3(0,1.35,0):new THREE.Vector3(0,.8,0);
+ const target=id==='curl'?new THREE.Vector3(.12,1.22,.08):id==='press'?new THREE.Vector3(0,1.35,0):id==='push_up'?new THREE.Vector3(0,.29,-.06):new THREE.Vector3(0,.8,0);
  focusBounds.setFromCenterAndSize(target,new THREE.Vector3(.3,.3,.3));
  const toTarget=focus?focusBounds.getCenter(new THREE.Vector3()):new THREE.Vector3(0,.84,0);
- const toPosition=focus?toTarget.clone().add(new THREE.Vector3(id==='curl'?.4:.65,.08,id==='curl'?1.95:2.9)):new THREE.Vector3(0,.93,2.9);
+ const toPosition=focus?toTarget.clone().add(new THREE.Vector3(id==='push_up'?2.2:id==='lunge'?1.55:id==='curl'?.4:.65,id==='push_up'?.72:.08,id==='curl'?1.95:id==='push_up'?2.3:2.9)):new THREE.Vector3(0,.93,2.9);
  const fromOrbit=new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
  const toOrbit=new THREE.Spherical().setFromVector3(toPosition.clone().sub(toTarget));
+ rotationBase=toOrbit.theta;
  // Follow the shorter arc, including when the user manually rotated the body.
  toOrbit.theta=fromOrbit.theta+Math.atan2(Math.sin(toOrbit.theta-fromOrbit.theta),Math.cos(toOrbit.theta-fromOrbit.theta));
  animation={started:performance.now(),duration:focus?900:720,fromTarget:controls.target.clone(),toTarget,fromOrbit,toOrbit,fromGlow:glowUniform.value,toGlow:focus?1:0,cameraCancelled:false};
- updateStatus(focus?({curl:'Bicep curl',squat:'Squat',press:'Shoulder press'}[id]+' — movement preview'):'Whole body — drag to explore');
+ updateStatus(focus?({curl:'Bicep curl',squat:'Squat',press:'Shoulder press',push_up:'Push-up',lunge:'Lunge'}[id]+' — movement preview'):'Whole body — drag to explore');
 }
 buttons.forEach(button=>button.onclick=()=>select(button.dataset.exercise));
 pauseButton.onclick=()=>{const playing=movement.pause();pauseButton.textContent=playing?'Pause movement':'Resume movement';};
@@ -122,7 +121,7 @@ const orbit=new THREE.Spherical(),offset=new THREE.Vector3();
 renderer.setAnimationLoop(()=>{
  if(!active){previous=performance.now();return;}
  const now=performance.now(),dt=Math.min((now-previous)/1000,.05);previous=now;
- if(movement){movement.update(dt,reduce.matches&& !movement.playing);const bones=movement.bones;const start=selected==='squat'?'upperleg01.L':'upperarm01.L',end=selected==='squat'?'lowerleg01.L':'lowerarm01.L';bones[start].getWorldPosition(armStart.value);bones[end].getWorldPosition(armEnd.value);bones[start.replace('.L','.R')].getWorldPosition(armStartR.value);bones[end.replace('.L','.R')].getWorldPosition(armEndR.value);if(selected==='press'){armEnd.value.lerp(armStart.value,.65);armEndR.value.lerp(armStartR.value,.65);}}
+ if(movement){movement.update(dt,reduce.matches&& !movement.playing);const bones=movement.bones;const legs=selected==='squat'||selected==='lunge';const start=legs?'upperleg01.L':'upperarm01.L',end=legs?'lowerleg01.L':'lowerarm01.L';bones[start].getWorldPosition(armStart.value);bones[end].getWorldPosition(armEnd.value);bones[start.replace('.L','.R')].getWorldPosition(armStartR.value);bones[end.replace('.L','.R')].getWorldPosition(armEndR.value);if(selected==='press'){armEnd.value.lerp(armStart.value,.65);armEndR.value.lerp(armStartR.value,.65);}if(selected==='push_up'){bones['spine03'].getWorldPosition(armStart.value);bones['spine01'].getWorldPosition(armEnd.value);armStartR.value.copy(armStart.value);armEndR.value.copy(armEnd.value);armStart.value.x=.11;armEnd.value.x=.11;armStartR.value.x=-.11;armEndR.value.x=-.11;}}
  shimmerUniform.value=reduce.matches?0:now/1000;
  if(animation){
   const t=reduce.matches?1:Math.min((now-animation.started)/animation.duration,1);
@@ -147,7 +146,8 @@ renderer.setAnimationLoop(()=>{
 
 function receive(data){
  if(!movement)return;
- if(data?.type==='spotter:select'&&[null,'curl','squat','press'].includes(data.id))select(data.id);
+ if(data?.type==='spotter:select'&&[null,'curl','squat','press','push_up','lunge'].includes(data.id))select(data.id);
+ if(data?.type==='spotter:rotate')rotate(data.degrees);
  if(data?.type==='spotter:pause'&&typeof data.playing==='boolean'&&movement.playing!==data.playing)movement.pause();
  if(data?.type==='spotter:active'&&typeof data.active==='boolean'){active=data.active;if(!active&&movement.playing)movement.pause();}
  if(data?.type==='spotter:motion'&&typeof data.reduced==='boolean')nativeReduced=data.reduced;

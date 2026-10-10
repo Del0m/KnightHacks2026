@@ -1,8 +1,13 @@
-export type ExerciseId = 'curl' | 'squat' | 'press';
+export type ExerciseId = 'curl' | 'squat' | 'press' | 'push_up' | 'lunge';
 export const exercises = [
   { id: 'curl' as const, name: 'Bicep curl', muscles: 'Biceps', sets: 3, reps: 12, equipment: 'Dumbbells' },
   { id: 'squat' as const, name: 'Squat', muscles: 'Quads · glutes', sets: 3, reps: 10, equipment: 'Bodyweight' },
   { id: 'press' as const, name: 'Shoulder press', muscles: 'Shoulders', sets: 3, reps: 10, equipment: 'Dumbbells' },
+];
+export const practiceExercises = [
+  ...exercises,
+  { id: 'push_up' as const, name: 'Push-up', muscles: 'Chest · triceps', equipment: 'Bodyweight' },
+  { id: 'lunge' as const, name: 'Lunge', muscles: 'Quads · glutes', equipment: 'Bodyweight' },
 ];
 export type WorkoutDetailSet = { exercise_id: string; reps: number; goodReps?: number; note?: string; medal?: 'gold' | 'silver' | 'bronze' };
 export type Workout = { id: string; day: string; finishedAt: string; sets: number; reps: number; minutes: number; details?: WorkoutDetailSet[] };
