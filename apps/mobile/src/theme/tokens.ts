@@ -14,3 +14,11 @@ export const typography = {
 export function useTheme() {
   return { scheme: 'light' as const, colors, spacing, radius, typography };
 }
+
+export const tabAccents = [
+  { color: colors.primary, glass: 'rgba(197,231,250,0.65)' },
+  { color: '#5D73BB', glass: 'rgba(211,221,250,0.65)' },
+  { color: '#8463B3', glass: 'rgba(227,214,249,0.65)' },
+  { color: '#A75B97', glass: 'rgba(243,214,237,0.65)' },
+  { color: '#B64F70', glass: 'rgba(250,215,225,0.65)' },
+] as const;

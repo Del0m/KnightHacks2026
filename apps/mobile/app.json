@@ -46,7 +46,14 @@
       "./plugins/withPoseModels",
       "expo-router",
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose a photo for your Spotter profile.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "scheme": "spotter"
   }
