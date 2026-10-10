@@ -379,7 +379,9 @@ export async function buildExportSession(
           end_ms: r.endMs ?? null,
           tempo_ms: r.tempoMs,
           range_deg: r.rangeDeg,
-          quality: r.quality ?? (r.clean ? 1 : 0),
+          quality: flagRows.some((f) => f.repId === r.id && f.ruleId === "manual_unscored")
+            ? null
+            : (r.quality ?? (r.clean ? 1 : 0)),
           flags: flagRows
             .filter((f) => f.repId === r.id)
             .map((f) => ({ rule_id: f.ruleId, severity: f.severity })),

@@ -8,6 +8,8 @@
 //
 // Safety: it only reads DEMO_DATABASE_URL, never DATABASE_URL, so it can't wipe your dev branch.
 // Set DEMO_PRESENTER_USER_ID to your Neon Auth user id to seed the presenter's own account too.
+import seedUserIds from "../../../data/demo-user-ids.json";
+import { pseudonymize } from "../src/integrations/databricks/upload.js";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { sql } from "drizzle-orm";
@@ -153,6 +155,7 @@ export interface SeedOptions {
   seed?: number;
   users?: number;
   presenterUserId?: string;
+  pseudonymSecret?: string;
 }
 
 export interface SeedSummary {
@@ -178,7 +181,13 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
 
   const now = options.now ?? new Date();
   const start = new Date(now.getTime() - WEEKS * 7 * DAY);
-  const userCount = options.users ?? 30;
+  const userCount = options.users ?? seedUserIds.length;
+  if (!Number.isInteger(userCount) || userCount < 1 || userCount > seedUserIds.length)
+    throw new Error(`users must be between 1 and ${seedUserIds.length}`);
+
+  if (options.presenterUserId && seedUserIds.slice(1, userCount).includes(options.presenterUserId)) {
+    throw new Error("Presenter id duplicates another demo user");
+  }
 
   // ---- Lifters ----
   const users: Insert<typeof schema.users>[] = [];
@@ -196,10 +205,7 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
   }[] = [];
 
   for (let i = 0; i < userCount; i++) {
-    const id =
-      i === 0 && options.presenterUserId
-        ? options.presenterUserId
-        : `demo-user-${String(i + 1).padStart(2, "0")}`;
+    const id = i === 0 && options.presenterUserId ? options.presenterUserId : seedUserIds[i]!;
     const gym = GYMS[i % GYMS.length]!;
     const r = rand();
     const level = r < 0.6 ? "beginner" : r < 0.9 ? "intermediate" : "advanced";
@@ -212,7 +218,11 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
     const goals = sample(injury ? ["rehab", ...GOAL_TAGS] : GOAL_TAGS, int(1, 3));
     const autoPost = i === 0 || rand() < 0.6;
 
-    users.push({ id, handle });
+    users.push({
+      id,
+      handle,
+      pseudonym: options.pseudonymSecret ? pseudonymize(id, options.pseudonymSecret) : null,
+    });
     profiles.push({
       userId: id,
       displayName: `${FIRST[i % FIRST.length]} ${String.fromCharCode(65 + (i % 26))}.`,
@@ -576,7 +586,10 @@ async function main() {
   const { db, close } = createNeonDb(url);
   try {
     console.log(`Resetting and seeding ${new URL(url).host} ...`);
-    const summary = await seedDemo(db, { presenterUserId: process.env.DEMO_PRESENTER_USER_ID || undefined });
+    const summary = await seedDemo(db, {
+      presenterUserId: process.env.DEMO_PRESENTER_USER_ID || undefined,
+      pseudonymSecret: process.env.SPOTTER_PSEUDONYM_SECRET,
+    });
     console.log("Seeded:", summary);
   } finally {
     await close();

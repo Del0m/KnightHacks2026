@@ -50,7 +50,7 @@ export function syncConfigFromEnv(env = process.env): SyncConfig {
     scopes: env.DATABRICKS_OAUTH_SCOPES || "all-apis",
     warehouseId: env.DATABRICKS_WAREHOUSE_ID!,
     pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET!,
-    lookbackDays: Number(env.SYNC_LOOKBACK_DAYS) || 35,
+    lookbackDays: Number(env.SYNC_LOOKBACK_DAYS) || 49,
   };
 }
 
@@ -197,8 +197,9 @@ async function inBatches<T>(rows: T[], write: (batch: T[]) => Promise<void>) {
 
 export async function upsertProgress(db: Db, rows: (ProgressRow & { neon_user_id: string })[]) {
   await inBatches(rows, (b) =>
-    db.query(
-      `INSERT INTO progress_daily (user_id, date, exercise_id, sets, reps, clean_reps, clean_share,
+    db
+      .query(
+        `INSERT INTO progress_daily (user_id, date, exercise_id, sets, reps, clean_reps, clean_share,
                                    volume_kg, avg_range_deg, avg_quality, est_1rm_kg, is_pr, synced_at)
        SELECT *, now() FROM unnest($1::text[], $2::date[], $3::text[], $4::int[], $5::int[], $6::int[],
                                    $7::real[], $8::real[], $9::real[], $10::real[], $11::real[], $12::boolean[])
@@ -207,43 +208,46 @@ export async function upsertProgress(db: Db, rows: (ProgressRow & { neon_user_id
          clean_share = EXCLUDED.clean_share, volume_kg = EXCLUDED.volume_kg,
          avg_range_deg = EXCLUDED.avg_range_deg, avg_quality = EXCLUDED.avg_quality,
          est_1rm_kg = EXCLUDED.est_1rm_kg, is_pr = EXCLUDED.is_pr, synced_at = now()`,
-      [
-        b.map((r) => r.neon_user_id),
-        b.map((r) => r.date),
-        b.map((r) => r.exercise_id),
-        b.map((r) => num(r.sets)),
-        b.map((r) => num(r.reps)),
-        b.map((r) => num(r.clean_reps)),
-        b.map((r) => num(r.clean_share)),
-        b.map((r) => num(r.volume_kg)),
-        b.map((r) => num(r.avg_range_deg)),
-        b.map((r) => num(r.avg_quality)),
-        b.map((r) => num(r.est_1rm_kg)),
-        b.map((r) => r.is_pr ?? null),
-      ],
-    ).then(() => undefined),
+        [
+          b.map((r) => r.neon_user_id),
+          b.map((r) => r.date),
+          b.map((r) => r.exercise_id),
+          b.map((r) => num(r.sets)),
+          b.map((r) => num(r.reps)),
+          b.map((r) => num(r.clean_reps)),
+          b.map((r) => num(r.clean_share)),
+          b.map((r) => num(r.volume_kg)),
+          b.map((r) => num(r.avg_range_deg)),
+          b.map((r) => num(r.avg_quality)),
+          b.map((r) => num(r.est_1rm_kg)),
+          b.map((r) => r.is_pr ?? null),
+        ],
+      )
+      .then(() => undefined),
   );
 }
 
 export async function upsertRisk(db: Db, rows: (RiskRow & { neon_user_id: string })[]) {
   await inBatches(rows, (b) =>
-    db.query(
-      `INSERT INTO risk_insights (user_id, body_part, as_of, score, explanation, top_features, synced_at)
+    db
+      .query(
+        `INSERT INTO risk_insights (user_id, body_part, as_of, score, explanation, top_features, synced_at)
        SELECT user_id, body_part, as_of, score, explanation, top_features::jsonb, now()
        FROM unnest($1::text[], $2::text[], $3::date[], $4::real[], $5::text[], $6::text[])
          AS t(user_id, body_part, as_of, score, explanation, top_features)
        ON CONFLICT (user_id, body_part, as_of) DO UPDATE SET
          score = EXCLUDED.score, explanation = EXCLUDED.explanation,
          top_features = EXCLUDED.top_features, synced_at = now()`,
-      [
-        b.map((r) => r.neon_user_id),
-        b.map((r) => r.body_part),
-        b.map((r) => r.date),
-        b.map((r) => Number(r.score)),
-        b.map((r) => explainRisk(r.body_part, r.top_features ?? [])),
-        b.map((r) => JSON.stringify(r.top_features ?? [])),
-      ],
-    ).then(() => undefined),
+        [
+          b.map((r) => r.neon_user_id),
+          b.map((r) => r.body_part),
+          b.map((r) => r.date),
+          b.map((r) => Number(r.score)),
+          b.map((r) => explainRisk(r.body_part, r.top_features ?? [])),
+          b.map((r) => JSON.stringify(r.top_features ?? [])),
+        ],
+      )
+      .then(() => undefined),
   );
 }
 
@@ -297,12 +301,19 @@ export interface SyncResult {
   ms: number;
 }
 
-export async function runInsightSync({ db, config, read = readGold, log = console }: SyncDeps): Promise<SyncResult> {
+export async function runInsightSync({
+  db,
+  config,
+  read = readGold,
+  log = console,
+}: SyncDeps): Promise<SyncResult> {
   const started = Date.now();
   const gold = await read(config, log);
 
   const users = await rowsOf<{ id: string }>(db, "SELECT id FROM users");
-  const byPseudonym = new Map(users.map((u) => [pseudonymize(String(u.id), config.pseudonymSecret), String(u.id)]));
+  const byPseudonym = new Map(
+    users.map((u) => [pseudonymize(String(u.id), config.pseudonymSecret), String(u.id)]),
+  );
 
   let skipped = 0;
   const resolve = <T extends { user_id: string }>(rows: T[]) =>
@@ -340,8 +351,10 @@ export function startInsightSync(deps: SyncDeps, intervalMs = SYNC_INTERVAL_MS):
     running = true;
     try {
       const r = await runInsightSync(deps);
-      log.info(`[insights] synced ${r.progress} progress, ${r.risk} risk, ${r.rom} range-of-motion rows` +
-        ` (${r.skipped_unknown_users} rows for unknown users) in ${r.ms} ms`);
+      log.info(
+        `[insights] synced ${r.progress} progress, ${r.risk} risk, ${r.rom} range-of-motion rows` +
+          ` (${r.skipped_unknown_users} rows for unknown users) in ${r.ms} ms`,
+      );
     } catch (err) {
       // Leave Neon as it was; the next tick retries.
       log.error(`[insights] sync failed: ${err instanceof Error ? err.message : String(err)}`);

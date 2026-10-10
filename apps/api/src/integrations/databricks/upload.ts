@@ -35,7 +35,7 @@ export interface FinishedRep {
   end_ms: number | null;
   tempo_ms: number;
   range_deg: number;
-  quality: number;
+  quality: number | null;
   flags: { rule_id: string; severity: string }[];
 }
 
@@ -70,6 +70,7 @@ export interface FinishedSession {
 export type ExportStatus = "pending" | "uploading" | "exported" | "failed";
 
 export interface ExportStatusStore {
+  claim?(sessionId: string): Promise<boolean>;
   set(sessionId: string, status: ExportStatus, error?: string): Promise<void>;
 }
 
@@ -232,7 +233,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function isRetryable(err: unknown): boolean {
   if (err instanceof NonRetryableError) return false;
-  if (err instanceof HttpError) return err.status === 401 || err.status === 408 || err.status === 429 || err.status >= 500;
+  if (err instanceof HttpError)
+    return err.status === 401 || err.status === 408 || err.status === 429 || err.status >= 500;
   return true; // network errors, timeouts
 }
 
@@ -254,7 +256,11 @@ export class DatabricksUploader {
 
   /** Uploads a finished session and records the outcome in Neon. Never throws. */
   async exportSession(session: FinishedSession): Promise<ExportStatus> {
-    await this.status.set(session.id, "uploading");
+    if (this.status.claim) {
+      if (!(await this.status.claim(session.id))) return "uploading";
+    } else {
+      await this.status.set(session.id, "uploading");
+    }
 
     let lastError: unknown;
     for (let attempt = 1; attempt <= this.config.maxAttempts; attempt++) {
@@ -269,8 +275,9 @@ export class DatabricksUploader {
 
         const backoff = this.config.baseDelayMs * 2 ** (attempt - 1);
         const jitter = Math.random() * this.config.baseDelayMs;
-        const retryAfter = err instanceof HttpError ? err.retryAfterMs ?? 0 : 0;
-        await sleep(Math.max(backoff + jitter, retryAfter));
+        const retryAfter = err instanceof HttpError ? (err.retryAfterMs ?? 0) : 0;
+        // Keep a configured five-attempt run inside the 15-minute export lease.
+        await sleep(Math.min(60_000, Math.max(backoff + jitter, retryAfter)));
       }
     }
 

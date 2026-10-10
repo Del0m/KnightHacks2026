@@ -5,6 +5,7 @@ import { neon } from "@neondatabase/serverless";
 import { databricksConfigured, insightSyncConfigured, loadEnv } from "./env.js";
 import { DatabricksUploader, uploadConfigFromEnv } from "./integrations/databricks/upload.js";
 import { Moderator as LlamaGuard, moderationConfigFromEnv } from "./integrations/huggingface/moderation.js";
+import { startExportRetry } from "./jobs/retryExports.js";
 import { startInsightSync, syncConfigFromEnv } from "./jobs/syncInsights.js";
 import { neonAuthVerifier } from "./middleware/auth.js";
 import { PoseEndpointClient, poseEndpointConfigFromEnv } from "./integrations/huggingface/poseEndpoint.js";
@@ -31,12 +32,16 @@ const logger = pino({ level: env.LOG_LEVEL });
 
 const { db, close } = createNeonDb(env.DATABASE_URL);
 
-const exportQueue = databricksConfigured(env)
+const databricksQueue = databricksConfigured(env)
   ? databricksExportQueue(
       new DatabricksUploader(uploadConfigFromEnv(), drizzleExportStatusStore(db), fetch, logger),
       logger,
     )
-  : disabledExportQueue(logger);
+  : null;
+const exportQueue = databricksQueue ?? disabledExportQueue(logger);
+const stopExportRetry = databricksQueue
+  ? startExportRetry({ db, queue: databricksQueue, log: logger })
+  : () => {};
 
 // CONN-09: Llama Guard on posts and comments.
 const moderator = env.HF_TOKEN
@@ -100,6 +105,7 @@ const stopPoseStream = poseEndpoint
 function shutdown(signal: string) {
   logger.info({ signal }, "shutting down");
   stopInsightSync();
+  stopExportRetry();
   stopPoseStream();
   server.close(() => {
     close().finally(() => process.exit(0));
