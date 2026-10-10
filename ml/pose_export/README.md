@@ -56,7 +56,9 @@ HF_TOKEN=hf_... uv run --group publish push_to_hub.py --skip-form   # pose only,
 The form model lives in Databricks Unity Catalog, so publish it from the Databricks job
 (`push_to_hub.job.json`): import `push_to_hub.py` and `export.py` into one workspace folder, set
 `<workspace-folder>` in the job file, and store a Hub write token as the secret
-`spotter/hf_write_token`. Run the job after retraining the form model.
+`spotter/hf_write_token`. Run the job after retraining the form model. The job passes `--skip-pose`:
+importing Ultralytics' OpenCV crashes Databricks serverless compute, so publish the pose models from a
+Mac with `--skip-form` (that's also the only place the Core ML models can be run before upload).
 
 ## Tests
 
