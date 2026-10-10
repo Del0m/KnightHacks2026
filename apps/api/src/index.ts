@@ -43,9 +43,12 @@ const stopExportRetry = databricksQueue
   ? startExportRetry({ db, queue: databricksQueue, log: logger })
   : () => {};
 
-// CONN-09: Llama Guard on posts and comments.
+// CONN-07: gpt-oss chain, shared by rest notes and the threats/harassment check.
+const llm = env.HF_TOKEN ? new HfLlm(llmConfigFromEnv()) : null;
+
+// CONN-09: Llama Guard plus the threats/harassment check on posts and comments.
 const moderator = env.HF_TOKEN
-  ? llamaGuardModerator(new LlamaGuard(moderationConfigFromEnv(), undefined, logger))
+  ? llamaGuardModerator(new LlamaGuard(moderationConfigFromEnv(), undefined, logger, llm))
   : allowAllModerator;
 if (!env.HF_TOKEN) logger.warn("HF_TOKEN is not set; posts and comments are not moderated");
 
@@ -61,7 +64,7 @@ const scoringConfigured = Boolean(
 );
 const rest = {
   scorer: scoringConfigured ? new DatabricksScorer(scoreConfigFromEnv(env), fetch, logger) : null,
-  notes: new RestNoteWriter(env.HF_TOKEN ? new HfLlm(llmConfigFromEnv()) : null, logger),
+  notes: new RestNoteWriter(llm, logger),
 };
 
 const verifyToken = neonAuthVerifier(env.NEON_AUTH_JWKS_URL, {
