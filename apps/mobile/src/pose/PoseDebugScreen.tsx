@@ -10,10 +10,27 @@ import { EXERCISE_SPECS } from '../engine/specs';
 import { useFormEngine } from '../engine/useFormEngine';
 import { useFormRules } from '../engine/useFormRules';
 import { restNote } from '../engine/rules';
+import type { ExerciseSpec, RepResult } from '../engine/types';
 import { createPoseClock } from '../engine/poseClock';
 import { createClipRecorder } from '../engine/recording';
 
 type Size = { width: number; height: number };
+
+/** `rule value op limit` for each flagged rule, e.g. `tempo 0.6s < 0.8s`; durations in seconds. */
+function describeFlags(spec: ExerciseSpec, rep: RepResult): string {
+  const flagged = rep.outcomes.filter((o) => o.status === 'flag');
+  if (flagged.length === 0) return 'clean';
+  return flagged
+    .map((o) => {
+      const rule = spec.rules.find((r) => r.id === o.rule_id);
+      const isTime = rule?.check.metric === 'duration_ms';
+      const fmt = (v: number) => (isTime ? `${(v / 1000).toFixed(1)}s` : v.toFixed(Math.abs(v) < 10 ? 2 : 0));
+      // The check failed, so the value sits on the wrong side of the rule's op.
+      const op = { '<=': '>', '<': '>=', '>=': '<', '>': '<=' }[rule?.check.op ?? '<='];
+      return `${o.rule_id} ${o.value === null ? '–' : fmt(o.value)} ${op} ${fmt(o.threshold)}`;
+    })
+    .join(', ');
+}
 
 /** The portrait app shows frames upright, so the short side is the width. */
 const uprightSize = (r: Size | undefined): Size | null =>
@@ -215,9 +232,7 @@ function LiveCamera({ poseMode, position, setPosition }: {
           </Text>
           <Text style={styles.readoutText} testID="pose-rules-readout">
             {rules.lastRep
-              ? `rep ${rules.lastRep.rep_index + 1} (${rules.lastRep.view}): ${
-                  rules.lastRep.flags.map((f) => f.rule_id).join(', ') || 'clean'
-                }`
+              ? `rep ${rules.lastRep.rep_index + 1} (${rules.lastRep.view}): ${describeFlags(spec, rules.lastRep)}`
               : 'no rep yet'}
           </Text>
           {rules.summary ? (
@@ -273,6 +288,12 @@ function LiveCamera({ poseMode, position, setPosition }: {
         </Pressable>
       ) : null}
 
+      {form.ended ? null : (
+        <Pressable testID="pose-set-end" style={[styles.button, styles.endSet]} onPress={form.endSet}>
+          <Text style={styles.buttonText}>End set</Text>
+        </Pressable>
+      )}
+
       <Pressable testID="pose-record-toggle" style={[styles.button, styles.record]} onPress={toggleRecording}>
         <Text style={styles.buttonText}>{recording ? 'Stop and share clip' : 'Record clip'}</Text>
       </Pressable>
@@ -306,5 +327,6 @@ const styles = StyleSheet.create({
   exercise: { position: 'absolute', bottom: 288, alignSelf: 'center' },
   record: { position: 'absolute', bottom: 348, alignSelf: 'center' },
   newSet: { position: 'absolute', bottom: 408, alignSelf: 'center' },
+  endSet: { position: 'absolute', bottom: 468, alignSelf: 'center' },
   buttonText: { color: '#000', fontSize: 16, fontWeight: '600' },
 });
