@@ -1,6 +1,6 @@
 // AI-13: the AI-suggested first answer to an advice question (Architecture §10.2).
 // Behaviour: docs/superpowers/specs/2026-10-10-advice-answer-design.md
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -452,6 +452,7 @@ describe("reputable sources", () => {
     "https://medlineplus.gov/sprainsandstrains.html",
     "https://my.clevelandclinic.org/health/articles/knee",
     "https://orthoinfo.aaos.org/en/recovery/knee-exercises/",
+    "https://www.orthoinfo.org/en/recovery/knee-conditioning-program/",
     "https://github.com/yuhonas/free-exercise-db",
     "https://raw.githubusercontent.com/yuhonas/free-exercise-db/0123abc/dist/exercises.json",
   ];
@@ -509,17 +510,6 @@ describe("reputable sources", () => {
   it("cites only allowed sites in the sample fixture", () => {
     for (const s of samples.sources) {
       if (s.kind !== "community_answer") expect(isReputableUrl(s.url ?? ""), s.id).toBe(true);
-    }
-  });
-
-  it("cites only allowed sites in the injury notes (rag/notes)", () => {
-    const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../rag/notes");
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md"))) {
-      const raw = readFileSync(path.join(dir, file), "utf8");
-      const line = raw.split("\n").find((l) => l.startsWith("sources:"));
-      const urls = JSON.parse(line?.slice("sources:".length) ?? "[]") as string[];
-      expect(urls.length, file).toBeGreaterThan(0);
-      for (const url of urls) expect(isReputableUrl(url), `${file}: ${url}`).toBe(true);
     }
   });
 });

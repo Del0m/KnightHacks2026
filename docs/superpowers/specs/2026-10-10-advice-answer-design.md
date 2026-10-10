@@ -64,9 +64,13 @@ export class AdviceWriter {
 
 `isReputableUrl(url)` is true only for `https:` URLs whose host is, or is a subdomain of, one of `REPUTABLE_SOURCE_HOSTS`, or that start with `https://github.com/yuhonas/free-exercise-db` or `https://raw.githubusercontent.com/yuhonas/free-exercise-db/` (free-exercise-db: technique only, public domain, chosen in §10.1). Hosts: public health bodies and national professional bodies, plus major academic medical centres:
 
-`nhs.uk`, `nhsinform.scot`, `nih.gov`, `medlineplus.gov`, `cdc.gov`, `who.int`, `orthoinfo.aaos.org`, `acsm.org`, `choosept.com`, `csp.org.uk`, `mayoclinic.org`, `clevelandclinic.org`, `hopkinsmedicine.org`, `health.harvard.edu`.
+`nhs.uk`, `nhsinform.scot`, `nih.gov`, `medlineplus.gov`, `cdc.gov`, `who.int`, `orthoinfo.aaos.org`, `orthoinfo.org` (AAOS OrthoInfo's current host), `acsm.org`, `choosept.com`, `csp.org.uk`, `mayoclinic.org`, `clevelandclinic.org`, `hopkinsmedicine.org`, `health.harvard.edu`.
 
-Every URL in `rag/notes/*.md` front matter and every library source in the sample fixture must pass it (tested).
+Every library source in the sample fixture must pass it (tested).
+
+## Injury note format (rag/notes, CONN-08)
+
+Each `## section` starts with a `Sources:` line: comma-separated URLs that support that section, every one passing `isReputableUrl`, or `Sources: team guidance` for content no reputable page states (programming details the team wrote). There are no note-level sources. `parseNote` throws on a section without the line. `noteChunks` puts the section's own URLs in `metadata.sources` and `metadata.team_guidance`, and leaves the line out of the content. BE-11 maps a chunk to an `AdviceSource` with `url = metadata.sources[0]`, so a team-guidance chunk has no URL and the writer drops it: it is never cited as if a health body said it (the planner can still use it). Each note ends with a sourced `## When to get checked` section (red flags from NHS / AAOS), and has more sourced sections than team guidance. A rewritten note is `reviewed: false` until a person signs it off; ingest skips unreviewed notes unless run with drafts.
 
 ## Pain and acute red flags (`acuteSignals`)
 
