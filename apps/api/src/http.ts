@@ -33,14 +33,16 @@ export function send(res: Response, body: unknown, status = 200): void {
   res.status(status).json(toSnake(body));
 }
 
-// A calendar date as YYYY-MM-DD. Checked by round trip, because Date.parse rolls impossible
-// dates like 2026-02-31 over into March instead of rejecting them (Postgres then would, as a 500).
+// A calendar date as YYYY-MM-DD that PostgreSQL will also accept. Checked by round trip, because
+// Date.parse rolls impossible dates like 2026-02-31 over into March instead of rejecting them, and
+// from year 0001, because JavaScript has a year 0000 and PostgreSQL doesn't. Either would otherwise
+// reach the database and come back as a 500.
 export const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD")
   .refine((d) => {
     const parsed = new Date(`${d}T00:00:00Z`);
-    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === d;
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === d && d >= "0001-01-01";
   }, "not a real date");
 
 export function parse<S extends ZodTypeAny>(schema: S, input: unknown): z.infer<S> {

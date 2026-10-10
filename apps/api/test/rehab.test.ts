@@ -10,7 +10,9 @@ import { loadSpecs } from "../src/services/exerciseSpecs.js";
 import {
   effectiveLimits,
   getPlan,
+  isTimeZone,
   localDate,
+  localDayBounds,
   REHAB_DISCLAIMER,
   todaysSession,
 } from "../src/services/rehab.js";
@@ -172,6 +174,7 @@ describe("BE-15 plans", () => {
     expect((await post({ ...ok, reps: 2.5 })).status).toBe(400);
     expect((await post(ok, { review_on: "2026-09-01" })).status).toBe(400);
     expect((await post(ok, { start_on: "2026-02-31" })).status).toBe(400);
+    expect((await post(ok, { start_on: "0000-01-01" })).status).toBe(400); // no year zero in PostgreSQL
     expect((await post({ ...ok, sneaky: true })).status).toBe(400);
 
     // Nothing was saved by the rejected requests.
@@ -430,6 +433,77 @@ describe("BE-15 start dates and time zones (PR #113 review)", () => {
     const exported = t.queue.sessions.find((s) => s.id === id)!;
     expect(exported.injury_groups).toEqual(["knee:right"]);
     expect(exported.rehab_start_on).toBeNull();
+  });
+});
+
+describe("time zones (PR #113 second review)", () => {
+  it("accepts IANA names and refuses raw UTC offsets, which engines read with opposite signs", () => {
+    for (const tz of ["UTC", "America/New_York", "Asia/Kolkata", "Etc/GMT-1"])
+      expect(isTimeZone(tz)).toBe(true);
+    for (const tz of ["+01:00", "-0530", "+01", "-05", "Mars/Olympus", ""])
+      expect(isTimeZone(tz)).toBe(false);
+  });
+
+  it("returns the user's local day as instants, including both DST changes", () => {
+    const iso = ({ start, end }: { start: Date; end: Date }) => [start.toISOString(), end.toISOString()];
+    expect(iso(localDayBounds("2026-10-10", "UTC"))).toEqual([
+      "2026-10-10T00:00:00.000Z",
+      "2026-10-11T00:00:00.000Z",
+    ]);
+    expect(iso(localDayBounds("2026-10-10", "America/New_York"))).toEqual([
+      "2026-10-10T04:00:00.000Z",
+      "2026-10-11T04:00:00.000Z",
+    ]);
+    expect(iso(localDayBounds("2026-10-10", "Asia/Kolkata"))).toEqual([
+      "2026-10-09T18:30:00.000Z",
+      "2026-10-10T18:30:00.000Z",
+    ]);
+    // New York's clocks go back on 2026-11-01 (a 25-hour day) and forward on 2026-03-08 (23 hours).
+    expect(iso(localDayBounds("2026-11-01", "America/New_York"))).toEqual([
+      "2026-11-01T04:00:00.000Z",
+      "2026-11-02T05:00:00.000Z",
+    ]);
+    expect(iso(localDayBounds("2026-03-08", "America/New_York"))).toEqual([
+      "2026-03-08T05:00:00.000Z",
+      "2026-03-09T04:00:00.000Z",
+    ]);
+  });
+
+  it("counts a set on the user's day east of UTC (the reviewer's +01:00 case, via an IANA zone)", async () => {
+    const api = await t.as("tz-east");
+    await api.post("/me/rehab-plans", kneePlan);
+    const { id } = (await api.post("/sessions")).body;
+    const set = (
+      await api.post(`/sessions/${id}/sets`, {
+        exercise_id: "squat",
+        reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
+      })
+    ).body;
+    // 23:30 UTC on the 10th is 00:30 on the 11th at UTC+1.
+    await t.db
+      .update(schema.sets)
+      .set({ createdAt: new Date("2026-10-10T23:30:00Z") })
+      .where(eq(schema.sets.id, set.id));
+
+    // Etc/GMT-1 is UTC+1 (IANA's sign is inverted, and both Intl and the zone database agree on it).
+    const east = await todaysSession(t.db, "tz-east", "Etc/GMT-1", new Date("2026-10-10T23:45:00Z"));
+    expect(east.date).toBe("2026-10-11");
+    expect(east.exercises.find((e) => e.exerciseId === "squat")?.setsDoneToday).toBe(1);
+    // The reviewer's exact call: the routes refuse "+01:00", but if it reaches the service anyway the
+    // count must agree with the date, because only Intl interprets the zone now (the database used
+    // to read it with the opposite sign and count 0).
+    const offset = await todaysSession(t.db, "tz-east", "+01:00", new Date("2026-10-10T23:45:00Z"));
+    expect(offset.date).toBe("2026-10-11");
+    expect(offset.exercises.find((e) => e.exerciseId === "squat")?.setsDoneToday).toBe(1);
+    const utc = await todaysSession(t.db, "tz-east", "UTC", new Date("2026-10-10T23:45:00Z"));
+    expect(utc.date).toBe("2026-10-10");
+    expect(utc.exercises.find((e) => e.exerciseId === "squat")?.setsDoneToday).toBe(1);
+
+    for (const tz of ["+01:00", "-0530"]) {
+      const res = await api.get(`/me/rehab-plans/active/today?tz=${encodeURIComponent(tz)}`);
+      expect(res.status).toBe(400);
+      expect((await api.get(`/me/limits?tz=${encodeURIComponent(tz)}`)).status).toBe(400);
+    }
   });
 });
 

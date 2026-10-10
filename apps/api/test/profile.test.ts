@@ -100,6 +100,7 @@ describe("injuries", () => {
     expect((await owner.post("/me/injuries", { body_part: "knee", since: "last week" })).status).toBe(400);
     // Impossible dates are a 400, not a database error.
     expect((await owner.post("/me/injuries", { body_part: "knee", since: "2026-02-31" })).status).toBe(400);
+    expect((await owner.post("/me/injuries", { body_part: "knee", since: "0000-01-01" })).status).toBe(400);
     expect((await owner.delete("/me/injuries/not-a-uuid")).status).toBe(400);
   });
 });

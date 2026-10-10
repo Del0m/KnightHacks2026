@@ -2,7 +2,7 @@
 //
 // Safety line (§1.1): the API stores what the user enters and never changes a physio's limits on
 // its own. Validation only rejects input the form engine couldn't apply; it never rewrites it.
-import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { HttpError, notFound } from "../http.js";
@@ -233,13 +233,66 @@ export async function effectiveLimits(db: Db, userId: string, today: string, tim
 
 // ---- GET /me/rehab-plans/active/today ----
 
+// An IANA zone name such as America/New_York or UTC. Intl also accepts raw offsets ("+01:00",
+// "-0530"), which other engines read with the opposite sign (PostgreSQL's AT TIME ZONE does), so
+// they're refused: the API promises IANA names, and the phone sends one.
+const UTC_OFFSET = /^[+-]\d{1,2}(:?\d{2})?$/;
+
 export function isTimeZone(tz: string): boolean {
+  if (UTC_OFFSET.test(tz)) return false;
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: tz });
     return true;
   } catch {
     return false;
   }
+}
+
+// Milliseconds the zone is ahead of UTC at instant `t` (negative west of Greenwich).
+function zoneOffsetMs(t: number, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(new Date(t))
+      .map((p) => [p.type, p.value]),
+  );
+  const wall = Date.UTC(
+    +parts.year!,
+    +parts.month! - 1,
+    +parts.day!,
+    +parts.hour!,
+    +parts.minute!,
+    +parts.second!,
+  );
+  return wall - Math.floor(t / 1000) * 1000;
+}
+
+// The instant local midnight starts `date` (YYYY-MM-DD) in `timeZone`. Two passes, so a DST change
+// between UTC midnight and local midnight lands on the right offset.
+function startOfLocalDay(date: string, timeZone: string): Date {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  const utcMidnight = Date.UTC(y, m - 1, d);
+  const first = utcMidnight - zoneOffsetMs(utcMidnight, timeZone);
+  return new Date(utcMidnight - zoneOffsetMs(first, timeZone));
+}
+
+/**
+ * The user's local day as a half-open range of instants [start, end). Worked out here with Intl so
+ * the database only compares timestamps and never interprets a zone itself. A DST day is 23 or 25
+ * hours long.
+ */
+export function localDayBounds(date: string, timeZone: string): { start: Date; end: Date } {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  const next = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  return { start: startOfLocalDay(date, timeZone), end: startOfLocalDay(next, timeZone) };
 }
 
 export function localDate(now: Date, timeZone: string): string {
@@ -256,6 +309,7 @@ export async function todaysSession(db: Db, userId: string, timeZone: string, no
   const plan = await activePlan(db, userId);
   if (!plan) throw notFound("Active rehab plan");
   const date = localDate(now, timeZone);
+  const day = localDayBounds(date, timeZone);
   const limits = await limitsFor(db, [plan.id]);
 
   const exerciseIds = [...new Set(limits.map((l) => l.exerciseId))];
@@ -272,7 +326,8 @@ export async function todaysSession(db: Db, userId: string, timeZone: string, no
           and(
             eq(sessions.userId, userId),
             inArray(sets.exerciseId, exerciseIds),
-            sql`(${sets.createdAt} at time zone ${timeZone})::date = ${date}::date`,
+            gte(sets.createdAt, day.start),
+            lt(sets.createdAt, day.end),
           ),
         )
         .groupBy(sets.exerciseId)
