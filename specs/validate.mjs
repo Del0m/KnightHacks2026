@@ -147,7 +147,7 @@ export function checkNote(text, banned, { placeholders = NOTE_PLACEHOLDERS } = {
   }
 
   for (const sentence of plain.split(/(?<=[.?!])\s+/)) {
-    const first = sentence.match(/^[^a-z{]*([a-z']+)/i)?.[1]?.toLowerCase();
+    const first = sentence.match(/^[^a-z{]*([a-z'-]+)/i)?.[1]?.toLowerCase();
     if (first && banned.imperative_openers.includes(first)) {
       problems.push(`sentence opens with imperative "${first}": "${sentence.trim()}"`);
     }

@@ -291,6 +291,10 @@ describe('checkNote', () => {
     ok('The stopwatch showed about 2 s on the way down.');
     ok('Badminton players often have strong shoulders.');
   });
+
+  test('a hyphenated opener is one word', () => {
+    ok('Push-ups put little load on the knees.');
+  });
 });
 
 describe('applyOverride', () => {
