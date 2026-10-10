@@ -22,9 +22,11 @@ export interface ClipRun {
   setEnd: EngineEvent & { type: 'set_ended' } | undefined;
 }
 
-/** Plays a clip through a fresh engine for its exercise, with the clip's image aspect. */
-export function runClip(clip: Clip, options: EngineOptions = {}): ClipRun {
-  const spec = getSpec(clip.exercise);
+/**
+ * Plays a clip through a fresh engine for its exercise, with the clip's image aspect. `spec` defaults
+ * to the base spec.
+ */
+export function runClip(clip: Clip, options: EngineOptions = {}, spec = getSpec(clip.exercise)): ClipRun {
   if (!spec) throw new Error(`unknown exercise ${clip.exercise}`);
   const engine = createFormEngine(spec, { imageAspect: clip.image.width / clip.image.height, ...options });
   const updates = clip.frames.map((f) => (isAbsentFrame(f) ? engine.pushAbsent(f.timestamp_ms) : engine.push(f)));

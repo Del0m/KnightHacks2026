@@ -1,7 +1,7 @@
 /// <reference types="node" />
 // Synthetic fixtures: committed JSON matches the generator, every clip is well formed, the
-// clean (noise-free) trajectories really contain the intended reps and partials, and the form
-// rules flag exactly the listed reps.
+// clean (noise-free) trajectories really contain the intended reps and partials, the form
+// rules flag exactly the listed reps, and the press rest clips need the primary gate.
 // `UPDATE_FIXTURES=1 npx jest src/engine/__tests__/fixtures.test.ts` rewrites the JSON.
 
 import fs from 'fs';
@@ -9,12 +9,13 @@ import path from 'path';
 
 import { JOINT_NAMES, isPoseResult, type PoseResult } from '../../pose/types';
 import { FIXTURES_DIR, loadFixtures } from '../__fixtures__/load';
-import { runClipRules } from '../__fixtures__/run';
+import { runClip, runClipRules } from '../__fixtures__/run';
 import { CLIP_DEFS, generateAll, generateClip, serializeClip, sortFlags } from '../__fixtures__/synth';
 import { applyInjuries } from '../overrides';
 import { isAbsentFrame, type Clip } from '../recording';
+import { STILL_BAND_DEG } from '../repCounter';
 import { getSpec } from '../specs';
-import type { ExerciseSpec, JointAngleSpec } from '../types';
+import type { ExerciseSpec, JointAngleSpec, PrimaryGate, SegmentTiltSpec } from '../types';
 
 const fileFor = (name: string) => path.join(FIXTURES_DIR, `${name}.json`);
 
@@ -23,11 +24,12 @@ if (process.env.UPDATE_FIXTURES === '1') {
 }
 
 describe('synthetic fixtures are up to date', () => {
-  it('has the thirteen listed clips', () => {
+  it('has the sixteen listed clips', () => {
     expect(CLIP_DEFS.map((d) => d.name).sort()).toEqual([
       'bicep_curl_clean', 'lunge_alternating', 'push_up_hip_sag', 'push_up_lockout', 'shoulder_press_clean',
-      'shoulder_press_cloud', 'squat_absent_end', 'squat_bounce_pause', 'squat_clean', 'squat_front_knees_in',
-      'squat_noisy', 'squat_off_form', 'squat_threshold_hover',
+      'shoulder_press_cloud', 'shoulder_press_cropped_wrists', 'shoulder_press_rest_positions', 'squat_absent_end',
+      'squat_bounce_pause', 'squat_clean', 'squat_front_knees_in', 'squat_noisy', 'squat_off_form',
+      'squat_still_mid', 'squat_threshold_hover',
     ]);
   });
 
@@ -96,6 +98,8 @@ describe('every fixture is well formed', () => {
 // Independent angle math for the sanity check (not the engine's angles.ts).
 
 const IDX = new Map(JOINT_NAMES.map((n, i) => [n, i]));
+/** Below this raw confidence the primary angle can't be read (the engine's default `minConfidence`). */
+const MIN_CONFIDENCE = 0.3;
 
 function point(r: PoseResult, name: string, side: 'left' | 'right', aspect: number) {
   const resolve = (n: string) => {
@@ -110,55 +114,94 @@ function point(r: PoseResult, name: string, side: 'left' | 'right', aspect: numb
   return resolve(IDX.has(name) ? name : `${side}_${name}`);
 }
 
-function sideAngle(r: PoseResult, spec: JointAngleSpec, side: 'left' | 'right', aspect: number) {
-  const [a, v, c] = spec.joints.map((n) => point(r, n, side, aspect));
-  const u = [a.X - v.X, a.Y - v.Y];
-  const w = [c.X - v.X, c.Y - v.Y];
-  const cos = (u[0] * w[0] + u[1] * w[1]) / (Math.hypot(u[0], u[1]) * Math.hypot(w[0], w[1]));
+const DEG = 180 / Math.PI;
+
+function sideAngle(r: PoseResult, spec: JointAngleSpec | SegmentTiltSpec, side: 'left' | 'right', aspect: number) {
+  const names = spec.type === 'joint_angle' ? spec.joints : [spec.from, spec.to];
+  const pts = names.map((n) => point(r, n, side, aspect));
+  let angle: number;
+  if (spec.type === 'joint_angle') {
+    const [a, v, c] = pts;
+    const u = [a.X - v.X, a.Y - v.Y];
+    const w = [c.X - v.X, c.Y - v.Y];
+    const cos = (u[0] * w[0] + u[1] * w[1]) / (Math.hypot(u[0], u[1]) * Math.hypot(w[0], w[1]));
+    angle = Math.acos(Math.max(-1, Math.min(1, cos))) * DEG;
+  } else {
+    const [from, to] = pts;
+    angle = Math.atan2(Math.abs(to.X - from.X), from.Y - to.Y) * DEG; // from image-up
+  }
   return {
-    angle: (Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI,
-    visibility: (a.c + v.c + c.c) / 3,
+    angle,
+    visibility: pts.reduce((sum, p) => sum + p.c, 0) / pts.length,
+    minC: Math.min(...pts.map((p) => p.c)),
   };
 }
 
-function primaryAngle(r: PoseResult, spec: ExerciseSpec, aspect: number): number {
-  const m = spec.angles[spec.primary_angle.name] as JointAngleSpec;
+/**
+ * A per-side angle metric with the spec's side mode. The primary angle is NaN when a point it uses is
+ * below `MIN_CONFIDENCE`.
+ */
+function metric(r: PoseResult, spec: ExerciseSpec, name: string, aspect: number): number {
+  const m = spec.angles[name] as JointAngleSpec | SegmentTiltSpec;
   const L = sideAngle(r, m, 'left', aspect);
   const R = sideAngle(r, m, 'right', aspect);
+  let used: (typeof L)[];
+  let value: number;
   switch (m.side ?? 'most_visible') {
-    case 'left': return L.angle;
-    case 'right': return R.angle;
-    case 'min': return Math.min(L.angle, R.angle);
-    case 'max': return Math.max(L.angle, R.angle);
-    case 'both_avg': return (L.angle + R.angle) / 2;
-    case 'most_visible': return R.visibility > L.visibility ? R.angle : L.angle;
+    case 'left': [used, value] = [[L], L.angle]; break;
+    case 'right': [used, value] = [[R], R.angle]; break;
+    case 'min': [used, value] = L.angle <= R.angle ? [[L], L.angle] : [[R], R.angle]; break;
+    case 'max': [used, value] = L.angle >= R.angle ? [[L], L.angle] : [[R], R.angle]; break;
+    case 'both_avg': [used, value] = [[L, R], (L.angle + R.angle) / 2]; break;
+    case 'most_visible': [used, value] = R.visibility > L.visibility ? [[R], R.angle] : [[L], L.angle]; break;
   }
+  const primary = name === spec.primary_angle.name;
+  return primary && used.some((u) => u.minC < MIN_CONFIDENCE) ? NaN : value;
 }
 
-/** Plain hysteresis count over the clean trajectory, with the deepest value of each attempt. */
-function countAttempts(values: { t: number; v: number }[], spec: ExerciseSpec) {
+/** How far the frame is past the primary gate's threshold: positive passes. +Infinity with no gate. */
+function gateMargin(r: PoseResult, gate: PrimaryGate | undefined, spec: ExerciseSpec, aspect: number): number {
+  if (!gate) return Infinity;
+  const v = metric(r, spec, gate.metric, aspect);
+  return gate.op === '<=' || gate.op === '<' ? gate.value - v : v - gate.value;
+}
+
+interface Attempt {
+  extreme: number;
+  counted: boolean;
+  topAfter: number;
+  /** Best gate margin on a frame within 5° of count_min or past it; -Infinity if it never got there. */
+  gate: number;
+}
+
+/**
+ * Plain hysteresis count over the clean trajectory, with the deepest value of each attempt. Like the
+ * engine, an attempt counts only once it is past count_min on a frame that passes the gate.
+ */
+function countAttempts(values: { t: number; v: number; gate: number }[], spec: ExerciseSpec) {
   const s = spec.primary_angle.direction === 'decreasing' ? 1 : -1;
   const p = spec.phases;
   const deeper = (v: number, x: number) => s * (x - v) > 0;
   const shallower = (v: number, x: number) => s * (v - x) > 0;
-  const attempts: { extreme: number; counted: boolean; topAfter: number }[] = [];
-  let open: { extreme: number; counted: boolean; topAfter: number } | null = null;
-  for (const { v } of values) {
+  const attempts: Attempt[] = [];
+  let open: Attempt | null = null;
+  for (const { v, gate } of values) {
     if (!open) {
       const last = attempts[attempts.length - 1];
       if (last && s * (last.topAfter - v) < 0) last.topAfter = v;
-      if (deeper(v, p.start_exit)) open = { extreme: v, counted: false, topAfter: v };
+      if (deeper(v, p.start_exit)) open = { extreme: v, counted: false, topAfter: v, gate: -Infinity };
       continue;
     }
     if (deeper(v, open.extreme)) open.extreme = v;
-    if (deeper(v, p.count_min)) open.counted = true;
+    if (s * (p.count_min - v) > -5) open.gate = Math.max(open.gate, gate);
+    if (deeper(open.extreme, p.count_min) && gate > 0) open.counted = true;
     if (shallower(v, p.start_enter)) {
       open.topAfter = v;
       attempts.push(open);
       open = null;
     }
   }
-  return { attempts, unfinished: open !== null };
+  return { attempts, unfinished: open };
 }
 
 describe('clean trajectories contain the intended reps', () => {
@@ -168,21 +211,25 @@ describe('clean trajectories contain the intended reps', () => {
     const aspect = clip.image.width / clip.image.height;
     const s = spec.primary_angle.direction === 'decreasing' ? 1 : -1;
     const p = spec.phases;
+    const primary = (f: PoseResult) => metric(f, spec, spec.primary_angle.name, aspect);
     const values = clip.frames
       .filter((f): f is PoseResult => !isAbsentFrame(f))
-      .map((f) => ({ t: f.timestamp_ms, v: primaryAngle(f, spec, aspect) }));
+      .map((f) => ({ t: f.timestamp_ms, v: primary(f), gate: gateMargin(f, spec.primary_angle.gate, spec, aspect) }));
 
-    const { attempts, unfinished } = countAttempts(values, spec);
-    expect(unfinished).toBe(false);
+    const { attempts, unfinished } = countAttempts(values.filter((x) => Number.isFinite(x.v)), spec);
+    // An attempt still open when the set ends becomes a partial; otherwise every attempt finishes.
+    if (clip.expected!.set_end === null) expect(unfinished).toBeNull();
     const reps = attempts.filter((a) => a.counted);
-    const partials = attempts.filter((a) => !a.counted);
+    const partials = [...attempts.filter((a) => !a.counted), ...(unfinished ? [unfinished] : [])];
     expect(reps.length).toBe(clip.expected!.reps);
     expect(partials.length).toBe(clip.expected!.partials);
     for (const a of reps) {
       expect(s * (p.count_min - a.extreme)).toBeGreaterThanOrEqual(5); // well past count_min
+      expect(a.gate).toBeGreaterThanOrEqual(5); // well inside the gate
       expect(s * (a.topAfter - p.start_enter)).toBeGreaterThanOrEqual(1); // back past start_enter
     }
-    for (const a of partials) expect(s * (p.count_min - a.extreme)).toBeLessThanOrEqual(-5); // short of count_min
+    // Each partial stays 5° short of count_min, or fails the gate by 5° wherever it gets that close.
+    for (const a of partials) expect(a.gate).toBeLessThanOrEqual(-5);
 
     // Set end: a long enough still or unreadable tail exactly when `expected.set_end` says so. An
     // unreadable tail is `lost` when most of it had a person (frames without the primary angle),
@@ -191,14 +238,14 @@ describe('clean trajectories contain the intended reps', () => {
     const tailMs = p.set_end_still_ms + 1000;
     const tail = clip.frames.filter((f) => f.timestamp_ms >= endT - tailMs);
     const tailValues = values.filter((x) => x.t >= endT - tailMs);
-    const unreadable = tail.filter((f) => isAbsentFrame(f) || !Number.isFinite(primaryAngle(f, spec, aspect)));
+    const unreadable = tail.filter((f) => isAbsentFrame(f) || !Number.isFinite(primary(f)));
     const allUnreadable = unreadable.length === tail.length;
     const withPerson = unreadable.filter((f) => !isAbsentFrame(f)).length;
+    // Still in any state: the whole tail inside the still band.
     const still =
       tail.every((f) => !isAbsentFrame(f)) &&
       tailValues.every((x) => Number.isFinite(x.v)) &&
-      Math.max(...tailValues.map((x) => x.v)) - Math.min(...tailValues.map((x) => x.v)) <= p.reverse_deg &&
-      tailValues.every((x) => s * (x.v - p.start_enter) > 0);
+      Math.max(...tailValues.map((x) => x.v)) - Math.min(...tailValues.map((x) => x.v)) <= STILL_BAND_DEG;
     const setEnd = allUnreadable ? (withPerson * 2 > tail.length ? 'lost' : 'absent') : still ? 'still' : null;
     expect(clip.expected!.set_end).toBe(setEnd);
   });
@@ -238,5 +285,21 @@ describe('form rules flag the listed reps', () => {
     expect(base.set!.flags.some((f) => f.severity === 'safety')).toBe(false);
     const agg = injured.set!.rules.find((a) => a.rule_id === 'trunk_lean')!;
     expect(agg).toMatchObject({ severity: 'safety', n: over.length });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The rest clips reproduce device false reps: without the primary gate, rests count.
+
+describe('the press rest clips need the primary gate', () => {
+  const spec = getSpec('shoulder_press')!;
+  const { name, direction } = spec.primary_angle;
+  const ungated: ExerciseSpec = { ...spec, primary_angle: { name, direction } };
+
+  it.each(['shoulder_press_rest_positions', 'shoulder_press_cropped_wrists'])('%s', (clipName) => {
+    const clip = loadFixtures().find((c) => c.name === clipName)!;
+    expect(spec.primary_angle.gate).toBeDefined();
+    expect(runClip(clip).counted).toHaveLength(clip.expected!.reps);
+    expect(runClip(clip, {}, ungated).counted.length).toBeGreaterThan(clip.expected!.reps);
   });
 });
