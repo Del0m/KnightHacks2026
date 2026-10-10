@@ -103,6 +103,7 @@ describe("acute red flags", () => {
     "Back spasms and I can barely stand up",
     "I nearly passed out during a heavy squat",
     "I felt something give in my hamstring",
+    "I get headaches when I lift heavy",
   ];
   for (const question of acute) {
     it(`flags "${question}"`, () => {
