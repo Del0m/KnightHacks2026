@@ -11,6 +11,7 @@ import { schema } from "../src/db.js";
 import { pseudonymize } from "../src/integrations/databricks/upload.js";
 import { runInsightSync, syncConfigFromEnv, type SyncConfig } from "../src/jobs/syncInsights.js";
 import { loadSpecs } from "../src/services/exerciseSpecs.js";
+import { Moderator as LlamaGuard } from "../src/integrations/huggingface/moderation.js";
 import { llamaGuardModerator } from "../src/services/moderation.js";
 import { createTestDb, setup } from "./helpers.js";
 
@@ -255,6 +256,31 @@ describe("CONN-09 moderation", () => {
     });
     expect(
       await adapter({ allowed: false, checked: true, categories: ["S11"], support: true, message: "988" }),
-    ).toEqual({ allowed: false, message: "988", support: true });
+    ).toEqual({ allowed: false, message: "988", support: true, categories: ["S11"] });
+  });
+
+  it("adds S15/S16 from the threats/harassment check, and fails open when it's unreachable", async () => {
+    const config = { token: "t", model: "guard", provider: "p", timeoutMs: 1000, attempts: 1 };
+    const safeGuard = { chatCompletion: async () => ({ choices: [{ message: { content: "safe" } }] }) } as never;
+    const silent = { warn: () => {} };
+    const llm = (category: string) => ({ generateJson: async () => ({ data: { category } }) }) as never;
+
+    const threat = await new LlamaGuard(config, safeGuard, silent, llm("threat")).moderate("watch your back", "comment");
+    expect(threat).toMatchObject({ allowed: false, checked: true, categories: ["S15"] });
+    expect(threat.message).toMatch(/threaten/);
+
+    const harassment = await new LlamaGuard(config, safeGuard, silent, llm("harassment")).moderate("pig", "post");
+    expect(harassment).toMatchObject({ allowed: false, checked: true, categories: ["S16"] });
+
+    const none = await new LlamaGuard(config, safeGuard, silent, llm("none")).moderate("crushed it", "comment");
+    expect(none).toEqual({ allowed: true, checked: true, categories: [] });
+
+    // Advice isn't shown to other members, so the check doesn't run on it.
+    const advice = await new LlamaGuard(config, safeGuard, silent, llm("threat")).moderate("knee hurts", "advice");
+    expect(advice).toEqual({ allowed: true, checked: true, categories: [] });
+
+    const down = { generateJson: async () => Promise.reject(new Error("all providers down")) } as never;
+    const unchecked = await new LlamaGuard(config, safeGuard, silent, down).moderate("hi", "comment");
+    expect(unchecked).toEqual({ allowed: true, checked: false, categories: [] });
   });
 });

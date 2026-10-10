@@ -1,18 +1,19 @@
 // Moderation port for posts, comments and advice (BE-10, §12).
 //
-// In production this is CONN-09's Llama Guard client (integrations/huggingface/moderation.ts),
-// adapted below and wired in src/index.ts when HF_TOKEN is set. Without a token, and in tests,
-// everything is allowed.
+// In production this is CONN-09's Llama Guard client plus its threats/harassment check
+// (integrations/huggingface/moderation.ts), adapted below and wired in src/index.ts when
+// HF_TOKEN is set. Without a token, and in tests, everything is allowed.
 import type { Moderator as LlamaGuard } from "../integrations/huggingface/moderation.js";
 
 // Extra fields from Llama Guard, for routes that need them (all optional):
 //   advisory  allowed, but asks for specialized (e.g. medical) advice: BE-11 should point to a
 //             professional rather than answer with AI
 //   checked   false when Llama Guard was unreachable and the text was allowed unchecked
-//   support   self-harm: show support resources rather than a plain block
+//   support     self-harm: show support resources rather than a plain block
+//   categories  why it was blocked, e.g. ["S15"], for the moderation log
 export type ModerationResult =
   | { allowed: true; advisory?: "specialized_advice"; checked?: boolean }
-  | { allowed: false; message: string; support?: boolean };
+  | { allowed: false; message: string; support?: boolean; categories?: string[] };
 
 export interface Moderator {
   check(text: string, kind: "post" | "comment" | "advice"): Promise<ModerationResult>;
@@ -42,6 +43,7 @@ export function llamaGuardModerator(guard: Pick<LlamaGuard, "moderate">): Modera
       return {
         allowed: false,
         message: result.message ?? BLOCKED_MESSAGE,
+        categories: result.categories,
         ...(result.support ? { support: true } : {}),
       };
     },

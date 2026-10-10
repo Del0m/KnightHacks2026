@@ -1,4 +1,5 @@
 // BE-09 feed and BE-10 social writes.
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { schema } from "../src/db.js";
 import type { Moderator } from "../src/services/moderation.js";
@@ -6,7 +7,9 @@ import { setup } from "./helpers.js";
 
 const moderator: Moderator = {
   async check(text) {
-    return /forbidden/i.test(text) ? { allowed: false, message: "Please keep it kind." } : { allowed: true };
+    if (/hopeless/i.test(text)) return { allowed: false, message: "Call or text 988.", support: true, categories: ["S11"] };
+    if (/forbidden/i.test(text)) return { allowed: false, message: "Please keep it kind.", categories: ["S15"] };
+    return { allowed: true };
   },
 };
 
@@ -125,5 +128,45 @@ describe("feed", () => {
 
     await t.db.insert(schema.blocks).values({ blockerId: "g-neighbour", blockedId: "g-me" });
     expect(await bodies()).toEqual([]);
+  });
+});
+
+describe("blocked content", () => {
+  it("logs blocked posts and comments with what they targeted", async () => {
+    const author = await t.as("m-author");
+    const troll = await t.as("m-troll");
+    const post = (await author.post("/posts", { kind: "goal", body: "Squat 100" })).body;
+    expect((await troll.post("/follows/m-author")).status).toBe(204);
+
+    expect((await troll.post("/posts", { kind: "goal", body: "forbidden post" })).status).toBe(422);
+    expect((await troll.post(`/posts/${post.id}/comments`, { body: "forbidden comment" })).status).toBe(422);
+
+    const logged = await t.db
+      .select()
+      .from(schema.moderationBlocks)
+      .where(eq(schema.moderationBlocks.authorId, "m-troll"));
+    expect(logged).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "post", postId: null, body: "forbidden post", categories: ["S15"] }),
+        expect.objectContaining({ kind: "comment", postId: post.id, body: "forbidden comment", categories: ["S15"] }),
+      ]),
+    );
+    expect(logged).toHaveLength(2);
+  });
+
+  it("flags self-harm as support and doesn't log it", async () => {
+    const api = await t.as("m-support");
+    const res = await api.post("/posts", { kind: "goal", body: "I feel hopeless" });
+    expect(res.status).toBe(422);
+    expect(res.body).toMatchObject({ error: "moderation_blocked", message: "Call or text 988.", details: { support: true } });
+
+    const blocked = await api.post("/posts", { kind: "goal", body: "forbidden" });
+    expect(blocked.body.details).toBeUndefined();
+
+    const logged = await t.db
+      .select()
+      .from(schema.moderationBlocks)
+      .where(eq(schema.moderationBlocks.authorId, "m-support"));
+    expect(logged.map((r) => r.categories)).toEqual([["S15"]]);
   });
 });
