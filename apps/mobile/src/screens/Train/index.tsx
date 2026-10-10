@@ -34,6 +34,8 @@ export default function TrainScreen() {
       <View style={styles.details}><Text style={styles.reps}>{e.sets} × {e.reps} reps</Text><Text style={styles.detail}>{e.muscles}</Text></View>
     </PolishedPressable>)}</View>
     <Action onPress={() => router.push('/workout')}>Begin Workout</Action>
+    <Action secondary onPress={() => router.push({ pathname: '/camera-setup', params: { exercise: selected ?? 'curl' } })}>Set up my camera</Action>
+    <PolishedPressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={ui.muted}>Set my goals & training rhythm</Text></PolishedPressable>
     <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>Sample routine · workout days build your streak</Text>
   </AppPage>;
 }

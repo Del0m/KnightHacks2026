@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Linking, Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { PoseSkeleton } from './PoseSkeleton';
@@ -85,7 +85,7 @@ function LiveCamera({ poseMode, position, setPosition }: {
     setImageSize((s) => s ?? uprightSize(frameOutputRef.current?.currentResolution));
   }, []);
   const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size, maxFps: 15, onPose });
-  frameOutputRef.current = frameOutput;
+  useLayoutEffect(() => { frameOutputRef.current = frameOutput; }, [frameOutput]);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
