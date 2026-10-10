@@ -49,6 +49,8 @@ AI-08 (#48) packages a finished set on the phone. INT-01 (#85) makes that payloa
 
 `null` for `start_ms` / `end_ms` / `lowering_ms` / `rising_ms` only happens on the server side (legacy or seeded rows); the phone always fills them, except `lowering_ms` / `rising_ms` when the rep has no window frame in range.
 
+Fractional capture times round clock positions before subtraction: `tempo_ms = end_ms - start_ms` and `rising_ms = tempo_ms - lowering_ms`. This can differ by 1 ms from rounding `durations.rep` independently. The unrounded engine duration must still match `countedAt - startedAt`.
+
 ### SetRecord
 
 `schema_version`, `set_index`, `exercise_id`, `weight_kg` (number 0–1000 \| null), `end_reason` (`still | absent | lost | manual`), `partial_reps` (int ≥ 0), `fps` (number > 0, ≤ 240 \| null when fewer than 2 frames), `frames` (`JointFrame[]` ≤ 5400), `reps` (`Rep[]` ≤ 200). All required, no other properties.
@@ -67,6 +69,7 @@ AI-08 (#48) packages a finished set on the phone. INT-01 (#85) makes that payloa
   - Before the first `rep_started`, keep only a ring of the last 1000 ms of poses. On the first `rep_started` keep the ring frames with `t >= startedAt - 1000`, then every pose until `set_ended`; ignore poses after it.
   - Cap at `MAX_SET_FRAMES = 5400` (BE-04's limit); later poses are dropped, reps still recorded.
   - `event(e: EngineEvent)`: collects `rep_closed` records, counts `partial`, notes `set_ended`.
+  - Closed records are reduced to scalar aggregates immediately so their frame windows are not retained. The recorder rejects more than 200 reps, malformed/out-of-order input, and missing or inconsistent final rule results. `finish` requires `set_ended`; reset all collectors for the next set.
   - `finish(setFlags: SetFlags): SetRecord`: throws if `setFlags.total_reps` ≠ the number of closed reps (contract problem, not a fallback).
 - `buildSetRecord(input)` is the pure packaging step the recorder calls; tests drive it directly.
 - Frames are the **raw** `PoseResult` joints, flattened `x, y, c` per joint in `JOINT_NAMES` order, rounded like `compactPose` (x/y 4 decimals, c 2). `t_ms = round(timestamp_ms - origin)`, origin = first kept frame (else the first rep's `startedAt`, else 0).
@@ -79,7 +82,8 @@ AI-08 (#48) packages a finished set on the phone. INT-01 (#85) makes that payloa
 - `upload.ts` and `score.ts` use the shared types; the stub interfaces go. `buildMetadata` returns `ExportMeta`, `buildJointsFile` writes `ExportJointsLine`s, and both take `set_index` from the set (not the array position).
 - `setInput` / `createSessionInput` zod mirror `SetRecord` / `SessionStart` and are typed against them (`z.ZodType<SetRecord, z.ZodTypeDef, unknown>`), so drift fails tsc. Unknown keys are stripped (zod default), so a client still sending `clean` or `medal` isn't rejected.
 - `buildExportSession` passes `quality` through (null stays null), `set_index` = `sets.position`, and the new fields.
-- Migration after `0005_int05_rest_note`: rename enum value `on_device` → `coreml`, add `vision`, drop the `inference_mode` default; add `sets.end_reason text`, `sets.partial_reps integer`, `reps.lowering_ms integer`, `reps.rising_ms integer` (all nullable).
+- Migration after `0006_int08_export_attempts`: rename enum value `on_device` → `coreml`, add `vision`, drop the `inference_mode` default; add `sets.end_reason text`, `sets.partial_reps integer`, `reps.lowering_ms integer`, `reps.rising_ms integer` (all nullable).
+- INT-08's manual workout screen stays local until a separate manual-upload contract exists. The upload helper takes shared `SessionStart` / `SetRecord` types and preserves caller-supplied set indices and pose source.
 
 ## 5. Databricks
 

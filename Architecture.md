@@ -295,6 +295,11 @@ stateDiagram-v2
   - **Manual:** a Done button.
 
   The still and absent ends only apply after the first counted rep, so setting up never ends a set. A rep cut off by the set end is a partial.
+- **Set record (AI-08):** when the set ends, `apps/mobile/src/engine/setRecord.ts` packages it for `POST /sessions/:id/sets`:
+  - **Per rep:** 0-based `rep_index`, start and count times, tempo, movement range (max − min of the primary angle), the lowering and rising split, and AI-07's flags.
+  - **Per set:** the end reason and the partial count.
+  - **Frames:** the raw joints, from 1 s before the first rep to the set end.
+  - **Contract:** the shape is defined once in `specs/set-record/schema.json` (INT-01), shared with the API and the Databricks bronze tables. Format: [docs/specs/set-record-format.md](docs/specs/set-record-format.md).
 
 ### 6.2 Example exercise spec
 
@@ -468,9 +473,9 @@ erDiagram
     SESSION ||--o{ SET : "contains"
     SET ||--o{ REP : "contains"
     REP ||--o{ FORM_FLAG : "may raise"
-    SESSION { uuid id date started_at string device string medal }
-    SET { uuid id string exercise int reps float weight_kg string medal }
-    REP { uuid id int tempo_ms float range_deg float quality }
+    SESSION { uuid id date started_at string device string inference_mode string medal }
+    SET { uuid id int position string exercise int reps float weight_kg string medal string end_reason int partial_reps }
+    REP { uuid id int position int start_ms int end_ms int tempo_ms float range_deg float quality int lowering_ms int rising_ms bool clean }
     FORM_FLAG { uuid id string rule_id string severity }
 ```
 
@@ -526,7 +531,7 @@ erDiagram
 
 | Method and path | Purpose |
 |---|---|
-| `POST /sessions` · `POST /sessions/:id/sets` · `POST /sessions/:id/finish` | Session lifecycle. Finishing computes the medal and PRs and queues the Databricks export. |
+| `POST /sessions` · `POST /sessions/:id/sets` · `POST /sessions/:id/finish` | Session lifecycle. Bodies are `SessionStart` and the phone's `SetRecord` (`specs/set-record/schema.json`). Finishing computes the medal and PRs and queues the Databricks export. |
 | `GET /sets/:id/rest-note` | Rest note for the last set |
 | `GET /me/progress` · `GET /me/insights` | Progress and risk insights (read from Neon) |
 | `POST /plans/generate` · `GET /plans/current` | Planner (see [§10](#10-workout-planner-and-advice)) |
@@ -614,7 +619,7 @@ flowchart LR
     class HUB hf
 ```
 
-- **Ingest:** the API uploads each finished session as JSON metadata plus gzip'd joint arrays to a Unity Catalog Volume through the Files API (`PUT /api/2.0/fs/files/Volumes/...`). Auto Loader in a Lakeflow Declarative Pipeline picks it up. Small rows can go in directly with the Statement Execution API.
+- **Ingest:** the API uploads each finished session as JSON metadata plus gzip'd joint arrays to a Unity Catalog Volume through the Files API (`PUT /api/2.0/fs/files/Volumes/...`). Both files follow `specs/set-record/schema.json` (`ExportMeta`, `ExportJointsLine`); a test fails if bronze's Spark schemas drift from it. Auto Loader in a Lakeflow Declarative Pipeline picks it up. Small rows can go in directly with the Statement Execution API.
 - **Live set scoring** goes from the phone through the API to the Model Serving endpoint (see [§5](#5-phone-databricks-and-hugging-face-inference-split)); the session upload happens afterwards.
 
 | Layer | Table | Key columns |
