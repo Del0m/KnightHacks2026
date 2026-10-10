@@ -65,22 +65,22 @@ const SUPPORT_MESSAGE =
   "If you're in the US, you can call or text 988 any time to talk to someone. This post wasn't shared.";
 
 const MESSAGES: Record<string, string> = {
-  S1: "Let's keep SteadyForum a safe place to train. Posts about hurting people can't be shared.",
+  S1: "Let's keep Spotter a safe place to train. Posts about hurting people can't be shared.",
   S2: "We can't share posts about illegal activity, like buying drugs or steroids without a prescription.",
-  S3: "This can't be shared on SteadyForum.",
-  S4: "This can't be shared on SteadyForum.",
+  S3: "This can't be shared on Spotter.",
+  S4: "This can't be shared on Spotter.",
   S5: "Please don't post claims that could damage someone's reputation.",
   S7: "Please keep personal details like addresses, phone numbers or someone's location out of your posts.",
   S8: "Please only share content you have the rights to.",
-  S9: "This can't be shared on SteadyForum.",
-  S10: "SteadyForum is for everyone. Please keep posts free of hateful language.",
+  S9: "This can't be shared on Spotter.",
+  S10: "Spotter is for everyone. Please keep posts free of hateful language.",
   S12: "Please keep posts gym-friendly and free of sexual content.",
-  S13: "SteadyForum is for training talk, so please keep election content elsewhere.",
-  S14: "This can't be shared on SteadyForum.",
-  S15: "Let's keep SteadyForum a safe place to train. Posts that threaten or keep tabs on other members can't be shared.",
-  S16: "SteadyForum is for lifting each other up. Please don't post insults, put-downs or unwanted comments aimed at someone.",
+  S13: "Spotter is for training talk, so please keep election content elsewhere.",
+  S14: "This can't be shared on Spotter.",
+  S15: "Let's keep Spotter a safe place to train. Posts that threaten or keep tabs on other members can't be shared.",
+  S16: "Spotter is for lifting each other up. Please don't post insults, put-downs or unwanted comments aimed at someone.",
 };
-const DEFAULT_MESSAGE = "This doesn't fit SteadyForum's community guidelines. Try rewording it and posting again.";
+const DEFAULT_MESSAGE = "This doesn't fit Spotter's community guidelines. Try rewording it and posting again.";
 
 // ---- Config ----
 
@@ -128,7 +128,7 @@ export function applyPolicy(categories: string[]): ModerationResult {
 
 // ---- Threats and harassment (S15, S16) ----
 
-export const PERSONAL_SYSTEM = `You moderate posts and comments on SteadyForum, a gym social app. Classify the text, read as written to another member:
+export const PERSONAL_SYSTEM = `You moderate posts and comments on Spotter, a gym social app. Classify the text, read as written to another member:
 - "threat": a real threat to hurt, stalk, follow, or intimidate a person, explicit or veiled ("watch your back", "I know where you live", "I'll be waiting by your car"). This includes letting someone know you've been watching them or tracking their schedule or whereabouts when it's unsolicited or suggestive ("saw you at the 6am class, you go every day right? 😉").
 - "harassment": abuse aimed at a person: degrading name-calling, body-shaming, slurs, or telling them they're unwanted or should quit or leave. This includes sexual harassment: sexual or suggestive comments about someone's body or how they look working out, unwanted advances or flirting, and pressure to meet up or share contact details.
 - "none": everything else. This includes plain friendly plans between members ("great class today, see you Thursday!"), compliments on effort or progress ("your squat depth has improved so much"), gym slang ("destroy legs", "this set killed me"), self-deprecation, obvious joking exaggeration between gym friends ("skip leg day again and I'll kill you 😂"), playful trash talk ("light weight baby", "you lift like my grandma"), and blunt or rude feedback about a lift or form ("your form is trash").

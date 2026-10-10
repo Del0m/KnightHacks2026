@@ -4,17 +4,25 @@ export type UploadCheckpoint = { sessionId?: string; finished?: boolean; result?
 export type WorkoutSet = {
   exercise_id: string;
   weight_kg?: number | null;
-  reps: { tempo_ms: number; range_deg: number; quality: number | null; clean?: boolean; flags: { rule_id: string; severity: string }[]; start_ms?: number; end_ms?: number }[];
+  reps: { tempo_ms: number; range_deg: number; quality: number | null; clean?: boolean; flags: { rule_id: string; severity: string }[]; start_ms?: number | null; end_ms?: number | null }[];
   fps?: number;
   frames?: { t_ms: number; kp: number[] }[];
 };
+
+export class WorkoutUploadError extends Error {
+  constructor(readonly status: number, message: string) { super(message); this.name = 'WorkoutUploadError'; }
+}
+export function isPermanentUploadFailure(error: unknown): error is WorkoutUploadError {
+  // Expired credentials and rate/timeout responses can recover without changing the workout.
+  return error instanceof WorkoutUploadError && error.status >= 400 && error.status < 500 && ![401, 403, 408, 409, 429].includes(error.status);
+}
 
 /** Stable set_index makes an interrupted save safe to resume on the same session. */
 export async function uploadWorkout(api: ApiRequest, checkpoint: UploadCheckpoint, startedAt: string, sets: WorkoutSet[], onCheckpoint: () => void = () => {}) {
   const request = timedRequest(api);
   async function post(path: string, body: object) {
     const response = await request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!response.ok) throw new Error('Could not save your workout. Keep this screen open and try again.');
+    if (!response.ok) throw new WorkoutUploadError(response.status, 'Could not save your workout. Keep this screen open and try again.');
     return response.json();
   }
   if (checkpoint.finished) return;
@@ -29,11 +37,11 @@ export async function uploadWorkout(api: ApiRequest, checkpoint: UploadCheckpoin
     });
     // This checkpoint owns the session and each index. 409 means this set already
     // committed, or the session finished before its response reached the phone.
-    if (!response.ok && response.status !== 409) throw new Error('Could not save your sets. Keep this screen open and try again.');
+    if (!response.ok && response.status !== 409) throw new WorkoutUploadError(response.status, 'Could not save your sets. Keep this screen open and try again.');
   }
   const response = await request(`/sessions/${checkpoint.sessionId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   // The API returns 409 on a repeated finish after an earlier response was lost.
-  if (!response.ok && response.status !== 409) throw new Error('Could not finish your workout. Keep this screen open and try again.');
+  if (!response.ok && response.status !== 409) throw new WorkoutUploadError(response.status, 'Could not finish your workout. Keep this screen open and try again.');
   const result = response.ok ? readFinishResult(await response.json()) : null;
   if (result) checkpoint.result = result;
   else {

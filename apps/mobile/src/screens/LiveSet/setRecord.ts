@@ -23,7 +23,8 @@ export function createSetCapture(spec: ExerciseSpec) {
         const rep = records.get(result.rep_index);
         if (!rep) throw new Error('A counted rep is missing its measured timing.');
         return {
-          start_ms: rep.startedAt, end_ms: rep.closedAt,
+          // No frame upload yet: omit bounds rather than send the absolute pose clock.
+          start_ms: null, end_ms: null,
           tempo_ms: Math.max(0, rep.countedAt - rep.startedAt),
           range_deg: Math.abs(spec.phases.start_enter - rep.extreme),
           quality: null, clean: result.flags.length === 0,

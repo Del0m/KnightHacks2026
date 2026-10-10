@@ -6,7 +6,7 @@ import { AppPage, Action, ui } from '@/components/AppPage';
 import { BodyPreview } from '@/components/BodyPreview';
 import { exercises } from '@/data/workout';
 import { useAuth } from '@/screens/Auth/session';
-import { uploadLiveSet, type UploadCheckpoint, type WorkoutSet } from '@/services/workoutApi';
+import { isPermanentUploadFailure, uploadLiveSet, type UploadCheckpoint, type WorkoutSet } from '@/services/workoutApi';
 import { queueWorkout, syncWorkouts } from '@/services/workoutQueue';
 import { useTraining } from '@/state/Training';
 import WorkoutCamera from '@/screens/LiveSet/WorkoutCamera';
@@ -65,7 +65,7 @@ function WorkoutScreen({ mode, exercise, cameraPosition }: { mode?: string; exer
     if (account && auth.user?.id === account) {
       setSyncStatus('Saved on this device. Syncing…');
       queueWorkout(account, { id, startedAt: started.current, sets: records, checkpoint: checkpoint.current }, requests.current);
-      void requests.current.then(() => syncWorkouts(account, auth.apiFetch)).then(() => setSyncStatus('Saved to your account.')).catch(() => setSyncStatus('Saved on this device. Account sync will retry.'));
+      void requests.current.then(() => syncWorkouts(account, auth.apiFetch)).then(() => setSyncStatus('Saved to your account.')).catch(error => setSyncStatus(isPermanentUploadFailure(error) ? 'Saved on this device. Account sync needs attention.' : 'Saved on this device. Account sync will retry.'));
     }
   }
   function leave() { if (records.length) save(); router.replace('/'); }
