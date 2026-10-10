@@ -11,17 +11,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		2DC189E8940B951C2220CFE8 /* PoseCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PoseCore; path = PoseCore; sourceTree = SOURCE_ROOT; };
-		6B4F28BB006CF7E47F3D1E56 /* PoseBench.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = PoseBench.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DC189E8940B951C2220CFE8 /* PoseCore */ = {isa = PBXFileReference; lastKnownFileType = folder; path = PoseCore; sourceTree = SOURCE_ROOT; };
+		6B4F28BB006CF7E47F3D1E56 /* PoseBench.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PoseBench.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		827E1D254A2054313ABD736E /* PoseBench */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
 			path = PoseBench;
 			sourceTree = "<group>";
 		};
@@ -100,7 +96,6 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					F268892FDE2BC95DE03CF5A6 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -274,7 +269,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 58568JN387;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = PoseBench;
 				INFOPLIST_KEY_NSCameraUsageDescription = "PoseBench uses the camera to test the pose model on this phone. Video never leaves the device.";
@@ -300,7 +295,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 58568JN387;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = PoseBench;
 				INFOPLIST_KEY_NSCameraUsageDescription = "PoseBench uses the camera to test the pose model on this phone. Video never leaves the device.";

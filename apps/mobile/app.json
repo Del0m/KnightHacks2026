@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Spotter",
+    "slug": "spotter",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.knighthacks.spotter",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Spotter uses the camera to see your form. Video never leaves your phone."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0",
+            "extraPods": [
+              {
+                "name": "PoseCore",
+                "path": "../../../ml/pose_export/PoseBench/PoseCore"
+              }
+            ]
+          }
+        }
+      ],
+      "./plugins/withPoseModels"
+    ]
+  }
+}

@@ -1,10 +1,10 @@
 # Architecture: Spotter (working name)
 
-A quiet AI spotter for new gym-goers and people returning from injury. The user's phone films the set and runs the pose AI on its own neural processor, and the user gets a short, kind note between sets instead of being talked at mid-rep. Spotter also plans workouts around injuries and connects beginners through a Strava-style social feed.
+**Spotter helps you get back to the gym after an injury, then keeps you there.** It's a quiet AI spotter for people returning from injury and for new gym-goers. The user's phone films the set and runs the pose AI on its own neural processor, and the user gets a short, kind note between sets instead of being talked at mid-rep. Spotter tracks the plan a physio gave you, shows your range of motion coming back week by week, plans workouts around the injury, and connects you with people recovering from something similar.
 
 > **Visual overview for non-engineers:** https://claude.ai/artifact/GEo4ve7Br3rcUVVMibxYwY (hand-drawn diagrams of everything below).
 >
-> Knight Hacks IX build. Team of 4: 2 AI engineers, 1 front-end developer, 1 back-end developer. **v3:** Raspberry Pi removed (the phone's neural processor runs the AI), one camera, medals measured against the lifter's own average.
+> Knight Hacks IX build. Team of 4: 2 AI engineers, 1 front-end developer, 1 back-end developer. **v4:** recovery-first positioning (physio plans, range-of-motion report, recovery buddies). **v3:** Raspberry Pi removed (the phone's neural processor runs the AI), one camera, medals measured against the lifter's own average.
 
 ---
 
@@ -44,6 +44,20 @@ A quiet AI spotter for new gym-goers and people returning from injury. The user'
 - Send finished sets (joint positions, reps, scores, never video) to Databricks for scoring, progress dashboards, injury-risk flags and retraining.
 - A Strava-like social layer: a session, PR and medal feed, kudos, comments, goals, advice questions, and gym-buddy matching for beginners.
 
+### 1.1 Positioning: back to the gym after injury
+
+AI rep counters are a common hackathon project. Leading with injury recovery makes Spotter stand out, gives judges a reason to care, and gives Databricks a clear, measurable result. Rehab exercises are also slow and bodyweight-based, which is easier for pose detection than fast lifts. Spotter stays a fitness app, not a medical one: it tracks what a physio prescribed and never prescribes treatment itself.
+
+| Feature | What the user gets | How it's built |
+|---|---|---|
+| **Plan from my physio** | Enter the exercises, sets, reps and range limits your physio gave you. Spotter guides and tracks those sessions at home with the same silent feedback. | `rehab_plans` and `rehab_limits` tables in Neon. Limits feed the form engine's injury overrides, so "clean" means "within what my physio allowed". |
+| **Range-of-motion tracking** | See the injured joint's range improve over time, e.g. "knee range up 18° in three weeks", next to the healthy side. | The phone records peak joint angles per rep. Databricks builds `gold_rom_trend` (per user, joint and side) and syncs it to Neon. |
+| **Physio report** | A one-page summary to show your physio: sessions done, range-of-motion trend, left/right comparison, any reps outside the prescribed limits. | API renders a shareable page or PDF from Neon data. The user chooses to share it; nothing is sent automatically. |
+| **Recovery buddies** | Get matched with people coming back from a similar injury, at a similar stage. | Buddy matching adds injury type and weeks-since-injury to the score, only for users who opt in to share their injury. |
+| **Back-to-gym milestone** | When your range of motion and form are steady at your physio's targets, Spotter suggests moving from the rehab plan to a regular gym plan. | Rule on `gold_rom_trend` plus medal history; the user confirms, and the note always says to check with your physio first. |
+
+**Safety lines we hold:** no diagnosis, no treatment advice, no changing a physio's limits. Pain mentioned anywhere routes to "please check with your physio or a doctor". Every recovery screen carries that note.
+
 **Stretch goals**
 
 - Android build (same model exported to TFLite).
@@ -71,7 +85,7 @@ A quiet AI spotter for new gym-goers and people returning from injury. The user'
 
 **Skipped:** NVIDIA Jetson, Full Sail, BNY, NextEra, OneEthos, Adobe and AMD, which are off-topic.
 
-**Story for judges:** *"Personal trainers and physios are expensive, and beginners and people coming back from injury are the ones most likely to get hurt, and the most self-conscious. Spotter turns the phone you already own into a quiet coach that watches every rep without saying a word, gives you one kind suggestion between sets, and connects you with people at the same stage."*
+**Story for judges:** *"Most people coming back from an injury do their physio exercises alone at home, with nobody checking their form, and many quit before they get back to the gym. Spotter turns the phone you already own into a quiet coach: it tracks the plan your physio gave you, shows your range of motion coming back week by week, and connects you with people recovering from the same thing. Then it keeps you going once you're back in the gym."*
 
 ---
 
@@ -386,6 +400,10 @@ erDiagram
     USER ||--o{ PLAN : "has"
     PLAN ||--o{ PLAN_ITEM : "lists"
     EXERCISE ||--o{ PLAN_ITEM : "used in"
+    USER ||--o{ REHAB_PLAN : "enters from physio"
+    REHAB_PLAN ||--o{ REHAB_LIMIT : "sets"
+    REHAB_PLAN { uuid id string from_physio date start date review_on }
+    REHAB_LIMIT { string exercise_id string joint float max_range_deg int sets int reps }
     INJURY { uuid id string body_part date since }
     PLAN { uuid id date week_of jsonb ai_sources }
     PLAN_ITEM { uuid id int sets int reps text swap_note }
@@ -525,6 +543,7 @@ flowchart LR
 | Gold | `gold_user_progress_daily` | user, date, exercise, reps, average range and quality, estimated PR |
 | Gold | `gold_form_summary` | exercise, rule, flag rate by experience level and injury group |
 | Gold | `gold_workout_medals` | session, medal tier, clean-rep share |
+| Gold | `gold_rom_trend` | user, joint, side, week, peak range, change vs injured-side baseline and healthy side |
 | Gold | `gold_training_features` | 32-frame rep windows plus labels |
 | Gold | `gold_injury_risk_scores` | user, body part, score, top contributing features, date |
 
@@ -551,7 +570,7 @@ This is a **training-load and form-trend score, not a diagnosis.** Example featu
 
 ## 12. Social platform
 
-Strava for beginners: share sessions, PRs and medals, set public goals, ask for advice, and find gym buddies at your level.
+Strava for people getting back on their feet: share sessions, recovery milestones, PRs and medals, set public goals, ask for advice, and find **recovery buddies** coming back from a similar injury, or gym buddies at your level.
 
 - **Activity feed:** auto-generated cards for finished sessions, PRs and gold workouts, with kudos and comments. Posting is always opt-in.
 - **Goals:** public goals with progress bars computed from sessions ("3 gold workouts this month"). Followers get nudges.
@@ -709,13 +728,13 @@ gantt
 
 About 4 minutes, adjusted per judging room. Lead with that room's challenge.
 
-1. **Hook (20 s):** "Beginners and people coming back from injury are the most likely to get hurt, and the most self-conscious. A trainer costs $60 an hour. Spotter watches every rep and never says a word while you lift."
+1. **Hook (20 s):** "After an injury, you do your physio exercises alone at home with nobody checking your form, and it's easy to give up before you ever get back to the gym. Spotter is a quiet coach on the phone you already own."
 2. **Live set (60 s):** a teammate squats with the phone propped up beside them. The rep counter climbs silently. One deliberate knees-in rep tints the knees amber, with no sound.
    - Turn on airplane mode mid-set to show the AI runs entirely on the phone. "17 joints per frame on the phone's own chip. Video never leaves the device."
 3. **Rest (30 s):** the rest note appears: *"7 of 8 reps were clean. Your knees drifted inward on one rep; pointing them over your toes keeps them comfortable."* Show the set medal.
    - *Databricks:* "That score came from our MLflow model on Databricks Model Serving, in about a second." Show the pipeline, the MLflow run and the dashboard, then ask Genie one question.
 4. **On-device proof (20 s):** show the live fps and latency readout from the phone's neural processor.
-5. **Injury mode (20 s):** switch the profile to a knee injury. The depth target relaxes, and the same set now earns gold.
+5. **Recovery (30 s):** open a demo user's physio plan and range-of-motion chart: "knee range up 18° in three weeks, now within 5° of the healthy side". Show the one-page physio report and a recovery-buddy match. The same squat set, judged against the physio's limits, earns gold.
 6. **Plan (30 s):** generate a week. Show "why this exercise" sources and the lunge swapped for a glute bridge.
    - *Hugging Face:* "gpt-oss on Inference Providers, RAG with BGE embeddings, Llama Guard, and our own labelled form dataset and model on the Hub." Show the Space.
 7. **Social (30 s):** "Finished a gold-level workout" posts to the feed; a buddy suggestion appears ("same gym, both beginners, both train mornings").
