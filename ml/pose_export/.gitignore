@@ -1,0 +1,9 @@
+*.pt
+*.mlpackage
+.venv/
+__pycache__/
+runs/
+.build/
+.swiftpm/
+xcuserdata/
+DerivedData/
