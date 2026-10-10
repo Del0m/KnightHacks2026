@@ -90,14 +90,18 @@ From the repo root, `node --test specs/*.test.mjs`: 62 pass, 0 fail.
 
 ## Not checked
 
-- **No live model run.** There's no `HF_TOKEN` in this checkout. Still unknown:
-  - how well gpt-oss follows the prompt
-  - how often it declines
-  - how often the guard rejects its answers
-  - latency against BE-11's budget
-
-  All model behaviour in the tests is stubbed.
-- **The 20 sample answers haven't been reviewed by the team.** Run `npm run advice:samples` with a token and review `docs/reviews/advice-<date>.md` before calling the samples reviewed.
+- **Team review of the live answers is still to do.** One live run is in `docs/reviews/advice-2026-10-10.md`: `npm run advice:samples` on the default chain, with a 12 s timeout.
+  - **Routing:** 20 of 20 as expected. The 10 answerable questions got answers, the off-topic one was declined, and all 9 pain or acute questions got the fixed reply with no model call.
+  - **Guard:** rejected nothing.
+  - **Latency:** 0.4 to 1.7 s per answer, and 4.1 s for the decline.
+  - **Quality, a first read only:**
+    - Several answers are close paraphrases of their sources: push-up progression, shoulder press variations, the back warm-up, and the knee strengthening answer to the diagnosis-bait question.
+    - Some add claims the sources don't make. The guard checks numbers, not claims:
+      - glutes_lunge: "an upright torso helps keep the focus on the glutes"
+      - clicks: "good form often helps with clicking"
+      - no_pain_tight: cites the lower-back note for hamstrings
+    - The reviewer-notes lines are blank, for the team.
+- **One run only.** Answers vary between runs, and how often the guard rejects across many questions is unmeasured.
 - **The pain check was probed by hand** beyond the tests, but it's a word-level check, not a classifier.
 
 ## Known limits
@@ -114,6 +118,7 @@ From the repo root, `node --test specs/*.test.mjs`: 62 pass, 0 fail.
 
   These go to the model. The guard still blocks a diagnosis or prescription, and the sources rarely cover them, so the model is likely to decline.
 - **Grounding** compares digits only, so "three sets" isn't checked against the sources.
+- **The fixed reply opens with "Pain like this…"** even when the question names an acute sign without the word pain (numbness, "injured my wrist", can't bear weight).
 - **The guard is strict, by design.** A rejected answer means no AI comment, never a wrong one.
 - **BE-11 must pass the post's title and body together** as `question`, or a red flag in the title is missed.
 - **Moderation conflict:** `moderation.ts` says "Advice isn't shown to other members" and skips the threats check for advice. §10.2 has community answers on advice posts. BE-11 should settle which is true.
