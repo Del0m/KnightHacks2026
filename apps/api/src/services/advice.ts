@@ -140,7 +140,12 @@ export function splitSentences(text: string): string[] {
     .filter(Boolean);
 }
 
-const plain = (text: string) => text.replace(/[‘’ʼ]/g, "'").toLowerCase();
+// Same normalising as specs/validate.mjs: straight apostrophes, and "-" for Unicode hyphens.
+const plain = (text: string) =>
+  text
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/[\u2010\u2011]/g, "-")
+    .toLowerCase();
 
 // ---------------------------------------------------------------------------
 // Acute red flags
