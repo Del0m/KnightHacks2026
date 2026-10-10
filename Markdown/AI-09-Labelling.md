@@ -22,7 +22,7 @@ pnpm exec expo run:ios --device --configuration Release
 
 Keep bundle identifier `com.knighthacks.spotter` and the existing signing team to update the installed app. A development client can load Metro changes with `pnpm start --lan`. A standalone Release app needs its updated bundled code. Expo Go cannot load the custom pose plugin.
 
-The October 10 build was installed as a standalone Release on the owner's iPhone 17 Pro Max running iOS 26.6.2 (23G90), from implementation commit `1921fe4`. After reconnecting and unlocking the phone, CoreDevice successfully launched Spotter with the labelling URL. Screen appearance and capture behaviour still require owner confirmation. To open the route from this Mac while the phone is connected and unlocked:
+The October 10 build was installed as a standalone Release on the owner's iPhone 17 Pro Max running iOS 26.6.2 (23G90), from implementation commit `1921fe4`. After reconnecting and unlocking the phone, CoreDevice successfully launched Spotter with the labelling URL, and the owner confirmed the Joint labelling screen is visible. Capture behaviour still requires the owner pilot. To open the route from this Mac while the phone is connected and unlocked:
 
 ```sh
 xcrun devicectl device process launch --device Armin --payload-url 'spotter://labelling' com.knighthacks.spotter
@@ -57,7 +57,9 @@ Unpack writes exact `clips.jsonl` and `training.jsonl` bytes plus `manifest.json
 
 Deletion on the phone removes linked app-managed drafts/exports and keeps a withdrawal tombstone. Exported copies on the Mac or other destinations must be deleted manually, including unpacked files and merged bundles. Rebuild any retained merged dataset and coverage after withdrawal. Keep consent evidence private; do not commit it or publish this dataset. With a single participant, report a one-person demonstration dataset and make no independent participant generalization claims.
 
-## Device acceptance: not yet verified
+## Device acceptance: initial rehearsal confirmed; remaining checks pending
+
+The owner confirmed the Joint labelling screen appears and that the initial capture, skeleton playback and human-review save worked on the installed Release build. Exercise, accepted count and measured FPS have not yet been reported. Close/reopen persistence, physical export and Mac validation, and the remaining interruption/privacy checks below are still pending.
 
 Start with a **three-rep capture/export rehearsal** before bulk collection. Then perform the five-rep annotation pilot: three comfortable clean reps and two comfortable modified-range attempts. Review all intervals, edit one boundary, discard one rep, save, close/reopen the app, and confirm the exact labels/boundaries persist. Transfer the bundle and consent evidence to the Mac, validate, unpack/reimport offline, and verify accepted counts. Synthetic tests do not supply this evidence.
 
@@ -102,7 +104,8 @@ Actual check results belong in the delivery report. Passing automated checks ver
 - Mobile `npm run lint`: zero errors; eight pre-existing warnings. TypeScript-aware import resolution fixes the previous `expo-file-system` resolution error.
 - `npx expo export --platform ios --output-dir /private/tmp/ai09-ios-export`: passed.
 - Native Release build: succeeded with zero errors and six warnings; installed successfully on iPhone 17 Pro Max, iOS 26.6.2 (23G90).
-- CoreDevice launch with `spotter://labelling`: succeeded at 5:40 p.m. Eastern. This confirms process launch; screen appearance and the owner pilot remain unverified.
+- CoreDevice launch with `spotter://labelling`: succeeded at 5:40 p.m. Eastern; the owner confirmed the Joint labelling screen is visible.
+- Owner rehearsal: capture, skeleton playback and human-review save confirmed. Review recovery, physical export, accepted counts and capture FPS remain unverified.
 
 Tests were added before the modules existed and failed with missing-module errors. Additional hardening regressions failed on existing behaviour before their fixes, including invalid consent, revision recovery/pruning, shared closure frames, confidence thresholds and impossible calendar dates. Mobile environment setup was corrected to simulate a foreground iPhone; expected capture/privacy outcomes were retained.
 
