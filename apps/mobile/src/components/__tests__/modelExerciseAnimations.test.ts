@@ -39,7 +39,7 @@ test('all five skeletal previews stay finite, plant bodyweight limbs, and reset 
         for (const exercise of ['curl', 'squat', 'press', 'push_up', 'lunge']) {
           movement.select(exercise);
           assert.equal(movement.weights.length, 2);
-          assert(movement.weights.every(weight => weight.visible === ['curl', 'press'].includes(exercise)));
+          assert(movement.weights.every(weight => weight.visible === ['curl', 'press', 'lunge'].includes(exercise)));
           const roots = [], wrists = [];
           for (let frame = 0; frame < 300; frame++) {
             movement.update(1 / 60, false);
@@ -61,6 +61,13 @@ test('all five skeletal previews stay finite, plant bodyweight limbs, and reset 
               }
             }
             if (exercise === 'lunge') {
+              for (const side of ['L', 'R']) {
+                const arm = position('wrist.' + side).sub(position('upperarm01.' + side)).normalize();
+                assert(arm.y < -.95, 'lunge arms hang down');
+                assert(movement.weights.find(weight => weight.name.endsWith(side)).parent === movement.bones['wrist.' + side], 'lunge weights follow wrists');
+                assert(movement.bones['finger3-2.' + side].quaternion.angleTo(rest['finger3-2.' + side].q) > .5, 'lunge fingers close around weights');
+              }
+
               assert(position('foot.L').z - position('foot.R').z > .75, 'lunge has split stance');
               assert(Math.abs(position('foot.L').y - .075) < .035, 'lunge front foot stays planted');
               assert(Math.abs(position('foot.R').y - .075) < .035, 'lunge rear foot stays planted');

@@ -14,7 +14,7 @@ export function ExerciseMenu({ open, onPractice }: { open: boolean; onPractice: 
   return <Animated.View aria-hidden={!open} pointerEvents={open ? 'auto' : 'none'} accessibilityElementsHidden={!open} importantForAccessibility={open ? 'auto' : 'no-hide-descendants'} style={{ height: progress.interpolate({ inputRange: [0, 1], outputRange: [0, 52] }), overflow: 'hidden', opacity: progress }}>
     <Animated.View style={{ paddingBottom: 8, transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }] }}>
       <PolishedPressable accessibilityRole="button" accessibilityLabel="Practice Form" disabled={!open} onPress={onPractice} style={{ minHeight: 44, paddingLeft: 40, justifyContent: 'center', alignItems: 'flex-start' }}>
-        <Text style={{ fontFamily: typography.label, color: '#247348', fontSize: 17 }}>Practice Form</Text>
+        <Text style={{ fontFamily: typography.label, color: '#008332', fontSize: 17 }}>Practice Form</Text>
       </PolishedPressable>
     </Animated.View>
   </Animated.View>;

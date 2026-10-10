@@ -74,7 +74,7 @@ export function createMovement(model, dumbbellModel) {
  }
  return {
   bones,weights,
-  select(id){selected=['curl','squat','press','push_up','lunge'].includes(id)?id:null;phase=0;playing=Boolean(selected);for(const [bone,r] of rest){bone.quaternion.copy(r.q);bone.position.copy(r.p);}model.updateMatrixWorld(true);weights.forEach(w=>w.visible=selected==='curl'||selected==='press');},
+  select(id){selected=['curl','squat','press','push_up','lunge'].includes(id)?id:null;phase=0;playing=Boolean(selected);for(const [bone,r] of rest){bone.quaternion.copy(r.q);bone.position.copy(r.p);}model.updateMatrixWorld(true);weights.forEach(w=>w.visible=selected==='curl'||selected==='press'||selected==='lunge');},
   pause(){playing=!playing;return playing;},get playing(){return playing;},
   update(dt,reduced){
    if(playing&&!reduced)phase+=Math.min(dt,.05);
@@ -100,12 +100,13 @@ export function createMovement(model, dumbbellModel) {
     }else if(squat){
      orient('upperarm01.'+side,[sign*.08,-.05,1],blend);forearm=[0,.02,1];palm=[0,-1,0];
     }else if(lunge){
-     orient('upperarm01.'+side,[sign*.07,-1,0],blend);forearm=[0,-1,.08];palm=[0,0,1];
+     // Neutral grip: palms face the thighs; straight arms clear the hips.
+     palm=[-sign,0,0];orient('upperarm01.'+side,[sign*.12,-1,-.03],blend,palm,.35);forearm=[sign*.04,-1,.02];
     }else{
      const a=rep*2.35;orient('upperarm01.'+side,[sign*.04,-1,0],blend);forearm=[0,-Math.cos(a),Math.sin(a)];palm=[0,Math.sin(a),Math.cos(a)];
     }
     orient('lowerarm01.'+side,forearm,blend,palm,.5);orient('lowerarm02.'+side,forearm,blend,palm);orient('wrist.'+side,pushUp?[0,0,1]:forearm,blend,palm);
-    if(squat||pushUp||lunge){for(let finger=1;finger<=5;finger++)for(let joint=1;joint<=3;joint++){const b=bones[`finger${finger}-${joint}.${side}`];if(b)b.quaternion.slerp(rest.get(b).q,blend);}}
+    if(squat||pushUp){for(let finger=1;finger<=5;finger++)for(let joint=1;joint<=3;joint++){const b=bones[`finger${finger}-${joint}.${side}`];if(b)b.quaternion.slerp(rest.get(b).q,blend);}}
     else grip(side,blend);
     const ankle=handFrames[side].foot.clone();if(lunge)ankle.z+=side==='L'?.43:-.43;if(pushUp)ankle.sub(r.position).applyAxisAngle(new THREE.Vector3(1,0,0),proneAngle).add(new THREE.Vector3(r.position.x,proneHeight,r.position.z));
     leg(side,blend,ankle,pushUp);

@@ -45,7 +45,7 @@ export default function TrainScreen() {
     </PolishedPressable>{menu(e.id)}</View>)}</View>
     <Action onPress={() => router.push({ pathname: '/camera-setup', params: { exercise: exercises[0].id } })}>Begin Workout</Action>
     </> : <>
-    <View>{practiceExercises.map(e => <View key={e.id}><PolishedPressable testID={`practice-exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ selected: selected === e.id, expanded: expanded === e.id }} onPress={() => select(e.id)} style={[styles.row, selected === e.id && { backgroundColor: 'rgba(255,255,255,.65)' }]}><Text style={styles.name}>{e.name}</Text><Text style={styles.detail}>{e.muscles}</Text><Text style={styles.detail}>{expanded === e.id ? '−' : '+'}</Text></PolishedPressable>{menu(e.id)}</View>)}</View></>}
+    <View>{practiceExercises.map(e => <View key={e.id}><PolishedPressable testID={`practice-exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ selected: selected === e.id, expanded: expanded === e.id }} onPress={() => select(e.id)} style={[styles.row, selected === e.id && { backgroundColor: 'rgba(255,255,255,.65)' }]}><Text style={styles.name}>{e.name}</Text><Text style={styles.detail}>{e.muscles}</Text></PolishedPressable>{menu(e.id)}</View>)}</View></>}
     <PolishedPressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={ui.muted}>Set goals & workout days</Text></PolishedPressable>
     <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>Sample full-body routine</Text>
   </AppPage>;
