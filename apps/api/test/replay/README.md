@@ -3,9 +3,10 @@
 Replays every clip in `apps/mobile/src/engine/__fixtures__/` through the set path and compares the result with a golden file per clip in `__golden__/`.
 
 1. **Engine (AI-06).** The mobile form engine, imported from `apps/mobile`.
-2. **Rules (AI-07) and set record (AI-08).** Not on main yet. `toSetPayload` in `pipeline.ts` stands in: reps go out with no rule flags and no quality.
-3. **API.** The real Express app on PGlite with the real migrations and exercise specs: `POST /sessions`, `POST /sessions/:id/sets`, `POST /sessions/:id/finish`.
-4. **Databricks upload.** The real uploader writes both files to a faked volume.
+2. **Rules (AI-07).** The mobile form rules run on the engine's events, and each rep goes out with its flags. Where a clip lists `expected.flags`, the replay checks that exactly those flags reach the API.
+3. **Set record (AI-08).** Not on main yet. `toSetPayload` in `pipeline.ts` stands in: reps go out with no quality.
+4. **API.** The real Express app on PGlite with the real migrations and exercise specs: `POST /sessions`, `POST /sessions/:id/sets`, `POST /sessions/:id/finish`.
+5. **Databricks upload.** The real uploader writes both files to a faked volume.
 
 Databricks (token, scoring, file upload) and Hugging Face (rest notes) run their real clients with `fetch` faked. Any other outbound request fails the replay.
 

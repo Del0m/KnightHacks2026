@@ -20,6 +20,7 @@ import { socialRouter } from "./routes/social.js";
 import { disabledExportQueue, JointsBuffer, type ExportQueue } from "./services/exportQueue.js";
 import { allowAllModerator, type Moderator } from "./services/moderation.js";
 import type { PlannerDeps } from "./services/planner.js";
+import type { ProfileEmbeddings } from "./services/profileEmbeddings.js";
 import type { RestTimeDeps } from "./services/restTime.js";
 import { userProvisioner } from "./services/users.js";
 
@@ -34,6 +35,7 @@ export interface AppDeps {
   corsOrigins?: string[];
   rest?: RestTimeDeps; // INT-05: set scoring + rest notes; defaults to phone score + fixed notes
   planner?: PlannerDeps; // AI-12: gpt-oss and the query embedder; defaults to the rules planner
+  profileEmbeddings?: ProfileEmbeddings; // CONN-08: buddy-matching embeddings; off without HF_TOKEN
 }
 
 function cors(origins: string[]): RequestHandler {
@@ -81,7 +83,13 @@ export function createApp(deps: AppDeps): express.Express {
   // Everything below needs a Neon Auth token.
   const provision = userProvisioner(deps.db, deps.pseudonymSecret);
   app.use(requireAuth(deps.verifyToken, provision));
-  app.use(meRouter(deps.db, { pseudonymSecret: deps.pseudonymSecret, onAccountDeleted: provision.forget }));
+  app.use(
+    meRouter(deps.db, {
+      pseudonymSecret: deps.pseudonymSecret,
+      onAccountDeleted: provision.forget,
+      profileEmbeddings: deps.profileEmbeddings,
+    }),
+  );
   app.use(sessionsRouter(deps.db, { exportQueue, joints, log: logger, rest: deps.rest }));
   app.use(setsRouter(deps.db));
   app.use(progressRouter(deps.db));

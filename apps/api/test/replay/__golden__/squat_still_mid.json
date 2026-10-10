@@ -68,7 +68,12 @@
         "quality": null,
         "start_ms": 4533,
         "end_ms": 6733,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       },
       {
         "tempo_ms": 1733,
@@ -76,7 +81,12 @@
         "quality": null,
         "start_ms": 7200,
         "end_ms": 9267,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       }
     ]
   },
@@ -88,13 +98,13 @@
       "exercise_id": "squat",
       "reps": 3,
       "weight_kg": null,
-      "medal": "gold",
-      "clean_share": 1,
+      "medal": "bronze",
+      "clean_share": 0.3333333333333333,
       "score_source": "databricks",
       "score": {
         "source": "databricks",
-        "medal": "gold",
-        "clean_share": 1,
+        "medal": "bronze",
+        "clean_share": 0.3333333333333333,
         "reps": [
           {
             "quality": 0.8,
@@ -104,32 +114,32 @@
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           },
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           }
         ]
       },
       "rest_note": {
-        "text": "3 of 3 reps were clean.",
+        "text": "1 of 3 reps were clean. Your reps took about 1.7 s on the way down. Around 2 s gives you more control.",
         "source": "fixed",
-        "rule_id": null
+        "rule_id": "tempo"
       },
       "created_at": "<time>",
-      "clean_reps": 3,
+      "clean_reps": 1,
       "set_id": "<id 1>"
     },
     "finish_response": {
       "session_id": "<id 2>",
       "finished_at": "2026-10-10T15:05:00.000Z",
-      "medal": "gold",
-      "form_score": 1,
+      "medal": "bronze",
+      "form_score": 0.3333333333333333,
       "baseline_share": 0.7,
       "total_reps": 3,
-      "clean_reps": 3,
+      "clean_reps": 1,
       "personal_records": [
         {
           "exercise_id": "squat",
@@ -140,7 +150,7 @@
       ],
       "posts": []
     },
-    "llm_called": false,
+    "llm_called": true,
     "rows": {
       "session": {
         "id": "<id 2>",
@@ -149,8 +159,8 @@
         "finishedAt": "2026-10-10T15:05:00.000Z",
         "device": "replay",
         "inferenceMode": "on_device",
-        "medal": "gold",
-        "formScore": 1,
+        "medal": "bronze",
+        "formScore": 0.33333334,
         "exportStatus": "exported",
         "exportError": null,
         "exportAttempts": 1,
@@ -165,8 +175,8 @@
           "exerciseId": "squat",
           "reps": 3,
           "weightKg": null,
-          "medal": "gold",
-          "cleanShare": 1,
+          "medal": "bronze",
+          "cleanShare": 0.33333334,
           "scoreSource": "databricks",
           "score": {
             "reps": [
@@ -176,24 +186,24 @@
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               }
             ],
-            "medal": "gold",
+            "medal": "bronze",
             "source": "databricks",
-            "clean_share": 1
+            "clean_share": 0.3333333333333333
           },
           "restNote": {
-            "text": "3 of 3 reps were clean.",
+            "text": "1 of 3 reps were clean. Your reps took about 1.7 s on the way down. Around 2 s gives you more control.",
             "source": "fixed",
-            "rule_id": null
+            "rule_id": "tempo"
           },
           "createdAt": "<time>"
         }
@@ -219,7 +229,7 @@
           "tempoMs": 1734,
           "rangeDeg": 79.4,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 5>",
@@ -230,17 +240,30 @@
           "tempoMs": 1733,
           "rangeDeg": 83.2,
           "quality": null,
-          "clean": true
+          "clean": false
         }
       ],
-      "form_flags": [],
-      "medals": [
+      "form_flags": [
         {
           "id": "<id 6>",
+          "repId": "<id 4>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 7>",
+          "repId": "<id 5>",
+          "ruleId": "tempo",
+          "severity": "form"
+        }
+      ],
+      "medals": [
+        {
+          "id": "<id 8>",
           "userId": "replay-squat_still_mid",
           "sessionId": "<id 2>",
-          "tier": "gold",
-          "formScore": 1,
+          "tier": "bronze",
+          "formScore": 0.33333334,
           "baselineShare": 0.7,
           "awardedAt": "2026-10-10T15:05:00.000Z"
         }
@@ -274,8 +297,8 @@
           "finished_at": "2026-10-10T15:05:00.000Z",
           "device": "replay",
           "inference_mode": "on_device",
-          "medal": "gold",
-          "form_score": 1,
+          "medal": "bronze",
+          "form_score": 0.33333334,
           "experience_level": "beginner",
           "injury_groups": [],
           "rehab_start_on": null,
@@ -286,7 +309,7 @@
               "set_index": 0,
               "exercise_id": "squat",
               "weight_kg": null,
-              "medal": "gold",
+              "medal": "bronze",
               "frame_count": 295,
               "reps": [
                 {
@@ -304,8 +327,13 @@
                   "end_ms": 6733,
                   "tempo_ms": 1734,
                   "range_deg": 79.4,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 },
                 {
                   "rep_index": 2,
@@ -313,8 +341,13 @@
                   "end_ms": 9267,
                   "tempo_ms": 1733,
                   "range_deg": 83.2,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 }
               ]
             }
