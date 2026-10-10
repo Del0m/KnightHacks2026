@@ -1,5 +1,5 @@
 {
-  "description": "AI-13 sample advice questions. expect is fixed_pain (acute red flag: the fixed reply, no LLM) or llm (answered by gpt-oss from the listed sources). Sources are short excerpts in the shape BE-11 retrieves: injury-note sections quoted from rag/notes and exercise-library-style passages. Used by test/advice.test.ts with a stubbed model and by scripts/advice-samples.ts on the real chain.",
+  "description": "AI-13 sample advice questions. expect is fixed_pain (pain or an acute red flag: the fixed reply, no model call), llm (answered by gpt-oss from the listed sources) or none (the model should decline: off-topic). Sources are short excerpts in the shape BE-11 retrieves: injury-note sections quoted from rag/notes and exercise-library-style passages. Used by test/advice.test.ts with a stubbed model and by scripts/advice-samples.ts on the real chain.",
   "sources": [
     {
       "id": "injury_note:knee#4",
@@ -163,7 +163,7 @@
     {
       "id": "off_topic",
       "category": "off_topic",
-      "expect": "llm",
+      "expect": "none",
       "question": "What's the best laptop for programming?",
       "source_ids": [
         "exercise:Pushups#0"
