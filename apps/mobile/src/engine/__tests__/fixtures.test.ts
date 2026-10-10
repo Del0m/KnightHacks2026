@@ -1,6 +1,7 @@
 /// <reference types="node" />
-// Synthetic fixtures: committed JSON matches the generator, every clip is well formed, and the
-// clean (noise-free) trajectories really contain the intended reps and partials.
+// Synthetic fixtures: committed JSON matches the generator, every clip is well formed, the
+// clean (noise-free) trajectories really contain the intended reps and partials, and the form
+// rules flag exactly the listed reps.
 // `UPDATE_FIXTURES=1 npx jest src/engine/__tests__/fixtures.test.ts` rewrites the JSON.
 
 import fs from 'fs';
@@ -8,7 +9,9 @@ import path from 'path';
 
 import { JOINT_NAMES, isPoseResult, type PoseResult } from '../../pose/types';
 import { FIXTURES_DIR, loadFixtures } from '../__fixtures__/load';
-import { CLIP_DEFS, generateAll, generateClip, serializeClip } from '../__fixtures__/synth';
+import { runClipRules } from '../__fixtures__/run';
+import { CLIP_DEFS, generateAll, generateClip, serializeClip, sortFlags } from '../__fixtures__/synth';
+import { applyInjuries } from '../overrides';
 import { isAbsentFrame, type Clip } from '../recording';
 import { getSpec } from '../specs';
 import type { ExerciseSpec, JointAngleSpec } from '../types';
@@ -20,12 +23,16 @@ if (process.env.UPDATE_FIXTURES === '1') {
 }
 
 describe('synthetic fixtures are up to date', () => {
-  it('has the ten listed clips', () => {
+  it('has the thirteen listed clips', () => {
     expect(CLIP_DEFS.map((d) => d.name).sort()).toEqual([
-      'bicep_curl_clean', 'lunge_alternating', 'push_up_lockout', 'shoulder_press_clean',
-      'shoulder_press_cloud', 'squat_absent_end', 'squat_bounce_pause', 'squat_clean', 'squat_noisy',
-      'squat_threshold_hover',
+      'bicep_curl_clean', 'lunge_alternating', 'push_up_hip_sag', 'push_up_lockout', 'shoulder_press_clean',
+      'shoulder_press_cloud', 'squat_absent_end', 'squat_bounce_pause', 'squat_clean', 'squat_front_knees_in',
+      'squat_noisy', 'squat_off_form', 'squat_threshold_hover',
     ]);
+  });
+
+  it('lists the expected flags for every synthetic clip', () => {
+    for (const d of CLIP_DEFS) expect(d.expected.flags).toBeDefined();
   });
 
   it.each(CLIP_DEFS.map((d) => [d.name, d] as const))('%s matches the generator', (name, def) => {
@@ -64,7 +71,7 @@ describe('every fixture is well formed', () => {
     expect(clip.expected).toBeDefined();
     expect(clip.expected!.reps).toBeGreaterThanOrEqual(0);
     expect(clip.expected!.partials).toBeGreaterThanOrEqual(0);
-    expect([null, 'still', 'absent']).toContain(clip.expected!.set_end);
+    expect([null, 'still', 'absent', 'lost']).toContain(clip.expected!.set_end);
     expect(clip.frames.length).toBeGreaterThan(0);
     let prev = -Infinity;
     for (const f of clip.frames) {
@@ -177,17 +184,59 @@ describe('clean trajectories contain the intended reps', () => {
     }
     for (const a of partials) expect(s * (p.count_min - a.extreme)).toBeLessThanOrEqual(-5); // short of count_min
 
-    // Set end: a long enough still or absent tail exactly when `expected.set_end` says so.
+    // Set end: a long enough still or unreadable tail exactly when `expected.set_end` says so. An
+    // unreadable tail is `lost` when most of it had a person (frames without the primary angle),
+    // otherwise `absent`.
     const endT = clip.frames[clip.frames.length - 1].timestamp_ms;
     const tailMs = p.set_end_still_ms + 1000;
     const tail = clip.frames.filter((f) => f.timestamp_ms >= endT - tailMs);
-    const allAbsent = tail.every(isAbsentFrame);
     const tailValues = values.filter((x) => x.t >= endT - tailMs);
+    const unreadable = tail.filter((f) => isAbsentFrame(f) || !Number.isFinite(primaryAngle(f, spec, aspect)));
+    const allUnreadable = unreadable.length === tail.length;
+    const withPerson = unreadable.filter((f) => !isAbsentFrame(f)).length;
     const still =
-      !allAbsent &&
       tail.every((f) => !isAbsentFrame(f)) &&
+      tailValues.every((x) => Number.isFinite(x.v)) &&
       Math.max(...tailValues.map((x) => x.v)) - Math.min(...tailValues.map((x) => x.v)) <= p.reverse_deg &&
       tailValues.every((x) => s * (x.v - p.start_enter) > 0);
-    expect(clip.expected!.set_end).toBe(allAbsent ? 'absent' : still ? 'still' : null);
+    const setEnd = allUnreadable ? (withPerson * 2 > tail.length ? 'lost' : 'absent') : still ? 'still' : null;
+    expect(clip.expected!.set_end).toBe(setEnd);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Form rules over the committed clips (base spec, no injuries, view detected).
+
+describe('form rules flag the listed reps', () => {
+  const withFlags = loadFixtures().filter((c) => c.expected?.flags !== undefined);
+
+  it.each(withFlags.map((c) => [c.name, c] as const))('%s', (_name, clip) => {
+    const { reps, set } = runClipRules(clip);
+    // The set's held flags when it ended, otherwise every evaluated rep's.
+    const flags = set ? set.flags : reps.flatMap((r) => r.flags);
+    if (set) expect(set.flags).toEqual(reps.flatMap((r) => r.flags));
+    expect(reps).toHaveLength(clip.expected!.reps);
+    expect(sortFlags(flags)).toEqual(sortFlags(clip.expected!.flags!));
+  });
+
+  it('a lower back injury tightens trunk_lean on squat_clean to a safety flag', () => {
+    const clip = loadFixtures().find((c) => c.name === 'squat_clean')!;
+    const base = runClipRules(clip);
+    const injured = runClipRules(clip, applyInjuries(getSpec('squat')!, ['lower_back']));
+    expect(base.set).not.toBeNull();
+    expect(injured.set).not.toBeNull();
+    const lean = base.reps.map((r) => r.outcomes.find((o) => o.rule_id === 'trunk_lean')!);
+    // Every clean rep leans between the injured limit (35) and the base limit (45).
+    expect(lean.every((o) => o.status === 'pass')).toBe(true);
+    const over = lean.flatMap((o, i) => (o.value! > 35 ? [i] : []));
+    expect(over.length).toBeGreaterThan(0);
+    expect(over.length).toBeLessThan(lean.length);
+
+    const safety = injured.set!.flags.filter((f) => f.rule_id === 'trunk_lean');
+    expect(safety.map((f) => f.rep_index)).toEqual(over);
+    expect(safety.every((f) => f.severity === 'safety')).toBe(true);
+    expect(base.set!.flags.some((f) => f.severity === 'safety')).toBe(false);
+    const agg = injured.set!.rules.find((a) => a.rule_id === 'trunk_lean')!;
+    expect(agg).toMatchObject({ severity: 'safety', n: over.length });
   });
 });

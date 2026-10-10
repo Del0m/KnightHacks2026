@@ -75,10 +75,12 @@ describe('detectView', () => {
     const expected: Record<string, 'front' | 'side'> = {
       squat: 'side', push_up: 'side', bicep_curl: 'side', lunge: 'side', shoulder_press: 'front',
     };
+    // Filmed from a three-quarter front angle.
+    const byClip: Record<string, 'front' | 'side'> = { squat_front_knees_in: 'front' };
     for (const clip of loadFixtures()) {
       const reps = runClip(clip).reps;
       expect(reps.length).toBeGreaterThan(0);
-      for (const rep of reps) expect([clip.name, detectView(rep.windows.rep, rep.imageAspect)]).toEqual([clip.name, expected[clip.exercise]]);
+      for (const rep of reps) expect([clip.name, detectView(rep.windows.rep, rep.imageAspect)]).toEqual([clip.name, byClip[clip.name] ?? expected[clip.exercise]]);
     }
   });
 });

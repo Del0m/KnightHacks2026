@@ -4,7 +4,7 @@ import { JOINT_NAMES } from '../pose/types';
 import type { DetectedView, EngineFrame } from './types';
 
 // Per-rep median ratio on the fixtures: side clips (squat, push_up, bicep_curl, lunge) 0.023–0.034,
-// front clips (shoulder_press) 0.529–0.538. A square-on torso only reaches about 0.55 (hip keypoints
+// front clips (shoulder_press) 0.529–0.538, a squat turned 30° from the camera 0.431–0.440. A square-on torso only reaches about 0.55 (hip keypoints
 // sit well inside the shoulders), so the front bound is 0.4 rather than 0.5 to allow a slight turn.
 /** A rep whose median ratio is at least this is `front`. */
 export const FRONT_MIN_RATIO = 0.4;
