@@ -48,8 +48,10 @@ const styles = StyleSheet.create({
   play: { color: c.text, fontFamily: t.label, fontSize: 14 }, pauseBar: { width: 3, height: 12, borderRadius: 1, backgroundColor: c.text }, playTriangle: { width: 0, height: 0, borderTopWidth: 6, borderBottomWidth: 6, borderLeftWidth: 9, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: c.text },
 });
 
-const ordinalRules = new Intl.PluralRules('en', { type: 'ordinal' });
-function orderLabel(number: number) {
-  const rule = ordinalRules.select(number);
-  return `${number}${rule === 'one' ? 'st' : rule === 'two' ? 'nd' : rule === 'few' ? 'rd' : 'th'}`;
+// English ordinals by hand: Hermes on iOS has no Intl.PluralRules, so constructing one crashes at launch.
+export function orderLabel(number: number) {
+  const tens = number % 100;
+  const ones = number % 10;
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : ones === 1 ? 'st' : ones === 2 ? 'nd' : ones === 3 ? 'rd' : 'th';
+  return `${number}${suffix}`;
 }
