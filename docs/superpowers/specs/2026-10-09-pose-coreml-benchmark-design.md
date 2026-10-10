@@ -31,7 +31,13 @@ From a fresh clone, get YOLOv8n-pose running live on an iPhone in a few minutes:
 
 ## 3. Non-iPhone users (constraint from outside this issue)
 
-Android and older phones will send frames to a server (**CONN-11**, `ml/cloud_endpoint/`, Architecture §4.1). This issue does not build that server, but it defines the **pose result contract** (§6) that the on-device path and the server must both produce, so the rep rules downstream cannot tell which one the joints came from. `PoseDecoder`'s logic is written as a pure function and documented step by step so CONN-11 can mirror it in Python.
+Android and older phones will send frames to a server (**CONN-11**, `ml/cloud_endpoint/`, Architecture §4.1). This issue does not build that server, but it defines the **pose result contract** (§6) that the on-device path and the server must both produce, so the rep rules downstream cannot tell which one the joints came from.
+
+What this issue does to be ready for offloading:
+- **Fixed output.** The contract (§6) is the output CONN-11 must return. It carries a `source` field so logs and benchmarks can tell the paths apart.
+- **Swappable estimator.** `PoseEstimator.swift` defines a `PoseEstimating` protocol, roughly "frame + orientation in, `PoseResult?` + latency out". The Core ML class conforms to it, and the UI and `Benchmark` depend only on the protocol, so a later `RemotePoseEstimator` drops in without changing them.
+- **Mirrorable decode.** `PoseDecoder`'s logic is a pure function, documented step by step in `docs/pose/how-it-works.md`, so CONN-11 can reproduce it in Python. A server running Ultralytics directly can instead map its `results.keypoints` onto the contract.
+- **Left to CONN-11.** The transport (WebSocket per §4.1), frame encoding and auth are not decided here. `pose-result-contract.md` lists them under "Open for CONN-11".
 
 ## 4. Layout
 
