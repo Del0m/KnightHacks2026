@@ -390,6 +390,18 @@ describe('the set', () => {
     expect(restNote(spec, set)).toBe('About 0.8 s per rep.');
   });
 
+  it('selects safety before form priority, then priority among safety flags', () => {
+    const safetySpec = makeSpec([
+      rule('form', { priority: 1 }),
+      rule('safety_later', { priority: 4, severity: 'safety' }),
+      rule('safety_first', { priority: 3, severity: 'safety', rest_note: 'Safety first.' }),
+    ]);
+    const results = [evaluateRep(safetySpec, peakRep([110]), { view: 'side' })];
+    const set = summarizeSet(safetySpec, results, 'manual');
+    expect(set.top?.rule_id).toBe('safety_first');
+    expect(restNote(safetySpec, set)).toBe('Safety first.');
+  });
+
   it('carries the injury notes of an effective spec', () => {
     const eff: EffectiveSpec = { ...spec, injuries: ['knee', 'lower_back'], extra_notes: ['Knee note.', 'Back note.'] };
     const set = summarizeSet(eff, [evaluateRep(eff, reps[2], { view: 'side' })], 'manual');

@@ -13,6 +13,7 @@ export const SIDE_MAX_RATIO = 0.25;
 
 const MIN_FRAMES = 3;
 const EPS = 1e-6;
+const MIN_CONFIDENCE = 0.3;
 
 const idx = (name: string) => JOINT_NAMES.indexOf(name);
 const L_SHOULDER = idx('left_shoulder');
@@ -27,10 +28,14 @@ const R_HIP = idx('right_hip');
  */
 export function viewRatio(frame: EngineFrame, imageAspect: number): number | null {
   const j = frame.joints;
-  const ls = j[L_SHOULDER] ?? null;
-  const rs = j[R_SHOULDER] ?? null;
-  const lh = j[L_HIP] ?? null;
-  const rh = j[R_HIP] ?? null;
+  const confident = (index: number) => {
+    const point = j[index];
+    return point && point.c >= MIN_CONFIDENCE ? point : null;
+  };
+  const ls = confident(L_SHOULDER);
+  const rs = confident(R_SHOULDER);
+  const lh = confident(L_HIP);
+  const rh = confident(R_HIP);
   if (ls && rs && lh && rh) {
     const midShoulder = { x: ((ls.x + rs.x) / 2) * imageAspect, y: (ls.y + rs.y) / 2 };
     const midHip = { x: ((lh.x + rh.x) / 2) * imageAspect, y: (lh.y + rh.y) / 2 };

@@ -24,6 +24,22 @@ function mount(spec: ExerciseSpec | null, onEvent?: (e: EngineEvent) => void) {
 }
 
 describe('useFormEngine', () => {
+  it('keeps the count across equivalent spec objects and resets on actual limit changes', () => {
+    const spec = getSpec('squat')!;
+    const { latest, renderer, rerender } = mount(spec);
+    const half = Math.floor(clip.frames.length / 2);
+    const push = (f: (typeof clip.frames)[number]) => act(() => latest.current!.onPose(isAbsentFrame(f) ? { latencyMs: 5 } : { result: f, latencyMs: 5 }));
+    clip.frames.slice(0, half).forEach(push);
+    const count = latest.current!.repCount;
+    expect(count).toBeGreaterThan(0);
+    rerender({ ...spec, phases: { ...spec.phases } });
+    expect(latest.current!.repCount).toBe(count);
+    clip.frames.slice(half).forEach(push);
+    expect(latest.current!.repCount).toBe(clip.expected!.reps);
+    rerender({ ...spec, phases: { ...spec.phases, target: 100 } });
+    expect(latest.current!.repCount).toBe(0);
+    act(() => renderer.unmount());
+  });
   it('exposes invalid-spec errors without rendering or counting with unrestricted limits', () => {
     const valid = getSpec('squat')!;
     const bad = { ...valid, phases: { ...valid.phases, target: 150 } };

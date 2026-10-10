@@ -214,7 +214,10 @@ export function summarizeSet(
     };
   });
   const top = rules.filter((a) => a.n > 0).reduce<RuleAggregate | null>(
-    (best, a) => (best === null || a.priority < best.priority ? a : best),
+    (best, a) => (
+      best === null || (a.severity === 'safety' && best.severity !== 'safety') ||
+      (a.severity === best.severity && a.priority < best.priority) ? a : best
+    ),
     null,
   );
   return {

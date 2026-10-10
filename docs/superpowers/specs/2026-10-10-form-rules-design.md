@@ -45,6 +45,8 @@ export function applyInjuries(spec: ExerciseSpec, injuries: readonly Injury[]): 
 
 ## 2. View detection: `view.ts`
 
+Only torso joints with confidence at least 0.3 are present for view detection; held low-confidence points are excluded.
+
 ```ts
 export const FRONT_MIN_RATIO: number; // 0.4
 export const SIDE_MAX_RATIO: number;  // 0.25
@@ -141,7 +143,7 @@ export function summarizeSet(spec: ExerciseSpec | EffectiveSpec, reps: RepResult
   - `n`: reps flagged.
   - `evaluated`: reps that passed or flagged.
   - `mean_value`: mean value over the flagged reps, or null when `n` is 0.
-- **`top`:** the aggregate with `n > 0` and the lowest `priority`, or null.
+- **`top`:** among aggregates with `n > 0`, prefer `safety`, then the lowest `priority` within the severity. Ties keep spec order. Null when no rule flagged.
 - **`extra_notes`:** `spec.extra_notes`, or `[]` for a plain `ExerciseSpec`.
 
 ## 5. Rest-note placeholders
@@ -168,14 +170,15 @@ export function useFormRules(spec: ExerciseSpec | EffectiveSpec | null, opts?: {
   onSetFlags?: (s: SetFlags) => void;
 }): {
   onEvent: (e: EngineEvent) => void; // chain from useFormEngine's onEvent
-  tintJoints: string[];              // last closed rep's flagged joints; [] after rep_started / set_ended / reset
+  tintJoints: string[];              // last closed rep's flagged joints; minimum 300 ms before next-rep clear
   lastRep: RepResult | null;
   summary: SetFlags | null;          // set once set_ended arrives
   reset: () => void;                 // call with the engine's reset for a new set
 };
 ```
 
-- **Lifetime:** one `SetRules` per `spec` and `view`, rebuilt when either changes. `onSetFlags` is read through a ref.
+- **Lifetime:** one `SetRules` per effective spec content and `view`. Both hooks canonicalize the full JSON spec, so equivalent new objects, reordered object keys and inline `applyInjuries` calls preserve a running set. A real content or view change starts fresh evaluation; id and injuries alone are not a sufficient key. `onSetFlags` is read through a ref.
+- **Tint lifetime:** a next `rep_started` clears the last closed rep's tint after at least 300 ms of display, so batched close/start events still show it. A newer closed rep replaces the tint and cancels pending clears. Set end, reset, spec/view change and unmount cancel pending clears; set end/reset clear immediately.
 - **Invalid spec:** returns `error: Error | null` instead of throwing during render. With an error, `onEvent` is inactive, there is no tint, rep or summary, and `onSetFlags` does not fire. A valid replacement clears the error and starts fresh. `useFormEngine` follows the same policy for poses and counts. Neither hook silently removes injury or physio limits by selecting a base spec.
 - **Re-renders:** only when `tintJoints`, `lastRep` or `summary` change.
 

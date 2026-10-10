@@ -123,7 +123,7 @@ Required order:
 | `view` | `front`, `side` or `any`. The rule is skipped when the detected camera view differs. |
 | `check` | `{ metric, reduce, op, value }`. `reduce` is `min`, `max`, `mean`, `first` or `last`, and is omitted for `duration_ms`. `op` is `<=`, `>=`, `<` or `>`. `value` is a number or a threshold name (`start_exit`, `count_min`, `target`, `start_enter`). |
 | `severity` | `form` or `safety`. Only `safety` may use the optional haptic. |
-| `priority` | Unique integer, where 1 is most important. The rest note covers only the top flagged rule. |
+| `priority` | Unique integer, where 1 is most important within a severity. The rest note prefers safety flags, then lowest priority. |
 | `label` | Form-model label (Architecture §6.3) |
 | `joints` | COCO joints that tint amber when the rule flags |
 | `rest_note` | Fixed note, shown when the LLM's version fails the tone check |
