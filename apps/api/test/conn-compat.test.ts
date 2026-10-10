@@ -148,6 +148,7 @@ describe("CONN-06 insight sync", () => {
       .from(schema.riskInsights)
       .where(eq(schema.riskInsights.userId, "sync-user"));
     expect(risk).toHaveLength(1);
+    expect(risk[0]!.topFeatures).toEqual(["flag_rate_rising"]);
 
     const insights = await api.get("/me/insights");
     expect(insights.body.insights[0]).toMatchObject({
@@ -159,6 +160,61 @@ describe("CONN-06 insight sync", () => {
   });
 });
 
+describe("CONN-14 range of motion sync", () => {
+  it("upserts gold_rom_trend into rom_trend, idempotently, and skips unknown users", async () => {
+    const config: SyncConfig = {
+      host: "https://dbc.example",
+      clientId: "id",
+      clientSecret: "secret",
+      scopes: "sql",
+      warehouseId: "wh",
+      pseudonymSecret: "test-pseudonym-secret-123456",
+      lookbackDays: 35,
+    };
+    const api = await t.as("rom-user");
+    await api.get("/me/profile");
+    const pseudo = pseudonymize("rom-user", config.pseudonymSecret);
+    const week = (w: string, peak: number, change: number | null, healthy: number | null) => ({
+      user_id: pseudo,
+      angle: "knee",
+      side: "left",
+      week: w,
+      peak_range_deg: peak,
+      baseline_range_deg: 71.9,
+      healthy_side_range_deg: healthy,
+      change_deg: change,
+    });
+    const gold = {
+      progress: [],
+      risk: [],
+      rom: [
+        week("2026-08-24", 71.9, 0, 94.7),
+        week("2026-09-21", 90.2, 18.3, 93.3),
+        { ...week("2026-09-21", 93.3, null, null), side: "right" },
+        { ...week("2026-09-21", 80, 8, 92), user_id: "someone-unknown" },
+      ],
+    };
+    const run = () => runInsightSync({ db: client, config, read: async () => gold });
+    expect(await run()).toMatchObject({ rom: 3, skipped_unknown_users: 1 });
+    await run(); // idempotent
+
+    const rows = await t.db.select().from(schema.romTrend).where(eq(schema.romTrend.userId, "rom-user"));
+    expect(rows).toHaveLength(3);
+    expect(rows.find((r) => r.week === "2026-09-21" && r.side === "left")).toMatchObject({
+      angle: "knee",
+      peakRangeDeg: expect.closeTo(90.2, 3),
+      changeDeg: expect.closeTo(18.3, 3),
+      healthySideRangeDeg: expect.closeTo(93.3, 3),
+    });
+
+    gold.rom[1] = week("2026-09-21", 91, 19.1, 93.3); // the pipeline recomputed the week
+    await run();
+    const updated = await t.db.select().from(schema.romTrend).where(eq(schema.romTrend.userId, "rom-user"));
+    expect(updated).toHaveLength(3);
+    expect(updated.find((r) => r.week === "2026-09-21" && r.side === "left")!.changeDeg).toBeCloseTo(19.1, 3);
+  });
+});
+
 describe("CONN-09 moderation", () => {
   it("blocks with Llama Guard's friendly message and lets normal posts through", async () => {
     const api = await t.as("mod-user");
@@ -166,5 +222,21 @@ describe("CONN-09 moderation", () => {
     expect(blocked.status).toBe(422);
     expect(blocked.body.message).toBe("We can't share posts about illegal activity.");
     expect((await api.post("/posts", { kind: "goal", body: "3 gold workouts this month" })).status).toBe(201);
+  });
+
+  it("passes Llama Guard's advisory, unchecked and support flags through the adapter", async () => {
+    const adapter = (result: Awaited<ReturnType<Parameters<typeof llamaGuardModerator>[0]["moderate"]>>) =>
+      llamaGuardModerator({ moderate: async () => result }).check("text", "advice");
+
+    expect(
+      await adapter({ allowed: true, checked: true, categories: ["S6"], advisory: "specialized_advice" }),
+    ).toEqual({ allowed: true, checked: true, advisory: "specialized_advice" });
+    expect(await adapter({ allowed: true, checked: false, categories: [] })).toEqual({
+      allowed: true,
+      checked: false,
+    });
+    expect(
+      await adapter({ allowed: false, checked: true, categories: ["S11"], support: true, message: "988" }),
+    ).toEqual({ allowed: false, message: "988", support: true });
   });
 });

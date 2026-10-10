@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { conflict, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
+import { deleteAccount } from "../services/accountDeletion.js";
 
 const { users, profiles, injuries } = schema;
 const onboardingGoals = new Set([
@@ -154,8 +155,22 @@ export async function getProfile(db: Db, id: string) {
   return row;
 }
 
-export function meRouter(db: Db): Router {
+export interface MeRouterOptions {
+  pseudonymSecret?: string;
+  onAccountDeleted?: (userId: string) => void;
+}
+
+export function meRouter(db: Db, options: MeRouterOptions = {}): Router {
   const router = Router();
+
+  // CONN-13: delete the account and everything in it; Databricks follows via deletion_requests.
+  // Idempotent: deleting an already-deleted account is also 204.
+  router.delete("/me", async (req, res) => {
+    const id = userId(req);
+    await deleteAccount(db, id, options.pseudonymSecret);
+    options.onAccountDeleted?.(id);
+    res.status(204).end();
+  });
 
   router.get("/me/profile", async (req, res) => {
     send(res, await getProfile(db, userId(req)));

@@ -29,8 +29,10 @@ export interface JointFrame {
 }
 
 export interface FinishedRep {
-  start_ms: number; // rep boundaries on the set's frame clock (JointFrame.t_ms)
-  end_ms: number;
+  // Rep boundaries on the set's frame clock (JointFrame.t_ms); null when the phone didn't send
+  // them. The pipeline keeps those reps but can't match them to frames.
+  start_ms: number | null;
+  end_ms: number | null;
   tempo_ms: number;
   range_deg: number;
   quality: number;
@@ -56,7 +58,10 @@ export interface FinishedSession {
   medal: string | null;
   form_score: number | null;
   experience_level: string | null; // from the profile (DB-03)
-  injury_groups: string[]; // coarse body parts, e.g. ["knee"]; never notes or dates
+  // Coarse injury tags: a body part, optionally with a side ("knee", "knee:left"); build them
+  // with injuryGroup(). Never notes or dates (§13). The side feeds range of motion (CONN-14).
+  injury_groups: string[];
+  rehab_start_on?: string | null; // YYYY-MM-DD start of the active rehab plan (DB-12), for the ROM baseline
   sets: FinishedSet[];
 }
 
@@ -123,6 +128,18 @@ export function uploadConfigFromEnv(env = process.env): UploadConfig {
 
 // ---- Payloads ----
 
+export type InjurySide = "left" | "right" | "both";
+
+/** A coarse injury tag for Databricks: "knee", or "knee:left" when the side is known. */
+export function injuryGroup(bodyPart: string, side?: string | null): string {
+  return side === "left" || side === "right" || side === "both" ? `${bodyPart}:${side}` : bodyPart;
+}
+
+// Only tags of that shape leave the server, so free text can't slip into Databricks.
+const isInjuryGroup = (tag: unknown): tag is string =>
+  typeof tag === "string" && /^[a-z_]{1,20}(:(left|right|both))?$/.test(tag);
+const isDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
 export const SCHEMA_VERSION = 1;
 
 // Stable per user, not reversible without the secret. The Databricks delete job (§13)
@@ -172,7 +189,8 @@ export function buildMetadata(session: FinishedSession, config: UploadConfig, jo
     medal: session.medal,
     form_score: session.form_score,
     experience_level: session.experience_level,
-    injury_groups: session.injury_groups.map(String),
+    injury_groups: session.injury_groups.filter(isInjuryGroup),
+    rehab_start_on: isDate(session.rehab_start_on) ? session.rehab_start_on : null,
     joints_path: jointsPath,
     exported_at: new Date().toISOString(),
     sets: session.sets.map((set, setIndex) => ({
@@ -218,6 +236,11 @@ function isRetryable(err: unknown): boolean {
   return true; // network errors, timeouts
 }
 
+// Console or pino: both take a plain message.
+export interface LogLike {
+  error(msg: string): void;
+}
+
 export class DatabricksUploader {
   private token: string | null = null;
   private tokenExpiresAt = 0;
@@ -226,6 +249,7 @@ export class DatabricksUploader {
     private readonly config: UploadConfig,
     private readonly status: ExportStatusStore,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly log: LogLike = console,
   ) {}
 
   /** Uploads a finished session and records the outcome in Neon. Never throws. */
@@ -251,7 +275,7 @@ export class DatabricksUploader {
     }
 
     const message = lastError instanceof Error ? lastError.message : String(lastError);
-    console.error(`[databricks] export failed for session ${session.id}: ${message}`);
+    this.log.error(`[databricks] export failed for session ${session.id}: ${message}`);
     await this.status.set(session.id, "failed", message);
     return "failed";
   }

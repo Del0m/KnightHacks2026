@@ -5,6 +5,7 @@ import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { conflict, isUniqueViolation, notFound } from "../http.js";
 import type { Logger } from "pino";
+import { injuryGroup } from "../integrations/databricks/upload.js";
 import type { BufferedSetJoints, ExportQueue, ExportSession, JointsBuffer } from "./exportQueue.js";
 import {
   BASELINE_WINDOW_DAYS,
@@ -358,7 +359,10 @@ export async function buildExportSession(
     medal: session.medal,
     form_score: session.formScore,
     experience_level: profile?.level ?? null,
-    injury_groups: injuryParts.map((p) => p.part),
+    // DB-12 adds injuries.side and rehab_plans: pass the side to injuryGroup() and set
+    // rehab_start_on from the active plan, so range of motion (CONN-14) compares the right sides.
+    injury_groups: injuryParts.map((p) => injuryGroup(p.part)),
+    rehab_start_on: null,
     sets: setRows.map((s) => ({
       exercise_id: s.exerciseId,
       weight_kg: s.weightKg,
@@ -368,8 +372,8 @@ export async function buildExportSession(
       reps: repRows
         .filter((r) => r.setId === s.id)
         .map((r) => ({
-          start_ms: r.startMs ?? 0,
-          end_ms: r.endMs ?? 0,
+          start_ms: r.startMs ?? null, // unknown, not 0: 0..0 would fail the pipeline's bounds check
+          end_ms: r.endMs ?? null,
           tempo_ms: r.tempoMs,
           range_deg: r.rangeDeg,
           quality: r.quality ?? (r.clean ? 1 : 0),

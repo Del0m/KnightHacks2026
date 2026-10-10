@@ -22,6 +22,20 @@
       "when": 1791651922022,
       "tag": "0002_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791656284248,
+      "tag": "0003_conn13_deletion_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791656284649,
+      "tag": "0004_conn14_rom_trend",
+      "breakpoints": true
     }
   ]
 }
