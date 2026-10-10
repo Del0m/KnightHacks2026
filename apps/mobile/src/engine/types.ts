@@ -84,13 +84,30 @@ export interface InjuryOverride {
   extra_note: string;
 }
 
+/**
+ * A condition the rep must meet to reach its peak, e.g. wrists above the shoulders for a press, so
+ * a rest position that happens to match the angle (arms hanging straight) can't count.
+ */
+export interface PrimaryGate {
+  /** An `angles` key (not `duration_ms`). */
+  metric: string;
+  op: CompareOp;
+  value: number;
+}
+
+export interface PrimaryAngle {
+  name: string;
+  direction: Direction;
+  gate?: PrimaryGate;
+}
+
 export interface ExerciseSpec {
   spec_version: 1;
   id: string;
   name: string;
   recommended_view: View;
   angles: Record<string, AngleSpec>;
-  primary_angle: { name: string; direction: Direction };
+  primary_angle: PrimaryAngle;
   phases: Phases;
   rules: Rule[];
   injury_overrides: Record<Injury, InjuryOverride>;
@@ -117,7 +134,11 @@ export type MetricSides = Record<string, MetricSide | null>;
 // Rep counter (pure: primary angle over time)
 
 export type RepState = 'start' | 'outbound' | 'peak' | 'return';
-export type SetEndReason = 'still' | 'absent' | 'manual';
+/**
+ * Why the set ended. `absent`: no person for `set_end_still_ms`. `lost`: a person was there for most
+ * of that gap but the primary angle couldn't be measured (e.g. ankles cropped out).
+ */
+export type SetEndReason = 'still' | 'absent' | 'lost' | 'manual';
 
 /** Durations in ms, per the spec format. `return` and `rep` stop at the `start_enter` crossing. */
 export interface RepDurations {
@@ -205,6 +226,8 @@ export interface RepRecord extends RepTiming {
   windows: RepWindows;
   /** Side of the primary angle at the extreme frame (range-of-motion tracking per side). */
   side: MetricSide | null;
+  /** Upright image width ÷ height when the rep closed, for geometry on `windows[*].joints`. */
+  imageAspect: number;
 }
 
 export type EngineEvent =
@@ -219,7 +242,10 @@ export interface EngineUpdate {
   state: RepState;
   repCount: number;
   ended: boolean;
-  /** Primary angle this frame, or null. */
+  /**
+   * Primary angle as the counter saw it: null when missing, when one of its joints is below
+   * `minConfidence`, or when rejected as an impossible jump (`metrics` keeps the raw value).
+   */
   primary: number | null;
   primarySide: MetricSide | null;
   metrics: Metrics;
@@ -244,7 +270,7 @@ export interface EngineOptions {
    */
   imageAspect?: number;
   filter?: Partial<OneEuroParams>;
-  /** Joints below this confidence are held, then missing. Default 0.3. */
+  /** Joints below this confidence are held, then missing. The primary angle is null if any of its joints is below it. Default 0.3. */
   minConfidence?: number;
   /** How long a low-confidence joint keeps its last value, ms. Default 300. */
   holdMs?: number;
@@ -252,4 +278,84 @@ export interface EngineOptions {
   sideMargin?: number;
   /** `width_ratio` is null when the denominator's x-distance is below this. Default 0.02. */
   minRatioDenominator?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Form rules (AI-07): docs/superpowers/specs/2026-10-10-form-rules-design.md
+
+/** Camera view of one rep. `unknown` runs only `view: "any"` rules. */
+export type DetectedView = View | 'unknown';
+
+/** One failed rule on one rep. Stored as `FORM_FLAG`. */
+export interface Flag {
+  rule_id: string;
+  severity: Severity;
+  /** 0-based within the set: `RepRecord.index - 1`. */
+  rep_index: number;
+}
+
+export type RuleStatus = 'pass' | 'flag' | 'skipped_view' | 'unmeasured';
+
+export interface RuleOutcome {
+  rule_id: string;
+  status: RuleStatus;
+  /** Reduced value (ms for `duration_ms`); null when skipped or unmeasured. */
+  value: number | null;
+  /** The resolved `check.value`. */
+  threshold: number;
+}
+
+/** Every rule's result for one rep, in `spec.rules` order. */
+export interface RepResult {
+  rep_index: number;
+  view: DetectedView;
+  /** `caller` when the view was passed in, else `detected`. */
+  view_source: 'caller' | 'detected';
+  flags: Flag[];
+  outcomes: RuleOutcome[];
+  /** Union of `joints` over the flagged rules, for the amber tint. */
+  tint_joints: string[];
+}
+
+/** One rule over the whole set. */
+export interface RuleAggregate {
+  rule_id: string;
+  severity: Severity;
+  priority: number;
+  /** Reps flagged by this rule (`{n}`). */
+  n: number;
+  /** Reps where it passed or flagged (not skipped or unmeasured). */
+  evaluated: number;
+  /** Mean reduced value over the flagged reps (`{value}`, and `{t}` in seconds); null when n = 0. */
+  mean_value: number | null;
+}
+
+/** The held flags, released when the set ends. AI-08 packages this. */
+export interface SetFlags {
+  exercise_id: string;
+  reason: SetEndReason;
+  /** Counted reps (`{total}`). */
+  total_reps: number;
+  /** Reps with no flags. */
+  clean_reps: number;
+  /** All flags, in rep order then `spec.rules` order. */
+  flags: Flag[];
+  reps: RepResult[];
+  /** One per rule in `spec.rules`, in that order. */
+  rules: RuleAggregate[];
+  /** The flagged rule with the best (lowest) priority: the one rest note. Null when every rep is clean. */
+  top: RuleAggregate | null;
+  /** The injury overrides' `extra_note`s, in body-part order. */
+  extra_notes: string[];
+}
+
+/**
+ * A spec with the user's injury overrides applied (`applyInjuries`). AI-16's physio limits go on top
+ * and keep these fields. The rules read `extra_notes` into `SetFlags`.
+ */
+export interface EffectiveSpec extends ExerciseSpec {
+  /** Applied in body-part order: `knee`, `shoulder`, `lower_back`. */
+  injuries: Injury[];
+  /** Their `extra_note`s, same order. */
+  extra_notes: string[];
 }

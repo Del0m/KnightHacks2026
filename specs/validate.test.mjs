@@ -2,8 +2,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  applyInjuries,
   applyOverride,
   checkNote,
+  injurySubsets,
   loadBanned,
   loadSchema,
   loadSpecs,
@@ -165,6 +167,53 @@ describe('semantic checks', () => {
     assertError(errorsFor((s) => (s.primary_angle.name = 'hip')), /primary_angle.*not defined/);
   });
 
+  describe('primary gate', () => {
+    const gated = (gate) => (s) => (s.primary_angle.gate = gate);
+
+    test('an angle other than the primary is valid', () => {
+      assert.deepEqual(errorsFor(gated({ metric: 'trunk', op: '<=', value: 60 })), []);
+    });
+
+    test('metric must be an angle in angles', () => {
+      assertError(
+        errorsFor(gated({ metric: 'elbow', op: '<=', value: 60 })),
+        /primary_angle\.gate: unknown metric "elbow"/,
+      );
+    });
+
+    test('metric cannot be duration_ms', () => {
+      assertError(
+        errorsFor(gated({ metric: 'duration_ms', op: '>=', value: 800 })),
+        /primary_angle\.gate.*not duration_ms/,
+      );
+    });
+
+    test('metric cannot be the primary angle', () => {
+      assertError(
+        errorsFor(gated({ metric: 'knee', op: '<=', value: 120 })),
+        /primary_angle\.gate.*"knee" is the primary angle itself/,
+      );
+    });
+
+    test('op must be a comparison', () => {
+      assertError(errorsFor(gated({ metric: 'trunk', op: '==', value: 60 })), /primary_angle\/gate\/op/);
+    });
+
+    test('value must be a number', () => {
+      assertError(
+        errorsFor(gated({ metric: 'trunk', op: '<=', value: 'target' })),
+        /primary_angle\/gate\/value: must be number/,
+      );
+    });
+
+    test('carries through injury overrides unchanged', () => {
+      const spec = fixture();
+      spec.primary_angle.gate = { metric: 'trunk', op: '<=', value: 60 };
+      assert.deepEqual(applyOverride(spec, 'knee').primary_angle, spec.primary_angle);
+      assert.deepEqual(applyInjuries(spec, ['knee', 'lower_back']).primary_angle, spec.primary_angle);
+    });
+  });
+
   test('unsided point needs a side', () => {
     assertError(errorsFor((s) => delete s.angles.knee.side), /angles\.knee.*needs a side/);
   });
@@ -201,6 +250,18 @@ describe('semantic checks', () => {
       errorsFor((s) => (s.injury_overrides.knee.phases.target = 140)),
       /injury_overrides\.knee.*decreasing/,
     );
+  });
+
+  test('ordering is checked for every injury combination', () => {
+    // Each override is fine alone; together the target ends up below count_min.
+    const errors = errorsFor((s) => {
+      s.injury_overrides.knee.phases.target = 130;
+      s.injury_overrides.shoulder.phases = { count_min: 125 };
+    });
+    assert.ok(!errors.some((e) => /injury_overrides\.(knee|shoulder):/.test(e)), errors.join('\n'));
+    assertError(errors, /^injury_overrides\.knee\+shoulder: .*decreasing \(got 130, 125,/);
+    assertError(errors, /^injury_overrides\.knee\+shoulder\+lower_back: .*decreasing/);
+    assert.ok(!errors.some((e) => /injury_overrides\.knee\+lower_back:/.test(e)), errors.join('\n'));
   });
 
   test('override rule references must exist', () => {
@@ -311,5 +372,192 @@ describe('applyOverride', () => {
 
     assert.equal(base.phases.target, 95, 'base spec is not mutated');
     assert.equal(base.rules.length, 2);
+  });
+});
+
+describe('applyInjuries', () => {
+  const rule = (spec, id) => spec.rules.find((r) => r.id === id);
+  // fixture() with the three overrides replaced, so each case sets only what it tests.
+  function withOverrides({ knee = {}, shoulder = {}, lower_back = {} }) {
+    const spec = fixture();
+    spec.injury_overrides = {
+      knee: { extra_note: 'knee note', ...knee },
+      shoulder: { extra_note: 'shoulder note', ...shoulder },
+      lower_back: { extra_note: 'back note', ...lower_back },
+    };
+    return spec;
+  }
+  function increasing(overrides) {
+    const spec = withOverrides(overrides);
+    spec.primary_angle.direction = 'increasing';
+    Object.assign(spec.phases, { start_enter: 95, start_exit: 100, count_min: 135, target: 160 });
+    return spec;
+  }
+
+  test('no injuries is the base spec plus empty lists', () => {
+    const base = fixture();
+    assert.deepEqual(applyInjuries(base, []), { ...base, injuries: [], extra_notes: [] });
+  });
+
+  test('one injury matches applyOverride', () => {
+    const base = fixture();
+    for (const injury of ['knee', 'shoulder', 'lower_back']) {
+      const one = applyInjuries(base, [injury]);
+      const ref = applyOverride(base, injury);
+      assert.deepEqual(one.phases, ref.phases, injury);
+      assert.deepEqual(one.rules, ref.rules, injury);
+      assert.deepEqual(one.injuries, [injury]);
+      assert.deepEqual(one.extra_notes, [base.injury_overrides[injury].extra_note]);
+    }
+  });
+
+  test('dedupes and applies in body-part order', () => {
+    const spec = withOverrides({ knee: { phases: { min_state_ms: 300 } }, lower_back: { phases: { min_state_ms: 200 } } });
+    const eff = applyInjuries(spec, ['lower_back', 'knee', 'lower_back', 'knee']);
+    assert.deepEqual(eff.injuries, ['knee', 'lower_back']);
+    assert.deepEqual(eff.extra_notes, ['knee note', 'back note']);
+    assert.equal(eff.phases.min_state_ms, 200, 'lower_back is applied last whatever the input order');
+  });
+
+  test('extra_notes follow every applied override in order', () => {
+    const eff = applyInjuries(withOverrides({}), ['lower_back', 'shoulder', 'knee']);
+    assert.deepEqual(eff.extra_notes, ['knee note', 'shoulder note', 'back note']);
+  });
+
+  test('count_min and target keep less range for decreasing', () => {
+    for (const [a, b] of [[110, 105], [105, 110]]) {
+      const spec = withOverrides({
+        knee: { phases: { target: a, count_min: a + 20 } },
+        lower_back: { phases: { target: b, count_min: b + 20 } },
+      });
+      const eff = applyInjuries(spec, ['knee', 'lower_back']);
+      assert.equal(eff.phases.target, 110);
+      assert.equal(eff.phases.count_min, 130);
+    }
+  });
+
+  test('count_min and target keep less range for increasing', () => {
+    for (const [a, b] of [[150, 145], [145, 150]]) {
+      const spec = increasing({
+        knee: { phases: { target: a, count_min: a - 20 } },
+        shoulder: { phases: { target: b, count_min: b - 20 } },
+      });
+      const eff = applyInjuries(spec, ['knee', 'shoulder']);
+      assert.equal(eff.phases.target, 145);
+      assert.equal(eff.phases.count_min, 125);
+    }
+  });
+
+  test('one override setting count_min or target is applied as is', () => {
+    const spec = withOverrides({ knee: { phases: { target: 90 } }, shoulder: { phases: { count_min: 140 } } });
+    const eff = applyInjuries(spec, ['knee', 'shoulder']);
+    assert.equal(eff.phases.target, 90);
+    assert.equal(eff.phases.count_min, 140);
+  });
+
+  test('other phase keys: the later override wins', () => {
+    const spec = withOverrides({
+      knee: { phases: { start_exit: 150, reverse_deg: 8 } },
+      shoulder: { phases: { start_exit: 155, reverse_deg: 3 } },
+    });
+    const eff = applyInjuries(spec, ['knee', 'shoulder']);
+    assert.equal(eff.phases.start_exit, 155);
+    assert.equal(eff.phases.reverse_deg, 3);
+  });
+
+  test('numeric values keep the stricter bound for the op', () => {
+    const cases = [
+      ['>=', 1200], ['>', 1200],
+      ['<=', 1000], ['<', 1000],
+    ];
+    for (const [op, expected] of cases) {
+      for (const [a, b] of [[1000, 1200], [1200, 1000]]) {
+        const spec = withOverrides({ knee: { rules: { tempo: { value: a } } }, shoulder: { rules: { tempo: { value: b } } } });
+        rule(spec, 'tempo').check.op = op;
+        const eff = applyInjuries(spec, ['knee', 'shoulder']);
+        assert.equal(rule(eff, 'tempo').check.value, expected, `${op} ${a} then ${b}`);
+        assert.equal(rule(eff, 'tempo').check.op, op);
+      }
+    }
+  });
+
+  test('a threshold name on either side: the later override wins', () => {
+    let spec = withOverrides({ knee: { rules: { depth: { value: 100 } } }, lower_back: { rules: { depth: { value: 'count_min' } } } });
+    assert.equal(rule(applyInjuries(spec, ['knee', 'lower_back']), 'depth').check.value, 'count_min');
+    spec = withOverrides({ knee: { rules: { depth: { value: 'count_min' } } }, lower_back: { rules: { depth: { value: 100 } } } });
+    assert.equal(rule(applyInjuries(spec, ['knee', 'lower_back']), 'depth').check.value, 100);
+    spec = withOverrides({ knee: { rules: { depth: { value: 'count_min' } } }, lower_back: { rules: { depth: { value: 'target' } } } });
+    assert.equal(rule(applyInjuries(spec, ['knee', 'lower_back']), 'depth').check.value, 'target');
+  });
+
+  test('safety wins over form', () => {
+    for (const [a, b] of [['safety', 'form'], ['form', 'safety']]) {
+      const spec = withOverrides({ knee: { rules: { depth: { severity: a } } }, shoulder: { rules: { depth: { severity: b } } } });
+      assert.equal(rule(applyInjuries(spec, ['knee', 'shoulder']), 'depth').severity, 'safety');
+    }
+    const spec = withOverrides({ knee: { rules: { tempo: { value: 1200 } } }, shoulder: { rules: { tempo: { severity: 'safety' } } } });
+    const tempo = rule(applyInjuries(spec, ['knee', 'shoulder']), 'tempo');
+    assert.equal(tempo.severity, 'safety');
+    assert.equal(tempo.check.value, 1200, 'a patch without a value leaves the earlier value');
+  });
+
+  test('rest_note follows the winning value', () => {
+    // tempo is >=, so 1500 is stricter than 1200.
+    let spec = withOverrides({
+      knee: { rules: { tempo: { value: 1500, rest_note: 'knee tempo' } } },
+      shoulder: { rules: { tempo: { value: 1200, rest_note: 'shoulder tempo' } } },
+    });
+    let tempo = rule(applyInjuries(spec, ['knee', 'shoulder']), 'tempo');
+    assert.equal(tempo.check.value, 1500);
+    assert.equal(tempo.rest_note, 'knee tempo');
+
+    // The winner has no note: the latest note set.
+    spec = withOverrides({
+      knee: { rules: { tempo: { value: 1500 } } },
+      shoulder: { rules: { tempo: { value: 1200, rest_note: 'shoulder tempo' } } },
+    });
+    tempo = rule(applyInjuries(spec, ['knee', 'shoulder']), 'tempo');
+    assert.equal(tempo.check.value, 1500);
+    assert.equal(tempo.rest_note, 'shoulder tempo');
+
+    // No values at all: the latest note set.
+    spec = withOverrides({
+      knee: { rules: { tempo: { rest_note: 'knee tempo' } } },
+      shoulder: { rules: { tempo: { rest_note: 'shoulder tempo' } } },
+      lower_back: { rules: { tempo: { severity: 'safety' } } },
+    });
+    tempo = rule(applyInjuries(spec, ['knee', 'shoulder', 'lower_back']), 'tempo');
+    assert.equal(tempo.rest_note, 'shoulder tempo');
+    assert.equal(tempo.check.value, 800);
+  });
+
+  test('disable_rules is the union', () => {
+    const spec = withOverrides({ knee: { disable_rules: ['depth'] }, lower_back: { disable_rules: ['tempo'] } });
+    assert.deepEqual(applyInjuries(spec, ['knee']).rules.map((r) => r.id), ['tempo']);
+    assert.deepEqual(applyInjuries(spec, ['knee', 'lower_back']).rules, []);
+  });
+
+  test('squat with knee and lower_back keeps the shallower target', () => {
+    const squat = loadSpecs().find((s) => s.fileId === 'squat').spec;
+    const eff = applyInjuries(squat, ['knee', 'lower_back']);
+    assert.equal(eff.phases.target, 110);
+    assert.equal(rule(eff, 'tempo').check.value, 1500);
+    assert.equal(rule(eff, 'trunk_lean').check.value, 35);
+    assert.equal(rule(eff, 'trunk_lean').severity, 'safety');
+  });
+
+  test('does not mutate the spec', () => {
+    const spec = withOverrides({ knee: { phases: { target: 110 }, rules: { tempo: { value: 1200 } } } });
+    const before = JSON.parse(JSON.stringify(spec));
+    applyInjuries(spec, ['knee', 'shoulder', 'lower_back']);
+    assert.deepEqual(spec, before);
+  });
+
+  test('injurySubsets lists the 7 combinations, singles first', () => {
+    assert.deepEqual(injurySubsets(), [
+      ['knee'], ['shoulder'], ['lower_back'],
+      ['knee', 'shoulder'], ['knee', 'lower_back'], ['shoulder', 'lower_back'],
+      ['knee', 'shoulder', 'lower_back'],
+    ]);
   });
 });

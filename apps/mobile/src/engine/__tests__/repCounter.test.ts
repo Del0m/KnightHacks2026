@@ -13,7 +13,8 @@ const SQUAT: Phases = {
 const SHOULDER_PRESS: Phases = { ...SQUAT, start_exit: 100, count_min: 135, target: 160, start_enter: 95 };
 const PUSH_UP: Phases = { ...SQUAT, start_exit: 150, count_min: 120, target: 90, start_enter: 155 };
 
-type Frame = [t: number, value: number | null];
+/** `person` defaults to true, as in `RepCounter.step`. */
+type Frame = [t: number, value: number | null, person?: boolean];
 type Key = [t: number, value: number | null];
 
 /** Small seeded PRNG (mulberry32), uniform in [0, 1). */
@@ -60,14 +61,18 @@ function seq(t0: number, dt: number, values: (number | null)[]): Frame[] {
   return values.map((v, i) => [t0 + i * dt, v]);
 }
 
+/** No-person frames `dt` ms apart starting at `t0`. */
+const absentSeq = (t0: number, dt: number, n: number): Frame[] =>
+  seq(t0, dt, Array(n).fill(null)).map(([t]) => [t, null, false]);
+
 interface Run {
-  steps: (CounterStep & { t: number; value: number | null })[];
+  steps: (CounterStep & { t: number; value: number | null; person?: boolean })[];
   events: CounterEvent[];
   last: CounterStep;
 }
 
 function run(counter: RepCounter, frames: Frame[]): Run {
-  const steps = frames.map(([t, value]) => ({ ...counter.step(t, value), t, value }));
+  const steps = frames.map(([t, value, person]) => ({ ...counter.step(t, value, person), t, value, person }));
   return { steps, events: steps.flatMap((s) => s.events), last: steps[steps.length - 1] };
 }
 
@@ -261,7 +266,7 @@ describe('createRepCounter: null frames and set end', () => {
   it('ends the set as absent after set_end_still_ms of nulls once a rep is counted', () => {
     const counter = createRepCounter('decreasing', SQUAT);
     run(counter, sample(reps(1, 175, 90)));
-    const { steps } = run(counter, seq(3000, 500, Array(20).fill(null)));
+    const { steps } = run(counter, absentSeq(3000, 500, 20));
     const ending = steps.filter((s) => s.events.length > 0);
     expect(ending).toHaveLength(1);
     expect(ending[0].t).toBe(11000);
@@ -272,16 +277,51 @@ describe('createRepCounter: null frames and set end', () => {
   it('emits partial for an attempt in progress on absent end', () => {
     const counter = createRepCounter('decreasing', SQUAT);
     run(counter, sample([[0, 175], [500, 175], [1500, 90], [2500, 175], [3000, 175], [3500, 140]]));
-    const { events } = run(counter, seq(3550, 1000, Array(10).fill(null)));
+    const { events } = run(counter, absentSeq(3550, 1000, 10));
     expect(events).toEqual([
       { type: 'partial', t: 11550, attempt: 2 },
       { type: 'set_ended', t: 11550, reason: 'absent' },
     ]);
   });
 
+  it('ends the set as lost when a person stays in view with no primary angle', () => {
+    const counter = createRepCounter('decreasing', SQUAT);
+    run(counter, sample(reps(1, 175, 90)));
+    const { events } = run(counter, seq(3000, 500, Array(20).fill(null)));
+    expect(events).toEqual([{ type: 'set_ended', t: 11000, reason: 'lost' }]);
+  });
+
+  it('decides lost or absent by the majority of the gap, a tie going to absent', () => {
+    const gap = (withPerson: number) =>
+      seq(3000, 500, Array(17).fill(null)).map(([t], i): Frame => [t, null, i < withPerson]);
+    for (const [withPerson, reason] of [
+      [9, 'lost'],
+      [8, 'absent'],
+      [3, 'absent'],
+    ] as const) {
+      const counter = createRepCounter('decreasing', SQUAT);
+      run(counter, sample(reps(1, 175, 90)));
+      expect(ofType(run(counter, gap(withPerson)).events, 'set_ended')[0].reason).toBe(reason);
+    }
+    // An even split: 2 of 4 frames with a person.
+    const tie: Frame[] = [[3000, null, true], [6000, null, false], [9000, null, true], [11000, null, false]];
+    const counter = createRepCounter('decreasing', SQUAT);
+    run(counter, sample(reps(1, 175, 90)));
+    expect(run(counter, tie).events).toEqual([{ type: 'set_ended', t: 11000, reason: 'absent' }]);
+  });
+
+  it('counts only the current gap toward lost', () => {
+    const counter = createRepCounter('decreasing', SQUAT);
+    run(counter, sample(reps(1, 175, 90)));
+    // A person-present gap, then a measured frame, then a no-person gap long enough to end the set.
+    run(counter, seq(3000, 500, Array(10).fill(null)).concat([[8000, 175]]));
+    const { events } = run(counter, absentSeq(8500, 500, 17));
+    expect(events).toEqual([{ type: 'set_ended', t: 16500, reason: 'absent' }]);
+  });
+
   it('never ends the set before the first counted rep', () => {
     const counter = createRepCounter('decreasing', SQUAT);
-    const absent = run(counter, seq(0, 500, Array(30).fill(null)));
+    const absent = run(counter, absentSeq(0, 500, 30));
     const still = run(counter, sample([[15000, 175], [40000, 175]]));
     expect(absent.events).toEqual([]);
     expect(still.events).toEqual([]);
@@ -423,5 +463,98 @@ describe('createRepCounter: settle tail and windows', () => {
     const ret = returnFrames(steps, 1);
     expect(Math.max(...ret.map((s) => s.value as number))).toBe(168);
     expect(ofType(events, 'rep_closed')[0].t).toBe(1400);
+  });
+});
+
+describe('createRepCounter: primary gate', () => {
+  /** Steps every frame with `gate(value)` as the gate. */
+  const runGated = (counter: RepCounter, frames: Frame[], gate: (v: number) => boolean) => {
+    const steps = frames.map(([t, value]) => ({
+      ...counter.step(t, value, true, value === null || gate(value)),
+      t,
+      value,
+    }));
+    return { steps, events: steps.flatMap((s) => s.events) };
+  };
+
+  it('blocks peak while the gate fails, so the attempt returns as a partial', () => {
+    const { steps, events } = runGated(createRepCounter('decreasing', SQUAT), sample(reps(1, 175, 90)), () => false);
+    expect(types(events)).toEqual(['rep_started', 'partial']);
+    expect(steps.some((s) => s.state === 'peak')).toBe(false);
+    expect(steps.at(-1)!.repCount).toBe(0);
+  });
+
+  it('enters peak on the first frame the gate passes, past count_min', () => {
+    const { steps, events } = runGated(createRepCounter('decreasing', SQUAT), sample(reps(1, 175, 90)), (v) => v <= 110);
+    expect(types(events)).toEqual(['rep_started', 'rep_counted', 'rep_closed']);
+    const firstPeak = steps.findIndex((s) => s.state === 'peak');
+    expect(steps[firstPeak].value).toBeLessThanOrEqual(110);
+    expect(steps[firstPeak - 1].state).toBe('outbound');
+    expect(steps[firstPeak - 1].value).toBeLessThan(SQUAT.count_min);
+  });
+
+  it('passes by default', () => {
+    const { events } = run(createRepCounter('decreasing', SQUAT), sample(reps(1, 175, 90)));
+    expect(ofType(events, 'rep_counted')).toHaveLength(1);
+  });
+});
+
+describe('createRepCounter: still end in any state', () => {
+  // Push-up: counted at 157 (t=700), then a jump to 175 at t=750 moves the still anchor there.
+  const toCount = seq(0, 50, [165, 165, 165, 165, 145, 130, 115, 110, 105, 100, 110, 125, 140, 153, 157]);
+  const settle: Frame[] = [[750, 175]];
+  /** Holds 175 until t=1450, closing the settle tail. */
+  const rested = seq(800, 50, Array(14).fill(175));
+  const endOf = (steps: Run['steps']) => steps.find((s) => s.events.some((e) => e.type === 'set_ended'));
+
+  it('ends a set resting mid-position (outbound), the attempt becoming a partial', () => {
+    // Resting at 140, past start_exit (150) but short of count_min (120), with ±3° jitter.
+    const rest = seq(1500, 50, Array.from({ length: 200 }, (_, i) => 140 + (i % 2 ? 3 : -3)));
+    const { steps } = run(createRepCounter('decreasing', PUSH_UP), [...toCount, ...settle, ...rested, ...rest]);
+    expect(steps.find((s) => s.t === 1500)!.events).toEqual([{ type: 'rep_started', t: 1500, attempt: 2 }]);
+    const end = endOf(steps)!;
+    expect(steps[steps.indexOf(end) - 1].state).toBe('outbound');
+    expect(end.events).toEqual([
+      { type: 'partial', t: 9500, attempt: 2 },
+      { type: 'set_ended', t: 9500, reason: 'still' },
+    ]);
+    expect(end).toMatchObject({ state: 'start', ended: true, repCount: 1, window: null });
+  });
+
+  it('ends a set resting at the start, jitter within ±8° not resetting the hold', () => {
+    const jitter = seq(800, 50, Array.from({ length: 200 }, (_, i) => 175 + (i % 2 ? 8 : -8)));
+    const { steps, events } = run(createRepCounter('decreasing', PUSH_UP), [...toCount, ...settle, ...jitter]);
+    expect(endOf(steps)!.t).toBe(750 + 8000);
+    expect(types(events).slice(-1)).toEqual(['set_ended']);
+    expect(ofType(events, 'rep_closed')).toHaveLength(1);
+  });
+
+  it('restarts the hold on a 12° move', () => {
+    const before = seq(800, 50, Array(64).fill(175));
+    const after = seq(4000, 50, Array(200).fill(187));
+    const { steps } = run(createRepCounter('decreasing', PUSH_UP), [...toCount, ...settle, ...before, ...after]);
+    expect(endOf(steps)!.t).toBe(4000 + 8000);
+  });
+
+  it('does not reset the hold on state transitions', () => {
+    // Squat hovering 158–167 crosses start_exit (160) and start_enter (165) without moving 10°.
+    const counter = createRepCounter('decreasing', SQUAT);
+    const first = run(counter, seq(0, 50, [175, 175, 175, 175, 150, 130, 110, 100, 100, 100, 120, 140, 160, 170]));
+    expect(ofType(first.events, 'rep_counted')).toHaveLength(1);
+    const hover = seq(700, 50, Array.from({ length: 200 }, (_, i) => [162, 158, 158, 158, 158, 167, 167, 167, 167][i % 9]));
+    const { steps, events } = run(counter, hover);
+    expect(ofType(events, 'rep_started').length).toBeGreaterThan(0);
+    expect(ofType(events, 'partial').length).toBeGreaterThan(0);
+    // The anchor moves from the count (170) to 158 at t=750; every later frame is within 10° of it.
+    const end = endOf(steps)!;
+    expect(end.t).toBe(750 + 8000);
+    expect(ofType(events, 'rep_started')[0].t).toBeGreaterThan(750);
+  });
+
+  it('does not apply before the first counted rep', () => {
+    const counter = createRepCounter('decreasing', PUSH_UP);
+    const { events, last } = run(counter, [...seq(0, 50, [165, 165, 165, 165]), ...seq(200, 50, Array(400).fill(140))]);
+    expect(types(events)).toEqual(['rep_started']);
+    expect(last).toMatchObject({ state: 'outbound', ended: false });
   });
 });

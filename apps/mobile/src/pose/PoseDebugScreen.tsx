@@ -8,10 +8,29 @@ import { usePoseOutput, type PoseEngine } from './usePoseOutput';
 import { usePoseMode, type PoseModeState } from './usePoseMode';
 import { EXERCISE_SPECS } from '../engine/specs';
 import { useFormEngine } from '../engine/useFormEngine';
+import { useFormRules } from '../engine/useFormRules';
+import { restNote } from '../engine/rules';
+import type { ExerciseSpec, RepResult } from '../engine/types';
 import { createPoseClock } from '../engine/poseClock';
 import { createClipRecorder } from '../engine/recording';
 
 type Size = { width: number; height: number };
+
+/** `rule value op limit` for each flagged rule, e.g. `tempo 0.6s < 0.8s`; durations in seconds. */
+function describeFlags(spec: ExerciseSpec, rep: RepResult): string {
+  const flagged = rep.outcomes.filter((o) => o.status === 'flag');
+  if (flagged.length === 0) return 'clean';
+  return flagged
+    .map((o) => {
+      const rule = spec.rules.find((r) => r.id === o.rule_id);
+      const isTime = rule?.check.metric === 'duration_ms';
+      const fmt = (v: number) => (isTime ? `${(v / 1000).toFixed(1)}s` : v.toFixed(Math.abs(v) < 10 ? 2 : 0));
+      // The check failed, so the value sits on the wrong side of the rule's op.
+      const op = { '<=': '>', '<': '>=', '>=': '<', '>': '<=' }[rule?.check.op ?? '<='];
+      return `${o.rule_id} ${o.value === null ? '–' : fmt(o.value)} ${op} ${fmt(o.threshold)}`;
+    })
+    .join(', ');
+}
 
 /** The portrait app shows frames upright, so the short side is the width. */
 const uprightSize = (r: Size | undefined): Size | null =>
@@ -85,8 +104,17 @@ function LiveCamera({ poseMode, position, setPosition }: {
 
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const spec = EXERCISE_SPECS[exerciseIndex];
-  const form = useFormEngine(spec, { imageAspect: imageSize ? imageSize.width / imageSize.height : undefined });
-  const { onPose: formOnPose, reset: resetForm } = form;
+  const rules = useFormRules(spec);
+  const form = useFormEngine(spec, {
+    imageAspect: imageSize ? imageSize.width / imageSize.height : undefined,
+    onEvent: rules.onEvent,
+  });
+  const { onPose: formOnPose, reset: resetEngine } = form;
+  const { reset: resetRules } = rules;
+  const resetForm = useCallback(() => {
+    resetEngine();
+    resetRules();
+  }, [resetEngine, resetRules]);
   const recorder = useRef<ReturnType<typeof createClipRecorder> | null>(null);
   const clock = useRef(createPoseClock()).current;
   const [recording, setRecording] = useState(false);
@@ -171,7 +199,14 @@ function LiveCamera({ poseMode, position, setPosition }: {
       )}
 
       {imageSize && viewSize ? (
-        <PoseSkeleton result={result} imageSize={imageSize} viewSize={viewSize} mirrored={mirrored} fit="cover" />
+        <PoseSkeleton
+          result={result}
+          imageSize={imageSize}
+          viewSize={viewSize}
+          mirrored={mirrored}
+          fit="cover"
+          highlight={rules.tintJoints}
+        />
       ) : null}
 
       {/* The banner stacks under the readout, so a longer or wrapped readout never hides behind it. */}
@@ -195,6 +230,22 @@ function LiveCamera({ poseMode, position, setPosition }: {
             {spec.name} · {form.state} · reps {form.repCount}{form.ended ? ' · set ended' : ''} ·{' '}
             {form.primary != null ? `${form.primary.toFixed(0)}°` : '–'} {form.primarySide ?? ''}
           </Text>
+          <Text style={styles.readoutText} testID="pose-rules-readout">
+            {rules.lastRep
+              ? `rep ${rules.lastRep.rep_index + 1} (${rules.lastRep.view}): ${describeFlags(spec, rules.lastRep)}`
+              : 'no rep yet'}
+          </Text>
+          {form.error || rules.error ? (
+            <Text style={styles.readoutText} testID="pose-spec-error">
+              Form tracking unavailable: {(form.error ?? rules.error)?.message}
+            </Text>
+          ) : null}
+          {rules.summary ? (
+            <Text style={styles.readoutText} testID="pose-set-summary">
+              set ({rules.summary.reason}): clean {rules.summary.clean_reps}/{rules.summary.total_reps}
+              {rules.summary.top ? ` · ${restNote(spec, rules.summary)}` : ''}
+            </Text>
+          ) : null}
         </View>
 
         {banner ? (
@@ -237,10 +288,16 @@ function LiveCamera({ poseMode, position, setPosition }: {
       )}
 
       {!recording && (form.ended || form.repCount > 0) ? (
-        <Pressable testID="pose-set-reset" style={[styles.button, styles.newSet]} onPress={form.reset}>
+        <Pressable testID="pose-set-reset" style={[styles.button, styles.newSet]} onPress={resetForm}>
           <Text style={styles.buttonText}>New set</Text>
         </Pressable>
       ) : null}
+
+      {form.ended ? null : (
+        <Pressable testID="pose-set-end" style={[styles.button, styles.endSet]} onPress={form.endSet}>
+          <Text style={styles.buttonText}>End set</Text>
+        </Pressable>
+      )}
 
       <Pressable testID="pose-record-toggle" style={[styles.button, styles.record]} onPress={toggleRecording}>
         <Text style={styles.buttonText}>{recording ? 'Stop and share clip' : 'Record clip'}</Text>
@@ -275,5 +332,6 @@ const styles = StyleSheet.create({
   exercise: { position: 'absolute', bottom: 288, alignSelf: 'center' },
   record: { position: 'absolute', bottom: 348, alignSelf: 'center' },
   newSet: { position: 'absolute', bottom: 408, alignSelf: 'center' },
+  endSet: { position: 'absolute', bottom: 468, alignSelf: 'center' },
   buttonText: { color: '#000', fontSize: 16, fontWeight: '600' },
 });

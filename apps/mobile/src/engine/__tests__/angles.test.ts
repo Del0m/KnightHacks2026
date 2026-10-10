@@ -294,3 +294,38 @@ describe('bundled specs', () => {
     expect(Object.values(m.compute(joints({})).metrics).every((v) => v === null)).toBe(true);
   });
 });
+
+describe('primary confidence', () => {
+  // `elbow` is the primary; `forearm` shares the wrist.
+  const spec = specWith({
+    elbow: { type: 'joint_angle', joints: ['shoulder', 'elbow', 'wrist'], side: 'left' },
+    forearm: { type: 'segment_tilt', from: 'elbow', to: 'wrist', side: 'left' },
+  });
+  /** The left arm at 90°, with the wrist at confidence `c` (as the smoother passes on a held joint). */
+  const withWrist = (c: number) => {
+    const a = arm('left', 90);
+    return joints({ ...a, left_wrist: { ...a.left_wrist, c } });
+  };
+
+  it('is null when a resolved point is held or low-confidence, other metrics still read it', () => {
+    const r = createMetricComputer(spec).compute(withWrist(0.1));
+    expect(r.metrics.elbow).toBeNull();
+    expect(r.sides.elbow).toBeNull();
+    expect(r.metrics.forearm).toBeCloseTo(90);
+    expect(r.sides.forearm).toBe('left');
+  });
+
+  it('accepts a point at minConfidence, and honours a custom minConfidence', () => {
+    expect(createMetricComputer(spec).compute(withWrist(0.3)).metrics.elbow).toBeCloseTo(90);
+    expect(createMetricComputer(spec, { minConfidence: 0.5 }).compute(withWrist(0.4)).metrics.elbow).toBeNull();
+    expect(createMetricComputer(spec, { minConfidence: 0.05 }).compute(withWrist(0.1)).metrics.elbow).toBeCloseTo(90);
+  });
+
+  it('checks only the side the value came from', () => {
+    const m = createMetricComputer(specWith({ elbow: { type: 'joint_angle', joints: ['shoulder', 'elbow', 'wrist'], side: 'max' } }));
+    const r = m.compute(joints({ ...arm('left', 90, 0.1), ...arm('right', 120, 0.9) }));
+    expect(r.metrics.elbow).toBeCloseTo(120);
+    expect(r.sides.elbow).toBe('right');
+    expect(m.compute(joints({ ...arm('left', 150, 0.1), ...arm('right', 120, 0.9) })).metrics.elbow).toBeNull();
+  });
+});

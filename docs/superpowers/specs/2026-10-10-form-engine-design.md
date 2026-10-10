@@ -7,7 +7,7 @@ PoseResult | null ──▶ JointSmoother ──▶ MetricComputer ──▶ Rep
                       (oneEuro.ts)       (angles.ts)        (repCounter.ts)   (engine.ts)
 ```
 
-AI-07 (rules, flags, view gating, `applyOverride`) and AI-08 (set payload) build on `RepRecord`, and FE-05 builds on `useFormEngine`. The engine itself never evaluates rules.
+AI-07 (rules, flags, view gating, `applyOverride`; see [form rules design](2026-10-10-form-rules-design.md)) and AI-08 (set payload) build on `RepRecord`, and FE-05 builds on `useFormEngine`. The engine itself never evaluates rules.
 
 ## Modules
 
@@ -124,13 +124,13 @@ interface RepCounter {
 | From | Condition | To | Effects |
 |---|---|---|---|
 | `start` | `deeper(v, start_exit)` (gated) | `outbound` | `attempt++`, `rep_started`, `startedAt = t`, `extreme = v`. If a settle tail is open, `rep_closed` for it **first**, and this frame is not in that rep. |
-| `outbound` | `deeper(v, count_min)` (gated) | `peak` | `peakAt = t` |
+| `outbound` | Range qualified by `deeper(v, count_min)` with a passing primary gate during this attempt, and the gate still passes (gated) | `peak` | `peakAt = t` |
 | `outbound` | `shallower(v, start_enter)` (gated) | `start` | `partial`, and the attempt's frames are discarded |
 | `peak` | `s * (v - extreme) >= reverse_deg` (back from the extreme, gated) | `return` | `returnAt = t` |
 | `return` | `shallower(v, start_enter)` (gated) | `start` | `repCount++`, `rep_counted {index: repCount}`, `countedAt = t`, open the settle tail |
 
 **More rules:**
-- **Extreme:** it updates whenever `deeper(v, extreme)` in `outbound`, `peak` or `return`. Going deeper again during `return` doesn't change the state.
+- **Extreme:** only gate-passing frames in `outbound`, `peak` or `return` supply it (all measured frames for an ungated spec). The first passing frame replaces any unqualified starting value; later deeper passing frames update it. Going deeper again during `return` doesn't change the state.
 - **`stateMs` reset:** entering a state sets `stateMs = 0`, and the frame that entered it adds no time.
 
 **Settle tail.** It runs from the count until the rep closes. Rule windows keep collecting frames as the `return` window.
@@ -152,12 +152,12 @@ interface RepCounter {
 Times are plain timestamp differences, null gaps included. `closedAt` is the closing frame's `t`.
 
 **Set end.** After `ended`, `step` returns the current state with no events and `window: null`.
-- **`still`:** in `start`, with `repCount >= 1`. It keeps an anchor value: if `|v - anchor| > reverse_deg` the anchor becomes `v` and the hold time goes back to 0, otherwise the frame's active time is added. Entering `start` (count or partial) resets it. When the active hold time reaches `set_end_still_ms`, the set ends. The tail always closes first, because `min_state_ms` is much shorter than `set_end_still_ms`.
-- **`absent`:** null values continuously for `set_end_still_ms` of wall time (`t - firstNullT`), with `repCount >= 1`.
+- **`still`:** in any state, with `repCount >= 1`. It keeps an anchor value: if `|v - anchor| > STILL_BAND_DEG` (10) the anchor becomes `v` and the hold time goes back to 0, otherwise the frame's active time is added. State changes don't reset it. When the active hold time reaches `set_end_still_ms`, the set ends (an attempt in progress becomes a partial). Changed in AI-07 (form rules design §9): it used to apply only in `start` with a `reverse_deg` band, so a set resting mid-position never ended. The tail always closes first, because `min_state_ms` is much shorter than `set_end_still_ms`.
+- **`absent` / `lost`:** null values continuously for `set_end_still_ms` of wall time (`t - firstNullT`), with `repCount >= 1`. `step(t, value, person = true)` is told whether a person was found; the engine's `pushAbsent` passes `false`. The reason is `lost` if strictly more than half of the run's null frames had a person (the primary angle couldn't be measured), otherwise `absent`. Added in AI-07.
 - **`manual`:** `end(t, 'manual')`.
 - **On any end:** an open tail emits `rep_closed`. An attempt still in `outbound`, `peak` or `return` emits `partial`, and the state goes back to `start`. Then `set_ended {reason}` fires.
 
-**Null value:** no transitions, no window, and the tail and still holds don't advance. The only check is `absent`.
+**Null value:** no transitions, no window, and the tail and still holds don't advance. The only check is `absent` / `lost`.
 
 **`window`:** this is assigned after the frame's transitions.
 - **`outbound`, `peak` or `return`:** the frame goes in that window of the current attempt.
@@ -180,12 +180,13 @@ interface FormEngine {
 **Each frame:**
 1. Smooth the joints.
 2. Compute the metrics.
-3. Step the counter with `metrics[primary_angle.name]`.
+3. Step the counter with `metrics[primary_angle.name]`, the gate result and whether a person was found. The primary is null when one of its joints is below `minConfidence` (held joints don't count), and a value moving faster than `MAX_PRIMARY_DEG_PER_S` (720°/s) from the last accepted one is rejected (accepted after 3 rejections in a row). See form rules design §9.
 4. Buffer `EngineFrame`s per attempt according to `window`. Frames with a null primary angle aren't buffered.
 
 **Events:**
 - **Translation:** counter events map to `EngineEvent`s. On `rep_closed`, the attempt's buffers become `RepRecord.windows`, where `rep` is the concatenation in time order.
 - **`RepRecord.side`:** `sides[primary]` at the frame where the primary angle reached `extreme`.
+- **`RepRecord.imageAspect`:** the upright aspect when the rep closed, so the rules can measure geometry on the window joints (AI-07).
 - **On `partial`:** the buffers are dropped.
 
 **Side locking:** `MetricComputer.setLocked(true)` on `rep_started`, and `false` on `rep_closed` or `partial`.
@@ -205,7 +206,7 @@ export function useFormEngine(spec: ExerciseSpec | null, opts?: EngineOptions & 
 
 - **Lifetime:** one engine per `spec` (and `imageAspect`), rebuilt when either changes.
 - **Re-renders:** these happen only when `state`, `repCount` or `ended` change, plus a throttled `primary` for the debug readout.
-- **Absent frames:** `PoseDetection` without a `result` becomes `pushAbsent(Date.now())`.
+- **Absent frames:** `PoseDetection` without a `result` becomes `pushAbsent(clock.now())`, on the pose clock (`poseClock.ts`).
 
 ## 6. Fixtures: `__fixtures__/`
 
@@ -216,7 +217,7 @@ export function useFormEngine(spec: ExerciseSpec | null, opts?: EngineOptions & 
   "source": "synthetic",             // or "recorded"
   "description": "8 reps, σ=0.006 noise, 10–15 fps, two 0.5 s dropouts",
   "image": { "width": 1080, "height": 1920 },   // upright; imageAspect = width / height
-  "expected": { "reps": 8, "partials": 0, "set_end": "still" },  // set_end: "still" | "absent" | null
+  "expected": { "reps": 8, "partials": 0, "set_end": "still" },  // set_end: "still" | "absent" | "lost" | null; optional "flags": [{ rule_id, rep_index }] (AI-07)
   "frames": [ /* PoseResult, or { "absent": true, "timestamp_ms": n } for no person */ ]
 }
 ```

@@ -24,7 +24,18 @@
       "additionalProperties": false,
       "properties": {
         "name": { "$ref": "#/$defs/snakeId" },
-        "direction": { "enum": ["decreasing", "increasing"] }
+        "direction": { "enum": ["decreasing", "increasing"] },
+        "gate": {
+          "description": "A per-frame condition the counter needs before an attempt can reach peak.",
+          "type": "object",
+          "required": ["metric", "op", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "metric": { "$ref": "#/$defs/snakeId" },
+            "op": { "enum": ["<=", ">=", "<", ">"] },
+            "value": { "type": "number" }
+          }
+        }
       }
     },
     "phases": {
