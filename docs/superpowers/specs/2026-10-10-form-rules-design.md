@@ -98,6 +98,7 @@ These add up to the rep. A pause at the bottom isn't counted as lowering. If no 
 
 **Reducing a window** (any metric other than `duration_ms`):
 1. **Window:** `frames = rep.windows[rule.phase]`. Take `valid`, the frames where `metrics[metric]` is not null.
+   - For a `peak` check of the primary angle's movement extreme (`min` for decreasing, `max` for increasing), use `rep.windows.rep` through `countedAt`. The minimum state time can keep the true turn in `outbound`; the settle tail after the count is excluded. Other metrics and reductions still use their phase window.
 2. **Coverage:** if `valid.length === 0` or `valid.length < MIN_COVERAGE × frames.length`, the outcome is `unmeasured` with `value: null`.
 3. **`mid_` basis:** this applies only when the metric's angle spec uses `mid_` points (`joints`, or `from`/`to`).
    - A frame is two-sided when, for every `mid_<base>` the metric uses, both `left_<base>` and `right_<base>` are non-null in `frame.joints` (index by `JOINT_NAMES`).
@@ -206,7 +207,7 @@ A screen recording of a seated shoulder press showed three problems:
   - `metric` is an `angles` key. It can't be `duration_ms` or the primary itself.
   - `value` is a number.
 - The engine evaluates the gate every frame from that frame's metrics: it passes if the metric is non-null and `metric op value` holds. With no gate, it always passes.
-- The counter's `outbound → peak` transition needs the gate to pass on that frame, as well as `count_min` and `min_state_ms`. An attempt that never passes the gate returns to `start` as a partial, as before.
+- The counter records range as qualified only when the primary angle passes `count_min` on a frame where the gate also passes. The `outbound → peak` transition needs this qualified range, the gate to pass on the transition frame, and `min_state_ms`. Qualified range is remembered across the dwell and reset for each attempt; an extreme reached while the gate failed cannot qualify a later frame. An attempt without qualified range returns to `start` as a partial.
 - `RepCounter.step(t, value, person = true, gate = true)`.
 - **Shoulder press:**
   - New angle `arm_raise`: `segment_tilt` from `shoulder` to `wrist`, `side: "max"`, so the lower arm decides. 0° is the wrist straight above the shoulder.

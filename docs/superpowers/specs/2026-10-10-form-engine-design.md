@@ -124,7 +124,7 @@ interface RepCounter {
 | From | Condition | To | Effects |
 |---|---|---|---|
 | `start` | `deeper(v, start_exit)` (gated) | `outbound` | `attempt++`, `rep_started`, `startedAt = t`, `extreme = v`. If a settle tail is open, `rep_closed` for it **first**, and this frame is not in that rep. |
-| `outbound` | `deeper(v, count_min)` and the primary `gate` passes (gated) | `peak` | `peakAt = t` |
+| `outbound` | Range qualified by `deeper(v, count_min)` with a passing primary gate during this attempt, and the gate still passes (gated) | `peak` | `peakAt = t` |
 | `outbound` | `shallower(v, start_enter)` (gated) | `start` | `partial`, and the attempt's frames are discarded |
 | `peak` | `s * (v - extreme) >= reverse_deg` (back from the extreme, gated) | `return` | `returnAt = t` |
 | `return` | `shallower(v, start_enter)` (gated) | `start` | `repCount++`, `rep_counted {index: repCount}`, `countedAt = t`, open the settle tail |

@@ -200,6 +200,24 @@ describe('evaluateRule', () => {
     expect([min('outbound'), min('peak'), min('return'), min('rep')]).toEqual([150, 90, 140, 90]);
   });
 
+  it.each(['decreasing', 'increasing'] as const)('includes the early %s extreme without the settle tail', (direction) => {
+    const increasing = direction === 'increasing';
+    const extreme = increasing ? 160 : 90;
+    const peak = increasing ? 140 : 110;
+    const tail = increasing ? 175 : 75;
+    const spec = { ...makeSpec([]), primary_angle: { name: 'knee', direction } };
+    const rep = makeRep([
+      { t: 0, phase: 'outbound', m: { knee: extreme } },
+      { t: 100, phase: 'peak', m: { knee: peak } },
+      { t: 200, phase: 'return', m: { knee: 150 } },
+      { t: 300, phase: 'return', m: { knee: tail } },
+    ], { countedAt: 200, extreme });
+    const check = { reduce: increasing ? 'max' as const : 'min' as const, op: increasing ? '>=' as const : '<=' as const, value: increasing ? 150 : 95 };
+    expect(evaluateRule(spec, rule('depth', { check }), rep, 'side')).toMatchObject({ status: 'pass', value: extreme });
+    // Other reductions still describe the actual peak window.
+    expect(evaluateRule(spec, rule('mean', { check: { reduce: 'mean' } }), rep, 'side').value).toBe(peak);
+  });
+
   it('is unmeasured below half coverage', () => {
     const r = rule('r', { check: { metric: 'width', reduce: 'min', op: '>=', value: 0.9 } });
     const half = peakRep([{ knee: 90, width: 0.8 }, { knee: 90, width: 1 }, { knee: 90, width: null }, { knee: 90, width: null }]);

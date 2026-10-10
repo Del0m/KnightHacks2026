@@ -85,7 +85,15 @@ function reduce(values: number[], how: string): number {
 /** The reduced metric over the rule's window, or null when too few frames have it. */
 function windowValue(spec: ExerciseSpec, rule: Rule, rep: RepRecord): number | null {
   const { metric } = rule.check;
-  const frames = rep.windows[rule.phase];
+  // The dwell can delay `peak` until after the turn. Primary-angle depth/lockout checks need
+  // the accepted extreme of the movement, including outbound frames but excluding the settle tail.
+  const primaryExtreme =
+    rule.phase === 'peak' &&
+    metric === spec.primary_angle.name &&
+    rule.check.reduce === (spec.primary_angle.direction === 'decreasing' ? 'min' : 'max');
+  const frames = primaryExtreme
+    ? rep.windows.rep.filter((f) => f.t <= rep.countedAt)
+    : rep.windows[rule.phase];
   let valid = frames.filter((f) => f.metrics[metric] != null);
   if (valid.length === 0 || valid.length < MIN_COVERAGE * frames.length) return null;
   // A `mid_` point is the mean of both sides or just the one present, so the two read differently.
