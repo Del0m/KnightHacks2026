@@ -84,13 +84,30 @@ export interface InjuryOverride {
   extra_note: string;
 }
 
+/**
+ * A condition the rep must meet to reach its peak, e.g. wrists above the shoulders for a press, so
+ * a rest position that happens to match the angle (arms hanging straight) can't count.
+ */
+export interface PrimaryGate {
+  /** An `angles` key (not `duration_ms`). */
+  metric: string;
+  op: CompareOp;
+  value: number;
+}
+
+export interface PrimaryAngle {
+  name: string;
+  direction: Direction;
+  gate?: PrimaryGate;
+}
+
 export interface ExerciseSpec {
   spec_version: 1;
   id: string;
   name: string;
   recommended_view: View;
   angles: Record<string, AngleSpec>;
-  primary_angle: { name: string; direction: Direction };
+  primary_angle: PrimaryAngle;
   phases: Phases;
   rules: Rule[];
   injury_overrides: Record<Injury, InjuryOverride>;
@@ -225,7 +242,10 @@ export interface EngineUpdate {
   state: RepState;
   repCount: number;
   ended: boolean;
-  /** Primary angle this frame, or null. */
+  /**
+   * Primary angle as the counter saw it: null when missing, when one of its joints is below
+   * `minConfidence`, or when rejected as an impossible jump (`metrics` keeps the raw value).
+   */
   primary: number | null;
   primarySide: MetricSide | null;
   metrics: Metrics;
@@ -250,7 +270,7 @@ export interface EngineOptions {
    */
   imageAspect?: number;
   filter?: Partial<OneEuroParams>;
-  /** Joints below this confidence are held, then missing. Default 0.3. */
+  /** Joints below this confidence are held, then missing. The primary angle is null if any of its joints is below it. Default 0.3. */
   minConfidence?: number;
   /** How long a low-confidence joint keeps its last value, ms. Default 300. */
   holdMs?: number;

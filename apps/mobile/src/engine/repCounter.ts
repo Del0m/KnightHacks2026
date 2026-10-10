@@ -9,14 +9,15 @@ import type {
   SetEndReason,
 } from './types';
 
-/** Rep state machine over the primary angle. Pure: it only sees `(t, value, person)`. */
+/** Rep state machine over the primary angle. Pure: it only sees `(t, value, person, gate)`. */
 export interface RepCounter {
   /**
    * `value` is the primary angle this frame, or null when it could not be measured. `person` says
    * whether a person was detected; it only matters on null frames, where it decides between `lost`
-   * and `absent` when the gap ends the set.
+   * and `absent` when the gap ends the set. `gate` is whether the spec's primary gate passes this
+   * frame (true when the spec has none); `outbound → peak` needs it.
    */
-  step(t: number, value: number | null, person?: boolean): CounterStep;
+  step(t: number, value: number | null, person?: boolean, gate?: boolean): CounterStep;
   /** Ends the set. Used for manual ends and internally for `still`, `absent` and `lost`. */
   end(t: number, reason: SetEndReason): CounterStep;
   reset(): void;
@@ -43,8 +44,15 @@ interface Tail {
 const SETTLE_PROGRESS_DEG = 1;
 
 /**
- * Creates the counter described in the form engine design (§3). `direction` and `phases` come
- * straight from the exercise spec, after any injury override.
+ * The still hold restarts when the angle moves more than this from its anchor. Wider than
+ * `reverse_deg`, so pose jitter on a resting person doesn't keep the set open.
+ */
+export const STILL_BAND_DEG = 10;
+
+/**
+ * Creates the counter described in the form engine design (§3), with the primary gate and the
+ * still end in any state from the form rules design (§9). `direction` and `phases` come straight
+ * from the exercise spec, after any injury override.
  */
 export function createRepCounter(direction: Direction, phases: Phases): RepCounter {
   const s = direction === 'decreasing' ? 1 : -1;
@@ -100,15 +108,15 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     stateMs = 0;
   }
 
-  /** Adds the frame's active time to the hold and reports whether it reached `limitMs`. */
-  function advanceHold(hold: Hold, v: number, dt: number, limitMs: number): boolean {
-    if (Math.abs(v - hold.anchor) > phases.reverse_deg) {
+  /** Adds the frame's active time to the still hold and reports whether it reached `set_end_still_ms`. */
+  function advanceStill(hold: Hold, v: number, dt: number): boolean {
+    if (Math.abs(v - hold.anchor) > STILL_BAND_DEG) {
       hold.anchor = v;
       hold.ms = 0;
       return false;
     }
     hold.ms += dt;
-    return hold.ms >= limitMs;
+    return hold.ms >= phases.set_end_still_ms;
   }
 
   function closeTail(t: number, events: CounterEvent[]) {
@@ -128,7 +136,7 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     still = null;
   }
 
-  function step(t: number, value: number | null, person = true): CounterStep {
+  function step(t: number, value: number | null, person = true, gate = true): CounterStep {
     if (ended) return result(null, []);
     const events: CounterEvent[] = [];
 
@@ -151,7 +159,6 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     nullFrames = 0;
     nullWithPerson = 0;
     stateMs += dt;
-    const from = state;
     const gated = stateMs >= phases.min_state_ms;
 
     let heldClose: number | null = null;
@@ -178,17 +185,15 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
           enter('outbound');
           startedAt = t;
           extreme = v;
-          still = null;
           events.push({ type: 'rep_started', t, attempt });
         }
         break;
       case 'outbound':
-        if (gated && deeper(extreme, phases.count_min)) {
+        if (gated && gate && deeper(extreme, phases.count_min)) {
           enter('peak');
           peakAt = t;
         } else if (gated && shallower(v, phases.start_enter)) {
           enter('start');
-          still = { anchor: v, ms: 0 };
           events.push({ type: 'partial', t, attempt });
         }
         break;
@@ -217,15 +222,15 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
             },
           };
           tail = { attempt, timing, best: v, hold: { anchor: v, ms: 0 } };
-          still = { anchor: v, ms: 0 };
           events.push({ type: 'rep_counted', t, attempt, index: repCount });
         }
         break;
     }
 
-    if (state === 'start' && from === 'start') {
+    // Still end, in any state once a rep is counted. Only movement restarts the hold, not transitions.
+    if (repCount >= 1) {
       if (still === null) still = { anchor: v, ms: 0 };
-      else if (advanceHold(still, v, dt, phases.set_end_still_ms) && repCount >= 1) {
+      else if (advanceStill(still, v, dt)) {
         finish(t, 'still', events);
         return result(null, events);
       }
