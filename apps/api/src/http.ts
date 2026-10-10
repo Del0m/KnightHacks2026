@@ -58,6 +58,14 @@ export function isUniqueViolation(err: unknown): boolean {
   return e?.code === "23505" || e?.cause?.code === "23505";
 }
 
+// Name of the unique constraint or index that a unique_violation hit, or null for any other error.
+// Lets a handler with several unique constraints report the right one.
+export function violatedUniqueConstraint(err: unknown): string | null {
+  if (!isUniqueViolation(err)) return null;
+  const e = err as { constraint?: string; cause?: { constraint?: string } };
+  return e.constraint ?? e.cause?.constraint ?? null;
+}
+
 export const notFoundHandler: RequestHandler = (_req, _res, next) => next(notFound("Route"));
 
 export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {

@@ -46,6 +46,8 @@ Before judging, set `DATABASE_URL` and `DEMO_DATABASE_URL` to `demo` and run `np
 - `GET /me/limits` is the one read the phone needs (AI-16, INT-07). It's versioned (`version: 1`): `body_parts` drive the spec injury overrides, and `limits` holds the active plan's limits keyed by exercise id, exactly as entered.
 - A limit's `angle` must be a `joint_angle` in that exercise's spec, and `max_range_deg` is flexion from straight (0-180).
 - One active plan per user (enforced in the database). The API never edits limits on its own; only the user does.
+- Every rehab route takes `?tz=` (the user's IANA time zone, default UTC). `started`, `review_due` and today's sets use the user's local date, not the server's.
+- A plan's limits apply from its `start_on`: before that, `GET /me/limits` returns the plan with `started: false` and empty `limits`, and the Databricks export leaves `rehab_start_on` empty.
 - Every response with plan data carries the fixed disclaimer. There's no public read path.
 
 ## Conventions

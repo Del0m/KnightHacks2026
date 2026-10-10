@@ -3,18 +3,29 @@
 // there is no public read path (§13). Every response that carries plan data includes
 // REHAB_DISCLAIMER (§1.1).
 import { and, eq, sql } from "drizzle-orm";
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
-import { badRequest, conflict, HttpError, isoDate, isUniqueViolation, parse, send, userId } from "../http.js";
 import {
-  assertLimitFitsSpec,
+  badRequest,
+  conflict,
+  HttpError,
+  isoDate,
+  parse,
+  send,
+  userId,
+  violatedUniqueConstraint,
+} from "../http.js";
+import {
+  assertLimitsFitSpecs,
   assertOwnInjury,
   effectiveLimits,
   getPlan,
+  invalid,
   isTimeZone,
   listPlans,
+  localDate,
   ownLimit,
   ownPlan,
   REHAB_DISCLAIMER,
@@ -69,6 +80,35 @@ export const planUpdate = z
 
 const ONE_ACTIVE = "You already have an active rehab plan. Pause or finish it before starting another.";
 
+// Constraint names from drizzle/schema/rehab.ts, so a conflict reports its real cause.
+const ONE_ACTIVE_UQ = "rehab_plans_one_active_uq";
+const LIMIT_UQ = "rehab_limits_plan_exercise_angle_side_uq";
+
+// ?tz= is the user's IANA time zone (default UTC). Every date-based field in these responses
+// (started, review_due, today's sets) is computed against the user's local date, not the server's.
+function localToday(req: Request): { timeZone: string; date: string } {
+  const { tz } = parse(z.object({ tz: z.string().max(64).default("UTC") }), req.query);
+  if (!isTimeZone(tz))
+    throw badRequest(`Unknown time zone "${tz}"; use an IANA name such as America/New_York`);
+  return { timeZone: tz, date: localDate(new Date(), tz) };
+}
+
+// The same exercise, angle and side twice in one request is a mistake in the body: a 400 up
+// front, so the transaction's only possible conflict is a second active plan.
+function assertNoDuplicateLimits(limits: readonly z.infer<typeof limitInput>[]): void {
+  const seen = new Set<string>();
+  limits.forEach((l, i) => {
+    const key = `${l.exercise_id}|${l.angle}|${l.side}`;
+    if (seen.has(key)) {
+      throw invalid(
+        `limits.${i}`,
+        `${l.exercise_id} already has a ${l.angle} limit (${l.side}) in this plan`,
+      );
+    }
+    seen.add(key);
+  });
+}
+
 const limitRow = (l: z.infer<typeof limitInput>) => ({
   exerciseId: l.exercise_id,
   angle: l.angle,
@@ -87,25 +127,32 @@ export function rehabRouter(db: Db): Router {
 
   // Registered before /me/rehab-plans/:id so "active" isn't read as a plan id.
   router.get("/me/rehab-plans/active/today", async (req, res) => {
-    const { tz } = parse(z.object({ tz: z.string().max(64).default("UTC") }), req.query);
-    if (!isTimeZone(tz))
-      throw badRequest(`Unknown time zone "${tz}"; use an IANA name such as America/New_York`);
-    send(res, await todaysSession(db, userId(req), tz));
+    const { timeZone } = localToday(req);
+    send(res, await todaysSession(db, userId(req), timeZone));
   });
 
   router.get("/me/limits", async (req, res) => {
-    send(res, await effectiveLimits(db, userId(req)));
+    const { timeZone, date } = localToday(req);
+    send(res, await effectiveLimits(db, userId(req), date, timeZone));
   });
 
   router.get("/me/rehab-plans", async (req, res) => {
-    send(res, { disclaimer: REHAB_DISCLAIMER, plans: await listPlans(db, userId(req)) });
+    const { date } = localToday(req);
+    send(res, { disclaimer: REHAB_DISCLAIMER, plans: await listPlans(db, userId(req), date) });
   });
 
   router.post("/me/rehab-plans", async (req, res) => {
     const me = userId(req);
+    const { date } = localToday(req);
     const input = parse(planInput, req.body);
+    const limits = input.limits ?? [];
+    assertNoDuplicateLimits(limits);
     if (input.injury_id) await assertOwnInjury(db, me, input.injury_id);
-    for (const l of input.limits ?? []) await assertLimitFitsSpec(db, l.exercise_id, l.angle);
+    await assertLimitsFitSpecs(
+      db,
+      limits.map((l) => ({ exerciseId: l.exercise_id, angle: l.angle })),
+      (i) => `limits.${i}`,
+    );
 
     let planId: string;
     try {
@@ -122,35 +169,31 @@ export function rehabRouter(db: Db): Router {
             notes: input.notes ?? null,
           })
           .returning({ id: rehabPlans.id });
-        if (input.limits?.length) {
+        if (limits.length) {
           await tx
             .insert(rehabLimits)
-            .values(input.limits.map((l, position) => ({ ...limitRow(l), position, rehabPlanId: plan!.id })));
+            .values(limits.map((l, position) => ({ ...limitRow(l), position, rehabPlanId: plan!.id })));
         }
         return plan!.id;
       });
     } catch (err) {
-      if (!isUniqueViolation(err)) throw err;
-      // Either a second active plan, or the same exercise/angle/side twice in limits.
-      const limits = input.limits ?? [];
-      const dupe = limits.find((l, i) =>
-        limits.some(
-          (o, j) => j < i && o.exercise_id === l.exercise_id && o.angle === l.angle && o.side === l.side,
-        ),
-      );
-      throw dupe ? duplicateLimit(dupe) : conflict(ONE_ACTIVE);
+      // Duplicate limits were rejected above, so a second active plan is the only expected conflict.
+      if (violatedUniqueConstraint(err) === ONE_ACTIVE_UQ) throw conflict(ONE_ACTIVE);
+      throw err;
     }
-    send(res, { disclaimer: REHAB_DISCLAIMER, plan: await getPlan(db, me, planId) }, 201);
+    send(res, { disclaimer: REHAB_DISCLAIMER, plan: await getPlan(db, me, planId, date) }, 201);
   });
 
   router.get("/me/rehab-plans/:id", async (req, res) => {
     const planId = parse(z.string().uuid(), req.params.id);
-    send(res, { disclaimer: REHAB_DISCLAIMER, plan: await getPlan(db, userId(req), planId) });
+    const { date } = localToday(req);
+    send(res, { disclaimer: REHAB_DISCLAIMER, plan: await getPlan(db, userId(req), planId, date) });
   });
 
   router.put("/me/rehab-plans/:id", async (req, res) => {
     const me = userId(req);
     const planId = parse(z.string().uuid(), req.params.id);
+    const { date } = localToday(req);
     const input = parse(planUpdate, req.body);
     const current = await ownPlan(db, me, planId);
     if (input.injury_id) await assertOwnInjury(db, me, input.injury_id);
@@ -176,10 +219,10 @@ export function rehabRouter(db: Db): Router {
         })
         .where(and(eq(rehabPlans.id, planId), eq(rehabPlans.userId, me)));
     } catch (err) {
-      if (isUniqueViolation(err)) throw conflict(ONE_ACTIVE);
+      if (violatedUniqueConstraint(err) === ONE_ACTIVE_UQ) throw conflict(ONE_ACTIVE);
       throw err;
     }
-    send(res, { disclaimer: REHAB_DISCLAIMER, plan: await getPlan(db, me, planId) });
+    send(res, { disclaimer: REHAB_DISCLAIMER, plan: await getPlan(db, me, planId, date) });
   });
 
   router.delete("/me/rehab-plans/:id", async (req, res) => {
@@ -193,7 +236,7 @@ export function rehabRouter(db: Db): Router {
     const planId = parse(z.string().uuid(), req.params.id);
     const input = parse(limitInput, req.body);
     await ownPlan(db, userId(req), planId);
-    await assertLimitFitsSpec(db, input.exercise_id, input.angle);
+    await assertLimitsFitSpecs(db, [{ exerciseId: input.exercise_id, angle: input.angle }]);
     try {
       const [limit] = await db
         .insert(rehabLimits)
@@ -206,7 +249,7 @@ export function rehabRouter(db: Db): Router {
         .returning();
       send(res, { disclaimer: REHAB_DISCLAIMER, limit }, 201);
     } catch (err) {
-      if (isUniqueViolation(err)) throw duplicateLimit(input);
+      if (violatedUniqueConstraint(err) === LIMIT_UQ) throw duplicateLimit(input);
       throw err;
     }
   });
@@ -224,7 +267,7 @@ export function rehabRouter(db: Db): Router {
       side: input.side ?? current.side,
     };
     if (input.exercise_id !== undefined || input.angle !== undefined) {
-      await assertLimitFitsSpec(db, merged.exerciseId, merged.angle);
+      await assertLimitsFitSpecs(db, [merged]);
     }
     try {
       const [limit] = await db
@@ -241,7 +284,7 @@ export function rehabRouter(db: Db): Router {
         .returning();
       send(res, { disclaimer: REHAB_DISCLAIMER, limit });
     } catch (err) {
-      if (isUniqueViolation(err)) throw duplicateLimit(merged);
+      if (violatedUniqueConstraint(err) === LIMIT_UQ) throw duplicateLimit(merged);
       throw err;
     }
   });

@@ -367,7 +367,12 @@ export async function buildExportSession(
     // The injured side and the rehab plan's start let range of motion (CONN-14) compare the
     // right sides from the right baseline. Coarse tags only, never notes or dates (§13).
     injury_groups: [...new Set(injuryRows.map((i) => injuryGroup(i.part, i.side)))],
-    rehab_start_on: activePlan?.startOn ?? null,
+    // Only once the plan has started by this session's date, so ROM never gets a baseline from
+    // the future. The session's UTC date is close enough here: it only picks the baseline window.
+    rehab_start_on:
+      activePlan && activePlan.startOn <= (session.finishedAt ?? new Date()).toISOString().slice(0, 10)
+        ? activePlan.startOn
+        : null,
     sets: setRows.map((s) => ({
       exercise_id: s.exerciseId,
       weight_kg: s.weightKg,

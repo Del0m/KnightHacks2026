@@ -33,37 +33,50 @@ export function limitableAngles(spec: SpecShape | null | undefined): string[] {
     .map(([name]) => name);
 }
 
-export async function assertLimitFitsSpec(db: Db, exerciseId: string, angle: string): Promise<void> {
-  const [row] = await db
-    .select({ spec: exercises.formSpec })
+// Checks every limit against the stored specs with one query, whatever the number of limits.
+// `pathPrefix` locates the offending limit in the request body, e.g. "limits.2".
+export async function assertLimitsFitSpecs(
+  db: Db,
+  limits: readonly { exerciseId: string; angle: string }[],
+  pathPrefix = (_i: number) => "",
+): Promise<void> {
+  if (!limits.length) return;
+  const specs = await db
+    .select({ id: exercises.id, spec: exercises.formSpec })
     .from(exercises)
-    .where(and(eq(exercises.id, exerciseId), isNotNull(exercises.formSpec)));
-  if (!row) {
-    const known = await db
-      .select({ id: exercises.id })
-      .from(exercises)
-      .where(isNotNull(exercises.formSpec))
-      .orderBy(asc(exercises.id));
-    throw invalid(
-      "exercise_id",
-      `"${exerciseId}" isn't a known exercise`,
-      known.map((k) => k.id),
-    );
-  }
-  const angles = limitableAngles(row.spec as SpecShape);
-  if (!angles.includes(angle)) {
-    throw invalid("angle", `"${angle}" isn't a joint angle measured in ${exerciseId}`, angles);
-  }
+    .where(isNotNull(exercises.formSpec))
+    .orderBy(asc(exercises.id));
+  const byId = new Map(specs.map((s) => [s.id, s.spec as SpecShape]));
+  limits.forEach(({ exerciseId, angle }, i) => {
+    const at = (field: string) => [pathPrefix(i), field].filter(Boolean).join(".");
+    const spec = byId.get(exerciseId);
+    if (!spec) {
+      throw invalid(at("exercise_id"), `"${exerciseId}" isn't a known exercise`, [...byId.keys()]);
+    }
+    const angles = limitableAngles(spec);
+    if (!angles.includes(angle)) {
+      throw invalid(at("angle"), `"${angle}" isn't a joint angle measured in ${exerciseId}`, angles);
+    }
+  });
 }
 
-function invalid(path: string, message: string, allowed: string[]): HttpError {
-  return new HttpError(400, "validation_failed", message, { issues: [{ path, message }], allowed });
+export function invalid(path: string, message: string, allowed?: string[]): HttpError {
+  return new HttpError(400, "validation_failed", message, {
+    issues: [{ path, message }],
+    ...(allowed ? { allowed } : {}),
+  });
 }
 
 // ---- Reads ----
 
-export function reviewDue(plan: Pick<PlanRow, "reviewOn">, today = new Date()): boolean {
-  return plan.reviewOn !== null && plan.reviewOn <= today.toISOString().slice(0, 10);
+// "Today" is always the user's local calendar date (YYYY-MM-DD), from the ?tz= the app sends
+// (UTC if it doesn't), so review_due and started flip at the user's midnight, not the server's.
+export function reviewDue(plan: Pick<PlanRow, "reviewOn">, today: string): boolean {
+  return plan.reviewOn !== null && plan.reviewOn <= today;
+}
+
+export function started(plan: Pick<PlanRow, "startOn">, today: string): boolean {
+  return plan.startOn <= today;
 }
 
 async function limitsFor(db: Db, planIds: string[]) {
@@ -89,16 +102,17 @@ async function limitsFor(db: Db, planIds: string[]) {
     .orderBy(asc(rehabLimits.rehabPlanId), asc(rehabLimits.position), asc(rehabLimits.createdAt));
 }
 
-function present(plan: PlanRow, limits: Awaited<ReturnType<typeof limitsFor>>) {
+function present(plan: PlanRow, limits: Awaited<ReturnType<typeof limitsFor>>, today: string) {
   const { userId: _u, ...rest } = plan;
   return {
     ...rest,
-    reviewDue: reviewDue(plan),
+    started: started(plan, today),
+    reviewDue: reviewDue(plan, today),
     limits: limits.filter((l) => l.rehabPlanId === plan.id).map(({ rehabPlanId: _p, ...l }) => l),
   };
 }
 
-export async function listPlans(db: Db, userId: string) {
+export async function listPlans(db: Db, userId: string, today: string) {
   const plans = await db
     .select()
     .from(rehabPlans)
@@ -108,7 +122,7 @@ export async function listPlans(db: Db, userId: string) {
     db,
     plans.map((p) => p.id),
   );
-  return plans.map((p) => present(p, limits));
+  return plans.map((p) => present(p, limits, today));
 }
 
 export async function ownPlan(db: Db, userId: string, planId: string): Promise<PlanRow> {
@@ -120,9 +134,9 @@ export async function ownPlan(db: Db, userId: string, planId: string): Promise<P
   return plan;
 }
 
-export async function getPlan(db: Db, userId: string, planId: string) {
+export async function getPlan(db: Db, userId: string, planId: string, today: string) {
   const plan = await ownPlan(db, userId, planId);
-  return present(plan, await limitsFor(db, [plan.id]));
+  return present(plan, await limitsFor(db, [plan.id]), today);
 }
 
 export async function activePlan(db: Db, userId: string): Promise<PlanRow | null> {
@@ -154,7 +168,9 @@ export async function assertOwnInjury(db: Db, userId: string, injuryId: string):
 
 // The one read the phone needs to build each effective spec: base spec, then the injury
 // overrides for these body parts, then the active plan's limits (INT-07 order).
-export async function effectiveLimits(db: Db, userId: string) {
+// A plan's limits only apply from its start_on (in the user's time zone): before that the
+// phone gets the plan with started: false and no limits, so it never caps range early.
+export async function effectiveLimits(db: Db, userId: string, today: string, timeZone: string) {
   const [userInjuries, plan] = await Promise.all([
     db
       .selectDistinct({ bodyPart: injuries.bodyPart, side: injuries.side })
@@ -163,7 +179,8 @@ export async function effectiveLimits(db: Db, userId: string) {
       .orderBy(injuries.bodyPart, injuries.side),
     activePlan(db, userId),
   ]);
-  const limits = plan ? await limitsFor(db, [plan.id]) : [];
+  const applies = plan !== null && started(plan, today);
+  const limits = applies ? await limitsFor(db, [plan.id]) : [];
 
   const byExercise: Record<
     string,
@@ -190,6 +207,8 @@ export async function effectiveLimits(db: Db, userId: string) {
   return {
     version: LIMITS_VERSION,
     disclaimer: REHAB_DISCLAIMER,
+    date: today,
+    timeZone,
     injuries: userInjuries,
     // Every injured body part, unfiltered: the phone applies spec.injury_overrides[part] where
     // the spec has one and skips the rest. Not filtered against the specs stored in Neon, so it
@@ -202,10 +221,12 @@ export async function effectiveLimits(db: Db, userId: string) {
           fromPhysio: plan.fromPhysio,
           startOn: plan.startOn,
           reviewOn: plan.reviewOn,
-          reviewDue: reviewDue(plan),
+          started: applies,
+          reviewDue: reviewDue(plan, today),
         }
       : null,
     // Keyed by exercise id, so the phone can look up a spec's limits directly. Kept as entered.
+    // Empty until the plan has started.
     limits: byExercise,
   };
 }
@@ -238,6 +259,10 @@ export async function todaysSession(db: Db, userId: string, timeZone: string, no
   const limits = await limitsFor(db, [plan.id]);
 
   const exerciseIds = [...new Set(limits.map((l) => l.exerciseId))];
+  // Any set of a prescribed exercise counts, wherever it was done: a squat set in a gym session is
+  // still squats done today, and sets aren't tagged as rehab. A set belongs to the local day it
+  // reached the API (the phone sends each set as it ends), so a session that runs past midnight
+  // splits across the two days. An offline-queued set counts on the day it syncs.
   const done = exerciseIds.length
     ? await db
         .select({ exerciseId: sets.exerciseId, n: sql<number>`count(*)::int` })
@@ -247,7 +272,7 @@ export async function todaysSession(db: Db, userId: string, timeZone: string, no
           and(
             eq(sessions.userId, userId),
             inArray(sets.exerciseId, exerciseIds),
-            sql`(${sessions.startedAt} at time zone ${timeZone})::date = ${date}::date`,
+            sql`(${sets.createdAt} at time zone ${timeZone})::date = ${date}::date`,
           ),
         )
         .groupBy(sets.exerciseId)
@@ -287,8 +312,8 @@ export async function todaysSession(db: Db, userId: string, timeZone: string, no
       fromPhysio: plan.fromPhysio,
       startOn: plan.startOn,
       reviewOn: plan.reviewOn,
-      reviewDue: reviewDue(plan, now),
-      started: plan.startOn <= date,
+      reviewDue: reviewDue(plan, date),
+      started: started(plan, date),
       notes: plan.notes,
     },
     exercises: exercisesToday,

@@ -7,7 +7,13 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { schema } from "../src/db.js";
 import { loadSpecs } from "../src/services/exerciseSpecs.js";
-import { REHAB_DISCLAIMER, todaysSession } from "../src/services/rehab.js";
+import {
+  effectiveLimits,
+  getPlan,
+  localDate,
+  REHAB_DISCLAIMER,
+  todaysSession,
+} from "../src/services/rehab.js";
 import { setup } from "./helpers.js";
 
 const SPECS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../specs/exercises");
@@ -183,6 +189,22 @@ describe("BE-15 plans", () => {
     expect((await api.post("/me/rehab-plans", { start_on: "2026-10-01", status: "paused" })).status).toBe(
       201,
     );
+    // Duplicate limits in the body are a 400 about the body, even when an active plan also exists.
+    const dupeLimit = {
+      exercise_id: "squat",
+      angle: "knee",
+      side: "left",
+      max_range_deg: 70,
+      sets: 3,
+      reps: 10,
+    };
+    const both = await api.post("/me/rehab-plans", {
+      start_on: "2026-10-01",
+      limits: [dupeLimit, dupeLimit],
+    });
+    expect(both.status).toBe(400);
+    expect(both.body.details.issues[0].path).toBe("limits.1");
+
     const paused = await api.put(`/me/rehab-plans/${first.id}`, { status: "done" });
     expect(paused.body.plan.status).toBe("done");
     expect((await api.post("/me/rehab-plans", { start_on: "2026-10-02" })).status).toBe(201);
@@ -351,6 +373,66 @@ describe("BE-15 GET /me/limits", () => {
   });
 });
 
+describe("BE-15 start dates and time zones (PR #113 review)", () => {
+  it("keeps a plan's limits out of /me/limits until its start date", async () => {
+    const api = await t.as("future-plan");
+    const plan = (await api.post("/me/rehab-plans", { ...kneePlan, start_on: "2099-01-05", review_on: null }))
+      .body.plan;
+    expect(plan.started).toBe(false);
+
+    const before = (await api.get("/me/limits")).body;
+    expect(before.rehab_plan).toMatchObject({ id: plan.id, started: false, start_on: "2099-01-05" });
+    expect(before.limits).toEqual({}); // the phone doesn't cap range yet
+
+    // On the start date itself, in the user's time zone, the limits apply.
+    const on = await effectiveLimits(t.db, "future-plan", "2099-01-05", "UTC");
+    expect(on.rehabPlan?.started).toBe(true);
+    expect(Object.keys(on.limits)).toEqual(["squat", "lunge"]);
+    expect((await effectiveLimits(t.db, "future-plan", "2099-01-04", "UTC")).limits).toEqual({});
+  });
+
+  it("works out review_due and started on the user's local date", async () => {
+    const api = await t.as("tz-plan");
+    const plan = (await api.post("/me/rehab-plans", { start_on: "2026-10-01", review_on: "2026-10-20" })).body
+      .plan;
+    // 22:00 on the 19th in New York is already the 20th in UTC.
+    expect(
+      (
+        await getPlan(
+          t.db,
+          "tz-plan",
+          plan.id,
+          localDate(new Date("2026-10-20T02:00:00Z"), "America/New_York"),
+        )
+      ).reviewDue,
+    ).toBe(false);
+    expect(
+      (await getPlan(t.db, "tz-plan", plan.id, localDate(new Date("2026-10-20T02:00:00Z"), "UTC"))).reviewDue,
+    ).toBe(true);
+
+    for (const path of ["/me/limits", "/me/rehab-plans", `/me/rehab-plans/${plan.id}`]) {
+      expect((await api.get(`${path}?tz=America/New_York`)).status).toBe(200);
+      expect((await api.get(`${path}?tz=Mars/Olympus`)).status).toBe(400);
+    }
+    expect((await api.get("/me/limits?tz=Asia/Tokyo")).body).toMatchObject({ time_zone: "Asia/Tokyo" });
+  });
+
+  it("doesn't send a future rehab start to Databricks", async () => {
+    const api = await t.as("export-future");
+    await api.post("/me/injuries", { body_part: "knee", side: "right" });
+    await api.post("/me/rehab-plans", { ...kneePlan, start_on: "2099-01-05", review_on: null });
+    const { id } = (await api.post("/sessions")).body;
+    await api.post(`/sessions/${id}/sets`, {
+      exercise_id: "squat",
+      reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
+    });
+    await api.post(`/sessions/${id}/finish`);
+    const exported = t.queue.sessions.find((s) => s.id === id)!;
+    expect(exported.injury_groups).toEqual(["knee:right"]);
+    expect(exported.rehab_start_on).toBeNull();
+  });
+});
+
 describe("BE-15 today's rehab session", () => {
   it("lists prescribed exercises with sets done today", async () => {
     const api = await t.as("today-user");
@@ -392,22 +474,36 @@ describe("BE-15 today's rehab session", () => {
     expect(res.body.exercises[1]).toMatchObject({ sets: 2, reps: 8, sets_done_today: 0 });
   });
 
-  it("counts 'today' in the user's time zone", async () => {
+  it("counts 'today' in the user's time zone, by each set's own time", async () => {
     const api = await t.as("today-tz");
     await api.post("/me/rehab-plans", kneePlan);
-    // 02:00 UTC on the 11th is still the evening of the 10th in New York.
-    const { id } = (await api.post("/sessions", { started_at: "2026-10-11T02:00:00Z" })).body;
-    await api.post(`/sessions/${id}/sets`, {
-      exercise_id: "squat",
-      reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
-    });
+    // A session that starts at 23:50 in New York and runs past midnight.
+    const { id } = (await api.post("/sessions", { started_at: "2026-10-11T03:50:00Z" })).body;
+    const addSquat = async (at: string) => {
+      const set = (
+        await api.post(`/sessions/${id}/sets`, {
+          exercise_id: "squat",
+          reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
+        })
+      ).body;
+      await t.db
+        .update(schema.sets)
+        .set({ createdAt: new Date(at) })
+        .where(eq(schema.sets.id, set.id));
+    };
+    await addSquat("2026-10-11T03:55:00Z"); // 23:55 on the 10th in New York
+    await addSquat("2026-10-11T04:10:00Z"); // 00:10 on the 11th
 
-    const now = new Date("2026-10-11T03:00:00Z");
-    const ny = await todaysSession(t.db, "today-tz", "America/New_York", now);
-    expect(ny.date).toBe("2026-10-10");
-    expect(ny.exercises.find((e) => e.exerciseId === "squat")?.setsDoneToday).toBe(1);
-    const utc = await todaysSession(t.db, "today-tz", "UTC", new Date("2026-10-12T03:00:00Z"));
-    expect(utc.exercises.find((e) => e.exerciseId === "squat")?.setsDoneToday).toBe(0);
+    const done = async (tz: string, now: string) =>
+      (await todaysSession(t.db, "today-tz", tz, new Date(now))).exercises.find(
+        (e) => e.exerciseId === "squat",
+      )?.setsDoneToday;
+    expect(
+      (await todaysSession(t.db, "today-tz", "America/New_York", new Date("2026-10-11T03:58:00Z"))).date,
+    ).toBe("2026-10-10");
+    expect(await done("America/New_York", "2026-10-11T03:58:00Z")).toBe(1); // the set before midnight
+    expect(await done("America/New_York", "2026-10-11T12:00:00Z")).toBe(1); // the set after it
+    expect(await done("UTC", "2026-10-11T12:00:00Z")).toBe(2); // both are on the 11th in UTC
 
     expect((await api.get("/me/rehab-plans/active/today?tz=Mars/Olympus")).status).toBe(400);
   });
