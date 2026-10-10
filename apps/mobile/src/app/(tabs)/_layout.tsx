@@ -2,7 +2,7 @@ import { GlassSurface } from '@/components/GlassSurface';
 import { SwipeTabs, TabSwipeBoundary } from '@/components/SwipeTabs';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Tabs } from 'expo-router';
-import { Animated, PanResponder, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, PanResponder, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors as c, typography as t, tabAccents, pageColors } from '@/theme/tokens';
 import { NavIcon } from '@/components/NavIcon';
@@ -66,8 +66,8 @@ function GlassTabBar({ state, descriptors, navigation }: BarProps) {
   </View>;
 }
 export default function TabLayout() {
-  const reduced = useReducedMotion();
-  return <SwipeTabs><Tabs screenOptions={({ route }) => ({ headerShown: false, animation: reduced === false ? 'fade' : 'none', sceneStyle: { backgroundColor: pageColors(route.name).background } })} tabBar={props => <GlassTabBar {...props} />}>
+  const reduced = useReducedMotion(), { width } = useWindowDimensions();
+  return <SwipeTabs><Tabs screenOptions={({ route }) => ({ headerShown: false, animation: reduced === false ? 'shift' : 'none', transitionSpec: { animation: 'timing', config: { duration: 260, easing: Easing.out(Easing.cubic) } }, sceneStyleInterpolator: ({ current }) => ({ sceneStyle: { transform: [{ translateX: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [-width, 0, width] }) }] } }), sceneStyle: { backgroundColor: pageColors(route.name).background } })} tabBar={props => <GlassTabBar {...props} />}>
     <Tabs.Screen name="index" options={{ title: 'Train' }} /><Tabs.Screen name="plan" options={{ title: 'Plan' }} /><Tabs.Screen name="feed" options={{ title: 'Feed' }} /><Tabs.Screen name="buddies" options={{ title: 'Buddies' }} /><Tabs.Screen name="me" options={{ title: 'Me' }} />
   </Tabs></SwipeTabs>;
 }
