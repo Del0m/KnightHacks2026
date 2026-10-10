@@ -1,8 +1,9 @@
 // CONN-05: score a finished set on the Databricks Model Serving endpoint during the rest timer.
 //
 // The endpoint serves spotter.ml.form_quality@champion (CONN-04) and returns, per rep,
-// { quality: 0-1, label: "clean" | "partial_range" | ... }. From that we pick the set's medal
-// (Architecture §8, applied to one set):
+// { quality: 0-1, label: "clean" | "partial_range" | ... }. Those are advice (INT-06): a rep is
+// clean when the phone raised no rule flags for it, whatever the source, and the set's medal
+// follows from that (Architecture §8, applied to one set):
 //   gold   every rep clean
 //   silver clean share >= the lifter's own baseline (4-week average, 70% for a first workout)
 //   bronze otherwise
@@ -135,7 +136,12 @@ export class DatabricksScorer {
       if (predictions.length !== input.reps.length) {
         throw new Error(`expected ${input.reps.length} predictions, got ${predictions.length}`);
       }
-      const reps = predictions.map((p) => ({ quality: p.quality, label: p.label, clean: p.label === "clean" }));
+      // INT-06: the rule flags decide clean (and so the medal); the model's quality and label are advice.
+      const reps = predictions.map((p, i) => ({
+        quality: p.quality,
+        label: p.label,
+        clean: input.reps[i]!.flags.length === 0,
+      }));
       return {
         source: "databricks",
         ...pickMedal(reps.map((r) => r.clean), input.baseline_share ?? BEGINNER_BASELINE),

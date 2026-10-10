@@ -13,9 +13,11 @@ import { healthRouter } from "./routes/health.js";
 import { meRouter } from "./routes/me.js";
 import { progressRouter } from "./routes/progress.js";
 import { sessionsRouter } from "./routes/sessions.js";
+import { setsRouter } from "./routes/sets.js";
 import { socialRouter } from "./routes/social.js";
 import { disabledExportQueue, JointsBuffer, type ExportQueue } from "./services/exportQueue.js";
 import { allowAllModerator, type Moderator } from "./services/moderation.js";
+import type { RestTimeDeps } from "./services/restTime.js";
 import { userProvisioner } from "./services/users.js";
 
 export interface AppDeps {
@@ -27,6 +29,7 @@ export interface AppDeps {
   joints?: JointsBuffer;
   pseudonymSecret?: string;
   corsOrigins?: string[];
+  rest?: RestTimeDeps; // INT-05: set scoring + rest notes; defaults to phone score + fixed notes
 }
 
 function cors(origins: string[]): RequestHandler {
@@ -75,7 +78,8 @@ export function createApp(deps: AppDeps): express.Express {
   const provision = userProvisioner(deps.db, deps.pseudonymSecret);
   app.use(requireAuth(deps.verifyToken, provision));
   app.use(meRouter(deps.db, { pseudonymSecret: deps.pseudonymSecret, onAccountDeleted: provision.forget }));
-  app.use(sessionsRouter(deps.db, { exportQueue, joints, log: logger }));
+  app.use(sessionsRouter(deps.db, { exportQueue, joints, log: logger, rest: deps.rest }));
+  app.use(setsRouter(deps.db));
   app.use(progressRouter(deps.db));
   app.use(feedRouter(deps.db));
   app.use(socialRouter(deps.db, moderator));

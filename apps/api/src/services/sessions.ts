@@ -6,6 +6,7 @@ import { schema } from "../db.js";
 import { conflict, isUniqueViolation, notFound } from "../http.js";
 import type { Logger } from "pino";
 import { injuryGroup } from "../integrations/databricks/upload.js";
+import type { RestTimeDeps } from "./restTime.js";
 import type { BufferedSetJoints, ExportQueue, ExportSession, JointsBuffer } from "./exportQueue.js";
 import {
   BASELINE_WINDOW_DAYS,
@@ -143,7 +144,8 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
 export interface FinishDeps {
   exportQueue: ExportQueue;
   joints: JointsBuffer;
-  log?: Pick<Logger, "error">;
+  log?: Pick<Logger, "error" | "info">;
+  rest?: RestTimeDeps; // INT-05 scoring and rest note; without it, phone score and fixed note
 }
 
 export async function finishSession(
