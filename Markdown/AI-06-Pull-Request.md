@@ -42,7 +42,8 @@ Branched from `main`, which has AI-05 (#82) and #83 (backend only, no overlap). 
   - **Exercise switcher.**
   - **Readout:** exercise, state, reps, set end, primary angle and side.
   - **"New set" button.**
-  - **Recorder (dev builds only):** a "Record clip" button shares the pose stream as clip JSON through React Native `Share`, with no new native dependency.
+  - **Recorder:** a "Record clip" button shares the pose stream as clip JSON through React Native `Share`, with no new native dependency. It shows in Release builds too, since the whole screen is a debug screen.
+  - **Banner placement:** the error banner now sits below the readout instead of at a fixed 160 px. The longer readout was disappearing behind it.
 - **Fixtures (`src/engine/__fixtures__/`):** a seeded stick-figure generator (`synth.ts`) produces ten clips, 1.8 MB in total. `UPDATE_FIXTURES=1 npx jest src/engine/__tests__/fixtures.test.ts` regenerates them, and a test fails if the committed JSON drifts from the generator.
 - **Docs:**
   - **Design contract:** `docs/superpowers/specs/2026-10-10-form-engine-design.md`.
@@ -168,7 +169,7 @@ From the repo root:
   3. Fill in `expected` by hand.
 
   The engine tests then cover it automatically.
-- **Not run on a device.** The debug-screen changes and the Metro `watchFolders` bundling were checked only with Jest, `tsc` and `getDefaultConfig`. They haven't been tried in a dev build. Sharing a long clip through `Share` as a message may be slow or truncated on some share targets.
+- **Built and installed, not yet exercised on a device.** `npx expo run:ios --device … --configuration Release` built with 0 errors and installed on an iPhone 17 Pro Max. The bundle step resolved the specs through `watchFolders`. Counting live reps on the phone hasn't been checked yet. Sharing a long clip through `Share` as a message may be slow or truncated on some share targets.
 - **Lint not run.** `npx expo lint` still fails with `Cannot find module 'eslint'`.
 - **Filter tuning comes from synthetic noise.** Real YOLOv8 and Apple Vision jitter may need different `beta` / `minCutoff`. The values are overridable through `EngineOptions.filter`.
 - **Default aspect ratio.** 9/16 assumes portrait 1080 × 1920. Cloud mode (CONN-11) and any other frame size must pass `imageAspect`.
@@ -180,6 +181,14 @@ From the repo root:
   The same applies if someone's resting angle sits between `start_exit` and `start_enter` (for example soft knees at 158° in a squat). The counter then stays in `outbound` until they straighten past `start_enter`, and their reps only count once they do. That's a threshold-tuning question for the specs, best answered with recorded clips.
 - **The "next rep starts" close is a safety net.** With the bundled specs, the settle tail always closes on hold or moved-back first. This is documented in the design contract.
 - **No-person timestamps.** No-person frames are stamped with `Date.now()` in the hook. Native `timestamp_ms` is also Unix time, but the two can be a few ms apart. That only affects the 8 s absent timer.
+
+## Also on this branch
+
+These are not part of AI-06:
+
+- **`issues/issues.json`:** adds an `area: integration` label and `INT-0x` dependencies on several DB, BE and FE issues.
+- **`Markdown/Integration-Issues-Prompt.md`:** a brief for creating those integration issues.
+- **`apps/mobile/package.json`:** a `lint` script (`expo lint`). `eslint` still isn't installed, so it fails for now.
 
 ## Not included
 
