@@ -2,7 +2,8 @@
 //   filter  same gym or within 5 km, experience within one level, not blocked, no existing match
 //   rank    by goal similarity (pgvector cosine on profile embeddings, CONN-08)
 //   score   0.4 goals + 0.3 schedule + 0.2 level + 0.1 streak
-// Until CONN-08 writes embeddings, goal similarity falls back to overlap of the goal tags.
+// CONN-08 writes the embeddings (services/profileEmbeddings.ts); a profile without one (no goals
+// or bio yet, or HF_TOKEN unset) falls back to overlap of the goal tags.
 import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
@@ -68,11 +69,21 @@ export function describeSlot(slot: string): string {
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+// bge-small cosine similarities between profiles sit in a narrow band: unrelated profiles still
+// score about 0.77, near-identical ones about 0.95 (two powerlifting bios 0.91, powerlifter vs
+// marathon runner 0.78, measured 2026-10-10). Used raw, every pair would get a goals score near
+// 0.8 and "Similar goals". So similarity is stretched from that band onto 0..1.
+export const SIMILARITY_FLOOR = 0.75;
+export const SIMILARITY_CEIL = 0.95;
+export const SIMILAR_GOALS_AT = 0.88;
+const goalScore = (similarity: number) =>
+  clamp01((similarity - SIMILARITY_FLOOR) / (SIMILARITY_CEIL - SIMILARITY_FLOOR));
+
 export function scorePair(me: MatchProfile, them: MatchCandidate): ScoredMatch {
   const sharedGoals = me.goals.filter((g) =>
     them.goals.map((x) => x.toLowerCase()).includes(g.toLowerCase()),
   );
-  const goals = them.goalSimilarity !== null ? clamp01(them.goalSimilarity) : jaccard(me.goals, them.goals);
+  const goals = them.goalSimilarity !== null ? goalScore(them.goalSimilarity) : jaccard(me.goals, them.goals);
   const sharedSlots = me.schedule.filter((s) => them.schedule.includes(s));
   const schedule = jaccard(me.schedule, them.schedule);
   const levelGap = Math.abs(LEVELS.indexOf(me.experienceLevel) - LEVELS.indexOf(them.experienceLevel));
@@ -97,7 +108,7 @@ export function scorePair(me: MatchProfile, them: MatchCandidate): ScoredMatch {
     reasons.push(`Both train ${sharedSlots.slice(0, 2).map(describeSlot).join(" and ")}`);
   }
   if (sharedGoals.length) reasons.push(`Shared goals: ${sharedGoals.slice(0, 3).join(", ")}`);
-  else if (them.goalSimilarity !== null && them.goalSimilarity >= 0.75) reasons.push("Similar goals");
+  else if (them.goalSimilarity !== null && them.goalSimilarity >= SIMILAR_GOALS_AT) reasons.push("Similar goals");
   if (streak >= 0.7 && maxRhythm > 0) reasons.push("Similar training rhythm");
 
   return { score: Math.round(score * 1000) / 1000, parts, reasons };
