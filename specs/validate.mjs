@@ -33,6 +33,7 @@ export function loadSpecs() {
 const typeOf = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
 
 function matchesType(value, type) {
+  if (Array.isArray(type)) return type.some((t) => matchesType(value, t));
   if (type === 'integer') return Number.isInteger(value);
   return typeOf(value) === type;
 }
@@ -58,7 +59,7 @@ export function validateSchema(value, schema, root = schema, path = '') {
     errors.push(`${at}: must be one of ${schema.enum.join(', ')}`);
   }
   if (schema.type && !matchesType(value, schema.type)) {
-    errors.push(`${at}: must be ${schema.type}`);
+    errors.push(`${at}: must be ${[].concat(schema.type).join(' or ')}`);
     return errors;
   }
   if (schema.oneOf) {

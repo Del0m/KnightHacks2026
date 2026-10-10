@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spotter.app/specs/set-record/schema.json",
+  "title": "Spotter set record",
+  "description": "The finished-set payload and everything derived from it, defined once (INT-01). Field meanings, units and clocks: docs/specs/set-record-format.md. TS types: generate-types.mjs writes types.ts from this file.",
+  "$defs": {
+    "ExerciseId": {
+      "description": "Spec id (specs/exercises/<id>.json).",
+      "type": "string",
+      "pattern": "^[a-z0-9_]{2,60}$"
+    },
+    "InferenceMode": {
+      "description": "Pose source that produced the joints (PoseSource on the phone).",
+      "enum": ["coreml", "vision", "cloud"]
+    },
+    "Severity": {
+      "enum": ["form", "safety"]
+    },
+    "Medal": {
+      "enum": ["bronze", "silver", "gold"]
+    },
+    "SetEndReason": {
+      "description": "still: no movement for set_end_still_ms. absent: no person. lost: a person but no primary angle. manual: the Done button.",
+      "enum": ["still", "absent", "lost", "manual"]
+    },
+    "Flag": {
+      "description": "One failed form rule on one rep (FORM_FLAG).",
+      "type": "object",
+      "required": ["rule_id", "severity", "rep_index"],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": { "description": "Rule id from the exercise spec.", "type": "string", "pattern": "^[a-z0-9_]{1,60}$" },
+        "severity": { "$ref": "#/$defs/Severity" },
+        "rep_index": { "description": "0-based within the set; equals the rep's rep_index.", "type": "integer", "minimum": 0 }
+      }
+    },
+    "Rep": {
+      "description": "Per-rep aggregates (REP). Times are integer ms on the set clock.",
+      "type": "object",
+      "required": ["rep_index", "start_ms", "end_ms", "tempo_ms", "range_deg", "quality", "lowering_ms", "rising_ms", "flags"],
+      "additionalProperties": false,
+      "properties": {
+        "rep_index": { "description": "0-based within the set: the engine's rep number minus 1.", "type": "integer", "minimum": 0 },
+        "start_ms": { "description": "When the rep left the start position, ms since set start.", "type": ["integer", "null"], "minimum": 0 },
+        "end_ms": { "description": "When the rep was counted, ms since set start.", "type": ["integer", "null"], "minimum": 0 },
+        "tempo_ms": { "description": "Rep duration, start to count.", "type": "integer", "minimum": 0, "maximum": 120000 },
+        "range_deg": { "description": "Movement range: max minus min of the primary angle over the rep.", "type": "number", "minimum": 0, "maximum": 180 },
+        "quality": { "description": "Form-quality model score, advisory only (INT-06). Null from the phone.", "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "lowering_ms": { "description": "Start to the frame with the smallest primary angle.", "type": ["integer", "null"], "minimum": 0 },
+        "rising_ms": { "description": "tempo_ms minus lowering_ms.", "type": ["integer", "null"], "minimum": 0 },
+        "flags": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/Flag" } }
+      }
+    },
+    "JointFrame": {
+      "description": "One pose frame. Joints only, never video (Architecture §13).",
+      "type": "object",
+      "required": ["t_ms", "kp"],
+      "additionalProperties": false,
+      "properties": {
+        "t_ms": { "description": "ms since set start.", "type": "integer", "minimum": 0 },
+        "kp": {
+          "description": "17 COCO joints flattened as x, y, c; x and y normalised 0-1 in the upright image, c is confidence.",
+          "type": "array",
+          "minItems": 51,
+          "maxItems": 51,
+          "items": { "type": "number" }
+        }
+      }
+    },
+    "SetRecord": {
+      "description": "Body of POST /sessions/:id/sets, built on the phone when the set ends (AI-08).",
+      "type": "object",
+      "required": ["schema_version", "set_index", "exercise_id", "weight_kg", "end_reason", "partial_reps", "fps", "frames", "reps"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "const": 1 },
+        "set_index": { "description": "0-based position of the set in its session.", "type": "integer", "minimum": 0, "maximum": 200 },
+        "exercise_id": { "$ref": "#/$defs/ExerciseId" },
+        "weight_kg": { "type": ["number", "null"], "minimum": 0, "maximum": 1000 },
+        "end_reason": { "$ref": "#/$defs/SetEndReason" },
+        "partial_reps": { "description": "Attempts that left the start position but weren't counted.", "type": "integer", "minimum": 0 },
+        "fps": { "description": "Measured over the kept frames; null with fewer than 2.", "type": ["number", "null"], "exclusiveMinimum": 0, "maximum": 240 },
+        "frames": { "type": "array", "maxItems": 5400, "items": { "$ref": "#/$defs/JointFrame" } },
+        "reps": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/Rep" } }
+      }
+    },
+    "SessionStart": {
+      "description": "Body of POST /sessions.",
+      "type": "object",
+      "required": ["inference_mode"],
+      "additionalProperties": false,
+      "properties": {
+        "started_at": { "description": "ISO 8601 with offset.", "type": "string" },
+        "device": { "type": "string", "maxLength": 120 },
+        "inference_mode": { "$ref": "#/$defs/InferenceMode" }
+      }
+    },
+    "ExportSet": {
+      "description": "One set as BE-04 hands it to the Databricks uploader (CONN-02).",
+      "type": "object",
+      "required": ["set_index", "exercise_id", "weight_kg", "medal", "end_reason", "partial_reps", "fps", "frames", "reps"],
+      "additionalProperties": false,
+      "properties": {
+        "set_index": { "type": "integer", "minimum": 0 },
+        "exercise_id": { "$ref": "#/$defs/ExerciseId" },
+        "weight_kg": { "type": ["number", "null"] },
+        "medal": { "oneOf": [{ "$ref": "#/$defs/Medal" }, { "type": "null" }] },
+        "end_reason": { "description": "Null for sets recorded before AI-08.", "oneOf": [{ "$ref": "#/$defs/SetEndReason" }, { "type": "null" }] },
+        "partial_reps": { "type": ["integer", "null"], "minimum": 0 },
+        "fps": { "type": ["number", "null"] },
+        "frames": { "type": "array", "items": { "$ref": "#/$defs/JointFrame" } },
+        "reps": { "type": "array", "items": { "$ref": "#/$defs/Rep" } }
+      }
+    },
+    "ExportSession": {
+      "description": "A finished session as BE-04 hands it to the uploader. user_id is the Neon id and never leaves the API.",
+      "type": "object",
+      "required": ["id", "user_id", "started_at", "finished_at", "device", "inference_mode", "medal", "form_score", "experience_level", "injury_groups", "rehab_start_on", "sets"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "started_at": { "type": "string" },
+        "finished_at": { "type": "string" },
+        "device": { "type": "string" },
+        "inference_mode": { "$ref": "#/$defs/InferenceMode" },
+        "medal": { "oneOf": [{ "$ref": "#/$defs/Medal" }, { "type": "null" }] },
+        "form_score": { "type": ["number", "null"] },
+        "experience_level": { "type": ["string", "null"] },
+        "injury_groups": { "description": "Coarse tags: a body part, optionally with a side (knee, knee:left).", "type": "array", "items": { "type": "string" } },
+        "rehab_start_on": { "description": "YYYY-MM-DD start of the active rehab plan.", "type": ["string", "null"] },
+        "sets": { "type": "array", "items": { "$ref": "#/$defs/ExportSet" } }
+      }
+    },
+    "MetaSet": {
+      "description": "One set in the metadata file: ExportSet without the frames.",
+      "type": "object",
+      "required": ["set_index", "exercise_id", "weight_kg", "medal", "end_reason", "partial_reps", "frame_count", "reps"],
+      "additionalProperties": false,
+      "properties": {
+        "set_index": { "type": "integer", "minimum": 0 },
+        "exercise_id": { "$ref": "#/$defs/ExerciseId" },
+        "weight_kg": { "type": ["number", "null"] },
+        "medal": { "oneOf": [{ "$ref": "#/$defs/Medal" }, { "type": "null" }] },
+        "end_reason": { "oneOf": [{ "$ref": "#/$defs/SetEndReason" }, { "type": "null" }] },
+        "partial_reps": { "type": ["integer", "null"], "minimum": 0 },
+        "frame_count": { "type": "integer", "minimum": 0 },
+        "reps": { "type": "array", "items": { "$ref": "#/$defs/Rep" } }
+      }
+    },
+    "ExportMeta": {
+      "description": "meta/<date>/<session_id>.json on the Databricks Volume (bronze META_SCHEMA).",
+      "type": "object",
+      "required": ["schema_version", "session_id", "user_id", "started_at", "finished_at", "device", "inference_mode", "medal", "form_score", "experience_level", "injury_groups", "rehab_start_on", "joints_path", "exported_at", "sets"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "const": 1 },
+        "session_id": { "type": "string" },
+        "user_id": { "description": "HMAC pseudonym, never the Neon id.", "type": "string" },
+        "started_at": { "type": "string" },
+        "finished_at": { "type": "string" },
+        "device": { "type": "string" },
+        "inference_mode": { "$ref": "#/$defs/InferenceMode" },
+        "medal": { "oneOf": [{ "$ref": "#/$defs/Medal" }, { "type": "null" }] },
+        "form_score": { "type": ["number", "null"] },
+        "experience_level": { "type": ["string", "null"] },
+        "injury_groups": { "type": "array", "items": { "type": "string" } },
+        "rehab_start_on": { "type": ["string", "null"] },
+        "joints_path": { "type": "string" },
+        "exported_at": { "type": "string" },
+        "sets": { "type": "array", "items": { "$ref": "#/$defs/MetaSet" } }
+      }
+    },
+    "ExportJointsLine": {
+      "description": "One line of joints/<date>/<session_id>.ndjson.gz (bronze JOINTS_SCHEMA).",
+      "type": "object",
+      "required": ["session_id", "set_index", "exercise_id", "fps", "frames"],
+      "additionalProperties": false,
+      "properties": {
+        "session_id": { "type": "string" },
+        "set_index": { "type": "integer", "minimum": 0 },
+        "exercise_id": { "$ref": "#/$defs/ExerciseId" },
+        "fps": { "type": ["number", "null"] },
+        "frames": { "type": "array", "items": { "$ref": "#/$defs/JointFrame" } }
+      }
+    }
+  }
+}
