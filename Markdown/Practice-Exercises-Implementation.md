@@ -25,3 +25,7 @@
 - iOS device build succeeds. The rebuilt app is installed and launched on the connected iPhone; owner confirmed native figure scrolling now matches the page. The final Practice Form subheading follows the owner’s feedback.
 - Native-model browser inspection renders push-ups and lunges without shader errors.
 - Private environment-value scan for this refinement: 4 changed/new files, zero matches.
+
+Held-slider refinement: Today’s Workout/Practice and Rotate figure reserve native page scrolling while touched. Release, cancellation and unmount clear the control’s lock. Model scrolling stays unchanged.
+
+Combined verification after API review fixes: 64 mobile suites / 636 tests pass; TypeScript passes; lint has zero errors and eight existing warnings. Page-level release/cancellation also clears any leftover slider locks, and forwarded model scrolling observes the lock. Supplied environment-value scan found zero matches. Physical held-slider behavior still needs owner verification on the phone.

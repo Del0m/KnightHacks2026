@@ -7,12 +7,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Head from 'expo-router/head';
 import { colors as c, typography as t, pageColors, PageColors, usePageColors } from '@/theme/tokens';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
-import { PageScroll } from './PageScroll';
+import { PageScroll, PageScrollLock } from './PageScroll';
 export function AppPage({ children, title = 'Train', intro, compact = false, headerAction, scrollable = true }: { children: ReactNode; title?: string; intro?: string; compact?: boolean; headerAction?: ReactNode; scrollable?: boolean }) {
   const colors = pageColors(title), ui = pageStyles(title);
   const reduced = useReducedMotion(), [entrance] = useState(() => new Animated.Value(1));
+  const locks = useRef(new Set<string>()), [scrollLocked, setScrollLocked] = useState(false);
+  const lockScroll = useCallback((control: string, locked: boolean) => { if (locked) locks.current.add(control); else locks.current.delete(control); setScrollLocked(locks.current.size > 0); }, []);
   const scroll = useRef<ScrollView>(null), position = useRef({ y: 0, content: 0, viewport: 0 });
   const scrollBy = useCallback((delta: number) => {
+    if (locks.current.size) return;
     const state = position.current;
     state.y = Math.min(Math.max(0, state.y + delta), Math.max(0, state.content - state.viewport));
     scroll.current?.scrollTo({ y: state.y, animated: false });
@@ -21,7 +24,10 @@ export function AppPage({ children, title = 'Train', intro, compact = false, hea
   const ScrollContainer = scrollable ? ScrollView : View;
   return <PageColors.Provider value={colors}><LinearGradient colors={['#FFFFFF', colors.background, colors.primarySoft]} style={{ flex: 1 }}>
     {Platform.OS === 'web' && <Head><title>{title} · SteadyForum</title></Head>}
-    <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}><PageScroll.Provider value={scrollBy}><ScrollContainer style={{ flex: 1 }} {...(scrollable ? { ref: scroll as never, contentContainerStyle: ui.scroll, scrollEventThrottle: 16,
+    <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}><PageScrollLock.Provider value={lockScroll}><PageScroll.Provider value={scrollBy}><ScrollContainer style={{ flex: 1 }} {...(scrollable ? { ref: scroll as never, scrollEnabled: !scrollLocked,
+      onTouchEnd: (event: import('react-native').GestureResponderEvent) => { if (!event.nativeEvent.touches.length) { locks.current.clear(); setScrollLocked(false); } },
+      onTouchCancel: () => { locks.current.clear(); setScrollLocked(false); },
+      contentContainerStyle: ui.scroll, scrollEventThrottle: 16,
       onScroll: (event: import('react-native').NativeSyntheticEvent<import('react-native').NativeScrollEvent>) => { position.current.y = event.nativeEvent.contentOffset.y; },
       onContentSizeChange: (_width: number, height: number) => { position.current.content = height; },
       onLayout: (event: import('react-native').LayoutChangeEvent) => { position.current.viewport = event.nativeEvent.layout.height; },
@@ -30,7 +36,7 @@ export function AppPage({ children, title = 'Train', intro, compact = false, hea
         <View style={ui.brandRow}><Text accessibilityRole="header" style={ui.brand}>SteadyForum</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, flexShrink: 1 }}>{headerAction}</View></View>
         {intro && <Text style={ui.pageTitle} accessibilityRole="header">{intro}</Text>}{children}
       </Animated.View>
-    </ScrollContainer></PageScroll.Provider></SafeAreaView>
+    </ScrollContainer></PageScroll.Provider></PageScrollLock.Provider></SafeAreaView>
   </LinearGradient></PageColors.Provider>;
 }
 export function Action({ children, onPress, secondary = false, disabled = false, tone }: { children: string; onPress: () => void; secondary?: boolean; disabled?: boolean; tone?: 'green' }) {

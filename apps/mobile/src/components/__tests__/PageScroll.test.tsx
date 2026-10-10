@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Native renderer test. */
 import React, { useContext } from 'react';
+import { Text } from 'react-native';
+import { SliderScrollBoundary } from '../SliderScrollBoundary';
 import { AppPage } from '../AppPage';
 import { PageScroll } from '../PageScroll';
 const { act, create } = require('react-test-renderer');
@@ -30,5 +32,23 @@ test('embedded model drags scroll from the current offset and clamp at page boun
   expect(mockScrollTo).toHaveBeenLastCalledWith({ y: 600, animated: false });
   act(() => scrollPage?.(-900));
   expect(mockScrollTo).toHaveBeenLastCalledWith({ y: 0, animated: false });
+  act(() => screen.unmount());
+});
+
+test('holding sliders locks page scrolling until all touches release, cancel, or unmount', () => {
+  let screen: ReturnType<typeof create>;
+  act(() => { screen = create(<AppPage><SliderScrollBoundary><Text>Slider</Text></SliderScrollBoundary></AppPage>); });
+  const control = () => screen.root.findByProps({ testID: 'slider-scroll-boundary' });
+  const enabled = () => screen.root.findByType('PageScrollHost').props.scrollEnabled;
+  expect(enabled()).toBe(true);
+  act(() => control().props.onTouchStart()); expect(enabled()).toBe(false);
+  act(() => control().props.onTouchEnd({ nativeEvent: { touches: [{}] } })); expect(enabled()).toBe(false);
+  act(() => control().props.onTouchEnd({ nativeEvent: { touches: [] } })); expect(enabled()).toBe(true);
+  act(() => control().props.onTouchStart());
+  act(() => control().props.onTouchCancel()); expect(enabled()).toBe(true);
+  act(() => control().props.onTouchStart());
+  act(() => screen.root.findByType('PageScrollHost').props.onTouchEnd({ nativeEvent: { touches: [] } })); expect(enabled()).toBe(true);
+  act(() => control().props.onTouchStart());
+  act(() => screen.update(<AppPage><Probe /></AppPage>)); expect(enabled()).toBe(true);
   act(() => screen.unmount());
 });
