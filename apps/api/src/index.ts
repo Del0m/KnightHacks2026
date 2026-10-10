@@ -60,7 +60,7 @@ const scoringConfigured = Boolean(
   env.DATABRICKS_HOST && env.DATABRICKS_CLIENT_ID && env.DATABRICKS_CLIENT_SECRET,
 );
 const rest = {
-  scorer: scoringConfigured ? new DatabricksScorer(scoreConfigFromEnv(), fetch, logger) : null,
+  scorer: scoringConfigured ? new DatabricksScorer(scoreConfigFromEnv(env), fetch, logger) : null,
   notes: new RestNoteWriter(env.HF_TOKEN ? new HfLlm(llmConfigFromEnv()) : null),
 };
 
