@@ -15,7 +15,19 @@ jest.mock('expo-router', () => {
 });
 let screen: ReturnType<typeof create>;
 beforeEach(() => jest.mocked(useReducedMotion).mockReturnValue(false));
-afterEach(() => act(() => screen.unmount()));
+afterEach(() => { if (screen) act(() => screen.unmount()); });
+test('Train loads on native engines without Intl.PluralRules', () => {
+  const original = Intl.PluralRules;
+  Object.defineProperty(Intl, 'PluralRules', { configurable: true, writable: true, value: undefined });
+  try {
+    jest.isolateModules(() => { expect(() => require('../index')).not.toThrow(); });
+    act(() => { screen = create(<TrainScreen />); });
+    const labels = JSON.stringify(screen.toJSON());
+    for (const label of ['1st', '2nd', '3rd']) expect(labels).toContain(label);
+  } finally {
+    Object.defineProperty(Intl, 'PluralRules', { configurable: true, writable: true, value: original });
+  }
+});
 test('first exercise autoplays and selecting it again keeps its focus and playback state', () => {
   act(() => { screen = create(<TrainScreen />); });
   const preview = () => screen.root.findByType('Preview').props;

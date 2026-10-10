@@ -49,8 +49,8 @@ const styles = StyleSheet.create({
   play: { color: c.text, fontFamily: t.label, fontSize: 14 }, pauseBar: { width: 3, height: 12, borderRadius: 1, backgroundColor: c.text }, playTriangle: { width: 0, height: 0, borderTopWidth: 6, borderBottomWidth: 6, borderLeftWidth: 9, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: c.text },
 });
 
-const ordinalRules = new Intl.PluralRules('en', { type: 'ordinal' });
 function orderLabel(number: number) {
-  const rule = ordinalRules.select(number);
-  return `${number}${rule === 'one' ? 'st' : rule === 'two' ? 'nd' : rule === 'few' ? 'rd' : 'th'}`;
+  const lastTwo = number % 100;
+  const suffix = lastTwo >= 11 && lastTwo <= 13 ? 'th' : number % 10 === 1 ? 'st' : number % 10 === 2 ? 'nd' : number % 10 === 3 ? 'rd' : 'th';
+  return `${number}${suffix}`;
 }

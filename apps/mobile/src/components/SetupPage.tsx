@@ -26,7 +26,7 @@ export function SetupPage({ children, step, total, eyebrow, title, intro, action
     animation.start(); return () => animation.stop();
   }, [step, reduced, entrance]);
   return <LinearGradient colors={['#FFFFFF', '#F4FAFE', '#DFEFF9']} style={s.fill}>
-    <Head><title>{title} · Steady forum</title></Head>
+    {Platform.OS === 'web' && <Head><title>{title} · Steady forum</title></Head>}
     <SafeAreaView style={s.fill} edges={['top', 'bottom', 'left', 'right']}>
       <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}><Text style={s.brand}>Steady forum</Text><GlassChoice label="Back" onPress={onBack} compact /></View>

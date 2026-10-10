@@ -59,7 +59,7 @@ export function FeatureScreen(props: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <Head><title>{props.section} · Steady forum</title></Head>
+      {Platform.OS === 'web' && <Head><title>{props.section} · Steady forum</title></Head>}
       <ScrollView ref={scroll} contentContainerStyle={styles.scroll}>
         <View style={[styles.hero, { minHeight: Math.max(compact ? 710 : 640, height - 70) }]}>
           <Animated.Image
