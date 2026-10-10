@@ -23,7 +23,9 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "static",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-dev-client",
@@ -41,7 +43,18 @@
           }
         }
       ],
-      "./plugins/withPoseModels"
-    ]
+      "./plugins/withPoseModels",
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose a photo for your Spotter profile.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "scheme": "spotter"
   }
 }

@@ -2,11 +2,12 @@ import { PolishedPressable } from '@/components/PolishedPressable';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { AppPage, Action, ui } from '@/components/AppPage';
+import { AppPage, Action, pageStyles } from '@/components/AppPage';
 import { exercises, type Profile } from '@/data/workout';
 import { useTraining } from '@/state/Training';
-import { colors as c } from '@/theme/tokens';
+import { pageColors } from '@/theme/tokens';
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const c = pageColors('Plan'), ui = pageStyles('Plan');
 export default function PlannerScreen() {
   const { profile, updateProfile } = useTraining(), [saved, setSaved] = useState(false);
   const [draftDays, setDays] = useState<number[] | null>(null), [draftFocus, setFocus] = useState<Profile['focus'] | null>(null);
