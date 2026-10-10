@@ -77,3 +77,7 @@ Still required for live acceptance: BE-03 endpoint/payload agreement and a real 
 - Verified the gear on a 390×844 browser preview using an empty guest profile through a temporary local preview route. The route was removed after inspection; the normal Me account gate remains in place. Preview: `Previews/FE-03-FE-04/profile-gear-390.jpg`.
 - 125 tests pass; typecheck and lint pass with the same six existing warnings. BE-03 saving and authenticated device acceptance remain pending.
 - Latest user instruction: keep the FE-03 changes local. Do not push or create a PR until explicitly authorized again.
+
+## Compact Settings layout
+
+Removed the four descriptions beneath the question buttons and arranged the glass controls in a two-column grid with equal-height rows. Verified at 390×844 in the authenticated Settings screen. Existing question-navigation test, typecheck and lint pass (six existing warnings). Preview: `Previews/FE-03-FE-04/settings-compact-390.jpg`. Changes remain local.
