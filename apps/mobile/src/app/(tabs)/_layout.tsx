@@ -59,7 +59,7 @@ function GlassTabBar({ state, descriptors, navigation }: BarProps) {
       {state.routes.map((route, index) => {
         const active = state.index === index, title = descriptors[route.key].options.title ?? route.name, color = tabAccents[index]?.color ?? c.primary;
         return <PolishedPressable key={route.key} accessibilityRole="tab" accessibilityState={{ selected: active }} aria-selected={active} accessibilityLabel={title} onPress={() => settle(navigate(index))} onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })} style={{ flex: 1, gap: 5, paddingVertical: 5, alignItems: 'center', borderRadius: 20 }}>
-          <NavIcon name={title} color={color} /><Text style={{ fontFamily: active ? t.strong : t.label, fontSize: 13, color }}>{title}</Text><View style={{ width: 15, height: 2, borderRadius: 2, backgroundColor: active ? color : 'transparent' }} />
+          <NavIcon name={title} color={color} /><Text style={{ fontFamily: active ? t.strong : t.label, fontSize: 13, color }}>{title}</Text>
         </PolishedPressable>;
       })}
     </View></TabSwipeBoundary>
