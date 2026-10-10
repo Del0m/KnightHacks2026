@@ -7,7 +7,7 @@ PoseResult | null ──▶ JointSmoother ──▶ MetricComputer ──▶ Rep
                       (oneEuro.ts)       (angles.ts)        (repCounter.ts)   (engine.ts)
 ```
 
-AI-07 (rules, flags, view gating, `applyOverride`) and AI-08 (set payload) build on `RepRecord`, and FE-05 builds on `useFormEngine`. The engine itself never evaluates rules.
+AI-07 (rules, flags, view gating, `applyOverride`; see [form rules design](2026-10-10-form-rules-design.md)) and AI-08 (set payload) build on `RepRecord`, and FE-05 builds on `useFormEngine`. The engine itself never evaluates rules.
 
 ## Modules
 
@@ -153,11 +153,11 @@ Times are plain timestamp differences, null gaps included. `closedAt` is the clo
 
 **Set end.** After `ended`, `step` returns the current state with no events and `window: null`.
 - **`still`:** in `start`, with `repCount >= 1`. It keeps an anchor value: if `|v - anchor| > reverse_deg` the anchor becomes `v` and the hold time goes back to 0, otherwise the frame's active time is added. Entering `start` (count or partial) resets it. When the active hold time reaches `set_end_still_ms`, the set ends. The tail always closes first, because `min_state_ms` is much shorter than `set_end_still_ms`.
-- **`absent`:** null values continuously for `set_end_still_ms` of wall time (`t - firstNullT`), with `repCount >= 1`.
+- **`absent` / `lost`:** null values continuously for `set_end_still_ms` of wall time (`t - firstNullT`), with `repCount >= 1`. `step(t, value, person = true)` is told whether a person was found; the engine's `pushAbsent` passes `false`. The reason is `lost` if strictly more than half of the run's null frames had a person (the primary angle couldn't be measured), otherwise `absent`. Added in AI-07.
 - **`manual`:** `end(t, 'manual')`.
 - **On any end:** an open tail emits `rep_closed`. An attempt still in `outbound`, `peak` or `return` emits `partial`, and the state goes back to `start`. Then `set_ended {reason}` fires.
 
-**Null value:** no transitions, no window, and the tail and still holds don't advance. The only check is `absent`.
+**Null value:** no transitions, no window, and the tail and still holds don't advance. The only check is `absent` / `lost`.
 
 **`window`:** this is assigned after the frame's transitions.
 - **`outbound`, `peak` or `return`:** the frame goes in that window of the current attempt.
@@ -186,6 +186,7 @@ interface FormEngine {
 **Events:**
 - **Translation:** counter events map to `EngineEvent`s. On `rep_closed`, the attempt's buffers become `RepRecord.windows`, where `rep` is the concatenation in time order.
 - **`RepRecord.side`:** `sides[primary]` at the frame where the primary angle reached `extreme`.
+- **`RepRecord.imageAspect`:** the upright aspect when the rep closed, so the rules can measure geometry on the window joints (AI-07).
 - **On `partial`:** the buffers are dropped.
 
 **Side locking:** `MetricComputer.setLocked(true)` on `rep_started`, and `false` on `rep_closed` or `partial`.
@@ -205,7 +206,7 @@ export function useFormEngine(spec: ExerciseSpec | null, opts?: EngineOptions & 
 
 - **Lifetime:** one engine per `spec` (and `imageAspect`), rebuilt when either changes.
 - **Re-renders:** these happen only when `state`, `repCount` or `ended` change, plus a throttled `primary` for the debug readout.
-- **Absent frames:** `PoseDetection` without a `result` becomes `pushAbsent(Date.now())`.
+- **Absent frames:** `PoseDetection` without a `result` becomes `pushAbsent(clock.now())`, on the pose clock (`poseClock.ts`).
 
 ## 6. Fixtures: `__fixtures__/`
 
@@ -216,7 +217,7 @@ export function useFormEngine(spec: ExerciseSpec | null, opts?: EngineOptions & 
   "source": "synthetic",             // or "recorded"
   "description": "8 reps, σ=0.006 noise, 10–15 fps, two 0.5 s dropouts",
   "image": { "width": 1080, "height": 1920 },   // upright; imageAspect = width / height
-  "expected": { "reps": 8, "partials": 0, "set_end": "still" },  // set_end: "still" | "absent" | null
+  "expected": { "reps": 8, "partials": 0, "set_end": "still" },  // set_end: "still" | "absent" | "lost" | null; optional "flags": [{ rule_id, rep_index }] (AI-07)
   "frames": [ /* PoseResult, or { "absent": true, "timestamp_ms": n } for no person */ ]
 }
 ```

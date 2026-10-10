@@ -288,6 +288,7 @@ stateDiagram-v2
 - **Set end:**
   - **Still:** the lifter has been still at the start for 8 s.
   - **Absent:** no person for 8 s.
+  - **Lost:** a person is in view but the primary angle can't be measured for 8 s (for example, the ankles are cropped out).
   - **Manual:** a Done button.
 
   The still and absent ends only apply after the first counted rep, so setting up never ends a set. A rep cut off by the set end is a partial.
@@ -316,7 +317,7 @@ Each rule has a `rest_note` that the LLM may rephrase. Notes describe the moveme
   "phases": { "start_exit": 160, "count_min": 135, "target": 95, "start_enter": 165,
               "reverse_deg": 5, "min_state_ms": 150, "set_end_still_ms": 8000 },
   "rules": [
-    { "id": "depth", "phase": "peak", "view": "any",
+    { "id": "depth", "phase": "peak", "view": "side",
       "check": { "metric": "knee", "reduce": "min", "op": "<=", "value": "target" },
       "severity": "form", "priority": 1, "label": "partial_range",
       "joints": ["left_hip", "right_hip", "left_knee", "right_knee"],
@@ -347,13 +348,18 @@ Each rule has a `rest_note` that the LLM may rephrase. Notes describe the moveme
 ```
 
 - **Checks are structured, not expressions.** A rule passes when `metric` (reduced over the rule's `phase` with `min`, `max`, `mean`, `first` or `last`) meets `op value`. Otherwise it flags that rep. `value` can name a threshold (`"target"`), so an injury override's phase changes carry through to the rules.
-- **`view`** is `front`, `side` or `any`. Rules that need a particular camera angle are skipped when the lifter is filmed from the other one, so a side-on squat never raises knee-tracking flags.
+- **`view`** is `front`, `side` or `any`. Rules that need a particular camera angle are skipped when the lifter is filmed from the other one, so a side-on squat never raises knee-tracking flags, and a front-on one never gets a depth flag from a knee angle foreshortened by the camera.
 - **`severity`, `priority`, `label` and `joints`:**
   - `severity`: `safety` is the only one that may use the optional haptic.
   - `priority`: picks the one note shown during rest.
   - `label`: the §6.3 model label.
   - `joints`: what tints amber on the skeleton.
-- **Injury overrides:** every spec has `knee`, `shoulder` and `lower_back`. An override can change thresholds, patch a rule's value, severity or note, and disable rules. Every override has an `extra_note`. These are fixed per body part. A physio's own limits (`REHAB_LIMIT`) are applied per user, on top.
+- **Form rules (AI-07):** `apps/mobile/src/engine/rules.ts` checks each rep when it settles and returns its flags and the joints to tint. Flags are held until the set ends, then released as one set summary: the flags, per-rule counts, and the top rule for the rest note.
+  - **View:** detected per rep from shoulder and hip width against torso length. When it's unclear, only `any` rules run.
+  - **Skipped rules:** a rule whose metric is missing in over half its frames is skipped for that rep, not flagged.
+  - **`duration_ms`:** measured with the deepest point as the turn, so tempo covers the whole way down.
+  - Full behaviour: [form rules design](docs/superpowers/specs/2026-10-10-form-rules-design.md).
+- **Injury overrides:** every spec has `knee`, `shoulder` and `lower_back`. An override can change thresholds, patch a rule's value, severity or note, and disable rules. Every override has an `extra_note`. These are fixed per body part. With several injuries, they apply in that order and the more conservative value wins (`applyInjuries`, the same merge on the phone and in `specs/validate.mjs`). A physio's own limits (`REHAB_LIMIT`) are applied per user, on top.
 
 ### 6.3 Form-quality model and our dataset (Hugging Face + Databricks)
 

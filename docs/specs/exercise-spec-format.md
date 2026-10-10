@@ -52,7 +52,16 @@ All values are in degrees, except the ratio.
 - `min` or `max`: the smaller or larger of the two.
 - `most_visible`: the side whose points have the higher mean confidence.
 
-`duration_ms` is a built-in metric: the time the rep spent in the rule's phase.
+`duration_ms` is a built-in metric: the time the rep spent in the rule's phase. The form rules measure it from the rep's frames, with the extreme as the turning point:
+
+| `phase` | `duration_ms` |
+|---|---|
+| `outbound` | From leaving the start (crossing `start_exit`) to first reaching within 1° of the extreme |
+| `peak` | Time spent within 1° of the extreme |
+| `return` | From last leaving the extreme to the count (crossing `start_enter`) |
+| `rep` | From leaving the start to the count |
+
+So a squat's `outbound` covers the whole way down, not just the stretch to `count_min`, and a pause at the bottom counts as `peak`.
 
 ## Phases and the rep counter
 
@@ -108,7 +117,16 @@ Required order:
 | `joints` | COCO joints that tint amber when the rule flags |
 | `rest_note` | Fixed note, shown when the LLM's version fails the tone check |
 
-**The rule passes when the check holds.** Otherwise the rep gets a flag `{ rule_id, severity, rep_index }`, held until the set ends.
+**The rule passes when the check holds.** Otherwise the rep gets a flag `{ rule_id, severity, rep_index }`, held until the set ends. `rep_index` is 0-based within the set (the on-screen count minus one).
+
+**How the form rules read a rule (AI-07, `apps/mobile/src/engine/rules.ts`):**
+
+- **`view`:** the camera view is detected per rep from how far apart the shoulders and hips are across the image, relative to torso length. When it's unclear, only `any` rules run. The app can also pass the view in, for example from the setup screen, and that takes priority.
+- **Missing data:** the check reduces over the frames where the metric could be measured. If that's under half the phase's frames, the rule is skipped for that rep (no flag).
+- **`mid_` points:** within a phase, the check uses only frames where the midpoint was taken the same way as in most of them (from both sides, or from one), so a hip dropping out mid-rep can't add a jump.
+- **Rules not in the file** (such as physio limits) are evaluated the same way.
+
+Full behaviour: [form rules design](../superpowers/specs/2026-10-10-form-rules-design.md).
 
 Placeholders in `rest_note`:
 
@@ -116,6 +134,8 @@ Placeholders in `rest_note`:
 - `{total}`: reps in the set
 - `{value}`: mean reduced value over the flagged reps
 - `{t}`: that value in seconds. Allowed only for `duration_ms` rules.
+
+The phone fills these for its fixed fallback note: `{t}` to 0.1 s (`0.8`, `1`), `{value}` as a whole number from 10 up and to two decimals below. The note is followed by the user's injury `extra_note`s.
 
 ## Injury overrides
 
@@ -128,7 +148,22 @@ All three keys are required in every spec. Each one has:
 | `disable_rules` | Rule ids to skip |
 | `extra_note` | Required. Shown with rest notes for users with this injury. No placeholders. |
 
-`applyOverride(spec, injury)` in `specs/validate.mjs` is the reference merge. For users with several injuries, apply `knee`, `shoulder`, `lower_back` in that order and keep the more conservative value for each threshold. Physio-entered limits (`REHAB_LIMIT`) go on top, per user.
+`applyOverride(spec, injury)` and `applyInjuries(spec, injuries)` in `specs/validate.mjs` are the reference merge. The phone's copy in `apps/mobile/src/engine/overrides.ts` is checked against them by a parity test. Physio-entered limits (`REHAB_LIMIT`) go on top, per user.
+
+For users with several injuries, the overrides apply in the order `knee`, `shoulder`, `lower_back`. When two of them set the same thing, the more conservative one wins:
+
+| What | Kept |
+|---|---|
+| `count_min`, `target` | The one asking for less range (the larger number for `decreasing`, the smaller for `increasing`) |
+| Other phase keys | The later override's |
+| A rule's numeric `value` | The stricter bound for its `op`: the larger for `>=` / `>`, the smaller for `<=` / `<` |
+| A rule's threshold-name `value` | The later override's |
+| `severity` | `safety` if either says so |
+| `rest_note` | The note from the override whose `value` was kept, else the later one |
+| `disable_rules` | Both lists |
+| `extra_note` | All of them, in order |
+
+The validator checks threshold order for every combination of injuries.
 
 ## Tone
 
