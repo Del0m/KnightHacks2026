@@ -15,6 +15,13 @@
       "when": 1791624738582,
       "tag": "0001_conn_compat",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791653195499,
+      "tag": "0002_conn13_deletion_requests",
+      "breakpoints": true
     }
   ]
 }

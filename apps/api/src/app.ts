@@ -72,8 +72,9 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(exercisesRouter(deps.db));
 
   // Everything below needs a Neon Auth token.
-  app.use(requireAuth(deps.verifyToken, userProvisioner(deps.db, deps.pseudonymSecret)));
-  app.use(meRouter(deps.db));
+  const provision = userProvisioner(deps.db, deps.pseudonymSecret);
+  app.use(requireAuth(deps.verifyToken, provision));
+  app.use(meRouter(deps.db, { pseudonymSecret: deps.pseudonymSecret, onAccountDeleted: provision.forget }));
   app.use(sessionsRouter(deps.db, { exportQueue, joints }));
   app.use(progressRouter(deps.db));
   app.use(feedRouter(deps.db));
