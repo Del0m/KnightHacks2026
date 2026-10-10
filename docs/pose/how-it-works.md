@@ -166,3 +166,29 @@ Basic mode is a manual, iPhone-only option that uses Apple Vision body pose inst
 - **Same result.** `VisionPoseMapper` converts Vision's points to a `PoseResult` with `source = "vision"`. The joint mapping, y flip and score rule are in [pose-result-contract.md](pose-result-contract.md#apple-vision-mapping).
 - **JS entry.** `useBasicPoseOutput` in `src/pose/basic.ts`, or `usePoseOutput({ engine: 'vision' })`. Both call `createBasicPoseDetector()` from `spotter-pose`, backed by the native `HybridBasicPoseDetector`. Both detectors share `PoseFrameReader` for orientation and timestamps.
 - **Debug screen.** A Core ML / Vision toggle switches detectors on the same camera feed.
+
+## In-app benchmark and mode selection (AI-04)
+
+On first launch an iPhone measures YOLOv8n-pose and picks a pose mode (Architecture §4.1). Unlike PoseBench's 10 s camera run above, this check is short, silent and needs no camera.
+
+- **Native loop.** `benchmarkPoseModel(size, warmUpMs, measureMs)` on the `spotter-pose` factory runs on a serial background queue and returns a promise.
+  - It builds one mid-gray 1080×1920 frame in the camera's own pixel format (`420f`), so Vision does the same conversion and scaling as on a live frame.
+  - It runs `PoseModelRunner`, the same model, request and decode code as the live `HybridPoseDetector`.
+  - The first inference pays for Core ML's lazy model load and is never counted.
+  - PoseCore's `TimedBenchmark` then discards 0.5 s of warm-up and measures for 1.5 s, and `BenchmarkMath.stats` gives the mean and p95.
+  - The gray frame has no person, but the decoder still scans every candidate, so the decode cost is representative.
+- **Pass mark.** `benchmark.ts` computes sustained fps as 1000 ÷ p95, so slow frames count. It tries 320 px first, then 256 px if 320 falls under `MIN_ON_DEVICE_FPS` (12). The live detector uses the size that passed.
+  - If neither size passes, the result keeps the best fps and `size` is null, so `selectPoseMode` chooses cloud.
+  - If the model fails to load, `fps` is null with the error message.
+- **Cache.** `modeStore.ts` keeps the result, the user's preference and cloud consent in MMKV (`id: 'pose'`). The cached result is tagged with `poseModelId()`.
+  - The id is each bundled model's name plus the export timestamp that Ultralytics writes into the Core ML metadata (`date`), for example `yolov8n-pose-320@2026-10-10T00:32:02…+yolov8n-pose-256@…`.
+  - It is read from the compiled model's `metadata.json` without loading the model. If that file is missing, it falls back to the Core ML model description.
+  - A re-export or downloaded model changes the id, and the next launch benchmarks again. Otherwise the benchmark only runs again when the user asks.
+- **Hook.** `startPoseBenchmark()` runs once from `App.tsx`. `usePoseMode()` returns the mode, which is `pending` until a result exists unless the user picked Apple Vision, plus:
+  - the benchmark and the size to use
+  - `needsCloudConsent`, which FE-15 uses to show its prompt. It is true when the phone would use cloud with consent and signal (a slow iPhone, Android, or a user who picked cloud) but has no consent yet.
+  - setters for the preference and consent
+  - `rerunBenchmark()` for settings
+  
+  Until CONN-11, `cloudReachable` is stubbed to `false`.
+- **Debug screen.** It shows the mode, the benchmark and consent, and has a "Re-run benchmark" button and a consent toggle. The camera unmounts while the benchmark runs, so the live detector doesn't compete for the Neural Engine.
