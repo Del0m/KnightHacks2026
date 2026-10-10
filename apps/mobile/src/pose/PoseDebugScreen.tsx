@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { Linking, Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Linking, Platform, Pressable, Share, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { PoseSkeleton } from './PoseSkeleton';
 import type { PoseDetection } from './types';
 import { isBasicModeSupported } from './basic';
 import { usePoseOutput, type PoseEngine } from './usePoseOutput';
 import { usePoseMode, type PoseModeState } from './usePoseMode';
+import { EXERCISE_SPECS } from '../engine/specs';
+import { useFormEngine } from '../engine/useFormEngine';
+import { createPoseClock } from '../engine/poseClock';
+import { createClipRecorder } from '../engine/recording';
 
 type Size = { width: number; height: number };
 
@@ -15,7 +19,8 @@ const uprightSize = (r: Size | undefined): Size | null =>
 
 /**
  * Debug screen: full-screen camera, live skeleton, and fps / latency / score / model / drop readout,
- * plus the pose mode, benchmark and cloud consent. Stands in for settings until a real screen exists:
+ * plus the pose mode, benchmark and cloud consent, and the form engine's rep state for a chosen
+ * exercise. It can record the pose stream and share it as a test clip. Stands in for settings until a real screen exists:
  * it re-runs the benchmark, toggles consent, and on iPhone switches the preference between automatic
  * (YOLOv8) and Apple Vision (basic mode).
  */
@@ -78,12 +83,23 @@ function LiveCamera({ poseMode, position, setPosition }: {
   const [imageSize, setImageSize] = useState<Size | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
+  const [exerciseIndex, setExerciseIndex] = useState(0);
+  const spec = EXERCISE_SPECS[exerciseIndex];
+  const form = useFormEngine(spec, { imageAspect: imageSize ? imageSize.width / imageSize.height : undefined });
+  const { onPose: formOnPose, reset: resetForm } = form;
+  const recorder = useRef<ReturnType<typeof createClipRecorder> | null>(null);
+  const clock = useRef(createPoseClock()).current;
+  const [recording, setRecording] = useState(false);
+
   // On a cold start `onConfigured` can fire before the resolution is known, so the first pose fills it in.
   const frameOutputRef = useRef<{ currentResolution?: Size } | null>(null);
   const onPose = useCallback((d: PoseDetection) => {
     setDetection(d);
     setImageSize((s) => s ?? uprightSize(frameOutputRef.current?.currentResolution));
-  }, []);
+    formOnPose(d);
+    if (d.result) clock.observe(d.result.timestamp_ms);
+    recorder.current?.add(d, clock.now());
+  }, [formOnPose, clock]);
   const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size, maxFps: 15, onPose });
   useLayoutEffect(() => { frameOutputRef.current = frameOutput; }, [frameOutput]);
 
@@ -103,6 +119,24 @@ function LiveCamera({ poseMode, position, setPosition }: {
     setDetection(null);
     setPreference(preference === 'vision' ? 'auto' : 'vision');
   }, [preference, setPreference]);
+
+  const nextExercise = useCallback(() => {
+    setExerciseIndex((i) => (i + 1) % EXERCISE_SPECS.length);
+  }, []);
+
+  const toggleRecording = useCallback(() => {
+    const active = recorder.current;
+    if (!active) {
+      recorder.current = createClipRecorder({ exercise: spec.id, image: imageSize ?? { width: 1080, height: 1920 } });
+      resetForm();
+      setRecording(true);
+      return;
+    }
+    recorder.current = null;
+    setRecording(false);
+    const clip = active.toClip(`${spec.id}_recorded_${new Date().toISOString().replace(/[:.]/g, '-')}`);
+    Share.share({ title: `${clip.name}.json`, message: JSON.stringify(clip) }).catch((e) => setCameraError(String(e)));
+  }, [resetForm, spec, imageSize]);
 
   const onConfigured = useCallback(() => {
     setImageSize(uprightSize(frameOutput.currentResolution));
@@ -140,28 +174,35 @@ function LiveCamera({ poseMode, position, setPosition }: {
         <PoseSkeleton result={result} imageSize={imageSize} viewSize={viewSize} mirrored={mirrored} fit="cover" />
       ) : null}
 
-      <View style={styles.readout} pointerEvents="none">
-        <Text style={styles.readoutText}>
-          fps {fps} · latency {detection ? detection.latencyMs.toFixed(1) : '–'} ms · score{' '}
-          {result ? result.score.toFixed(2) : '–'}
-        </Text>
-        <Text style={styles.readoutText}>
-          {model ?? 'no model'} · dropped {dropped}
-        </Text>
-        <Text style={styles.readoutText}>
-          mode {mode} · consent {cloudConsent ? 'yes' : needsCloudConsent ? 'needed' : 'no'}
-        </Text>
-        <Text style={styles.readoutText}>
-          benchmark {benchmark?.size ?? '–'} · p95 {benchmark?.p95Ms != null ? benchmark.p95Ms.toFixed(1) : '–'} ms ·{' '}
-          {benchmark?.fps != null ? benchmark.fps.toFixed(1) : '–'} fps
-        </Text>
-      </View>
-
-      {banner ? (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>{banner}</Text>
+      {/* The banner stacks under the readout, so a longer or wrapped readout never hides behind it. */}
+      <View style={styles.overlay} pointerEvents="box-none">
+        <View style={styles.readout} pointerEvents="none">
+          <Text style={styles.readoutText}>
+            fps {fps} · latency {detection ? detection.latencyMs.toFixed(1) : '–'} ms · score{' '}
+            {result ? result.score.toFixed(2) : '–'}
+          </Text>
+          <Text style={styles.readoutText}>
+            {model ?? 'no model'} · dropped {dropped}
+          </Text>
+          <Text style={styles.readoutText}>
+            mode {mode} · consent {cloudConsent ? 'yes' : needsCloudConsent ? 'needed' : 'no'}
+          </Text>
+          <Text style={styles.readoutText}>
+            benchmark {benchmark?.size ?? '–'} · p95 {benchmark?.p95Ms != null ? benchmark.p95Ms.toFixed(1) : '–'} ms ·{' '}
+            {benchmark?.fps != null ? benchmark.fps.toFixed(1) : '–'} fps
+          </Text>
+          <Text style={styles.readoutText} testID="pose-form-readout">
+            {spec.name} · {form.state} · reps {form.repCount}{form.ended ? ' · set ended' : ''} ·{' '}
+            {form.primary != null ? `${form.primary.toFixed(0)}°` : '–'} {form.primarySide ?? ''}
+          </Text>
         </View>
-      ) : null}
+
+        {banner ? (
+          <View style={styles.banner}>
+            <Text style={styles.bannerText}>{banner}</Text>
+          </View>
+        ) : null}
+      </View>
 
       <Pressable style={[styles.button, styles.flip]} onPress={flip}>
         <Text style={styles.buttonText}>{position === 'front' ? 'Use back camera' : 'Use front camera'}</Text>
@@ -188,6 +229,22 @@ function LiveCamera({ poseMode, position, setPosition }: {
       >
         <Text style={styles.buttonText}>{cloudConsent ? 'Revoke cloud consent' : 'Allow cloud'}</Text>
       </Pressable>
+
+      {recording ? null : (
+        <Pressable testID="pose-exercise-next" style={[styles.button, styles.exercise]} onPress={nextExercise}>
+          <Text style={styles.buttonText}>{spec.name}: next exercise</Text>
+        </Pressable>
+      )}
+
+      {!recording && (form.ended || form.repCount > 0) ? (
+        <Pressable testID="pose-set-reset" style={[styles.button, styles.newSet]} onPress={form.reset}>
+          <Text style={styles.buttonText}>New set</Text>
+        </Pressable>
+      ) : null}
+
+      <Pressable testID="pose-record-toggle" style={[styles.button, styles.record]} onPress={toggleRecording}>
+        <Text style={styles.buttonText}>{recording ? 'Stop and share clip' : 'Record clip'}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -197,21 +254,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#000' },
   message: { color: '#fff', fontSize: 16, textAlign: 'center', marginBottom: 16 },
   mirror: { transform: [{ scaleX: -1 }] },
+  overlay: { position: 'absolute', top: 60, left: 16, right: 16, gap: 8 },
   readout: {
-    position: 'absolute',
-    top: 60,
-    left: 16,
-    right: 16,
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   readoutText: { color: '#fff', fontSize: 14, fontVariant: ['tabular-nums'] },
   banner: {
-    position: 'absolute',
-    top: 160,
-    left: 16,
-    right: 16,
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(200,0,0,0.85)',
@@ -222,5 +272,8 @@ const styles = StyleSheet.create({
   engine: { position: 'absolute', bottom: 108, alignSelf: 'center' },
   rerun: { position: 'absolute', bottom: 168, alignSelf: 'center' },
   consent: { position: 'absolute', bottom: 228, alignSelf: 'center' },
+  exercise: { position: 'absolute', bottom: 288, alignSelf: 'center' },
+  record: { position: 'absolute', bottom: 348, alignSelf: 'center' },
+  newSet: { position: 'absolute', bottom: 408, alignSelf: 'center' },
   buttonText: { color: '#000', fontSize: 16, fontWeight: '600' },
 });
