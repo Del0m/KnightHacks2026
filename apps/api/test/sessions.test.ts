@@ -2,6 +2,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { schema } from "../src/db.js";
+import { JointsBuffer } from "../src/services/exportQueue.js";
 import { frames, rep, setup } from "./helpers.js";
 
 let t: Awaited<ReturnType<typeof setup>>;
@@ -163,6 +164,7 @@ describe("session lifecycle", () => {
       reps: [rep()],
     });
     expect(dupe.status).toBe(409);
+    expect(dupe.body.message).toBe("Set 0 was already recorded for this session");
 
     expect((await api.post(`/sessions/${id}/finish`)).status).toBe(200);
     expect((await api.post(`/sessions/${id}/finish`)).status).toBe(409);
@@ -174,5 +176,95 @@ describe("session lifecycle", () => {
   it("requires a token", async () => {
     const { default: request } = await import("supertest");
     expect((await request(t.app).post("/sessions").send({})).status).toBe(401);
+  });
+});
+
+// PR #105 review notes.
+describe("set positions", () => {
+  it("continues after the highest position when set_index leaves gaps", async () => {
+    const { api, id } = await startSession("pos-gaps");
+    await api.post(`/sessions/${id}/sets`, { set_index: 0, exercise_id: "squat", reps: [rep()] });
+    await api.post(`/sessions/${id}/sets`, { set_index: 2, exercise_id: "squat", reps: [rep()] });
+    const next = await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] });
+    expect(next.status).toBe(201);
+    expect(next.body.position).toBe(3); // count(*) would have picked 2 and collided
+  });
+
+  // PGlite has one connection, so this can't race here the way it did on Neon (8 concurrent sets,
+  // 6 rejected) before the session row lock; it pins the behaviour so a refactor can't drop it.
+  it("gives concurrent sets distinct positions", async () => {
+    const { api, id } = await startSession("pos-concurrent");
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () =>
+        api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] }),
+      ),
+    );
+    expect(results.map((r) => r.status)).toEqual(Array(6).fill(201));
+    expect(results.map((r) => r.body.position).sort()).toEqual([0, 1, 2, 3, 4, 5]);
+  });
+});
+
+describe("finish when the export step fails", () => {
+  // Fails the first read of the joints buffer, which happens while the export upload is built.
+  class FlakyJoints extends JointsBuffer {
+    failNext = true;
+    override peek(sessionId: string) {
+      if (this.failNext) {
+        this.failNext = false;
+        throw new Error("simulated failure while building the export");
+      }
+      return super.peek(sessionId);
+    }
+  }
+
+  it("rolls back so a retry gets the medal, and uploads the joints once", async () => {
+    const joints = new FlakyJoints();
+    const f = await setup({ joints });
+    try {
+      const api = await f.as("flaky-export");
+      const { id } = (await api.post("/sessions")).body;
+      await api.post(`/sessions/${id}/sets`, {
+        exercise_id: "squat",
+        fps: 30,
+        frames: frames(4),
+        reps: [rep()],
+      });
+
+      expect((await api.post(`/sessions/${id}/finish`)).status).toBe(500);
+      const [afterFailure] = await f.db.select().from(schema.sessions).where(eq(schema.sessions.id, id));
+      expect(afterFailure?.finishedAt).toBeNull(); // rolled back, not finished without a result
+      expect(await f.db.select().from(schema.medals).where(eq(schema.medals.sessionId, id))).toHaveLength(0);
+
+      const retry = await api.post(`/sessions/${id}/finish`);
+      expect(retry.status).toBe(200);
+      expect(retry.body.medal).toBe("gold");
+      expect(f.queue.sessions).toHaveLength(1);
+      expect(f.queue.sessions[0]!.sets[0]!.frames).toHaveLength(4); // joints survived the failed attempt
+      expect(joints.peek(id).size).toBe(0); // and were drained after the commit
+    } finally {
+      await f.close();
+    }
+  });
+
+  it("still returns the result if queueing the upload throws", async () => {
+    const f = await setup({
+      exportQueue: {
+        enqueue() {
+          throw new Error("queue down");
+        },
+      },
+    });
+    try {
+      const api = await f.as("queue-down");
+      const { id } = (await api.post("/sessions")).body;
+      await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] });
+      const res = await api.post(`/sessions/${id}/finish`);
+      expect(res.status).toBe(200);
+      expect(res.body.medal).toBe("gold");
+      const [session] = await f.db.select().from(schema.sessions).where(eq(schema.sessions.id, id));
+      expect(session?.exportStatus).toBe("pending");
+    } finally {
+      await f.close();
+    }
   });
 });

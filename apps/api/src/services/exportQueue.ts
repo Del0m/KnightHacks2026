@@ -80,6 +80,12 @@ export class JointsBuffer {
     this.bySession.set(sessionId, entry);
   }
 
+  // Read without removing: finishSession builds the upload inside its transaction and only
+  // drains the buffer once that commits.
+  peek(sessionId: string): ReadonlyMap<number, BufferedSetJoints> {
+    return this.bySession.get(sessionId)?.sets ?? new Map();
+  }
+
   take(sessionId: string): Map<number, BufferedSetJoints> {
     const entry = this.bySession.get(sessionId);
     this.bySession.delete(sessionId);

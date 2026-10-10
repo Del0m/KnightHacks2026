@@ -9,8 +9,7 @@ import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { parse, send, userId } from "../http.js";
 import { JOINT_COUNT, VALUES_PER_JOINT } from "../integrations/databricks/upload.js";
-import type { ExportQueue, JointsBuffer } from "../services/exportQueue.js";
-import { addSet, finishSession } from "../services/sessions.js";
+import { addSet, finishSession, type FinishDeps } from "../services/sessions.js";
 
 const MAX_FRAMES_PER_SET = 30 * 60 * 3; // 3 minutes at 30 fps
 
@@ -61,7 +60,7 @@ export const finishInput = z
   .strict()
   .default({});
 
-export function sessionsRouter(db: Db, deps: { exportQueue: ExportQueue; joints: JointsBuffer }): Router {
+export function sessionsRouter(db: Db, deps: FinishDeps): Router {
   const router = Router();
 
   router.post("/sessions", async (req, res) => {
