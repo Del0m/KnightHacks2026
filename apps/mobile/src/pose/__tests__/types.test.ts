@@ -45,4 +45,14 @@ describe('isPoseResult', () => {
   it('rejects null', () => {
     expect(isPoseResult(null)).toBe(false);
   });
+
+  it('accepts every pose source', () => {
+    for (const source of ['coreml', 'vision', 'cloud']) {
+      expect(isPoseResult({ ...contractExample, source })).toBe(true);
+    }
+  });
+
+  it('rejects an unknown source', () => {
+    expect(isPoseResult({ ...contractExample, source: 'mlkit' })).toBe(false);
+  });
 });
