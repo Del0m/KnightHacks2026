@@ -86,11 +86,11 @@ const LIMIT_UQ = "rehab_limits_plan_exercise_angle_side_uq";
 
 // ?tz= is the user's IANA time zone (default UTC). Every date-based field in these responses
 // (started, review_due, today's sets) is computed against the user's local date, not the server's.
-function localToday(req: Request): { timeZone: string; date: string } {
+export function localToday(req: Request, now = new Date()): { timeZone: string; date: string } {
   const { tz } = parse(z.object({ tz: z.string().max(64).default("UTC") }), req.query);
   if (!isTimeZone(tz))
     throw badRequest(`Unknown time zone "${tz}"; use an IANA name such as America/New_York`);
-  return { timeZone: tz, date: localDate(new Date(), tz) };
+  return { timeZone: tz, date: localDate(now, tz) };
 }
 
 // The same exercise, angle and side twice in one request is a mistake in the body: a 400 up

@@ -12,6 +12,7 @@ import { PoseEndpointClient, poseEndpointConfigFromEnv } from "./integrations/hu
 import { attachPoseStream } from "./routes/poseStream.js";
 import { DatabricksScorer, scoreConfigFromEnv } from "./integrations/databricks/score.js";
 import { HfLlm, llmConfigFromEnv } from "./integrations/huggingface/llm.js";
+import { hfQueryEmbedder } from "./integrations/huggingface/embed.js";
 import { hfEmbedder } from "./integrations/huggingface/embeddings.js";
 import { profileEmbeddings } from "./services/profileEmbeddings.js";
 import { RestNoteWriter } from "./services/restNote.js";
@@ -69,6 +70,13 @@ const rest = {
   notes: new RestNoteWriter(llm, logger),
 };
 
+// AI-12: gpt-oss drafts plans and bge-small embeds the search; without HF_TOKEN the rules planner runs.
+const planner = {
+  llm,
+  embed: env.HF_TOKEN ? hfQueryEmbedder(env.HF_TOKEN) : null,
+  log: logger,
+};
+
 const verifyToken = neonAuthVerifier(env.NEON_AUTH_JWKS_URL, {
   issuer: env.NEON_AUTH_ISSUER,
   audience: env.NEON_AUTH_AUDIENCE,
@@ -81,6 +89,7 @@ const app = createApp({
   moderator,
   verifyToken,
   rest,
+  planner,
   // CONN-08: buddy-matching embeddings, refreshed when goals or bio change.
   profileEmbeddings: env.HF_TOKEN ? profileEmbeddings(db, hfEmbedder(env.HF_TOKEN)) : undefined,
   pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET,
@@ -100,6 +109,7 @@ const server = app.listen(env.PORT, () => {
       cloudPose: Boolean(poseEndpoint),
       setScoring: scoringConfigured,
       llmRestNotes: Boolean(env.HF_TOKEN),
+      llmPlans: Boolean(env.HF_TOKEN),
     },
     "spotter api listening",
   );
