@@ -5,6 +5,8 @@ import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { conflict, isUniqueViolation, notFound } from "../http.js";
 import type { Logger } from "pino";
+import { injuryGroup } from "../integrations/databricks/upload.js";
+import type { RestTimeDeps } from "./restTime.js";
 import type { BufferedSetJoints, ExportQueue, ExportSession, JointsBuffer } from "./exportQueue.js";
 import {
   BASELINE_WINDOW_DAYS,
@@ -18,7 +20,8 @@ import {
   type PrResult,
 } from "./medals.js";
 
-const { sessions, sets, reps, formFlags, medals, personalRecords, profiles, injuries, posts } = schema;
+const { sessions, sets, reps, formFlags, medals, personalRecords, profiles, injuries, posts, rehabPlans } =
+  schema;
 
 export interface NewSet {
   setIndex?: number;
@@ -91,7 +94,8 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
         tempoMs: Math.round(r.tempoMs),
         rangeDeg: r.rangeDeg,
         quality: r.quality ?? null,
-        clean: r.clean ?? r.flags.length === 0,
+        // INT-06: clean means the phone raised no rule flags, whatever else the client sent.
+        clean: r.flags.length === 0,
         startMs: r.startMs ?? null,
         endMs: r.endMs ?? null,
       }));
@@ -106,7 +110,7 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
           reps: repRows.length,
           weightKg: input.weightKg,
           medal: input.medal ?? null,
-          cleanShare: input.cleanShare ?? (repRows.length ? cleanCount / repRows.length : null),
+          cleanShare: repRows.length ? cleanCount / repRows.length : null, // INT-06: from the flags
           scoreSource: input.scoreSource ?? null,
         })
         .returning();
@@ -142,7 +146,8 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
 export interface FinishDeps {
   exportQueue: ExportQueue;
   joints: JointsBuffer;
-  log?: Pick<Logger, "error">;
+  log?: Pick<Logger, "error" | "info">;
+  rest?: RestTimeDeps; // INT-05 scoring and rest note; without it, phone score and fixed note
 }
 
 export async function finishSession(
@@ -343,10 +348,14 @@ export async function buildExportSession(
     .select({ level: profiles.experienceLevel })
     .from(profiles)
     .where(eq(profiles.userId, userId));
-  const injuryParts = await db
-    .selectDistinct({ part: injuries.bodyPart })
+  const injuryRows = await db
+    .selectDistinct({ part: injuries.bodyPart, side: injuries.side })
     .from(injuries)
     .where(eq(injuries.userId, userId));
+  const [activePlan] = await db
+    .select({ startOn: rehabPlans.startOn })
+    .from(rehabPlans)
+    .where(and(eq(rehabPlans.userId, userId), eq(rehabPlans.status, "active")));
 
   return {
     id: session.id,
@@ -358,7 +367,15 @@ export async function buildExportSession(
     medal: session.medal,
     form_score: session.formScore,
     experience_level: profile?.level ?? null,
-    injury_groups: injuryParts.map((p) => p.part),
+    // The injured side and the rehab plan's start let range of motion (CONN-14) compare the
+    // right sides from the right baseline. Coarse tags only, never notes or dates (§13).
+    injury_groups: [...new Set(injuryRows.map((i) => injuryGroup(i.part, i.side)))],
+    // Only once the plan has started by this session's date, so ROM never gets a baseline from
+    // the future. The session's UTC date is close enough here: it only picks the baseline window.
+    rehab_start_on:
+      activePlan && activePlan.startOn <= (session.finishedAt ?? new Date()).toISOString().slice(0, 10)
+        ? activePlan.startOn
+        : null,
     sets: setRows.map((s) => ({
       exercise_id: s.exerciseId,
       weight_kg: s.weightKg,
@@ -368,11 +385,13 @@ export async function buildExportSession(
       reps: repRows
         .filter((r) => r.setId === s.id)
         .map((r) => ({
-          start_ms: r.startMs ?? 0,
-          end_ms: r.endMs ?? 0,
+          start_ms: r.startMs ?? null, // unknown, not 0: 0..0 would fail the pipeline's bounds check
+          end_ms: r.endMs ?? null,
           tempo_ms: r.tempoMs,
           range_deg: r.rangeDeg,
-          quality: r.quality ?? (r.clean ? 1 : 0),
+          quality: flagRows.some((f) => f.repId === r.id && f.ruleId === "manual_unscored")
+            ? null
+            : (r.quality ?? (r.clean ? 1 : 0)),
           flags: flagRows
             .filter((f) => f.repId === r.id)
             .map((f) => ({ rule_id: f.ruleId, severity: f.severity })),

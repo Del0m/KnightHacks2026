@@ -20,7 +20,16 @@ export interface Clip {
   description: string;
   /** Upright frame size; `imageAspect` is width ÷ height. */
   image: { width: number; height: number };
-  expected?: { reps: number; partials: number; set_end: 'still' | 'absent' | null };
+  expected?: {
+    reps: number;
+    partials: number;
+    set_end: 'still' | 'absent' | 'lost' | null;
+    /**
+     * The complete list of rule flags for the clip with the base spec, no injuries, view detected.
+     * `rep_index` is 0-based.
+     */
+    flags?: { rule_id: string; rep_index: number }[];
+  };
   frames: ClipFrame[];
 }
 

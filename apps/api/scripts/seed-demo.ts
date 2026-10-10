@@ -8,6 +8,8 @@
 //
 // Safety: it only reads DEMO_DATABASE_URL, never DATABASE_URL, so it can't wipe your dev branch.
 // Set DEMO_PRESENTER_USER_ID to your Neon Auth user id to seed the presenter's own account too.
+import seedUserIds from "../../../data/demo-user-ids.json";
+import { pseudonymize } from "../src/integrations/databricks/upload.js";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { sql } from "drizzle-orm";
@@ -153,6 +155,7 @@ export interface SeedOptions {
   seed?: number;
   users?: number;
   presenterUserId?: string;
+  pseudonymSecret?: string;
 }
 
 export interface SeedSummary {
@@ -167,6 +170,8 @@ export interface SeedSummary {
   kudos: number;
   follows: number;
   buddyMatches: number;
+  rehabPlans: number;
+  romTrendWeeks: number;
 }
 
 export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedSummary> {
@@ -178,7 +183,13 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
 
   const now = options.now ?? new Date();
   const start = new Date(now.getTime() - WEEKS * 7 * DAY);
-  const userCount = options.users ?? 30;
+  const userCount = options.users ?? seedUserIds.length;
+  if (!Number.isInteger(userCount) || userCount < 1 || userCount > seedUserIds.length)
+    throw new Error(`users must be between 1 and ${seedUserIds.length}`);
+
+  if (options.presenterUserId && seedUserIds.slice(1, userCount).includes(options.presenterUserId)) {
+    throw new Error("Presenter id duplicates another demo user");
+  }
 
   // ---- Lifters ----
   const users: Insert<typeof schema.users>[] = [];
@@ -189,6 +200,8 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
     gym: (typeof GYMS)[number];
     level: "beginner" | "intermediate" | "advanced";
     injury: "knee" | "shoulder" | "lower_back" | null;
+    injuryId: string | null;
+    side: "left" | "right" | "n/a";
     perWeek: number;
     skill: number; // starting clean-rep probability; rises over the 6 weeks
     autoPost: boolean;
@@ -196,14 +209,15 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
   }[] = [];
 
   for (let i = 0; i < userCount; i++) {
-    const id =
-      i === 0 && options.presenterUserId
-        ? options.presenterUserId
-        : `demo-user-${String(i + 1).padStart(2, "0")}`;
+    const id = i === 0 && options.presenterUserId ? options.presenterUserId : seedUserIds[i]!;
     const gym = GYMS[i % GYMS.length]!;
     const r = rand();
     const level = r < 0.6 ? "beginner" : r < 0.9 ? "intermediate" : "advanced";
-    const injury = rand() < 0.25 ? pick(["knee", "shoulder", "lower_back"] as const) : null;
+    // The first lifter (the presenter's account) is the §17 recovery story: a left knee.
+    const injury =
+      i === 0 ? "knee" : rand() < 0.25 ? pick(["knee", "shoulder", "lower_back"] as const) : null;
+    const side = i === 0 ? "left" : injury === "lower_back" ? "n/a" : pick(["left", "right"] as const);
+    const injuryId = injury ? randomUUID() : null;
     const handle = `${pick(STYLE)}_${pick(NOUN)}_${i + 1}`;
     const schedule = sample(
       SLOTS.filter((s) => !s.endsWith("pm") || rand() < 0.5),
@@ -212,7 +226,11 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
     const goals = sample(injury ? ["rehab", ...GOAL_TAGS] : GOAL_TAGS, int(1, 3));
     const autoPost = i === 0 || rand() < 0.6;
 
-    users.push({ id, handle });
+    users.push({
+      id,
+      handle,
+      pseudonym: options.pseudonymSecret ? pseudonymize(id, options.pseudonymSecret) : null,
+    });
     profiles.push({
       userId: id,
       displayName: `${FIRST[i % FIRST.length]} ${String.fromCharCode(65 + (i % 26))}.`,
@@ -230,8 +248,10 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
     });
     if (injury) {
       injuries.push({
+        id: injuryId!,
         userId: id,
         bodyPart: injury,
+        side,
         severity: pick(["mild", "moderate"] as const),
         since: new Date(start.getTime() - int(14, 120) * DAY).toISOString().slice(0, 10),
         isPrivate: true,
@@ -242,6 +262,8 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
       gym,
       level,
       injury,
+      injuryId,
+      side,
       perWeek: level === "beginner" ? int(2, 3) : int(3, 4),
       skill:
         level === "beginner"
@@ -520,6 +542,69 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
       })),
     );
 
+  // ---- Rehab plans (DB-12): what a physio gave the knee and shoulder lifters ----
+  const rehabPlans: Insert<typeof schema.rehabPlans>[] = [];
+  const rehabLimits: Insert<typeof schema.rehabLimits>[] = [];
+  const PRESCRIPTIONS = {
+    // Angles must be joint angles in the spec, the same check BE-15 applies.
+    knee: [
+      { exerciseId: "squat", angle: "knee", maxRangeDeg: 70, sets: 3, reps: 10, tempoMinMs: 2000 },
+      { exerciseId: "lunge", angle: "knee", maxRangeDeg: 60, sets: 2, reps: 8, tempoMinMs: null },
+    ],
+    shoulder: [
+      { exerciseId: "shoulder_press", angle: "elbow", maxRangeDeg: 90, sets: 3, reps: 10, tempoMinMs: 1500 },
+      { exerciseId: "push_up", angle: "elbow", maxRangeDeg: 80, sets: 2, reps: 8, tempoMinMs: null },
+    ],
+  } as const;
+  for (const l of lifters) {
+    if (l.injury !== "knee" && l.injury !== "shoulder") continue;
+    const planId = randomUUID();
+    rehabPlans.push({
+      id: planId,
+      userId: l.id,
+      injuryId: l.injuryId,
+      fromPhysio: pick(["Riverside Physio", "UCF Sports Medicine", "Lakeside Rehab Clinic"]),
+      startOn: new Date(start.getTime() + 3 * DAY).toISOString().slice(0, 10),
+      reviewOn: new Date(now.getTime() + int(5, 14) * DAY).toISOString().slice(0, 10),
+      status: "active",
+      notes: "Stay inside the range limits; stop wherever it pinches.",
+    });
+    PRESCRIPTIONS[l.injury].forEach((p, position) =>
+      rehabLimits.push({ ...p, rehabPlanId: planId, side: l.side === "n/a" ? "both" : l.side, position }),
+    );
+  }
+
+  // ---- Range-of-motion trend (what CONN-14's sync would write into rom_trend) ----
+  // Knee lifters: two flat baseline weeks, then range coming back toward the healthy side.
+  // The presenter's numbers are pinned to the §17 line: up 18° in three weeks, within 5°.
+  const romTrend: Insert<typeof schema.romTrend>[] = [];
+  const firstMonday = mondayOf(start);
+  for (const [n, l] of lifters.entries()) {
+    if (l.injury !== "knee" || l.side === "n/a") continue;
+    const healthy = n === 0 ? 103 : Math.round(between(105, 118));
+    const base = n === 0 ? 72 : Math.round(between(62, 78));
+    const weekly =
+      n === 0
+        ? [72, 73, 80, 86, 92, 98]
+        : [0, 1, 2, 3, 4, 5].map((w) => base + Math.max(0, w - 1) * between(3, 6));
+    const baseline = (weekly[0]! + weekly[1]!) / 2;
+    weekly.forEach((peak, w) => {
+      const week = new Date(firstMonday.getTime() + w * 7 * DAY);
+      if (week > now) return;
+      const peakRangeDeg = Math.min(Math.round(peak * 10) / 10, healthy);
+      romTrend.push({
+        userId: l.id,
+        angle: "knee",
+        side: l.side,
+        week: week.toISOString().slice(0, 10),
+        peakRangeDeg,
+        baselineRangeDeg: baseline,
+        healthySideRangeDeg: healthy,
+        changeDeg: Math.round((peakRangeDeg - baseline) * 10) / 10,
+      });
+    });
+  }
+
   // ---- Write ----
   await db.transaction(async (tx) => {
     // Cascades to every per-user table. The exercise library and RAG chunks are left alone.
@@ -548,6 +633,9 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
     await chunked(schema.follows, follows);
     await chunked(schema.buddyMatches, buddyMatches);
     await chunked(schema.riskInsights, riskInsights);
+    await chunked(schema.rehabPlans, rehabPlans);
+    await chunked(schema.rehabLimits, rehabLimits);
+    await chunked(schema.romTrend, romTrend);
   });
 
   return {
@@ -562,7 +650,14 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
     kudos: kudos.length,
     follows: follows.length,
     buddyMatches: buddyMatches.length,
+    rehabPlans: rehabPlans.length,
+    romTrendWeeks: romTrend.length,
   };
+}
+
+function mondayOf(d: Date): Date {
+  const day = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  return new Date(day.getTime() - ((day.getUTCDay() + 6) % 7) * DAY);
 }
 
 async function main() {
@@ -576,7 +671,10 @@ async function main() {
   const { db, close } = createNeonDb(url);
   try {
     console.log(`Resetting and seeding ${new URL(url).host} ...`);
-    const summary = await seedDemo(db, { presenterUserId: process.env.DEMO_PRESENTER_USER_ID || undefined });
+    const summary = await seedDemo(db, {
+      presenterUserId: process.env.DEMO_PRESENTER_USER_ID || undefined,
+      pseudonymSecret: process.env.SPOTTER_PSEUDONYM_SECRET,
+    });
     console.log("Seeded:", summary);
   } finally {
     await close();

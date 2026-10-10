@@ -9,11 +9,16 @@ import type {
   SetEndReason,
 } from './types';
 
-/** Rep state machine over the primary angle. Pure: it only sees `(t, value)`. */
+/** Rep state machine over the primary angle. Pure: it only sees `(t, value, person, gate)`. */
 export interface RepCounter {
-  /** `value` is the primary angle this frame, or null when it could not be measured. */
-  step(t: number, value: number | null): CounterStep;
-  /** Ends the set. Used for manual ends and internally for `still` and `absent`. */
+  /**
+   * `value` is the primary angle this frame, or null when it could not be measured. `person` says
+   * whether a person was detected; it only matters on null frames, where it decides between `lost`
+   * and `absent` when the gap ends the set. `gate` is whether the spec's primary gate passes this
+   * frame (true when the spec has none); `outbound → peak` needs it.
+   */
+  step(t: number, value: number | null, person?: boolean, gate?: boolean): CounterStep;
+  /** Ends the set. Used for manual ends and internally for `still`, `absent` and `lost`. */
   end(t: number, reason: SetEndReason): CounterStep;
   reset(): void;
 }
@@ -39,8 +44,15 @@ interface Tail {
 const SETTLE_PROGRESS_DEG = 1;
 
 /**
- * Creates the counter described in the form engine design (§3). `direction` and `phases` come
- * straight from the exercise spec, after any injury override.
+ * The still hold restarts when the angle moves more than this from its anchor. Wider than
+ * `reverse_deg`, so pose jitter on a resting person doesn't keep the set open.
+ */
+export const STILL_BAND_DEG = 10;
+
+/**
+ * Creates the counter described in the form engine design (§3), with the primary gate and the
+ * still end in any state from the form rules design (§9). `direction` and `phases` come straight
+ * from the exercise spec, after any injury override.
  */
 export function createRepCounter(direction: Direction, phases: Phases): RepCounter {
   const s = direction === 'decreasing' ? 1 : -1;
@@ -54,10 +66,17 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
   let stateMs: number;
   let prevT: number | null;
   let firstNullT: number | null;
+  /** Null frames in the current gap, and how many of them had a person. */
+  let nullFrames: number;
+  let nullWithPerson: number;
   let startedAt: number;
   let peakAt: number;
   let returnAt: number;
   let extreme: number;
+  /** Whether the extreme came from a gate-passing frame in this attempt. */
+  let hasQualifiedExtreme: boolean;
+  /** Range was reached on a frame whose primary gate passed, even before the dwell expired. */
+  let qualifiedRange: boolean;
   let tail: Tail | null;
   let still: Hold | null;
 
@@ -69,10 +88,14 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     stateMs = 0;
     prevT = null;
     firstNullT = null;
+    nullFrames = 0;
+    nullWithPerson = 0;
     startedAt = 0;
     peakAt = 0;
     returnAt = 0;
     extreme = 0;
+    hasQualifiedExtreme = false;
+    qualifiedRange = false;
     tail = null;
     still = null;
   }
@@ -91,15 +114,15 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     stateMs = 0;
   }
 
-  /** Adds the frame's active time to the hold and reports whether it reached `limitMs`. */
-  function advanceHold(hold: Hold, v: number, dt: number, limitMs: number): boolean {
-    if (Math.abs(v - hold.anchor) > phases.reverse_deg) {
+  /** Adds the frame's active time to the still hold and reports whether it reached `set_end_still_ms`. */
+  function advanceStill(hold: Hold, v: number, dt: number): boolean {
+    if (Math.abs(v - hold.anchor) > STILL_BAND_DEG) {
       hold.anchor = v;
       hold.ms = 0;
       return false;
     }
     hold.ms += dt;
-    return hold.ms >= limitMs;
+    return hold.ms >= phases.set_end_still_ms;
   }
 
   function closeTail(t: number, events: CounterEvent[]) {
@@ -119,14 +142,19 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     still = null;
   }
 
-  function step(t: number, value: number | null): CounterStep {
+  function step(t: number, value: number | null, person = true, gate = true): CounterStep {
     if (ended) return result(null, []);
     const events: CounterEvent[] = [];
 
     if (value === null) {
       prevT = null;
       if (firstNullT === null) firstNullT = t;
-      if (repCount >= 1 && t - firstNullT >= phases.set_end_still_ms) finish(t, 'absent', events);
+      nullFrames += 1;
+      if (person) nullWithPerson += 1;
+      if (repCount >= 1 && t - firstNullT >= phases.set_end_still_ms) {
+        // `lost` only when a person was there for strictly more than half the gap; a tie is `absent`.
+        finish(t, 2 * nullWithPerson > nullFrames ? 'lost' : 'absent', events);
+      }
       return result(null, events);
     }
 
@@ -134,8 +162,9 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     const dt = prevT === null ? 0 : Math.max(0, t - prevT);
     prevT = t;
     firstNullT = null;
+    nullFrames = 0;
+    nullWithPerson = 0;
     stateMs += dt;
-    const from = state;
     const gated = stateMs >= phases.min_state_ms;
 
     let heldClose: number | null = null;
@@ -151,7 +180,11 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
       }
     }
 
-    if (state !== 'start' && deeper(v, extreme)) extreme = v;
+    if (state !== 'start' && gate && (!hasQualifiedExtreme || deeper(v, extreme))) {
+      extreme = v;
+      hasQualifiedExtreme = true;
+    }
+    if (state === 'outbound' && gate && deeper(v, phases.count_min)) qualifiedRange = true;
 
     switch (state) {
       case 'start':
@@ -162,17 +195,17 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
           enter('outbound');
           startedAt = t;
           extreme = v;
-          still = null;
+          hasQualifiedExtreme = gate;
+          qualifiedRange = gate && deeper(v, phases.count_min);
           events.push({ type: 'rep_started', t, attempt });
         }
         break;
       case 'outbound':
-        if (gated && deeper(extreme, phases.count_min)) {
+        if (gated && gate && qualifiedRange) {
           enter('peak');
           peakAt = t;
         } else if (gated && shallower(v, phases.start_enter)) {
           enter('start');
-          still = { anchor: v, ms: 0 };
           events.push({ type: 'partial', t, attempt });
         }
         break;
@@ -201,15 +234,15 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
             },
           };
           tail = { attempt, timing, best: v, hold: { anchor: v, ms: 0 } };
-          still = { anchor: v, ms: 0 };
           events.push({ type: 'rep_counted', t, attempt, index: repCount });
         }
         break;
     }
 
-    if (state === 'start' && from === 'start') {
+    // Still end, in any state once a rep is counted. Only movement restarts the hold, not transitions.
+    if (repCount >= 1) {
       if (still === null) still = { anchor: v, ms: 0 };
-      else if (advanceHold(still, v, dt, phases.set_end_still_ms) && repCount >= 1) {
+      else if (advanceStill(still, v, dt)) {
         finish(t, 'still', events);
         return result(null, events);
       }

@@ -4,7 +4,7 @@
 // while TypeScript and Drizzle use camelCase. Request bodies are parsed with snake_case Zod
 // schemas, and responses go through `send`, which converts keys.
 import type { ErrorRequestHandler, Request, RequestHandler, Response } from "express";
-import { ZodError, type z, type ZodTypeAny } from "zod";
+import { z, ZodError, type ZodTypeAny } from "zod";
 
 export class HttpError extends Error {
   constructor(
@@ -33,6 +33,18 @@ export function send(res: Response, body: unknown, status = 200): void {
   res.status(status).json(toSnake(body));
 }
 
+// A calendar date as YYYY-MM-DD that PostgreSQL will also accept. Checked by round trip, because
+// Date.parse rolls impossible dates like 2026-02-31 over into March instead of rejecting them, and
+// from year 0001, because JavaScript has a year 0000 and PostgreSQL doesn't. Either would otherwise
+// reach the database and come back as a 500.
+export const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD")
+  .refine((d) => {
+    const parsed = new Date(`${d}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === d && d >= "0001-01-01";
+  }, "not a real date");
+
 export function parse<S extends ZodTypeAny>(schema: S, input: unknown): z.infer<S> {
   return schema.parse(input);
 }
@@ -46,6 +58,14 @@ export function userId(req: Request): string {
 export function isUniqueViolation(err: unknown): boolean {
   const e = err as { code?: string; cause?: { code?: string } } | null;
   return e?.code === "23505" || e?.cause?.code === "23505";
+}
+
+// Name of the unique constraint or index that a unique_violation hit, or null for any other error.
+// Lets a handler with several unique constraints report the right one.
+export function violatedUniqueConstraint(err: unknown): string | null {
+  if (!isUniqueViolation(err)) return null;
+  const e = err as { constraint?: string; cause?: { constraint?: string } };
+  return e.constraint ?? e.cause?.constraint ?? null;
 }
 
 export const notFoundHandler: RequestHandler = (_req, _res, next) => next(notFound("Route"));

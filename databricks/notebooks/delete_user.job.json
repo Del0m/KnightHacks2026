@@ -1,0 +1,27 @@
+{
+  "name": "spotter-delete-users",
+  "description": "CONN-13: daily, deletes the Databricks data of accounts deleted in the app (Neon deletion_requests). Replace <workspace-folder> with the folder holding the delete_user notebook. Needs the secret spotter/neon_database_url. Runbook: docs/runbooks/account-deletion.md.",
+  "max_concurrent_runs": 1,
+  "schedule": {
+    "quartz_cron_expression": "0 0 4 * * ?",
+    "timezone_id": "UTC",
+    "pause_status": "UNPAUSED"
+  },
+  "tasks": [
+    {
+      "task_key": "delete_users",
+      "notebook_task": {
+        "notebook_path": "<workspace-folder>/delete_user",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "pipeline_id": "325c516b-c907-4b0f-9320-4b0c93f3b51e",
+          "dry_run": "false"
+        }
+      },
+      "max_retries": 2,
+      "min_retry_interval_millis": 600000,
+      "retry_on_timeout": true,
+      "timeout_seconds": 7200
+    }
+  ]
+}

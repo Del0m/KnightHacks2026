@@ -7,7 +7,7 @@ import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { parse, send, userId } from "../http.js";
 
-const { sessions, sets, medals, personalRecords, riskInsights } = schema;
+const { sessions, sets, medals, personalRecords, riskInsights, progressDaily } = schema;
 
 export const INSIGHTS_DISCLAIMER =
   "This is a training-load and form-trend score, not a diagnosis. If something hurts, check with a physio.";
@@ -35,7 +35,7 @@ export function progressRouter(db: Db): Router {
     );
     const day = sql<string>`to_char(${sessions.finishedAt} at time zone 'UTC', 'YYYY-MM-DD')`;
 
-    const [daily, trend, medalCounts, records] = await Promise.all([
+    const [daily, trend, medalCounts, records, exerciseDaily] = await Promise.all([
       db
         .select({
           day,
@@ -75,6 +75,23 @@ export function progressRouter(db: Db): Router {
         .from(personalRecords)
         .where(eq(personalRecords.userId, me))
         .orderBy(personalRecords.exerciseId, personalRecords.metric, desc(personalRecords.value)),
+      db
+        .select({
+          date: progressDaily.date,
+          exerciseId: progressDaily.exerciseId,
+          sets: progressDaily.sets,
+          reps: progressDaily.reps,
+          cleanReps: progressDaily.cleanReps,
+          cleanShare: progressDaily.cleanShare,
+          volumeKg: progressDaily.volumeKg,
+          avgRangeDeg: progressDaily.avgRangeDeg,
+          avgQuality: progressDaily.avgQuality,
+          est1rmKg: progressDaily.est1rmKg,
+          isPr: progressDaily.isPr,
+        })
+        .from(progressDaily)
+        .where(and(eq(progressDaily.userId, me), gte(progressDaily.date, since.toISOString().slice(0, 10))))
+        .orderBy(progressDaily.date, progressDaily.exerciseId),
     ]);
 
     const tiers = { bronze: 0, silver: 0, gold: 0 };
@@ -86,6 +103,7 @@ export function progressRouter(db: Db): Router {
       formTrend: trend,
       medals: tiers,
       personalRecords: records,
+      exerciseDaily,
     });
   });
 

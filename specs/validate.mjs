@@ -185,12 +185,8 @@ function phaseOrderProblem(phases, direction) {
     : `thresholds must satisfy target >= count_min > start_exit > start_enter for increasing (got ${target}, ${countMin}, ${exit}, ${enter})`;
 }
 
-/**
- * The spec as it applies to a user with one injury: phases merged, rule patches applied,
- * disabled rules removed. Does not mutate `spec`.
- */
-export function applyOverride(spec, injury) {
-  const override = spec.injury_overrides[injury] ?? {};
+/** Applies one override object: phases merged, rule patches applied, disabled rules removed. */
+function patchSpec(spec, override) {
   const disabled = new Set(override.disable_rules ?? []);
   const patches = override.rules ?? {};
   return {
@@ -209,6 +205,99 @@ export function applyOverride(spec, injury) {
         };
       }),
   };
+}
+
+/**
+ * The spec as it applies to a user with one injury: phases merged, rule patches applied,
+ * disabled rules removed. Does not mutate `spec`.
+ */
+export function applyOverride(spec, injury) {
+  return patchSpec(spec, spec.injury_overrides[injury] ?? {});
+}
+
+/** Phase keys where the override asking for less range wins. */
+const RANGE_KEYS = new Set(['count_min', 'target']);
+
+/** True when `later` should replace `earlier` as a rule's numeric `value` (ties go to `later`). */
+function stricterOrEqual(op, earlier, later) {
+  return op === '>=' || op === '>' ? later >= earlier : later <= earlier;
+}
+
+/**
+ * Folds several overrides (already in INJURIES order) into one, keeping the more conservative
+ * value wherever two of them set the same thing. See applyInjuries.
+ */
+function mergeOverrides(spec, overrides) {
+  const decreasing = spec.primary_angle.direction === 'decreasing';
+  const phases = {};
+  const rules = {};
+  const valueFrom = {}; // rule id -> the patch whose value won
+  const latestNote = {}; // rule id -> the last rest_note set
+  const disabled = new Set();
+
+  for (const override of overrides) {
+    for (const [key, v] of Object.entries(override.phases ?? {})) {
+      if (key in phases && RANGE_KEYS.has(key)) {
+        phases[key] = decreasing ? Math.max(phases[key], v) : Math.min(phases[key], v);
+      } else {
+        phases[key] = v;
+      }
+    }
+    for (const [id, patch] of Object.entries(override.rules ?? {})) {
+      const merged = (rules[id] ??= {});
+      if (patch.value !== undefined) {
+        const op = spec.rules.find((r) => r.id === id)?.check.op;
+        const bothNumbers = typeof merged.value === 'number' && typeof patch.value === 'number';
+        if (!bothNumbers || stricterOrEqual(op, merged.value, patch.value)) {
+          merged.value = patch.value;
+          valueFrom[id] = patch;
+        }
+      }
+      if (patch.severity !== undefined && merged.severity !== 'safety') merged.severity = patch.severity;
+      if (patch.rest_note !== undefined) latestNote[id] = patch.rest_note;
+    }
+    for (const id of override.disable_rules ?? []) disabled.add(id);
+  }
+
+  for (const [id, merged] of Object.entries(rules)) {
+    const note = valueFrom[id]?.rest_note ?? latestNote[id];
+    if (note !== undefined) merged.rest_note = note;
+  }
+  return { phases, rules, disable_rules: [...disabled] };
+}
+
+/**
+ * The spec as it applies to a user with any set of injuries. Injuries are deduped and applied in
+ * INJURIES order. Where two overrides set the same thing, the more conservative one wins:
+ * - `count_min` / `target`: less range (the larger for decreasing, the smaller for increasing).
+ *   Other phase keys: the later override.
+ * - a rule's `value`: when both are numbers, the stricter bound for the rule's `op` (larger for
+ *   `>=` and `>`, smaller for `<=` and `<`); a threshold name on either side, the later override.
+ * - `severity`: `safety` if any override says so. `rest_note`: the note from the override whose
+ *   `value` won, else the latest note set.
+ * - `disable_rules`: the union. `extra_notes`: every applied override's `extra_note`, in order.
+ * With one injury, `phases` and `rules` equal applyOverride. Does not mutate `spec`.
+ */
+export function applyInjuries(spec, injuries) {
+  const applied = INJURIES.filter((injury) => injuries.includes(injury));
+  const overrides = applied.map((injury) => spec.injury_overrides[injury] ?? {});
+  const { phases, rules } = patchSpec(spec, mergeOverrides(spec, overrides));
+  return {
+    ...spec,
+    phases,
+    rules,
+    injuries: applied,
+    extra_notes: overrides.map((o) => o.extra_note).filter((note) => note !== undefined),
+  };
+}
+
+/** Every non-empty subset of INJURIES, singles first, each in INJURIES order. */
+export function injurySubsets() {
+  const subsets = [];
+  for (let mask = 1; mask < 1 << INJURIES.length; mask++) {
+    subsets.push(INJURIES.filter((_, i) => mask & (1 << i)));
+  }
+  return subsets.sort((a, b) => a.length - b.length);
 }
 
 function noteErrors(where, text, banned, placeholders) {
@@ -241,6 +330,17 @@ export function validateSpec(spec, { schema, banned, fileId }) {
     errors.push(`primary_angle: "${spec.primary_angle.name}" is not defined in angles`);
   } else if (primary.type !== 'joint_angle') {
     errors.push(`primary_angle: "${spec.primary_angle.name}" must be a joint_angle`);
+  }
+
+  const gate = spec.primary_angle.gate;
+  if (gate) {
+    if (gate.metric === 'duration_ms') {
+      errors.push('primary_angle.gate: metric must be an angle, not duration_ms');
+    } else if (gate.metric === spec.primary_angle.name) {
+      errors.push(`primary_angle.gate: metric "${gate.metric}" is the primary angle itself`);
+    } else if (!spec.angles[gate.metric]) {
+      errors.push(`primary_angle.gate: unknown metric "${gate.metric}"`);
+    }
   }
 
   const direction = spec.primary_angle.direction;
@@ -286,9 +386,12 @@ export function validateSpec(spec, { schema, banned, fileId }) {
       }
     }
     errors.push(...noteErrors(`${where}.extra_note`, override.extra_note, banned, []));
+  }
 
-    const order = phaseOrderProblem(applyOverride(spec, injury).phases, direction);
-    if (order) errors.push(`${where}: ${order}`);
+  // Threshold order for every combination a user can have, e.g. injury_overrides.knee+lower_back.
+  for (const subset of injurySubsets()) {
+    const order = phaseOrderProblem(applyInjuries(spec, subset).phases, direction);
+    if (order) errors.push(`injury_overrides.${subset.join('+')}: ${order}`);
   }
 
   return errors;

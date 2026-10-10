@@ -25,6 +25,11 @@ export interface MetricComputerOptions {
   sideMargin?: number;
   /** Default 0.02, in aspect-corrected units. */
   minRatioDenominator?: number;
+  /**
+   * The primary angle is null when any point it resolves has raw `c` below this, so a held or
+   * low-confidence joint can't drive the rep counter. Other metrics still use held joints. Default 0.3.
+   */
+  minConfidence?: number;
 }
 
 export interface MetricComputer {
@@ -111,13 +116,21 @@ interface SideReading {
   value: number | null;
   /** Mean raw `c` over the resolved points; a missing point counts as 0. */
   visibility: number;
+  /** Lowest raw `c` over the resolved points; a missing point counts as 0. */
+  minC: number;
 }
 
-/** Computes every metric of `spec` each frame, keeping a sticky side per `most_visible` metric. */
+/**
+ * Computes every metric of `spec` each frame, keeping a sticky side per `most_visible` metric. The
+ * primary angle (`spec.primary_angle.name`) is also null when a point it resolves is below
+ * `minConfidence`.
+ */
 export function createMetricComputer(spec: ExerciseSpec, opts: MetricComputerOptions = {}): MetricComputer {
   let imageAspect = opts.imageAspect ?? 9 / 16;
   const sideMargin = opts.sideMargin ?? 0.1;
   const minDen = opts.minRatioDenominator ?? 0.02;
+  const minConfidence = opts.minConfidence ?? 0.3;
+  const primaryName = spec.primary_angle.name;
   const entries = Object.entries(spec.angles).map(([name, angle]) => ({
     name,
     angle,
@@ -130,15 +143,16 @@ export function createMetricComputer(spec: ExerciseSpec, opts: MetricComputerOpt
   const read = (angle: AngleSpec, side: Side, joints: SmoothedJoints): SideReading => {
     const resolved = pointsOf(angle).map((p) => resolvePoint(p, side, joints));
     const visibility = resolved.reduce((s, j) => s + (j?.c ?? 0), 0) / resolved.length;
-    if (resolved.some((j) => j === null)) return { value: null, visibility };
+    const minC = Math.min(...resolved.map((j) => j?.c ?? 0));
+    if (resolved.some((j) => j === null)) return { value: null, visibility, minC };
     const v = (resolved as Joint[]).map((j) => ({ x: j.x * imageAspect, y: j.y }));
     switch (angle.type) {
       case 'joint_angle':
-        return { value: jointAngle(v[0], v[1], v[2]), visibility };
+        return { value: jointAngle(v[0], v[1], v[2]), visibility, minC };
       case 'segment_tilt':
-        return { value: segmentTilt(v[0], v[1]), visibility };
+        return { value: segmentTilt(v[0], v[1]), visibility, minC };
       case 'width_ratio':
-        return { value: widthRatio(v[0], v[1], v[2], v[3], minDen), visibility };
+        return { value: widthRatio(v[0], v[1], v[2], v[3], minDen), visibility, minC };
     }
   };
 
@@ -159,8 +173,17 @@ export function createMetricComputer(spec: ExerciseSpec, opts: MetricComputerOpt
     angle: AngleSpec,
     mode: SideMode,
     joints: SmoothedJoints,
-  ): [number | null, MetricSide | null] => {
+  ): [number | null, MetricSide | null, Record<Side, SideReading>] => {
     const r = { left: read(angle, 'left', joints), right: read(angle, 'right', joints) };
+    const [value, side] = pickSide(name, mode, r);
+    return [value, side, r];
+  };
+
+  const pickSide = (
+    name: string,
+    mode: SideMode,
+    r: Record<Side, SideReading>,
+  ): [number | null, MetricSide | null] => {
     const present = (['left', 'right'] as const).filter((s) => r[s].value !== null);
     if (mode === 'left' || mode === 'right') return [r[mode].value, r[mode].value === null ? null : mode];
     if (mode === 'most_visible') {
@@ -182,11 +205,21 @@ export function createMetricComputer(spec: ExerciseSpec, opts: MetricComputerOpt
       for (const { name, angle, sided: sidedAngle } of entries) {
         let value: number | null;
         let side: MetricSide | null;
+        /** The readings behind `value`, for the primary's confidence check. */
+        let used: SideReading[];
         if (sidedAngle) {
-          [value, side] = sided(name, sidedAngle, sidedAngle.side ?? 'most_visible', joints);
+          let r: Record<Side, SideReading>;
+          [value, side, r] = sided(name, sidedAngle, sidedAngle.side ?? 'most_visible', joints);
+          used = side === 'both' ? [r.left, r.right] : side === null ? [] : [r[side]];
         } else {
-          value = read(angle, 'left', joints).value;
+          const reading = read(angle, 'left', joints);
+          value = reading.value;
           side = value === null ? null : 'both';
+          used = [reading];
+        }
+        if (name === primaryName && value !== null && used.some((u) => u.minC < minConfidence)) {
+          value = null;
+          side = null;
         }
         metrics[name] = value;
         sides[name] = side;

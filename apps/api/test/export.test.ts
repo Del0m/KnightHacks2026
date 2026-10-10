@@ -4,6 +4,8 @@ import { gunzipSync } from "node:zlib";
 import { eq } from "drizzle-orm";
 import { pino } from "pino";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { runExportRetry, STALE_AFTER_MS } from "../src/jobs/retryExports.js";
+import { buildExportSession } from "../src/services/sessions.js";
 import { schema } from "../src/db.js";
 import {
   DatabricksUploader,
@@ -27,6 +29,7 @@ const config: UploadConfig = {
 let t: Awaited<ReturnType<typeof setup>>;
 const puts: { url: string; body: Buffer }[] = [];
 let failPuts = false;
+let queue: ReturnType<typeof databricksExportQueue>;
 
 beforeAll(async () => {
   const { db, close } = await createTestDb();
@@ -40,7 +43,7 @@ beforeAll(async () => {
     return new Response(null, { status: 204 });
   });
   const uploader = new DatabricksUploader(config, drizzleExportStatusStore(db), fakeFetch as typeof fetch);
-  const queue = databricksExportQueue(uploader, pino({ level: "silent" }));
+  queue = databricksExportQueue(uploader, pino({ level: "silent" }));
   t = await setup({ db, close, exportQueue: queue, pseudonymSecret: config.pseudonymSecret });
 });
 afterAll(() => t.close());
@@ -64,7 +67,7 @@ describe("Databricks export on finish", () => {
       weight_kg: 40,
       fps: 30,
       frames: frames(3),
-      reps: [rep(), rep(["depth"])],
+      reps: [rep(), rep(["depth"], { start_ms: 0, end_ms: 2000 })],
     });
     await api.post(`/sessions/${id}/finish`);
 
@@ -78,6 +81,9 @@ describe("Databricks export on finish", () => {
     expect(JSON.stringify(meta)).not.toContain("private note");
     expect(meta.sets[0].reps).toHaveLength(2);
     expect(meta.sets[0].reps[1].flags).toEqual([{ rule_id: "depth", severity: "warn" }]);
+    // Unknown rep boundaries go out as null, not 0..0, which the pipeline's bounds check would drop.
+    expect(meta.sets[0].reps[0]).toMatchObject({ start_ms: null, end_ms: null });
+    expect(meta.sets[0].reps[1]).toMatchObject({ start_ms: 0, end_ms: 2000 });
 
     const joints = gunzipSync(puts[0]!.body)
       .toString()
@@ -101,6 +107,54 @@ describe("Databricks export on finish", () => {
     expect(res.status).toBe(200);
     const session = await waitForStatus(id, "failed");
     expect(session.exportError).toContain("503");
+    expect(session.exportAttempts).toBe(1);
     failPuts = false;
+    expect(await runExportRetry({ db: t.db, queue })).toMatchObject({
+      exported: 1,
+      failed: 0,
+      without_joints: 0,
+    });
+    const recovered = await waitForStatus(id, "exported");
+    expect(recovered.exportError).toBeNull();
+    expect(recovered.exportAttempts).toBe(2);
+  });
+  it("rebuilds stale sessions after restart, skips active leases, and retries beyond ten attempts", async () => {
+    const api = await t.as("restart-user");
+    const { id } = (await api.post("/sessions")).body;
+    await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] });
+    await api.post(`/sessions/${id}/finish`);
+    await waitForStatus(id, "exported");
+    await t.db
+      .update(schema.sessions)
+      .set({
+        exportStatus: "pending",
+        exportAttempts: 12,
+        finishedAt: new Date(Date.now() - STALE_AFTER_MS - 1000),
+      })
+      .where(eq(schema.sessions.id, id));
+    expect(await runExportRetry({ db: t.db, queue })).toMatchObject({ exported: 1, without_joints: 1 });
+    expect((await waitForStatus(id, "exported")).exportAttempts).toBe(13);
+    await t.db
+      .update(schema.sessions)
+      .set({ exportStatus: "uploading", exportStartedAt: new Date() })
+      .where(eq(schema.sessions.id, id));
+    expect(await runExportRetry({ db: t.db, queue })).toMatchObject({ retried: 0 });
+    await t.db
+      .update(schema.sessions)
+      .set({ exportStartedAt: new Date(Date.now() - STALE_AFTER_MS - 1000) })
+      .where(eq(schema.sessions.id, id));
+    expect(await runExportRetry({ db: t.db, queue })).toMatchObject({ exported: 1 });
+  });
+  it("claims a finished session atomically so two workers cannot upload it", async () => {
+    const api = await t.as("claim-user");
+    const { id } = (await api.post("/sessions")).body;
+    await api.post(`/sessions/${id}/finish`);
+    await waitForStatus(id, "exported");
+    await t.db.update(schema.sessions).set({ exportStatus: "failed" }).where(eq(schema.sessions.id, id));
+    const store = drizzleExportStatusStore(t.db);
+    const claims = await Promise.all([store.claim!(id), store.claim!(id)]);
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    expect(await queue.exportNow(await buildExportSession(t.db, "claim-user", id))).toBe("uploading");
+    await store.set(id, "exported");
   });
 });

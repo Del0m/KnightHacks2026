@@ -1,6 +1,7 @@
 // DB-04: sessions, sets, reps and form flags. Aggregates only: per-frame joints go straight to
 // the Databricks Volume (CONN-02) and are never stored in Neon (§9.1).
 import {
+  jsonb,
   boolean,
   index,
   integer,
@@ -35,6 +36,8 @@ export const sessions = pgTable(
     formScore: real(), // clean reps / total reps, set on finish
     exportStatus: exportStatus().notNull().default("pending"),
     exportError: text(),
+    exportAttempts: integer().notNull().default(0),
+    exportStartedAt: timestamp({ withTimezone: true }),
     exportedAt: timestamp({ withTimezone: true }),
   },
   (t) => [index("sessions_user_started_idx").on(t.userId, t.startedAt.desc())],
@@ -55,6 +58,9 @@ export const sets = pgTable(
     medal: medalTier(),
     cleanShare: real(),
     scoreSource: text(), // "databricks" | "phone" (CONN-05)
+    // INT-05: the rest-time result, saved so GET /sets/:id/rest-note returns the same thing later.
+    score: jsonb(), // SetScore from scoreSet() (integrations/databricks/score.ts)
+    restNote: jsonb(), // { text, source: "llm" | "fixed", rule_id } (services/restNote.ts)
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

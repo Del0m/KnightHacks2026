@@ -4,7 +4,8 @@ import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
-import { conflict, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
+import { conflict, isoDate, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
+import { deleteAccount } from "../services/accountDeletion.js";
 
 const { users, profiles, injuries } = schema;
 const onboardingGoals = new Set([
@@ -110,12 +111,12 @@ export const profileUpdate = z
     }
   });
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD");
-
 export const injuryInput = z
   .object({
     body_part: z.enum(["knee", "shoulder", "lower_back", "hip", "ankle", "wrist", "elbow", "neck", "other"]),
     severity: z.enum(["mild", "moderate", "severe"]).default("mild"),
+    // DB-12: lets range-of-motion trends compare the injured side with the healthy one.
+    side: z.enum(["left", "right", "both", "n/a"]).default("n/a"),
     since: isoDate.nullable().optional(),
     notes: z.string().max(500).nullable().optional(),
     is_private: z.boolean().default(true),
@@ -154,8 +155,22 @@ export async function getProfile(db: Db, id: string) {
   return row;
 }
 
-export function meRouter(db: Db): Router {
+export interface MeRouterOptions {
+  pseudonymSecret?: string;
+  onAccountDeleted?: (userId: string) => void;
+}
+
+export function meRouter(db: Db, options: MeRouterOptions = {}): Router {
   const router = Router();
+
+  // CONN-13: delete the account and everything in it; Databricks follows via deletion_requests.
+  // Idempotent: deleting an already-deleted account is also 204.
+  router.delete("/me", async (req, res) => {
+    const id = userId(req);
+    await deleteAccount(db, id, options.pseudonymSecret);
+    options.onAccountDeleted?.(id);
+    res.status(204).end();
+  });
 
   router.get("/me/profile", async (req, res) => {
     send(res, await getProfile(db, userId(req)));
@@ -243,6 +258,7 @@ export function meRouter(db: Db): Router {
         userId: userId(req),
         bodyPart: input.body_part,
         severity: input.severity,
+        side: input.side,
         since: input.since ?? null,
         notes: input.notes ?? null,
         isPrivate: input.is_private,

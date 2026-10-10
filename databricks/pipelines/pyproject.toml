@@ -1,0 +1,12 @@
+[project]
+name = "spotter-pipelines-tests"
+version = "0.1.0"
+description = "Local tests for the spotter_sessions Lakeflow pipeline (bronze/silver/gold)"
+requires-python = ">=3.10,<3.14"
+dependencies = ["pyspark==4.0.1", "pytest"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["spotter_sessions/tests"]

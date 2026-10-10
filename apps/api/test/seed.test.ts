@@ -1,7 +1,9 @@
 // DB-10: the demo seed runs on a fresh branch, resets on re-run, and the API serves it.
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import seedUserIds from "../../../data/demo-user-ids.json";
+import { pseudonymize } from "../src/integrations/databricks/upload.js";
 import { seedDemo, type SeedSummary } from "../scripts/seed-demo.js";
 import { schema } from "../src/db.js";
 import { setup } from "./helpers.js";
@@ -12,7 +14,11 @@ const now = new Date("2026-10-10T12:00:00Z");
 
 beforeAll(async () => {
   t = await setup();
-  summary = await seedDemo(t.db, { now, presenterUserId: "presenter-neon-id" });
+  summary = await seedDemo(t.db, {
+    now,
+    presenterUserId: "presenter-neon-id",
+    pseudonymSecret: "shared-demo-secret",
+  });
 }, 120_000);
 afterAll(() => t.close());
 
@@ -23,6 +29,11 @@ describe("seed-demo", () => {
   it("creates ~30 lifters at 2 gyms with 6 weeks of history", async () => {
     expect(summary.users).toBe(30);
     expect(await count(schema.users)).toBe(30);
+    const seededUsers = await t.db.select().from(schema.users);
+    expect(seededUsers.map((u) => u.id).sort()).toEqual(
+      ["presenter-neon-id", ...seedUserIds.slice(1)].sort(),
+    );
+    for (const user of seededUsers) expect(user.pseudonym).toBe(pseudonymize(user.id, "shared-demo-secret"));
     const gyms = await t.db.selectDistinct({ gym: schema.profiles.gymPlaceId }).from(schema.profiles);
     expect(gyms).toHaveLength(2);
 
@@ -62,8 +73,40 @@ describe("seed-demo", () => {
     expect((await api.get("/buddies/suggestions")).status).toBe(200);
   });
 
+  it("gives the presenter the §17 recovery story: a knee plan and range coming back", async () => {
+    expect(summary.rehabPlans).toBeGreaterThan(0);
+    const api = await t.as("presenter-neon-id");
+
+    const limits = (await api.get("/me/limits")).body;
+    expect(limits.body_parts).toEqual(["knee"]);
+    expect(limits.injuries).toEqual([{ body_part: "knee", side: "left" }]);
+    expect(Object.keys(limits.limits)).toEqual(["squat", "lunge"]);
+    expect(limits.rehab_plan.status).toBe("active");
+
+    const today = await api.get("/me/rehab-plans/active/today");
+    expect(today.status).toBe(200);
+    expect(today.body.exercises.map((e: { exercise_id: string }) => e.exercise_id)).toEqual([
+      "squat",
+      "lunge",
+    ]);
+
+    const trend = await t.db
+      .select()
+      .from(schema.romTrend)
+      .where(eq(schema.romTrend.userId, "presenter-neon-id"))
+      .orderBy(schema.romTrend.week);
+    expect(trend).toHaveLength(6);
+    const last = trend.at(-1)!;
+    expect(last.peakRangeDeg! - trend.at(-4)!.peakRangeDeg!).toBe(18); // up 18° in three weeks
+    expect(last.healthySideRangeDeg! - last.peakRangeDeg!).toBeLessThanOrEqual(5); // within 5°
+  });
+
   it("resets instead of duplicating when run again", async () => {
-    const again = await seedDemo(t.db, { now, presenterUserId: "presenter-neon-id" });
+    const again = await seedDemo(t.db, {
+      now,
+      presenterUserId: "presenter-neon-id",
+      pseudonymSecret: "shared-demo-secret",
+    });
     expect(again).toEqual(summary); // deterministic
     expect(await count(schema.users)).toBe(30);
     expect(await count(schema.sessions)).toBe(summary.sessions);

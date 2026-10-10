@@ -22,6 +22,41 @@
       "when": 1791651922022,
       "tag": "0002_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791656284248,
+      "tag": "0003_conn13_deletion_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791656284649,
+      "tag": "0004_conn14_rom_trend",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791657280432,
+      "tag": "0005_int05_rest_note",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791658555018,
+      "tag": "0006_int08_export_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791660368947,
+      "tag": "0007_db12_rehab",
+      "breakpoints": true
     }
   ]
 }

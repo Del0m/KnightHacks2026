@@ -1,0 +1,4 @@
+# Installed by the Inference Endpoints toolkit on top of its PyTorch image (CONN-11).
+ultralytics==8.4.175
+# Headless OpenCV: the GUI build can crash on servers without a display (seen on Databricks).
+opencv-python-headless

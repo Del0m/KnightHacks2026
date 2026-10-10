@@ -2,6 +2,7 @@
 //
 // Same rules as gold_workout_medals in databricks/pipelines/spotter_sessions/gold.py and
 // pickMedal in CONN-05's score.ts, so the app, the pipeline and set scoring never disagree:
+//   clean      the phone raised no rule flags for the rep (INT-06); the model only advises
 //   form score = clean reps / total reps
 //   gold       every rep clean (and at least one rep)
 //   silver     form score >= average over the previous 28 days (70% if there is no history)
