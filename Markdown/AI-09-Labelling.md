@@ -20,7 +20,13 @@ For a standalone Release build and performance acceptance:
 pnpm exec expo run:ios --device --configuration Release
 ```
 
-Keep bundle identifier `com.knighthacks.spotter` and the existing signing team to update the installed app. The owner's known phone is an iPhone 17 Pro Max; the current installed build configuration and iOS version must be recorded during the pilot. A development client can load Metro changes with `pnpm start --lan`. A standalone Release app needs its updated bundled code. Expo Go cannot load the custom pose plugin.
+Keep bundle identifier `com.knighthacks.spotter` and the existing signing team to update the installed app. A development client can load Metro changes with `pnpm start --lan`. A standalone Release app needs its updated bundled code. Expo Go cannot load the custom pose plugin.
+
+The October 10 build was installed as a standalone Release on the owner's iPhone 17 Pro Max running iOS 26.6.2 (23G90), from implementation commit `1921fe4`. After reconnecting and unlocking the phone, CoreDevice successfully launched Spotter with the labelling URL. Screen appearance and capture behaviour still require owner confirmation. To open the route from this Mac while the phone is connected and unlocked:
+
+```sh
+xcrun devicectl device process launch --device Armin --payload-url 'spotter://labelling' com.knighthacks.spotter
+```
 
 ## Capture and review
 
@@ -95,8 +101,9 @@ Actual check results belong in the delivery report. Passing automated checks ver
 - Mobile `npm run typecheck`: passed.
 - Mobile `npm run lint`: zero errors; eight pre-existing warnings. TypeScript-aware import resolution fixes the previous `expo-file-system` resolution error.
 - `npx expo export --platform ios --output-dir /private/tmp/ai09-ios-export`: passed.
-- Connected device reports iPhone 17 Pro Max, iOS 26.6.2 (23G90). Native Release installation and owner pilot results are recorded separately when completed.
+- Native Release build: succeeded with zero errors and six warnings; installed successfully on iPhone 17 Pro Max, iOS 26.6.2 (23G90).
+- CoreDevice launch with `spotter://labelling`: succeeded at 5:40 p.m. Eastern. This confirms process launch; screen appearance and the owner pilot remain unverified.
 
 Tests were added before the modules existed and failed with missing-module errors. Additional hardening regressions failed on existing behaviour before their fixes, including invalid consent, revision recovery/pruning, shared closure frames, confidence thresholds and impossible calendar dates. Mobile environment setup was corrected to simulate a foreground iPhone; expected capture/privacy outcomes were retained.
 
-The generated `ios/` checkout contained Finder/iCloud conflict copies of the Xcode project/workspace, causing CocoaPods to reject automatic project selection. Those copies were temporarily preserved separately for the build, without manually editing native project files. Subsequent builds must resolve or temporarily isolate duplicate generated projects if they remain present.
+The generated `ios/` checkout contained Finder/iCloud conflict copies of the Xcode project/workspace, causing CocoaPods to reject automatic project selection. Those copies were temporarily preserved separately for the build, without manually editing native project files, and restored to their original locations after installation. Subsequent builds must resolve or temporarily isolate duplicate generated projects if they remain present.
