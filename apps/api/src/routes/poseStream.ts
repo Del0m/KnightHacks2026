@@ -97,6 +97,10 @@ function relay(ws: WebSocket, userId: string, deps: PoseStreamDeps): void {
       dropped = 0;
     } else if (reply.status === "warming") {
       warmingUntil = Date.now() + WARMING_BACKOFF_MS;
+      // A frame queued behind this one would go straight to the starting endpoint; drop it so
+      // the back-off holds for it too.
+      if (pending) dropped++;
+      pending = null;
       send({ type: "status", status: "warming" });
     } else {
       send({ type: "error", message: reply.message });

@@ -126,6 +126,28 @@ describe("pose stream relay", () => {
     ws.close();
   });
 
+  it("drops a frame queued behind a warming reply instead of sending it to the starting endpoint", async () => {
+    endpoint.calls = [];
+    endpoint.delayMs = 100;
+    const original = endpoint.reply;
+    endpoint.reply = () => ({ status: "warming" });
+    const { ws, waitFor } = await connect();
+    ws.send(frame(1));
+    ws.send(frame(2)); // queued while frame 1 is in flight
+    await waitFor(2);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(endpoint.calls).toEqual([1]); // frame 2 must not hit the endpoint during the back-off
+
+    // After the back-off, the next reply reports the queued frame as dropped.
+    endpoint.reply = original;
+    endpoint.delayMs = 0;
+    await new Promise((r) => setTimeout(r, 2000));
+    ws.send(frame(3));
+    const messages = await waitFor(3);
+    expect(messages[2]).toMatchObject({ type: "pose", timestamp_ms: 3, dropped: 1 });
+    ws.close();
+  }, 10_000);
+
   it("rejects frames that aren't timestamped JPEGs", async () => {
     const { ws, waitFor } = await connect();
     ws.send("hello");
