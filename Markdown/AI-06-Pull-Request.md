@@ -189,6 +189,7 @@ These are not part of AI-06:
 - **`issues/issues.json`:** adds an `area: integration` label and `INT-0x` dependencies on several DB, BE and FE issues.
 - **`Markdown/Integration-Issues-Prompt.md`:** a brief for creating those integration issues.
 - **`apps/mobile/package.json`:** a `lint` script (`expo lint`). `eslint` still isn't installed, so it fails for now.
+- **`.gitignore`:** ignores sync conflict copies (`* 2`, `* 2.*`, as iCloud and Finder name them). No tracked file matches either pattern.
 
 ## Not included
 
