@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ingest, type Chunk } from "../../../rag/ingest.js";
 import { schema } from "../src/db.js";
 import { pseudonymize } from "../src/integrations/databricks/upload.js";
-import { runInsightSync, type SyncConfig } from "../src/jobs/syncInsights.js";
+import { runInsightSync, syncConfigFromEnv, type SyncConfig } from "../src/jobs/syncInsights.js";
 import { loadSpecs } from "../src/services/exerciseSpecs.js";
 import { llamaGuardModerator } from "../src/services/moderation.js";
 import { createTestDb, setup } from "./helpers.js";
@@ -92,6 +92,17 @@ describe("CONN-08 RAG ingest", () => {
 });
 
 describe("CONN-06 insight sync", () => {
+  it("reads enough history for the six-week demo by default", () => {
+    expect(
+      syncConfigFromEnv({
+        DATABRICKS_HOST: "https://dbc.example",
+        DATABRICKS_CLIENT_ID: "id",
+        DATABRICKS_CLIENT_SECRET: "secret",
+        DATABRICKS_WAREHOUSE_ID: "wh",
+        SPOTTER_PSEUDONYM_SECRET: "test-secret",
+      }).lookbackDays,
+    ).toBe(49);
+  });
   const config: SyncConfig = {
     host: "https://dbc.example",
     clientId: "id",
@@ -110,7 +121,7 @@ describe("CONN-06 insight sync", () => {
       progress: [
         {
           user_id: pseudo,
-          date: "2026-10-08",
+          date: new Date().toISOString().slice(0, 10),
           exercise_id: "squat",
           sets: 3,
           reps: 24,
@@ -143,6 +154,13 @@ describe("CONN-06 insight sync", () => {
     expect(progress).toHaveLength(1);
     expect(progress[0]).toMatchObject({ userId: "sync-user", exerciseId: "squat", reps: 24, isPr: true });
 
+    const response = await api.get("/me/progress?days=49");
+    expect(response.body.exercise_daily).toEqual([
+      expect.objectContaining({ exercise_id: "squat", reps: 24, clean_reps: 20, is_pr: true }),
+    ]);
+    expect((await (await t.as("another-sync-user")).get("/me/progress?days=49")).body.exercise_daily).toEqual(
+      [],
+    );
     const risk = await t.db
       .select()
       .from(schema.riskInsights)

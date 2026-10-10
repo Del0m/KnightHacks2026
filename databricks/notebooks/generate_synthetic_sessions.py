@@ -27,6 +27,23 @@ import math
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+
+def load_seed_user_ids(path: str, users: int, presenter_user_id: str = "") -> list[str]:
+    """Shared DB-10 manifest; presenter replaces the first account in both seeds."""
+    ids = json.loads(Path(path).read_text())
+    if not isinstance(ids, list) or not ids or not all(isinstance(u, str) and u for u in ids):
+        raise ValueError("Invalid demo user manifest")
+    if len(set(ids)) != len(ids) or not 1 <= users <= len(ids):
+        raise ValueError("Invalid demo user count or duplicate ids")
+    ids = ids[:users]
+    if presenter_user_id:
+        ids[0] = presenter_user_id
+    if len(set(ids)) != len(ids):
+        raise ValueError("Presenter id duplicates another demo user")
+    return ids
+
 
 FPS = 10
 SCHEMA_VERSION = 1
@@ -95,15 +112,14 @@ def rep_frames(start_ms: int, duration_ms: int, angle: str, range_l: float, rang
 
 # ---- Sessions ----
 
-def generate(users: int, weeks: int, secret: str, recovery: dict, now: datetime, seed: int = 7):
+def generate(user_ids: list[str], weeks: int, secret: str, recovery: dict, now: datetime, seed: int = 7):
     """Yields (date, session_id, meta, joints_lines) in upload.ts's format."""
     rng = random.Random(seed)
     # Weeks start on Monday, like the pipeline's weeks (date_trunc("week")), so each generated week
     # lands in one gold_rom_trend week. The rehab plan starts on the first Monday.
     first = (now - timedelta(weeks=weeks)).replace(hour=0, minute=0, second=0, microsecond=0)
     start = first - timedelta(days=first.weekday())
-    for i in range(1, users + 1):
-        user_id = f"demo-user-{i:02d}"
+    for user_id in user_ids:
         pseudonym = pseudonymize(user_id, secret)
         injury = recovery.get(user_id)  # (body_part, side) or None
         level = rng.choice(["beginner", "beginner", "intermediate", "advanced"])
@@ -150,7 +166,7 @@ def generate(users: int, weeks: int, secret: str, recovery: dict, now: datetime,
                 meta = {
                     "schema_version": SCHEMA_VERSION, "session_id": session_id, "user_id": pseudonym,
                     "started_at": day.isoformat(), "finished_at": (day + timedelta(minutes=35)).isoformat(),
-                    "device": "synthetic", "inference_mode": "coreml", "medal": None, "form_score": None,
+                    "device": "synthetic", "inference_mode": "on_device", "medal": None, "form_score": None,
                     "experience_level": level,
                     "injury_groups": [f"{injury[0]}:{injury[1]}"] if injury else [],
                     "rehab_start_on": start.date().isoformat() if injury else None,
@@ -181,6 +197,8 @@ def write_sessions(sessions, volume: str) -> int:
 
 # COMMAND ----------
 
+dbutils.widgets.text("seed_user_ids_path", "", "repo data/demo-user-ids.json path (required)")
+dbutils.widgets.text("presenter_user_id", "", "same as DEMO_PRESENTER_USER_ID")
 dbutils.widgets.text("users", "30", "demo users (demo-user-01 ...)")
 dbutils.widgets.text("weeks", "6", "weeks of history")
 dbutils.widgets.text("recovery", "demo-user-01:knee:left,demo-user-04:shoulder:right,demo-user-07:knee:right",
@@ -191,9 +209,12 @@ recovery = {
     u: (part, side)
     for u, part, side in (r.split(":") for r in dbutils.widgets.get("recovery").split(",") if r.strip())
 }
+presenter = dbutils.widgets.get("presenter_user_id")
+if presenter and "demo-user-01" in recovery:
+    recovery[presenter] = recovery.pop("demo-user-01")
 written = write_sessions(
     generate(
-        users=int(dbutils.widgets.get("users")),
+        user_ids=load_seed_user_ids(dbutils.widgets.get("seed_user_ids_path"), int(dbutils.widgets.get("users")), dbutils.widgets.get("presenter_user_id")),
         weeks=int(dbutils.widgets.get("weeks")),
         secret=dbutils.secrets.get(scope="spotter", key="pseudonym_secret"),
         recovery=recovery,

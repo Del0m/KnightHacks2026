@@ -11,6 +11,7 @@ import { useTraining } from '@/state/Training';
 import { useAuth } from '@/screens/Auth/session';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { pageColors, typography as t, tabAccents } from '@/theme/tokens';
+import { SyncedProgress } from './SyncedProgress';
 import { monthCells } from './calendar';
 import { router } from 'expo-router';
 import { useOnboarding } from '@/screens/Onboarding/state';
@@ -90,6 +91,7 @@ export default function ProgressScreen() {
       <Text style={ui.emptyTitle}>{section === 1 ? 'No videos yet' : 'No personal bests yet'}</Text>
       <Text style={ui.muted}>{section === 1 ? 'Your workout videos will appear here.' : 'Add your personal bests in Settings.'}</Text>
     </View>}
+    <SyncedProgress />
     <View style={styles.account}>
       <Text style={ui.muted}>{auth.user?.email}</Text>
       <PolishedPressable accessibilityRole="button" disabled={loggingOut} onPress={() => { setLoggingOut(true); setError(null); void auth.logout().catch(error => setError(error.message)).finally(() => setLoggingOut(false)); }}><Text style={styles.link}>{loggingOut ? 'Logging out…' : 'Log out'}</Text></PolishedPressable>
