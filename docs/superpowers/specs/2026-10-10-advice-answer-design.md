@@ -58,8 +58,8 @@ export class AdviceWriter {
 ## Pain and acute red flags (`acuteSignals`)
 
 Architecture §1.1: "Pain mentioned anywhere routes to 'please check with your physio or a doctor'." Deterministic, case-insensitive, on the question text. BE-11 must pass the post's title and body together as `question`, so a red flag in the title counts. A signal is returned for each of:
-- any pain word that isn't negated: pain, painful, hurt/hurts/hurting, ache/aches/aching, twinge, throb;
-- agony, "killing me", dislocated or out of place, broke/broken/fractured, a crack, spasms, a hernia, passed out / blacked out / fainting, can't feel a limb, can barely walk / stand / move, hot or red to the touch, black and blue, a racing heart, dark urine after training, "something gave";
+- any pain word that isn't negated: pain, painful, hurt/hurts/hurting, ache/aches/aching/achy, headache, backache, neck or stomach ache, migraine, twinge, throb, "ouch";
+- agony, "killing me", dislocated or out of place, broke/broken/fractured, a crack, spasms, a hernia, passed out / blacked out / fainting, can't feel a limb, can barely walk / stand / move, hot or red to the touch, black and blue, a racing heart, dark urine after training, "something gave", limping, hard to walk, tender to the touch;
 - sharp, stabbing, shooting, sudden or severe pain;
 - a pop, snap or tear ("tore", "torn", "ripped");
 - swelling, swollen, bruising, bruised;

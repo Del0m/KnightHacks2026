@@ -573,7 +573,13 @@ flowchart LR
 1. Moderate with Llama Guard.
 2. Find similar answered questions with pgvector.
 3. Draft a short, sourced answer with gpt-oss, labelled **"AI suggestion"**, posted as the first comment. Community answers follow.
-4. Questions mentioning acute pain get a fixed "please see a medical professional" reply instead of an LLM answer.
+4. Questions mentioning pain get a fixed "please see a medical professional" reply instead of an LLM answer.
+
+**Answer writer (AI-13):** `apps/api/src/services/advice.ts`, called by BE-11 with the question and the sources it retrieved:
+- **Pain:** following §1.1, a check in code returns the fixed reply for any pain word that isn't negated, and for acute signs (a pop or tear, swelling, numbness, can't bear weight, chest pain or dizziness, a fresh injury). The model never sees the question. Soreness, stiffness and tightness still get an answer, and so does a past or recovering injury with no pain or acute sign: training again after an injury is what Spotter is for.
+- **Sources:** the question and up to 6 sources go to gpt-oss as data. The answer is at most 3 sentences and cites 1 to 3 of them by id.
+- **Guard:** the answer is shown only when every cited id was given, every number in it comes from a cited source, it passes the §7 tone check (no commands or banned phrases), and it names no condition, cause, medication or guaranteed outcome, and carries no links or promotions.
+- **Fallback:** anything else (nothing to cite, a slow or failed model, a rejected answer) means no AI comment; community answers carry the thread.
 
 ---
 
