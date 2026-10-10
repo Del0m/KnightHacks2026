@@ -16,24 +16,17 @@
 // Job fallback (if serving isn't available on Free Edition): the phone score is shown live,
 // and the pipeline's gold_workout_medals (CONN-03) recomputes medals in batch afterwards.
 //
-// Stubs until dependencies land:
-//   - ScoreRep mirrors the AI-08 per-rep aggregates; swap for the shared type once it exists.
-//   - Env is read directly; move to the Zod env from BE-01.
+import type { Flag, Rep } from "../../../../../specs/set-record/types.js";
+export type { Medal } from "../../../../../specs/set-record/types.js";
+import type { Medal } from "../../../../../specs/set-record/types.js";
 
-// ---- Input / output ----
-
-export interface ScoreRep {
-  range_deg: number;
-  tempo_ms: number;
-  flags: { rule_id: string }[]; // the phone's rule result
-  quality?: number | null; // the phone's own 0-1 score, if it has one
-  // Frame-derived features; optional until the phone computes them (the model handles nulls).
-  lowering_ms?: number | null;
-  rising_ms?: number | null;
-  asymmetry?: number | null;
-  max_trunk_angle?: number | null;
-  min_knee_ankle_ratio?: number | null;
-}
+export type ScoreRep = Pick<Rep, "range_deg" | "tempo_ms"> &
+  Partial<Omit<Rep, "range_deg" | "tempo_ms" | "flags">> & {
+    flags: (Pick<Flag, "rule_id"> & Partial<Omit<Flag, "rule_id">>)[];
+    asymmetry?: number | null;
+    max_trunk_angle?: number | null;
+    min_knee_ankle_ratio?: number | null;
+  };
 
 export interface ScoreSetInput {
   exercise_id: string;
@@ -41,8 +34,6 @@ export interface ScoreSetInput {
   reps: ScoreRep[];
   baseline_share?: number | null; // lifter's 4-week clean share; defaults to the beginner baseline
 }
-
-export type Medal = "gold" | "silver" | "bronze";
 
 export interface SetScore {
   source: "databricks" | "phone";
@@ -101,7 +92,10 @@ export function phoneScore(input: ScoreSetInput, startedAt: number, reason: stri
   const baseline = input.baseline_share ?? BEGINNER_BASELINE;
   return {
     source: "phone",
-    ...pickMedal(reps.map((r) => r.clean), baseline),
+    ...pickMedal(
+      reps.map((r) => r.clean),
+      baseline,
+    ),
     reps,
     latency_ms: Date.now() - startedAt,
     fallback_reason: reason,
@@ -144,14 +138,19 @@ export class DatabricksScorer {
       }));
       return {
         source: "databricks",
-        ...pickMedal(reps.map((r) => r.clean), input.baseline_share ?? BEGINNER_BASELINE),
+        ...pickMedal(
+          reps.map((r) => r.clean),
+          input.baseline_share ?? BEGINNER_BASELINE,
+        ),
         reps,
         latency_ms: Date.now() - startedAt,
       };
     } catch (err) {
       const reason = signal.aborted
         ? `timed out after ${this.config.timeoutMs} ms`
-        : err instanceof Error ? err.message : String(err);
+        : err instanceof Error
+          ? err.message
+          : String(err);
       if (/HTTP 401|HTTP 403/.test(reason)) this.token = null;
       this.log.warn(`[databricks] scoring fell back to phone score: ${reason}`);
       return phoneScore(input, startedAt, reason);

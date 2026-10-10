@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { schema } from "../src/db.js";
 import { pseudonymize } from "../src/integrations/databricks/upload.js";
-import { createTestDb, rep, setup } from "./helpers.js";
+import { createTestDb, rep, setup, setRecord } from "./helpers.js";
 
 const SECRET = "test-pseudonym-secret-123456";
 const ME = "delete-me";
@@ -59,12 +59,16 @@ describe("account deletion", () => {
     await other.get("/me/profile"); // users are created on their first request
     await me.put("/me/profile", { bio: "deleting soon", goals: ["squat 100"] });
     await me.post("/me/injuries", { body_part: "knee", notes: "private note" });
-    const { id: sessionId } = (await me.post("/sessions", { device: "iPhone" })).body;
-    await me.post(`/sessions/${sessionId}/sets`, {
-      exercise_id: "squat",
-      weight_kg: 60,
-      reps: [rep(), rep(["depth"])],
-    });
+    const { id: sessionId } = (await me.post("/sessions", { inference_mode: "coreml", device: "iPhone" }))
+      .body;
+    await me.post(
+      `/sessions/${sessionId}/sets`,
+      setRecord({
+        exercise_id: "squat",
+        weight_kg: 60,
+        reps: [rep(), rep(["depth"])],
+      }),
+    );
     await me.post(`/sessions/${sessionId}/finish`);
     // Posts are only visible (and commentable) between followers.
     await me.post(`/follows/${OTHER}`);

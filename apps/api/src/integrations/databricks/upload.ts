@@ -10,60 +10,24 @@
 // nothing else on the input (video, frames, email, handle) can leak through, and the user id
 // is replaced with an HMAC pseudonym.
 //
-// Stubs until dependencies land:
-//   - FinishedSession mirrors the AI-08 set record; swap for the shared type once it exists.
-//   - ExportStatusStore is the Neon write; BE-04 should pass neonExportStatusStore(sql).
-//   - Env is read directly; move to the Zod env from BE-01.
-
 import { createHmac } from "node:crypto";
 import { gzipSync } from "node:zlib";
-
-// ---- Session record (stub of AI-08) ----
+import type {
+  ExportJointsLine,
+  ExportMeta,
+  ExportSession,
+  JointFrame,
+} from "../../../../../specs/set-record/types.js";
+export type {
+  JointFrame,
+  Rep as FinishedRep,
+  ExportSet as FinishedSet,
+  ExportSession as FinishedSession,
+} from "../../../../../specs/set-record/types.js";
+type FinishedSession = ExportSession;
 
 export const JOINT_COUNT = 17; // COCO keypoints
 export const VALUES_PER_JOINT = 3; // x, y, confidence
-
-export interface JointFrame {
-  t_ms: number; // ms since set start
-  kp: number[]; // flat [x0, y0, c0, x1, y1, c1, ...], length 51
-}
-
-export interface FinishedRep {
-  // Rep boundaries on the set's frame clock (JointFrame.t_ms); null when the phone didn't send
-  // them. The pipeline keeps those reps but can't match them to frames.
-  start_ms: number | null;
-  end_ms: number | null;
-  tempo_ms: number;
-  range_deg: number;
-  quality: number | null;
-  flags: { rule_id: string; severity: string }[];
-}
-
-export interface FinishedSet {
-  exercise_id: string;
-  reps: FinishedRep[];
-  weight_kg: number | null;
-  medal: string | null;
-  fps: number;
-  frames: JointFrame[];
-}
-
-export interface FinishedSession {
-  id: string;
-  user_id: string; // Neon Auth id, never sent as-is
-  started_at: string;
-  finished_at: string;
-  device: string;
-  inference_mode: "on_device" | "cloud";
-  medal: string | null;
-  form_score: number | null;
-  experience_level: string | null; // from the profile (DB-03)
-  // Coarse injury tags: a body part, optionally with a side ("knee", "knee:left"); build them
-  // with injuryGroup(). Never notes or dates (§13). The side feeds range of motion (CONN-14).
-  injury_groups: string[];
-  rehab_start_on?: string | null; // YYYY-MM-DD start of the active rehab plan (DB-12), for the ROM baseline
-  sets: FinishedSet[];
-}
 
 // ---- export_status in Neon ----
 
@@ -166,19 +130,24 @@ function assertFrame(frame: JointFrame): JointFrame {
 }
 
 export function buildJointsFile(session: FinishedSession): Buffer {
-  const lines = session.sets.map((set, setIndex) =>
-    JSON.stringify({
+  const lines = session.sets.map((set) => {
+    const line: ExportJointsLine = {
       session_id: session.id,
-      set_index: setIndex,
+      set_index: set.set_index,
       exercise_id: set.exercise_id,
       fps: set.fps,
       frames: set.frames.map(assertFrame),
-    }),
-  );
+    };
+    return JSON.stringify(line);
+  });
   return gzipSync(lines.join("\n") + "\n");
 }
 
-export function buildMetadata(session: FinishedSession, config: UploadConfig, jointsPath: string) {
+export function buildMetadata(
+  session: FinishedSession,
+  config: UploadConfig,
+  jointsPath: string,
+): ExportMeta {
   return {
     schema_version: SCHEMA_VERSION,
     session_id: session.id,
@@ -194,20 +163,28 @@ export function buildMetadata(session: FinishedSession, config: UploadConfig, jo
     rehab_start_on: isDate(session.rehab_start_on) ? session.rehab_start_on : null,
     joints_path: jointsPath,
     exported_at: new Date().toISOString(),
-    sets: session.sets.map((set, setIndex) => ({
-      set_index: setIndex,
+    sets: session.sets.map((set) => ({
+      set_index: set.set_index,
       exercise_id: set.exercise_id,
       weight_kg: set.weight_kg,
       medal: set.medal,
+      end_reason: set.end_reason,
+      partial_reps: set.partial_reps,
       frame_count: set.frames.length,
-      reps: set.reps.map((rep, repIndex) => ({
-        rep_index: repIndex,
+      reps: set.reps.map((rep) => ({
+        rep_index: rep.rep_index,
         start_ms: rep.start_ms,
         end_ms: rep.end_ms,
         tempo_ms: rep.tempo_ms,
         range_deg: rep.range_deg,
         quality: rep.quality,
-        flags: rep.flags.map((f) => ({ rule_id: f.rule_id, severity: f.severity })),
+        lowering_ms: rep.lowering_ms,
+        rising_ms: rep.rising_ms,
+        flags: rep.flags.map((flag) => ({
+          rule_id: flag.rule_id,
+          severity: flag.severity,
+          rep_index: flag.rep_index,
+        })),
       })),
     })),
   };

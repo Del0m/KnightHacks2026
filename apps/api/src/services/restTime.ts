@@ -32,6 +32,8 @@ export interface RestRep {
   rangeDeg: number;
   tempoMs: number;
   quality?: number | null;
+  loweringMs?: number | null;
+  risingMs?: number | null;
   flags: { ruleId: string }[];
 }
 
@@ -105,6 +107,8 @@ export async function restTimeResult(
       range_deg: r.rangeDeg,
       tempo_ms: r.tempoMs,
       quality: r.quality ?? null,
+      lowering_ms: r.loweringMs ?? null,
+      rising_ms: r.risingMs ?? null,
       flags: r.flags.map((f) => ({ rule_id: f.ruleId })),
     })),
   };

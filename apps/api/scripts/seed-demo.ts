@@ -338,7 +338,7 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
               quality: Math.round((isClean ? between(0.8, 0.98) : between(0.35, 0.7)) * 100) / 100,
               clean: isClean,
             });
-            if (!isClean) flags.push({ repId, ruleId: pick(exercise.rules), severity: "warn" });
+            if (!isClean) flags.push({ repId, ruleId: pick(exercise.rules), severity: "form" });
             setClean += isClean ? 1 : 0;
           }
           sets.push({
@@ -372,7 +372,7 @@ export async function seedDemo(db: Db, options: SeedOptions = {}): Promise<SeedS
         startedAt,
         finishedAt,
         device: pick(["iPhone 15", "iPhone 16 Pro", "iPhone 17 Pro Max", "iPhone 14"]),
-        inferenceMode: "on_device",
+        inferenceMode: "coreml",
         medal: tier,
         formScore: score,
         exportStatus: "exported",

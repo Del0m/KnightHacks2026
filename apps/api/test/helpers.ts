@@ -8,6 +8,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWK } from "jose";
 import request from "supertest";
+import type { SetRecord } from "../../../specs/set-record/types.js";
 import { createApp, type AppDeps } from "../src/app.js";
 import { CASING, schema, type Db } from "../src/db.js";
 import { jwtVerifier } from "../src/middleware/auth.js";
@@ -75,12 +76,39 @@ export async function setup(overrides: Partial<AppDeps> & { close?: () => Promis
 // A rep as the phone sends it (AI-08 set record).
 export function rep(flags: string[] = [], overrides: Record<string, unknown> = {}) {
   return {
+    rep_index: 0,
+    start_ms: null,
+    end_ms: null,
+    lowering_ms: null,
+    rising_ms: null,
     tempo_ms: 2000,
     range_deg: 95,
     quality: flags.length ? 0.5 : 0.95,
-    flags: flags.map((rule_id) => ({ rule_id, severity: "warn" })),
+    flags: flags.map((rule_id) => ({ rule_id, severity: "form", rep_index: 0 })),
     ...overrides,
   };
+}
+
+export function setRecord(input: { reps: object[]; [key: string]: unknown }): SetRecord {
+  return {
+    schema_version: 1,
+    set_index: 0,
+    exercise_id: "squat",
+    weight_kg: null,
+    end_reason: "manual",
+    partial_reps: 0,
+    fps: null,
+    frames: [],
+    ...input,
+    reps: input.reps.map((value, index) => {
+      const valueWithDefaults = { ...rep(), ...value };
+      return {
+        ...valueWithDefaults,
+        rep_index: index,
+        flags: valueWithDefaults.flags.map((flag) => ({ ...flag, rep_index: index })),
+      };
+    }),
+  } as SetRecord;
 }
 
 export function frames(n: number) {
