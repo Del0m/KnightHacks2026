@@ -45,8 +45,10 @@ Live workout rep counting is FE-05 / INT-02 and remains outside FE-03/FE-04. Set
 - Browser verified Begin Workout → spec-backed picker → side-on curl placement. Restarted Metro to load the merged watch-folder config. Preview: `Previews/FE-03-FE-04/curl-spec-placement.png`.
 - iOS, Android and web exports passed (18 static web routes). Bundling does not verify native camera hardware.
 
-## Runtime configuration still needed
+## Local runtime configuration
 
-`apps/mobile/.env.local` has an empty `EXPO_PUBLIC_API_URL`, and `apps/api/.env` is absent. A development API URL is required to test saving in the running app. The API deployment must apply `0002_onboarding.sql` before serving this frontend (`cd apps/api && npm run db:migrate` with its own configured development database). No shared database or deployment was modified.
+Configured `apps/api/.env` from the owner-supplied environment file and set the website's `EXPO_PUBLIC_API_URL` to `http://localhost:3000` in `apps/mobile/.env.local`. Both files remain Git-ignored. The backend allows the local website origin `http://localhost:8082`; the API and Metro were restarted with these settings.
+
+Applied the additive onboarding migration to the configured database and verified all four onboarding columns exist. The live readiness endpoint reports database status `ok`, the authentication signing-key endpoint responds, and the profile route's browser preflight succeeds. An authenticated save through the running browser remains to be verified; adapter-to-backend saving is covered by the integration tests above.
 
 Physical iPhone checks remain: camera placement, side-on joint confidence, background/resume, native glass, VoiceOver and Dynamic Type. The strict all-17-joint framing criterion can be difficult side-on and has not been relaxed without hardware evidence.
