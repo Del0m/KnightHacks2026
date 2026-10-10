@@ -78,7 +78,16 @@ start ──past start_exit──▶ outbound ──past count_min──▶ peak
 | `min_state_ms` | Minimum time in a state before a transition |
 | `set_end_still_ms` | Stillness in `start` that ends the set |
 
-**Rule windows close when the rep settles, not at the count.** The rep is counted the moment the angle crosses `start_enter`. The frames that rules reduce over for `return` and `rep` keep going until the angle stops moving toward the start position: it moves back by `reverse_deg`, or holds within `reverse_deg` for `min_state_ms`, or the set ends, or the next rep starts. That way a lockout check such as "elbow max on return ≥ 160" with `start_enter` at 155 sees the top of the movement. `duration_ms` for `return` still stops at the `start_enter` crossing, so tempo isn't inflated by the pause at the top.
+**Rule windows close when the rep settles, not at the count.** The rep is counted the moment the angle crosses `start_enter`. The frames that rules reduce over for `return` and `rep` keep going until the angle stops moving toward the start position: it moves back by `reverse_deg`, or makes no more progress (under 1°) toward the start for `min_state_ms`, or the set ends, or the next rep starts. That way a lockout check such as "elbow max on return ≥ 160" with `start_enter` at 155 sees the top of the movement. `duration_ms` for `return` still stops at the `start_enter` crossing, so tempo isn't inflated by the pause at the top.
+
+**How the engine reads a spec (AI-06, `apps/mobile/src/engine/`):**
+
+- **Every transition** needs at least `min_state_ms` in the current state. Time spent without a primary angle doesn't count toward it.
+- **Going deeper during `return`** doesn't change state. It only moves the rep's extreme.
+- **Angles are measured in the upright image** with x scaled by width ÷ height, so a right angle on a portrait frame reads 90°.
+- **The `side` of each frame** is reported alongside its metrics. `most_visible` keeps one side for the whole rep.
+
+Full behaviour: [form engine design](../superpowers/specs/2026-10-10-form-engine-design.md).
 
 Required order:
 
