@@ -1,5 +1,5 @@
 {
-  "id": "7d059e2c-6de5-4dae-b0c3-da808a5aba05",
+  "id": "1552edf0-c7f0-4600-ae4a-10270b60833f",
   "prevId": "39d20a30-d476-40b9-8c7a-928f1ab4690c",
   "version": "7",
   "dialect": "postgresql",
@@ -162,6 +162,32 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::text[]"
+        },
+        "personal_bests": {
+          "name": "personal_bests",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "training_schedule": {
+          "name": "training_schedule",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "onboarding_completed": {
+          "name": "onboarding_completed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "onboarding_injury_id": {
+          "name": "onboarding_injury_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "bio": {
           "name": "bio",
@@ -2225,88 +2251,6 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.deletion_requests": {
-      "name": "deletion_requests",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "pseudonym": {
-          "name": "pseudonym",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "requested_at": {
-          "name": "requested_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "status": {
-          "name": "status",
-          "type": "deletion_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "last_error": {
-          "name": "last_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "done_at": {
-          "name": "done_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "deletion_requests_status_idx": {
-          "name": "deletion_requests_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "requested_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -2406,14 +2350,6 @@
         "max_weight_kg",
         "max_reps",
         "est_1rm_kg"
-      ]
-    },
-    "public.deletion_status": {
-      "name": "deletion_status",
-      "schema": "public",
-      "values": [
-        "pending",
-        "done"
       ]
     }
   },
