@@ -19,7 +19,7 @@ const uprightSize = (r: Size | undefined): Size | null =>
 /**
  * Debug screen: full-screen camera, live skeleton, and fps / latency / score / model / drop readout,
  * plus the pose mode, benchmark and cloud consent, and the form engine's rep state for a chosen
- * exercise. In development it can record the pose stream and share it as a test clip. Stands in for settings until a real screen exists:
+ * exercise. It can record the pose stream and share it as a test clip. Stands in for settings until a real screen exists:
  * it re-runs the benchmark, toggles consent, and on iPhone switches the preference between automatic
  * (YOLOv8) and Apple Vision (basic mode).
  */
@@ -171,32 +171,35 @@ function LiveCamera({ poseMode, position, setPosition }: {
         <PoseSkeleton result={result} imageSize={imageSize} viewSize={viewSize} mirrored={mirrored} fit="cover" />
       ) : null}
 
-      <View style={styles.readout} pointerEvents="none">
-        <Text style={styles.readoutText}>
-          fps {fps} · latency {detection ? detection.latencyMs.toFixed(1) : '–'} ms · score{' '}
-          {result ? result.score.toFixed(2) : '–'}
-        </Text>
-        <Text style={styles.readoutText}>
-          {model ?? 'no model'} · dropped {dropped}
-        </Text>
-        <Text style={styles.readoutText}>
-          mode {mode} · consent {cloudConsent ? 'yes' : needsCloudConsent ? 'needed' : 'no'}
-        </Text>
-        <Text style={styles.readoutText}>
-          benchmark {benchmark?.size ?? '–'} · p95 {benchmark?.p95Ms != null ? benchmark.p95Ms.toFixed(1) : '–'} ms ·{' '}
-          {benchmark?.fps != null ? benchmark.fps.toFixed(1) : '–'} fps
-        </Text>
-        <Text style={styles.readoutText} testID="pose-form-readout">
-          {spec.name} · {form.state} · reps {form.repCount}{form.ended ? ' · set ended' : ''} ·{' '}
-          {form.primary != null ? `${form.primary.toFixed(0)}°` : '–'} {form.primarySide ?? ''}
-        </Text>
-      </View>
-
-      {banner ? (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>{banner}</Text>
+      {/* The banner stacks under the readout, so a longer or wrapped readout never hides behind it. */}
+      <View style={styles.overlay} pointerEvents="box-none">
+        <View style={styles.readout} pointerEvents="none">
+          <Text style={styles.readoutText}>
+            fps {fps} · latency {detection ? detection.latencyMs.toFixed(1) : '–'} ms · score{' '}
+            {result ? result.score.toFixed(2) : '–'}
+          </Text>
+          <Text style={styles.readoutText}>
+            {model ?? 'no model'} · dropped {dropped}
+          </Text>
+          <Text style={styles.readoutText}>
+            mode {mode} · consent {cloudConsent ? 'yes' : needsCloudConsent ? 'needed' : 'no'}
+          </Text>
+          <Text style={styles.readoutText}>
+            benchmark {benchmark?.size ?? '–'} · p95 {benchmark?.p95Ms != null ? benchmark.p95Ms.toFixed(1) : '–'} ms ·{' '}
+            {benchmark?.fps != null ? benchmark.fps.toFixed(1) : '–'} fps
+          </Text>
+          <Text style={styles.readoutText} testID="pose-form-readout">
+            {spec.name} · {form.state} · reps {form.repCount}{form.ended ? ' · set ended' : ''} ·{' '}
+            {form.primary != null ? `${form.primary.toFixed(0)}°` : '–'} {form.primarySide ?? ''}
+          </Text>
         </View>
-      ) : null}
+
+        {banner ? (
+          <View style={styles.banner}>
+            <Text style={styles.bannerText}>{banner}</Text>
+          </View>
+        ) : null}
+      </View>
 
       <Pressable style={[styles.button, styles.flip]} onPress={flip}>
         <Text style={styles.buttonText}>{position === 'front' ? 'Use back camera' : 'Use front camera'}</Text>
@@ -236,11 +239,9 @@ function LiveCamera({ poseMode, position, setPosition }: {
         </Pressable>
       ) : null}
 
-      {__DEV__ ? (
-        <Pressable testID="pose-record-toggle" style={[styles.button, styles.record]} onPress={toggleRecording}>
-          <Text style={styles.buttonText}>{recording ? 'Stop and share clip' : 'Record clip'}</Text>
-        </Pressable>
-      ) : null}
+      <Pressable testID="pose-record-toggle" style={[styles.button, styles.record]} onPress={toggleRecording}>
+        <Text style={styles.buttonText}>{recording ? 'Stop and share clip' : 'Record clip'}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -250,21 +251,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#000' },
   message: { color: '#fff', fontSize: 16, textAlign: 'center', marginBottom: 16 },
   mirror: { transform: [{ scaleX: -1 }] },
+  overlay: { position: 'absolute', top: 60, left: 16, right: 16, gap: 8 },
   readout: {
-    position: 'absolute',
-    top: 60,
-    left: 16,
-    right: 16,
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   readoutText: { color: '#fff', fontSize: 14, fontVariant: ['tabular-nums'] },
   banner: {
-    position: 'absolute',
-    top: 160,
-    left: 16,
-    right: 16,
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(200,0,0,0.85)',
