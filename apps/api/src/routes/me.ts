@@ -4,7 +4,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
-import { conflict, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
+import { conflict, isoDate, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
 import { deleteAccount } from "../services/accountDeletion.js";
 
 const { users, profiles, injuries } = schema;
@@ -110,8 +110,6 @@ export const profileUpdate = z
       });
     }
   });
-
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD");
 
 export const injuryInput = z
   .object({

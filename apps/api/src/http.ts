@@ -4,7 +4,7 @@
 // while TypeScript and Drizzle use camelCase. Request bodies are parsed with snake_case Zod
 // schemas, and responses go through `send`, which converts keys.
 import type { ErrorRequestHandler, Request, RequestHandler, Response } from "express";
-import { ZodError, type z, type ZodTypeAny } from "zod";
+import { z, ZodError, type ZodTypeAny } from "zod";
 
 export class HttpError extends Error {
   constructor(
@@ -32,6 +32,16 @@ export function toSnake(value: unknown): unknown {
 export function send(res: Response, body: unknown, status = 200): void {
   res.status(status).json(toSnake(body));
 }
+
+// A calendar date as YYYY-MM-DD. Checked by round trip, because Date.parse rolls impossible
+// dates like 2026-02-31 over into March instead of rejecting them (Postgres then would, as a 500).
+export const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD")
+  .refine((d) => {
+    const parsed = new Date(`${d}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === d;
+  }, "not a real date");
 
 export function parse<S extends ZodTypeAny>(schema: S, input: unknown): z.infer<S> {
   return schema.parse(input);
