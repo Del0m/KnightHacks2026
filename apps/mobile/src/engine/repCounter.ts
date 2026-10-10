@@ -9,11 +9,15 @@ import type {
   SetEndReason,
 } from './types';
 
-/** Rep state machine over the primary angle. Pure: it only sees `(t, value)`. */
+/** Rep state machine over the primary angle. Pure: it only sees `(t, value, person)`. */
 export interface RepCounter {
-  /** `value` is the primary angle this frame, or null when it could not be measured. */
-  step(t: number, value: number | null): CounterStep;
-  /** Ends the set. Used for manual ends and internally for `still` and `absent`. */
+  /**
+   * `value` is the primary angle this frame, or null when it could not be measured. `person` says
+   * whether a person was detected; it only matters on null frames, where it decides between `lost`
+   * and `absent` when the gap ends the set.
+   */
+  step(t: number, value: number | null, person?: boolean): CounterStep;
+  /** Ends the set. Used for manual ends and internally for `still`, `absent` and `lost`. */
   end(t: number, reason: SetEndReason): CounterStep;
   reset(): void;
 }
@@ -54,6 +58,9 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
   let stateMs: number;
   let prevT: number | null;
   let firstNullT: number | null;
+  /** Null frames in the current gap, and how many of them had a person. */
+  let nullFrames: number;
+  let nullWithPerson: number;
   let startedAt: number;
   let peakAt: number;
   let returnAt: number;
@@ -69,6 +76,8 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     stateMs = 0;
     prevT = null;
     firstNullT = null;
+    nullFrames = 0;
+    nullWithPerson = 0;
     startedAt = 0;
     peakAt = 0;
     returnAt = 0;
@@ -119,14 +128,19 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     still = null;
   }
 
-  function step(t: number, value: number | null): CounterStep {
+  function step(t: number, value: number | null, person = true): CounterStep {
     if (ended) return result(null, []);
     const events: CounterEvent[] = [];
 
     if (value === null) {
       prevT = null;
       if (firstNullT === null) firstNullT = t;
-      if (repCount >= 1 && t - firstNullT >= phases.set_end_still_ms) finish(t, 'absent', events);
+      nullFrames += 1;
+      if (person) nullWithPerson += 1;
+      if (repCount >= 1 && t - firstNullT >= phases.set_end_still_ms) {
+        // `lost` only when a person was there for strictly more than half the gap; a tie is `absent`.
+        finish(t, 2 * nullWithPerson > nullFrames ? 'lost' : 'absent', events);
+      }
       return result(null, events);
     }
 
@@ -134,6 +148,8 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     const dt = prevT === null ? 0 : Math.max(0, t - prevT);
     prevT = t;
     firstNullT = null;
+    nullFrames = 0;
+    nullWithPerson = 0;
     stateMs += dt;
     const from = state;
     const gated = stateMs >= phases.min_state_ms;

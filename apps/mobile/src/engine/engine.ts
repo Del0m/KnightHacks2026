@@ -21,7 +21,7 @@ export interface FormEngine {
   readonly spec: ExerciseSpec;
   /** One detected pose. */
   push(pose: PoseResult): EngineUpdate;
-  /** No person found at `tMs`. */
+  /** No person found at `tMs`. A long enough run of these ends the set as `absent`, not `lost`. */
   pushAbsent(tMs: number): EngineUpdate;
   /** Manual set end: closes or drops the open rep, then emits `set_ended`. */
   endSet(tMs: number): EngineUpdate;
@@ -56,6 +56,8 @@ export function createFormEngine(spec: ExerciseSpec, options: EngineOptions = {}
     minRatioDenominator: options.minRatioDenominator,
   });
   const counter = createRepCounter(spec.primary_angle.direction, spec.phases);
+  /** Kept in step with the metric computer's, for `RepRecord.imageAspect`. */
+  let imageAspect = options.imageAspect ?? 9 / 16;
   const attempts = new Map<number, Attempt>();
   const emptyMetrics = (): Metrics => Object.fromEntries(Object.keys(spec.angles).map((k) => [k, null]));
 
@@ -69,7 +71,7 @@ export function createFormEngine(spec: ExerciseSpec, options: EngineOptions = {}
       rep: [...a.outbound, ...a.peak, ...a.return],
     };
     const atExtreme = windows.rep.find((f) => f.metrics[primaryName] === timing.extreme);
-    return { ...timing, windows, side: atExtreme?.sides[primaryName] ?? null };
+    return { ...timing, windows, side: atExtreme?.sides[primaryName] ?? null, imageAspect };
   }
 
   function finish(
@@ -135,18 +137,19 @@ export function createFormEngine(spec: ExerciseSpec, options: EngineOptions = {}
       const joints = smoother.push(pose.joints, t);
       const { metrics, sides } = metricsOf.compute(joints);
       const primary = metrics[primaryName] ?? null;
-      const step = counter.step(t, primary);
+      const step = counter.step(t, primary, true);
       const frame: EngineFrame | null = primary === null ? null : { t, metrics, sides, joints };
       return finish(t, step, frame, metrics, sides, joints);
     },
     pushAbsent(tMs) {
-      return finish(tMs, counter.step(tMs, null), null, emptyMetrics(), {}, null);
+      return finish(tMs, counter.step(tMs, null, false), null, emptyMetrics(), {}, null);
     },
     endSet(tMs) {
       return finish(tMs, counter.end(tMs, 'manual'), null, emptyMetrics(), {}, null);
     },
     setImageAspect(aspect) {
       metricsOf.setImageAspect(aspect);
+      imageAspect = aspect ?? 9 / 16;
     },
     reset() {
       smoother.reset();

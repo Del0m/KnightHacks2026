@@ -1,8 +1,8 @@
 import { loadFixtures } from '../__fixtures__/load';
 import { runClip } from '../__fixtures__/run';
-import { createFormEngine } from '../engine';
+import { createFormEngine, type FormEngine } from '../engine';
 import { getSpec } from '../specs';
-import type { Clip } from '../recording';
+import { isAbsentFrame, type Clip } from '../recording';
 import type { PoseResult } from '../../pose/types';
 
 const clips: Clip[] = loadFixtures();
@@ -119,5 +119,46 @@ describe('createFormEngine', () => {
     const engine = createFormEngine(squat);
     const u = engine.pushAbsent(1000);
     expect(u).toMatchObject({ state: 'start', repCount: 0, primary: null, joints: null, events: [] });
+  });
+
+  /** Plays the clip's frames in `[from, upTo)` ms; returns the reps closed. */
+  const play = (engine: FormEngine, clip: Clip, from = 0, upTo = Infinity) =>
+    clip.frames
+      .filter((f) => f.timestamp_ms >= from && f.timestamp_ms < upTo)
+      .flatMap((f) => (isAbsentFrame(f) ? engine.pushAbsent(f.timestamp_ms) : engine.push(f)).events)
+      .flatMap((e) => (e.type === 'rep_closed' ? [e.rep] : []));
+
+  it('stamps each rep with the upright aspect it closed under', () => {
+    const clip = named('squat_clean');
+    const byDefault = play(createFormEngine(squat), clip);
+    expect(byDefault.length).toBe(clip.expected!.reps);
+    for (const r of byDefault) expect(r.imageAspect).toBe(9 / 16);
+
+    const fromOption = play(createFormEngine(squat, { imageAspect: 0.56 }), clip);
+    expect(fromOption.length).toBe(clip.expected!.reps);
+    for (const r of fromOption) expect(r.imageAspect).toBe(0.56);
+
+    const engine = createFormEngine(squat, { imageAspect: 0.56 });
+    const first = play(engine, clip, 0, byDefault[1].closedAt + 1);
+    engine.setImageAspect(0.57);
+    const middle = play(engine, clip, byDefault[1].closedAt + 1, byDefault[3].closedAt + 1);
+    engine.setImageAspect(undefined);
+    const rest = play(engine, clip, byDefault[3].closedAt + 1);
+    expect([...first, ...middle, ...rest].map((r) => r.imageAspect)).toEqual([0.56, 0.56, 0.57, 0.57, 9 / 16, 9 / 16]);
+  });
+
+  it('ends the set as lost when the person stays but the primary angle cannot be measured', () => {
+    const clip = named('squat_clean');
+    const firstRep = play(createFormEngine(squat), clip)[0];
+    const engine = createFormEngine(squat);
+    play(engine, clip, 0, firstRep.closedAt + 1);
+    // The detector still finds a person, but no joint is confident enough to measure.
+    const pose = clip.frames.find((f): f is PoseResult => !isAbsentFrame(f))!;
+    const blind = pose.joints.map((j) => ({ ...j, c: 0 }));
+    const ends = [];
+    for (let t = firstRep.closedAt + 100; t <= firstRep.closedAt + 9000; t += 100) {
+      ends.push(...engine.push({ ...pose, timestamp_ms: t, joints: blind }).events.filter((e) => e.type === 'set_ended'));
+    }
+    expect(ends).toEqual([expect.objectContaining({ type: 'set_ended', reason: 'lost' })]);
   });
 });
