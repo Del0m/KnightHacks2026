@@ -11,6 +11,7 @@ jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: null }) }))
 jest.mock('@/services/workoutQueue', () => ({ queueWorkout: jest.fn(), syncWorkouts: jest.fn() }));
 jest.mock('@/state/Training', () => ({ useTraining: jest.fn() }));
 jest.mock('../WorkoutCamera', () => ({ __esModule: true, default: 'WorkoutCamera' }));
+jest.mock('@/screens/Summary', () => ({ WorkoutSummary: 'WorkoutSummary' }));
 jest.mock('@/components/BodyPreview', () => ({ BodyPreview: 'Body' }));
 jest.mock('@/components/SetupPage', () => ({ SetupPage: (props: unknown) => require('react').createElement('SetupPage', props) }));
 jest.mock('@/components/GlassChoice', () => ({ GlassChoice: 'Choice' }));

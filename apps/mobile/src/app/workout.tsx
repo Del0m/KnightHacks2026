@@ -1,3 +1,4 @@
+import { WorkoutSummary } from '@/screens/Summary';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Text, TextInput, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
@@ -22,7 +23,7 @@ function WorkoutScreen({ mode, exercise, cameraPosition }: { mode?: string; exer
   const { finish, workouts } = useTraining();
   const [records, setRecords] = useState<WorkoutSet[]>([]), [feedbacks, setFeedbacks] = useState<(SetFeedback | null)[]>([]);
   const [manual, setManual] = useState(mode === 'manual' || Platform.OS !== 'ios'), [reps, setReps] = useState(cameraSpec(exercise).id === 'bicep_curl' ? '12' : '10');
-  const [restUntil, setRestUntil] = useState(0), [now, setNow] = useState(Date.now), [done, setDone] = useState(false), [playing, setPlaying] = useState(false), [syncStatus, setSyncStatus] = useState('Saved on this device.');
+  const [restUntil, setRestUntil] = useState(0), [now, setNow] = useState(Date.now), [done, setDone] = useState(false), [playing, setPlaying] = useState(false), [syncStatus, setSyncStatus] = useState('Saved on this device.'), [workoutId, setWorkoutId] = useState('');
   const [restRequest, setRestRequest] = useState<Promise<ServerRestResult | null> | null>(null);
   const requests = useRef<Promise<unknown>>(Promise.resolve()), reachable = useRef(true);
   const selected = cameraSpec(exercise);
@@ -59,7 +60,7 @@ function WorkoutScreen({ mode, exercise, cameraPosition }: { mode?: string; exer
     if (recorded.current) return;
     recorded.current = true;
     const id = finish(records.length, records.reduce((n, s) => n + s.reps.length, 0), Math.max(1, Math.round((Date.now() - Date.parse(started.current)) / 60000)), records.map((record, i) => ({ exercise_id: record.exercise_id, reps: record.reps.length, ...(feedbacks[i] ? { goodReps: feedbacks[i]!.cleanReps, medal: feedbacks[i]!.medal, note: feedbacks[i]!.note } : {}) })));
-    setDone(true);
+    setWorkoutId(id); setDone(true);
     const account = owner.current;
     if (account && auth.user?.id === account) {
       setSyncStatus('Saved on this device. Syncing…');
@@ -70,7 +71,7 @@ function WorkoutScreen({ mode, exercise, cameraPosition }: { mode?: string; exer
   function leave() { if (records.length) save(); router.replace('/'); }
   const exit = <Action secondary onPress={leave}>Back to Train</Action>;
   if (owner.current !== auth.user?.id) return <AppPage title="Workout"><Text style={ui.muted}>Your account changed. Start a new workout to keep its history separate.</Text><Action onPress={() => router.replace('/')}>Back to Train</Action></AppPage>;
-  if (done) return <AppPage title="Workout" intro="Workout saved"><Text style={ui.heading}>{records.length} sets · {records.reduce((n, s) => n + s.reps.length, 0)} reps</Text><Text style={ui.muted}>{syncStatus}</Text><Action onPress={() => router.replace('/')}>Back to Train</Action><Action secondary onPress={() => router.replace('/me')}>View my history</Action></AppPage>;
+  if (done) return <WorkoutSummary workoutId={workoutId} records={records} history={workouts} syncStatus={syncStatus} />;
   if (resting) return <AppPage headerAction={exit} title="Workout" intro={finished ? 'Last set complete' : 'Rest'}>{last ? <RestCard phone={last} server={server} secondsLeft={Math.ceil((restUntil - now) / 1000)} /> : <View style={{ gap: 12 }}><Text style={ui.heading}>{records[records.length - 1].reps.length} reps logged</Text><Text style={ui.pageTitle}>{Math.ceil((restUntil - now) / 1000)}s</Text><Text style={ui.muted}>Manual tracking has no measured form score.</Text></View>}{!finished && <Text style={ui.muted}>Next: {current.name} · set {current.set} of {current.sets}</Text>}<Action onPress={() => { if (finished) save(); else { setRestUntil(0); setRestRequest(null); } }}>{finished ? 'Finish Workout' : 'Start next set'}</Action></AppPage>;
   if (finished) return <AppPage headerAction={exit} title="Workout" intro="Session complete">{last && <RestCard phone={last} server={null} />}<Action onPress={save}>Finish Workout</Action></AppPage>;
   return <AppPage headerAction={exit} title="Workout"><Text style={ui.muted}>{records.length} of {plan.length} sets complete</Text><Text style={ui.pageTitle}>{current.name}</Text><Text style={ui.muted}>Set {current.set} of {current.sets} · aim for {current.reps} reps</Text>

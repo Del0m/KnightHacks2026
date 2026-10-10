@@ -1,7 +1,7 @@
-import { queueWorkout, syncWorkouts } from '../workoutQueue';
+import { queueWorkout, syncWorkouts, readWorkoutResult } from '../workoutQueue';
 const mockData = new Map<string, string>();
 jest.mock('react-native-mmkv', () => ({ createMMKV: () => ({ getString: (k: string) => mockData.get(k), set: (k: string, v: string) => mockData.set(k, v) }) }));
-const response = (status: number, body: object = {}) => ({ ok: status < 400, status, json: async () => body }) as Response;
+const response = (status: number, body: object = { session_id: 'existing', medal: 'bronze', form_score: 0, baseline_share: .7, total_reps: 0, clean_reps: 0, personal_records: [] }) => ({ ok: status < 400, status, json: async () => body }) as Response;
 beforeEach(() => mockData.clear());
 it('retains failed saves and retries their original session without crossing accounts', async () => {
   queueWorkout('a', { id: 'local', startedAt: '2026-10-10T12:00:00Z', sets: [{ exercise_id: 'squat', reps: [] }], checkpoint: {} });
@@ -26,4 +26,11 @@ it('persists a finished workout immediately while its rest upload settles', asyn
   release(); await wait; await Promise.resolve();
   await syncWorkouts('a', request);
   expect(request).toHaveBeenCalledTimes(1);
+});
+it('retains the authoritative finish result after the queued workout is removed', async () => {
+ const result = { session_id: 'server', medal: 'gold', form_score: 1, baseline_share: .7, total_reps: 1, clean_reps: 1, personal_records: [] };
+ queueWorkout('a', { id: 'local', startedAt: '2026-10-10T12:00:00Z', sets: [], checkpoint: { sessionId: 'server' } });
+ await syncWorkouts('a', jest.fn().mockResolvedValue(response(200, result)));
+ expect(readWorkoutResult('a', 'local')).toEqual(result);
+ expect(readWorkoutResult('b', 'local')).toBeNull();
 });

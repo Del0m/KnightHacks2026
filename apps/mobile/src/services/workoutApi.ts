@@ -1,5 +1,6 @@
+import { readFinishResult, type FinishResult } from '@/screens/Summary/summary';
 export type ApiRequest = (path: string, options?: RequestInit) => Promise<Response>;
-export type UploadCheckpoint = { sessionId?: string; finished?: boolean };
+export type UploadCheckpoint = { sessionId?: string; finished?: boolean; result?: FinishResult };
 export type WorkoutSet = {
   exercise_id: string;
   weight_kg?: number | null;
@@ -33,6 +34,14 @@ export async function uploadWorkout(api: ApiRequest, checkpoint: UploadCheckpoin
   const response = await request(`/sessions/${checkpoint.sessionId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   // The API returns 409 on a repeated finish after an earlier response was lost.
   if (!response.ok && response.status !== 409) throw new Error('Could not finish your workout. Keep this screen open and try again.');
+  const result = response.ok ? readFinishResult(await response.json()) : null;
+  if (result) checkpoint.result = result;
+  else {
+    const recovered = await request(`/sessions/${checkpoint.sessionId}/summary`);
+    const summary = recovered.ok ? readFinishResult(await recovered.json()) : null;
+    if (!summary) throw new Error('Your workout is saved. Account results will retry.');
+    checkpoint.result = summary;
+  }
   checkpoint.finished = true;
   onCheckpoint();
 }

@@ -1,3 +1,4 @@
+import { readFinishResult, type FinishResult } from '@/screens/Summary/summary';
 import { Platform } from 'react-native';
 import type { MMKV } from 'react-native-mmkv';
 import { uploadWorkout, type ApiRequest, type UploadCheckpoint, type WorkoutSet } from './workoutApi';
@@ -27,8 +28,24 @@ export function syncWorkouts(account: string, request: ApiRequest): Promise<void
       const next = read(account)[0]; if (!next || blocked.has(`${account}/${next.id}`)) return;
       try { await uploadWorkout(request, next.checkpoint, next.startedAt, next.sets, () => queueWorkout(account, next)); }
       catch (error) { queueWorkout(account, next); throw error; }
+      if (next.checkpoint.result) saveWorkoutResult(account, next.id, next.checkpoint.result);
       write(account, read(account).filter(p => p.id !== next.id));
     }
   })().finally(() => workers.delete(account));
   workers.set(account, worker); return worker;
 }
+
+const listeners = new Set<() => void>();
+const resultKey = (account: string, id: string) => `workout-result:${encodeURIComponent(account)}:${id}`;
+const resultCache = new Map<string, { raw: string | null | undefined; result: FinishResult | null }>();
+export function readWorkoutResult(account: string, id: string): FinishResult | null {
+ try { const k = resultKey(account, id), raw = Platform.OS === 'web' ? localStorage.getItem(k) : native().getString(k); const cached = resultCache.get(k); if (cached && cached.raw === raw) return cached.result; const result = readFinishResult(JSON.parse(raw ?? 'null')); resultCache.set(k, { raw, result }); return result; } catch { return null; }
+}
+function saveWorkoutResult(account: string, id: string, result: FinishResult) {
+ const k = resultKey(account, id), data = JSON.stringify(result);
+ if (Platform.OS === 'web') localStorage.setItem(k, data); else native().set(k, data);
+ listeners.forEach(listener => listener());
+}
+export function subscribeWorkoutResults(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
+export function workoutShared(account: string, id: string) { const k = `${resultKey(account, id)}:shared`; return Platform.OS === 'web' ? localStorage.getItem(k) === 'yes' : native().getString(k) === 'yes'; }
+export function markWorkoutShared(account: string, id: string) { const k = `${resultKey(account, id)}:shared`; if (Platform.OS === 'web') localStorage.setItem(k, 'yes'); else native().set(k, 'yes'); }

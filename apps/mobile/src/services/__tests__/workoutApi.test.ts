@@ -1,6 +1,7 @@
 import { uploadWorkout, type UploadCheckpoint, type WorkoutSet } from '../workoutApi';
 const set: WorkoutSet = { exercise_id: 'squat', reps: [{ tempo_ms: 2000, range_deg: 95, quality: 0.9, flags: [] }] };
-function response(status: number, body = {}) { return { ok: status < 400, status, json: async () => body } as Response; }
+const summary = { session_id: 'session-id', medal: 'gold', form_score: 1, baseline_share: .7, total_reps: 1, clean_reps: 1, personal_records: [] };
+function response(status: number, body: object = summary) { return { ok: status < 400, status, json: async () => body } as Response; }
 it('uploads the phone record and finishes only after its sets commit', async () => {
   const request = jest.fn().mockResolvedValueOnce(response(201, { id: 'session-id' })).mockResolvedValue(response(200));
   const checkpoint: UploadCheckpoint = {};
@@ -20,8 +21,9 @@ it('resumes after a lost set response using the existing session and explicit in
 });
 it('handles a lost finish response and never repeats a confirmed finish', async () => {
   const checkpoint: UploadCheckpoint = { sessionId: 'already-finished' };
-  const request = jest.fn().mockResolvedValue(response(409));
+  const request = jest.fn().mockImplementation((path: string) => Promise.resolve(path.endsWith('/summary') ? response(200) : response(409)));
   await uploadWorkout(request, checkpoint, '2026-10-10T12:00:00Z', [set]);
   await uploadWorkout(request, checkpoint, '2026-10-10T12:00:00Z', [set]);
-  expect(request).toHaveBeenCalledTimes(2);
+  expect(request).toHaveBeenCalledTimes(3);
+  expect(checkpoint.result).toEqual(summary);
 });
