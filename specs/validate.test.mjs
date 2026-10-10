@@ -167,6 +167,53 @@ describe('semantic checks', () => {
     assertError(errorsFor((s) => (s.primary_angle.name = 'hip')), /primary_angle.*not defined/);
   });
 
+  describe('primary gate', () => {
+    const gated = (gate) => (s) => (s.primary_angle.gate = gate);
+
+    test('an angle other than the primary is valid', () => {
+      assert.deepEqual(errorsFor(gated({ metric: 'trunk', op: '<=', value: 60 })), []);
+    });
+
+    test('metric must be an angle in angles', () => {
+      assertError(
+        errorsFor(gated({ metric: 'elbow', op: '<=', value: 60 })),
+        /primary_angle\.gate: unknown metric "elbow"/,
+      );
+    });
+
+    test('metric cannot be duration_ms', () => {
+      assertError(
+        errorsFor(gated({ metric: 'duration_ms', op: '>=', value: 800 })),
+        /primary_angle\.gate.*not duration_ms/,
+      );
+    });
+
+    test('metric cannot be the primary angle', () => {
+      assertError(
+        errorsFor(gated({ metric: 'knee', op: '<=', value: 120 })),
+        /primary_angle\.gate.*"knee" is the primary angle itself/,
+      );
+    });
+
+    test('op must be a comparison', () => {
+      assertError(errorsFor(gated({ metric: 'trunk', op: '==', value: 60 })), /primary_angle\/gate\/op/);
+    });
+
+    test('value must be a number', () => {
+      assertError(
+        errorsFor(gated({ metric: 'trunk', op: '<=', value: 'target' })),
+        /primary_angle\/gate\/value: must be number/,
+      );
+    });
+
+    test('carries through injury overrides unchanged', () => {
+      const spec = fixture();
+      spec.primary_angle.gate = { metric: 'trunk', op: '<=', value: 60 };
+      assert.deepEqual(applyOverride(spec, 'knee').primary_angle, spec.primary_angle);
+      assert.deepEqual(applyInjuries(spec, ['knee', 'lower_back']).primary_angle, spec.primary_angle);
+    });
+  });
+
   test('unsided point needs a side', () => {
     assertError(errorsFor((s) => delete s.angles.knee.side), /angles\.knee.*needs a side/);
   });

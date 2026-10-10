@@ -332,6 +332,17 @@ export function validateSpec(spec, { schema, banned, fileId }) {
     errors.push(`primary_angle: "${spec.primary_angle.name}" must be a joint_angle`);
   }
 
+  const gate = spec.primary_angle.gate;
+  if (gate) {
+    if (gate.metric === 'duration_ms') {
+      errors.push('primary_angle.gate: metric must be an angle, not duration_ms');
+    } else if (gate.metric === spec.primary_angle.name) {
+      errors.push(`primary_angle.gate: metric "${gate.metric}" is the primary angle itself`);
+    } else if (!spec.angles[gate.metric]) {
+      errors.push(`primary_angle.gate: unknown metric "${gate.metric}"`);
+    }
+  }
+
   const direction = spec.primary_angle.direction;
   const baseOrder = phaseOrderProblem(spec.phases, direction);
   if (baseOrder) errors.push(`phases: ${baseOrder}`);
