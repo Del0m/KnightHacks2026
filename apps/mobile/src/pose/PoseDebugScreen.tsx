@@ -85,7 +85,16 @@ function LiveCamera({ poseMode, position, setPosition }: {
 
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const spec = EXERCISE_SPECS[exerciseIndex];
-  const form = useFormEngine(spec, { imageAspect: imageSize ? imageSize.width / imageSize.height : undefined });
+  const form = useFormEngine(spec, {
+    imageAspect: imageSize
+    ? imageSize.width / imageSize.height
+    : undefined,
+    onEvent: event => {
+      if (event.type === 'rep_closed') {
+        console.log('Completed measured rep:', event.rep);
+      }
+    },
+  });
   const { onPose: formOnPose, reset: resetForm } = form;
   const recorder = useRef<ReturnType<typeof createClipRecorder> | null>(null);
   const clock = useRef(createPoseClock()).current;
