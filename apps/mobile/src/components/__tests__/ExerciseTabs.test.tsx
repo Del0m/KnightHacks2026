@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Native interaction test. */
 import React from 'react';
-import { Dimensions, PanResponder } from 'react-native';
+import { Dimensions, PanResponder, StyleSheet } from 'react-native';
 import { ExerciseTabs } from '../ExerciseTabs';
 const { act, create } = require('react-test-renderer');
 jest.mock('@/hooks/useReducedMotion', () => ({ useReducedMotion: () => true }));
@@ -23,5 +23,25 @@ test('dragging the selector chooses the nearest section; canceled drags retain t
   expect(onChange).not.toHaveBeenCalled();
   act(() => responder.onPanResponderRelease?.({} as never, gesture as never));
   expect(onChange).toHaveBeenCalledWith('practice');
+  act(() => screen.unmount()); responders.mockRestore();
+});
+
+test('the visible tint changes during a drag before committing the section', () => {
+  const onChange = jest.fn(), responders = jest.spyOn(PanResponder, 'create');
+  let screen: ReturnType<typeof create>;
+  act(() => { screen = create(<ExerciseTabs value="workout" onChange={onChange} />); });
+  act(() => screen.root.findByProps({ accessibilityRole: 'tablist' }).props.onLayout({ nativeEvent: { layout: { width: 320 } } }));
+  const tint = () => {
+    const color = StyleSheet.flatten(screen.root.findAllByProps({ testID: 'exercise-selector-tint' })[0].props.style).backgroundColor;
+    return typeof color === 'string' ? color : color.__getValue();
+  };
+  const blue = tint(), responder = responders.mock.calls.at(-1)![0];
+  act(() => responder.onPanResponderGrant?.({} as never, {} as never));
+  act(() => responder.onPanResponderMove?.({} as never, { moveX: (Dimensions.get('window').width - 320) / 2 + 160 } as never));
+  const middle = tint();
+  act(() => responder.onPanResponderMove?.({} as never, { moveX: (Dimensions.get('window').width - 320) / 2 + 238 } as never));
+  expect(middle).not.toBe(blue);
+  expect(tint()).not.toBe(middle);
+  expect(onChange).not.toHaveBeenCalled();
   act(() => screen.unmount()); responders.mockRestore();
 });

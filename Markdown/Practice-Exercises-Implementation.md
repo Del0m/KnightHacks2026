@@ -4,7 +4,7 @@
 
 - The existing daily routine stays in place under Today’s Workout. The Practice selector beneath the figure lists five exercise previews: bicep curl, squat, shoulder press, push-up, and lunge.
 - All five use the existing rigged human model, with exercise-specific bone animation, camera framing, and muscle highlights. Dumbbells appear for curls, shoulder presses, and lunges. Lunges use straight arms and a neutral grip, with fingers closed around the weights.
-- The Workout/Practice selector accepts held drags, with a blue tint for Workout and a green tint for Practice. Its highlight follows the finger and springs back on cancellation.
+- The Workout/Practice selector accepts held drags, with a blue tint for Workout and a green tint for Practice that blend continuously with thumb position, before release. Its highlight follows the finger and springs back on cancellation.
 - Workout and Practice share the same selected exercise, playback and viewing angle; switching selectors leaves the figure running.
 - Selecting an exercise smoothly expands a indented bright-green Practice Form subheading beneath the exercise row. Practice uses the live camera and form engine, then shows good-rep feedback and advice. Practice again starts a fresh attempt; Return to Training exits. Practice does not save or upload workout sets.
 - Completion checks occupy a fixed-width column at the far right, with a 12-point gap.
