@@ -20,6 +20,8 @@ namespace margelo::nitro::spotterpose { class HybridPoseDetectorFactorySpec; }
 namespace margelo::nitro::spotterpose { class HybridPoseDetectorSpec; }
 // Forward declaration of `Joint` to properly resolve imports.
 namespace margelo::nitro::spotterpose { struct Joint; }
+// Forward declaration of `PoseBenchmark` to properly resolve imports.
+namespace margelo::nitro::spotterpose { struct PoseBenchmark; }
 // Forward declaration of `PoseDetection` to properly resolve imports.
 namespace margelo::nitro::spotterpose { struct PoseDetection; }
 // Forward declaration of `PoseResult` to properly resolve imports.
@@ -29,8 +31,10 @@ namespace margelo::nitro::spotterpose { struct PoseResult; }
 #include "HybridPoseDetectorFactorySpec.hpp"
 #include "HybridPoseDetectorSpec.hpp"
 #include "Joint.hpp"
+#include "PoseBenchmark.hpp"
 #include "PoseDetection.hpp"
 #include "PoseResult.hpp"
+#include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <VisionCamera/HybridCameraFrameOutputSpec.hpp>
 #include <VisionCamera/HybridCameraOutputSpec.hpp>

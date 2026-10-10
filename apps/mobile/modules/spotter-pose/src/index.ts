@@ -1,5 +1,5 @@
 import { NitroModules } from 'react-native-nitro-modules'
-import type { PoseDetector, PoseDetectorFactory } from './specs/PoseDetector.nitro'
+import type { PoseBenchmark, PoseDetector, PoseDetectorFactory } from './specs/PoseDetector.nitro'
 
 let factory: PoseDetectorFactory | undefined
 
@@ -18,4 +18,19 @@ export function createBasicPoseDetector(): PoseDetector {
   return factory.createBasicPoseDetector()
 }
 
-export type { PoseDetector, PoseDetection, PoseResult, Joint } from './specs/PoseDetector.nitro'
+/** Fingerprint of the bundled YOLOv8 models; changes when a model is re-exported or replaced. */
+export function getPoseModelId(): string {
+  factory ??= NitroModules.createHybridObject<PoseDetectorFactory>('PoseDetectorFactory')
+  return factory.poseModelId()
+}
+
+/**
+ * Runs YOLOv8 back to back on a synthetic frame: discards `warmUpMs`, then measures for `measureMs`.
+ * Rejects when the model is missing or fails to load.
+ */
+export function benchmarkPoseModel(size: number, warmUpMs: number, measureMs: number): Promise<PoseBenchmark> {
+  factory ??= NitroModules.createHybridObject<PoseDetectorFactory>('PoseDetectorFactory')
+  return factory.benchmarkPoseModel(size, warmUpMs, measureMs)
+}
+
+export type { PoseBenchmark, PoseDetector, PoseDetection, PoseResult, Joint } from './specs/PoseDetector.nitro'

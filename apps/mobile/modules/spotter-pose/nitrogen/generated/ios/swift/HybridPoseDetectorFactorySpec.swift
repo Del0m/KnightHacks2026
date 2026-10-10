@@ -15,6 +15,8 @@ public protocol HybridPoseDetectorFactorySpec_protocol: HybridObject {
   // Methods
   func createPoseDetector(size: Double) throws -> (any HybridPoseDetectorSpec)
   func createBasicPoseDetector() throws -> (any HybridPoseDetectorSpec)
+  func poseModelId() throws -> String
+  func benchmarkPoseModel(size: Double, warmUpMs: Double, measureMs: Double) throws -> Promise<PoseBenchmark>
 }
 
 public extension HybridPoseDetectorFactorySpec_protocol {

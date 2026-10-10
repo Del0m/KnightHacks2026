@@ -20,6 +20,8 @@ namespace margelo::nitro::spotterpose { class HybridPoseDetectorFactorySpec; }
 namespace margelo::nitro::spotterpose { class HybridPoseDetectorSpec; }
 // Forward declaration of `Joint` to properly resolve imports.
 namespace margelo::nitro::spotterpose { struct Joint; }
+// Forward declaration of `PoseBenchmark` to properly resolve imports.
+namespace margelo::nitro::spotterpose { struct PoseBenchmark; }
 // Forward declaration of `PoseDetection` to properly resolve imports.
 namespace margelo::nitro::spotterpose { struct PoseDetection; }
 // Forward declaration of `PoseResult` to properly resolve imports.
@@ -41,13 +43,17 @@ namespace SpotterPose { class HybridPoseDetectorSpec_cxx; }
 #include "HybridPoseDetectorFactorySpec.hpp"
 #include "HybridPoseDetectorSpec.hpp"
 #include "Joint.hpp"
+#include "PoseBenchmark.hpp"
 #include "PoseDetection.hpp"
 #include "PoseResult.hpp"
+#include <NitroModules/Promise.hpp>
+#include <NitroModules/PromiseHolder.hpp>
 #include <NitroModules/Result.hpp>
 #include <VisionCamera/HybridCameraFrameOutputSpec.hpp>
 #include <VisionCamera/HybridCameraOutputSpec.hpp>
 #include <VisionCamera/HybridFrameSpec.hpp>
 #include <exception>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -154,6 +160,62 @@ namespace margelo::nitro::spotterpose::bridge::swift {
     return Result<PoseDetection>::withError(error);
   }
   
+  // pragma MARK: std::shared_ptr<Promise<PoseBenchmark>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<PoseBenchmark>>`.
+   */
+  using std__shared_ptr_Promise_PoseBenchmark__ = std::shared_ptr<Promise<PoseBenchmark>>;
+  inline std::shared_ptr<Promise<PoseBenchmark>> create_std__shared_ptr_Promise_PoseBenchmark__() noexcept {
+    return Promise<PoseBenchmark>::create();
+  }
+  inline PromiseHolder<PoseBenchmark> wrap_std__shared_ptr_Promise_PoseBenchmark__(std::shared_ptr<Promise<PoseBenchmark>> promise) noexcept {
+    return PromiseHolder<PoseBenchmark>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const PoseBenchmark& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const PoseBenchmark&)>`.
+   */
+  using Func_void_PoseBenchmark = std::function<void(const PoseBenchmark& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const PoseBenchmark& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_PoseBenchmark_Wrapper final {
+  public:
+    explicit Func_void_PoseBenchmark_Wrapper(std::function<void(const PoseBenchmark& /* result */)>&& func): _function(std::make_unique<std::function<void(const PoseBenchmark& /* result */)>>(std::move(func))) {}
+    inline void call(PoseBenchmark result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const PoseBenchmark& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_PoseBenchmark create_Func_void_PoseBenchmark(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_PoseBenchmark_Wrapper wrap_Func_void_PoseBenchmark(Func_void_PoseBenchmark value) noexcept {
+    return Func_void_PoseBenchmark_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
+  /**
+   * Specialized version of `std::function<void(const std::exception_ptr&)>`.
+   */
+  using Func_void_std__exception_ptr = std::function<void(const std::exception_ptr& /* error */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::exception_ptr& / * error * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__exception_ptr_Wrapper final {
+  public:
+    explicit Func_void_std__exception_ptr_Wrapper(std::function<void(const std::exception_ptr& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::exception_ptr& /* error */)>>(std::move(func))) {}
+    inline void call(std::exception_ptr error) const noexcept {
+      _function->operator()(error);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::exception_ptr& /* error */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__exception_ptr_Wrapper wrap_Func_void_std__exception_ptr(Func_void_std__exception_ptr value) noexcept {
+    return Func_void_std__exception_ptr_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::shared_ptr<HybridPoseDetectorFactorySpec>
   /**
    * Specialized version of `std::shared_ptr<HybridPoseDetectorFactorySpec>`.
@@ -173,6 +235,24 @@ namespace margelo::nitro::spotterpose::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridPoseDetectorSpec__ create_Result_std__shared_ptr_HybridPoseDetectorSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridPoseDetectorSpec>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::string>
+  using Result_std__string_ = Result<std::string>;
+  inline Result_std__string_ create_Result_std__string_(const std::string& value) noexcept {
+    return Result<std::string>::withValue(value);
+  }
+  inline Result_std__string_ create_Result_std__string_(const std::exception_ptr& error) noexcept {
+    return Result<std::string>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<PoseBenchmark>>>
+  using Result_std__shared_ptr_Promise_PoseBenchmark___ = Result<std::shared_ptr<Promise<PoseBenchmark>>>;
+  inline Result_std__shared_ptr_Promise_PoseBenchmark___ create_Result_std__shared_ptr_Promise_PoseBenchmark___(const std::shared_ptr<Promise<PoseBenchmark>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<PoseBenchmark>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_PoseBenchmark___ create_Result_std__shared_ptr_Promise_PoseBenchmark___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<PoseBenchmark>>>::withError(error);
   }
 
 } // namespace margelo::nitro::spotterpose::bridge::swift
