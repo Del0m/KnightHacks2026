@@ -8,7 +8,7 @@ Design: [FE-03-FE-04-Design.md](FE-03-FE-04-Design.md).
 
 - Four-step onboarding with 12 glass goal bubbles and exactly three choices, Beginner/Experienced/Advanced, conditional PBs with units and reps, weekly or interval schedules with a date preview, and optional free-text injuries with the disclaimer.
 - Onboarding drafts stay in memory, survive navigation and failed saves, and are discarded on account changes. Only a verified server response counts as completed setup.
-- Train and Me link to setup. Confirmed accounts with a missing/incomplete server profile are prompted once per account session; users can defer setup and keep training. Plan shows the saved training rhythm and goals; Me shows self-reported PBs.
+- Train links to setup; Me’s top-right Settings button opens all four onboarding questions. Confirmed accounts with a missing/incomplete server profile are prompted once per account session; users can defer setup and keep training. Plan shows the saved training rhythm and goals; Me shows self-reported PBs.
 - Camera setup asks users to choose their exercise spot, place the phone about 8 feet away, then return to the spot for a live framing check. Squats and lunges get side-on placement instructions.
 - Live framing uses the existing iPhone pose pipeline, an outline, a text status, and phone-placement hints. All 17 joints must exceed 0.35 confidence, be inside the cropped preview with an 8% margin, be centered, and occupy at least 45% of preview height. Detection must remain suitable for 800 ms. Results older than 1 second are stale. Missing joints, camera errors, camera changes and backgrounding clear readiness.
 - Web/Android retain the placement instructions and an honest manual-tracking fallback. This issue does not add live rep counting or video recording; workouts still use manual tracking.
@@ -62,3 +62,10 @@ Still required for live acceptance: BE-03 endpoint/payload agreement and a real 
 - Decision: work on a new local feature branch in the provided checkout, preserving the unrelated untracked `FE-01-iPhone-Check.md` file.
 - Decision: eight feet is a placement suggestion, because the supplied pose contract has no calibrated depth.
 - Decision: use a documented proposed BE-03 payload rather than changing backend-owned code or manufacturing successful saves.
+
+## Requested polish follow-up
+
+- Begin Workout enters camera setup. The duplicate Set up my camera action is removed; direct workout links also enter setup unless the user has completed it or explicitly chosen manual tracking. Rechecking placement during a workout returns to the existing session.
+- Goal, experience and schedule choices have stronger translucent blue surfaces, gradient highlights, inset rims and soft shadows; web also uses backdrop blur. Native iOS glass and reduced-transparency fallbacks remain supported. PB and injury inputs receive a tinted surface.
+- Me has a top-right Settings button. Settings opens Goals, Experience & personal bests, Workout schedule, and Injuries & limitations at the corresponding step with the current draft. Back dismisses to the existing Settings screen; the header wraps for larger text. Continue through the remaining questions to save the complete profile. Injury notes still follow the proposed append-only backend contract above.
+- Follow-up verification: 125 tests in 23 suites pass, typecheck passes, and lint has zero errors with the same six existing warnings. iOS, Android and web export passes (18 static web routes). Browser verified Begin Workout → camera setup and updated glass choices at 390×844. Authenticated settings and physical-iPhone checks still depend on the acceptance items above.

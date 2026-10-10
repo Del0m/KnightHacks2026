@@ -1,13 +1,17 @@
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { useEffect, useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { AppPage, Action, ui } from '@/components/AppPage';
 import { BodyPreview } from '@/components/BodyPreview';
 import { exercises } from '@/data/workout';
 import { useTraining } from '@/state/Training';
 import { colors as c } from '@/theme/tokens';
-export default function WorkoutScreen() {
+export default function WorkoutEntry() {
+  const { setup } = useLocalSearchParams<{ setup?: string }>();
+  return setup === 'done' ? <WorkoutScreen /> : <Redirect href="/camera-setup" />;
+}
+function WorkoutScreen() {
   const { finish, removeWorkout } = useTraining(), started = useRef(0), recorded = useRef(false), savedId = useRef<string | null>(null);
   const [sets, setSets] = useState<number[]>([]), [reps, setReps] = useState(String(exercises[0].reps)), [rest, setRest] = useState(0), [done, setDone] = useState(false), [playing, setPlaying] = useState(false);
   useEffect(() => { started.current = Date.now(); }, []);

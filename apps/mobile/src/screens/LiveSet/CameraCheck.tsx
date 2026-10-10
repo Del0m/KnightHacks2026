@@ -86,7 +86,7 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
     {(exercise === 'squat' || exercise === 'lunge') && <Text style={s.text}>Side-on view: face across the camera, so it can see your movement from the side.</Text>}
     <Text style={s.caption}>Keep your full rep inside the frame. The eight-foot guide is approximate.</Text>
     <GlassChoice compact label={position === 'front' ? 'Use back camera' : 'Use front camera'} onPress={onFlip} />
-    <GlassChoice label="Framing checked · return to workout" primary selected disabled={!valid} onPress={onContinue} />
+    <GlassChoice label="Framing checked · continue" primary selected disabled={!valid} onPress={onContinue} />
     <GlassChoice compact label="Continue without camera" onPress={onContinue} />
     <Text style={s.caption}>Your workout still uses manual rep tracking. Live set coaching comes next.</Text>
   </View>;

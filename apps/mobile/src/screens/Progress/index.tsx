@@ -3,6 +3,7 @@ import { ActivityIndicator, Animated, Easing, Image, StyleSheet, Text, TextInput
 import * as ImagePicker from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
 import { AppPage, Action, pageStyles } from '@/components/AppPage';
+import { GlassChoice } from '@/components/GlassChoice';
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { Streak } from '@/components/Streak';
 import { calendarDay, streak } from '@/data/workout';
@@ -53,7 +54,7 @@ export default function ProgressScreen() {
     finally { setPhotoBusy(false); }
   }
   function edit() { setName(displayName === 'Your name' ? '' : displayName); setBio(profile.bio); setEditing(true); }
-  return <AppPage title="Me">
+  return <AppPage title="Me" headerAction={<GlassChoice compact label="Settings" onPress={() => router.push('/settings')} />}>
     <View style={styles.profile}>
       <View style={styles.identity}>
         <PolishedPressable accessibilityRole="button" accessibilityLabel="Change profile picture" disabled={photoBusy} onPress={() => { void pickPhoto(); }} style={styles.avatar}>
@@ -76,7 +77,6 @@ export default function ProgressScreen() {
       <Streak days={streak(workouts)} />
     </View>
     {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-    <PolishedPressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={{ minHeight: 48, justifyContent: 'center' }}><Text style={styles.link}>{setup.profile?.onboarding_completed ? 'Edit goals & training rhythm' : 'Set up goals & training rhythm'}</Text></PolishedPressable>
     <View style={styles.tabs} onLayout={event => setTabWidth(event.nativeEvent.layout.width)}>
       {tabWidth > 0 && <Animated.View pointerEvents="none" style={[styles.tabLine, { width: tabWidth / 3, backgroundColor: slide.interpolate({ inputRange: [0, tabWidth / 3, 2 * tabWidth / 3], outputRange: sectionColors, extrapolate: 'clamp' }), transform: [{ translateX: slide }] }]} />}
       {sections.map((label, index) => <PolishedPressable key={label} accessibilityRole="tab" accessibilityState={{ selected: index === section }} accessibilityLabel={label} onPress={() => setSection(index)} style={styles.tab}><SymbolView name={sectionIcons[index]} tintColor={sectionColors[index]} size={25} style={{ opacity: index === section ? 1 : 0.6 }} /></PolishedPressable>)}

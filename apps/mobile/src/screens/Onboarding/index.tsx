@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SetupPage } from '@/components/SetupPage';
 import { GlassChoice } from '@/components/GlassChoice';
 import { colors as c, typography as t } from '@/theme/tokens';
@@ -16,6 +16,9 @@ const copy = [
 ];
 export default function OnboardingScreen() {
   const state = useOnboarding(), auth = useAuth();
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const editing = from === 'settings';
+  function leave() { if (editing) router.dismissTo('/settings'); else router.replace('/'); }
   const { draft, setDraft, step, setStep, busy, status } = state;
   const [notice, setNotice] = useState<string | null>(null), [finished, setFinished] = useState(false);
   const heading = useRef<Text>(null);
@@ -28,10 +31,10 @@ export default function OnboardingScreen() {
     if (step < 3) { setStep(step + 1); return; }
     setFinished(await state.save(skip));
   }
-  if (finished && status === 'complete' && !state.error) return <SetupPage step={3} total={4} eyebrow="You're set" title="Your starting point is saved." intro="A little stronger, at your own pace." action="Back to Train" onAction={() => router.replace('/')} onBack={() => { setFinished(false); setStep(0); }}><Text style={s.text}>Your goals, experience and training rhythm are ready for your planner.</Text></SetupPage>;
+  if (finished && status === 'complete' && !state.error) return <SetupPage step={3} total={4} eyebrow="You're set" title="Your starting point is saved." intro="A little stronger, at your own pace." action={editing ? "Back to Settings" : "Back to Train"} onAction={leave} onBack={() => { setFinished(false); setStep(0); }}><Text style={s.text}>Your goals, experience and training rhythm are ready for your planner.</Text></SetupPage>;
   const content = copy[step];
   const blocked = busy || status === 'loading';
-  return <SetupPage step={step} total={4} {...content} action={busy ? 'Saving…' : step === 3 ? 'Finish setup' : 'Continue'} disabled={blocked} onAction={() => { void advance(); }} onBack={() => { if (busy) return; setNotice(null); if (step) setStep(step - 1); else router.replace('/'); }} secondary={step === 3 ? 'Skip injury note' : 'Set up later'} onSecondary={() => { if (step === 3) void advance(true); else router.replace('/'); }}>
+  return <SetupPage step={step} total={4} {...content} action={busy ? 'Saving…' : step === 3 ? 'Finish setup' : 'Continue'} disabled={blocked} onAction={() => { void advance(); }} onBack={() => { if (busy) return; setNotice(null); if (editing) leave(); else if (step) setStep(step - 1); else leave(); }} secondary={step === 3 ? 'Skip injury note' : editing ? 'Back to Settings' : 'Set up later'} onSecondary={() => { if (step === 3) void advance(true); else leave(); }}>
     {status === 'loading' ? <ActivityIndicator color={c.primary} accessibilityLabel="Loading your profile" /> : <View style={{ gap: 28 }} pointerEvents={busy ? 'none' : 'auto'}>
       {step === 0 && <>
         <View style={s.count}><Text ref={heading} accessibilityLiveRegion="polite" style={s.label}>{draft.goals.length} / 3 selected</Text><Text style={s.muted}>Choose what matters.</Text></View>
@@ -84,7 +87,7 @@ const s = StyleSheet.create({
   section: { fontFamily: t.label, fontSize: 19, color: c.text }, label: { fontFamily: t.label, fontSize: 15, color: c.text },
   text: { fontFamily: t.family, fontSize: 17, lineHeight: 26, color: c.text }, muted: { fontFamily: t.family, fontSize: 14, lineHeight: 21, color: c.muted },
   best: { gap: 8 }, inputs: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, half: { flex: 1, minWidth: 100 },
-  input: { minHeight: 52, fontFamily: t.family, fontSize: 17, color: c.text, borderWidth: 1, borderColor: '#BDD6E6', borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.76)', paddingHorizontal: 16, paddingVertical: 14 },
+  input: { minHeight: 52, fontFamily: t.family, fontSize: 17, color: c.text, borderWidth: 1, borderColor: '#BDD6E6', borderRadius: 16, backgroundColor: 'rgba(213,235,248,0.45)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.95), 0 5px 16px rgba(40,95,125,0.08)', paddingHorizontal: 16, paddingVertical: 14 },
   note: { minHeight: 180 }, preview: { gap: 8, paddingTop: 18, borderTopWidth: 1, borderColor: c.border },
   disclaimer: { fontFamily: t.family, fontSize: 14, lineHeight: 22, color: c.text }, error: { fontFamily: t.label, fontSize: 15, lineHeight: 22, color: '#963C30' },
 });

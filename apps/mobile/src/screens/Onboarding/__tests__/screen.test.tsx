@@ -2,15 +2,16 @@
 import React from 'react';
 import OnboardingScreen from '../index';
 import { OnboardingProvider } from '../state';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/screens/Auth/session';
 const { act, create } = require('react-test-renderer');
 
 jest.mock('@/screens/Auth/session', () => ({ useAuth: jest.fn() }));
-jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
+jest.mock('expo-router', () => ({ router: { replace: jest.fn(), dismissTo: jest.fn() }, useLocalSearchParams: jest.fn(() => ({})) }));
 jest.mock('@/components/SetupPage', () => ({ SetupPage: (props: unknown) => require('react').createElement('SetupPage', props) }));
 jest.mock('@/components/GlassChoice', () => ({ GlassChoice: (props: unknown) => require('react').createElement('Choice', props) }));
 let renderer: ReturnType<typeof create>;
-beforeEach(() => jest.mocked(useAuth).mockReturnValue({ user: null, apiFetch: jest.fn() } as never));
+beforeEach(() => { jest.mocked(useAuth).mockReturnValue({ user: null, apiFetch: jest.fn() } as never); jest.mocked(useLocalSearchParams).mockReturnValue({}); });
 afterEach(() => act(() => renderer.unmount()));
 const choose = (label: string) => renderer.root.findAllByType('Choice').find((n: { props: { label: string } }) => n.props.label === label);
 const next = () => act(() => renderer.root.findByType('SetupPage').props.onAction());
@@ -54,4 +55,14 @@ test('account changes discard the previous account’s answers', async () => {
   jest.mocked(useAuth).mockReturnValue({ user: { id: 'b' }, apiFetch } as never);
   await act(async () => renderer.update(<OnboardingProvider key="b"><OnboardingScreen /></OnboardingProvider>));
   expect(choose('Increase muscle').props.selected).toBe(false);
+});
+
+test('editing returns to the existing settings screen from any question', async () => {
+  jest.mocked(useLocalSearchParams).mockReturnValue({ from: 'settings' });
+  act(() => { renderer = create(<OnboardingProvider><OnboardingScreen /></OnboardingProvider>); });
+  for (const label of ['Increase muscle', 'Core', 'Arms']) act(() => choose(label).props.onPress());
+  await next();
+  act(() => renderer.root.findByType('SetupPage').props.onBack());
+  expect(router.dismissTo).toHaveBeenCalledWith('/settings');
+  expect(renderer.root.findByType('SetupPage').props.step).toBe(1);
 });

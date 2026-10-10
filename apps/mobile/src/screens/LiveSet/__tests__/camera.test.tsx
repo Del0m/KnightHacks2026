@@ -19,7 +19,7 @@ beforeEach(() => {
   jest.mocked(usePoseOutput).mockReturnValue({ frameOutput: { currentResolution: { width: 1920, height: 1080 } }, error: null } as never);
 });
 afterEach(() => { act(() => renderer.unmount()); jest.useRealTimers(); });
-const readyButton = () => renderer.root.findAllByType('Choice').find((n: { props: { label: string } }) => n.props.label === 'Framing checked · return to workout');
+const readyButton = () => renderer.root.findAllByType('Choice').find((n: { props: { label: string } }) => n.props.label === 'Framing checked · continue');
 
 test('camera check stabilizes detection, clears stale readiness, and respects mirroring', () => {
   act(() => { renderer = create(<CameraCheck exercise="squat" onContinue={jest.fn()} />); });
