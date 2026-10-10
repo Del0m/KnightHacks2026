@@ -24,7 +24,7 @@ export function GlassChoice({ label, selected = false, onPress, disabled = false
   return <PolishedPressable testID={testID} accessibilityRole={radio ? 'radio' : compact || primary ? 'button' : 'checkbox'} accessibilityLabel={label} accessibilityHint={hint} aria-checked={radio || !compact && !primary ? selected : undefined} accessibilityState={{ disabled, ...(radio ? { checked: selected } : !compact && !primary ? { checked: selected } : {}) }} disabled={disabled} onPress={onPress} style={({ pressed }) => [s.press, compact && s.compact, primary && s.primary, !!icon && s.icon, style, { borderColor: selected ? '#8CBED9' : '#C7DEE9', backgroundColor: nativeGlass ? 'transparent' : background, opacity: disabled ? 0.45 : 1, transform: [{ scale: pressed && reduced === false ? 0.975 : 1 }] }]}>
     {nativeGlass && <GlassView pointerEvents="none" colorScheme="light" glassEffectStyle="regular" tintColor={primary ? '#087DBA' : selected ? '#C1E6FB' : '#FFFFFF'} isInteractive={reduced === false} style={[StyleSheet.absoluteFill, { borderRadius: primary ? 24 : 999 }]} />}
     {!nativeGlass && !opaque && !primary && <LinearGradient pointerEvents="none" colors={selected ? ['rgba(255,255,255,0.78)', 'rgba(180,220,242,0.12)', 'rgba(94,172,215,0.24)'] : ['rgba(255,255,255,0.88)', 'rgba(255,255,255,0.18)', 'rgba(123,190,226,0.22)']} locations={[0, 0.42, 1]} style={[StyleSheet.absoluteFill, { borderRadius: 999 }]} />}
-    <View style={s.content}>{icon ? <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{icon}</View> : <>{selected && !primary && !compact && <Text importantForAccessibility="no" accessibilityElementsHidden style={s.check}>✓</Text>}<Text style={[s.label, primary && { color: 'white', fontFamily: t.strong, fontSize: 18 }, selected && !primary && { color: '#075F90' }]}>{label}</Text></>}</View>
+    <View style={s.content}>{icon ? <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{icon}</View> : <><Text style={[s.label, primary && { color: 'white', fontFamily: t.strong, fontSize: 18 }, selected && !primary && { color: '#075F90' }]}>{label}</Text></>}</View>
   </PolishedPressable>;
 }
 const s = StyleSheet.create({
@@ -32,5 +32,5 @@ const s = StyleSheet.create({
   compact: { minHeight: 44, paddingHorizontal: 16, paddingVertical: 10 }, primary: { minHeight: 56, borderRadius: 24 },
   icon: { width: 48, height: 48, minHeight: 48, paddingHorizontal: 0, paddingVertical: 0, flexShrink: 0 },
   content: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, alignItems: 'center', justifyContent: 'center' },
-  label: { fontFamily: t.label, fontSize: 16, color: c.text, flexShrink: 1, textAlign: 'center' }, check: { fontFamily: t.strong, fontSize: 16, color: '#075F90' },
+  label: { fontFamily: t.label, fontSize: 16, color: c.text, flexShrink: 1, textAlign: 'center' },
 });
