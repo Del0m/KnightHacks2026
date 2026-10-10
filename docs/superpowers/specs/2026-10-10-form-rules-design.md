@@ -191,5 +191,5 @@ export function useFormRules(spec: ExerciseSpec | EffectiveSpec | null, opts?: {
 - **The synthetic squat lean is lowered** so the clean squat clips pass `trunk_lean`. Rep counts don't change.
 - **Off-form clips** are added so every rule type has a firing fixture:
   - a squat with shallow and leaning reps (side view)
-  - a front-view squat with knees in
+  - a squat with knees in, filmed 30° off square-on. Square-on, the 2D knee angle stays at 180° and no reps count, so a front-view squat needs a slight turn. Squat and lunge `depth` are `view: side`, because the turned knee angle reads shallow.
   - a push-up with hip sag
