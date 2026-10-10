@@ -50,17 +50,21 @@ ml/pose_export/
 └── PoseBench/
     ├── project.yml
     ├── PoseBench.xcodeproj/
-    ├── PoseBench/
-    │   ├── Models/              # *.mlpackage, gitignored
-    │   ├── PoseResult.swift     # the contract (§6)
-    │   ├── PoseDecoder.swift    # raw tensor → PoseResult, pure
-    │   ├── PoseEstimator.swift  # Vision + Core ML, model loading, timing
-    │   ├── CameraFeed.swift     # AVCaptureSession, front/back, 15 fps throttle
-    │   ├── Benchmark.swift      # warm-up, measurement, stats, markdown row
-    │   └── ContentView.swift    # preview, overlay, readout, toggles, buttons
-    └── PoseBenchTests/
-        ├── PoseDecoderTests.swift
-        └── BenchmarkTests.swift
+    ├── PoseCore/                # local Swift package: pure logic, tested on the Mac with `swift test`
+    │   ├── Package.swift
+    │   ├── Sources/PoseCore/
+    │   │   ├── PoseResult.swift       # the contract (§6)
+    │   │   ├── PoseDecoder.swift      # raw tensor → PoseResult, pure
+    │   │   ├── MultiArrayReader.swift # MLMultiArray (FP16/FP32, any strides) → [Float]
+    │   │   ├── Benchmark.swift        # stats, run timing, markdown row
+    │   │   └── OverlayGeometry.swift  # normalized joint → view point (fit + mirroring)
+    │   └── Tests/PoseCoreTests/
+    └── PoseBench/               # the app target
+        ├── Models/              # *.mlpackage, gitignored
+        ├── PoseEstimator.swift  # PoseEstimating protocol + Vision/Core ML implementation
+        ├── CameraFeed.swift     # AVCaptureSession, front/back, 15 fps throttle
+        ├── PoseBenchModel.swift # wires camera → estimator → benchmark → UI state
+        └── ContentView.swift    # preview, overlay, readout, toggles, buttons
 
 docs/pose/
 ├── how-it-works.md
@@ -68,8 +72,10 @@ docs/pose/
 └── benchmark-results.md
 ```
 
+This machine has no iOS simulator runtime, so everything testable lives in `PoseCore` and runs on macOS. AI-02's frame-processor plugin can depend on the same package.
+
 Each Swift file has one job:
-- `PoseDecoder` has no camera, UI or Core ML imports and is unit-tested.
+- `PoseDecoder` has no camera or UI imports and is unit-tested.
 - `PoseEstimator` is the only file that touches Core ML.
 - `CameraFeed` only delivers frames.
 - `ContentView` only draws.
@@ -127,9 +133,7 @@ Steps:
 
 `export.py`'s verification also asserts row 4 and the visibility rows fall within 0–1 on a sample image, so a layout change is caught at export time.
 
-**Orientation:** the app is locked to portrait.
-- Back camera: Vision gets `.right`.
-- Front camera: Vision gets `.leftMirrored`, so the result is in unmirrored image space (§6). The overlay is then mirrored horizontally to line up with the mirrored preview.
+**Orientation:** the app is locked to portrait. The camera's video-data connection is set to `videoRotationAngle = 90` and `isVideoMirrored = false`, so frames arrive upright and unmirrored for both cameras, and Vision always gets `.up`. This keeps left and right anatomically correct: the model labels the lifter's real left knee `left_knee`, which the form rules depend on. The only mirroring happens in the overlay for the front camera, to line up with the mirrored preview.
 
 **Readout:** model size · latency ms · effective fps · "no person" when no result.
 
@@ -165,6 +169,8 @@ The columns are phone model, iOS version, size, mean ms, p95 ms, max fps, holds 
 | App backgrounded mid-benchmark | Benchmark cancelled; screen asks to run it again |
 
 ## 10. Testing
+
+All Swift tests run on the Mac with `swift test` in `PoseCore/`.
 
 - **`PoseDecoderTests`** (no phone needed):
   - picks the most confident candidate
