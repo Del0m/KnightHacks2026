@@ -7,6 +7,20 @@ import { schema } from "../db.js";
 import { conflict, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
 
 const { users, profiles, injuries } = schema;
+const onboardingGoals = new Set([
+  "muscle",
+  "weight",
+  "strength",
+  "endurance",
+  "mobility",
+  "consistency",
+  "chest",
+  "back",
+  "shoulders",
+  "arms",
+  "core",
+  "legs",
+]);
 
 const calendarDate = z
   .string()
@@ -85,7 +99,8 @@ export const profileUpdate = z
         !input.personal_bests ||
         !input.goals ||
         input.goals.length !== 3 ||
-        new Set(input.goals).size !== 3)
+        new Set(input.goals).size !== 3 ||
+        input.goals.some((goal) => !onboardingGoals.has(goal)))
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -173,6 +188,16 @@ export function meRouter(db: Db): Router {
         // Serialize settings edits for this account, including the managed injury note.
         const [current] = await tx.select().from(profiles).where(eq(profiles.userId, id)).for("update");
         if (!current) throw notFound("Profile");
+        // Partial edits must preserve a profile the onboarding client can reload.
+        if (rest.onboarding_completed ?? current.onboardingCompleted) {
+          parse(profileUpdate, {
+            goals: rest.goals ?? current.goals,
+            experience_level: rest.experience_level ?? current.experienceLevel,
+            personal_bests: rest.personal_bests ?? current.personalBests,
+            training_schedule: rest.training_schedule ?? current.trainingSchedule,
+            onboarding_completed: true,
+          });
+        }
         let onboardingInjuryId = current.onboardingInjuryId;
         if (rest.injury_note !== undefined) {
           if (onboardingInjuryId)

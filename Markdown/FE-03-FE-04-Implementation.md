@@ -40,7 +40,7 @@ Live workout rep counting is FE-05 / INT-02 and remains outside FE-03/FE-04. Set
 ## Verification
 
 - Mobile: 33 suites / 314 tests passed, including AI-06, camera, settings, onboarding and spec mapping.
-- API: full suite 12 files / 63 tests passed against fresh PGlite databases and real JWT verification. The new test calls the actual frontend adapter through Express and checks reload, interval cadence, PBs, injury edits/clearing, retries and account isolation.
+- API: full suite 12 files / 64 tests passed against fresh PGlite databases and real JWT verification. The new tests call the actual frontend adapter through Express and check reload, interval cadence, PBs, injury edits/clearing, retries, account isolation and partial-edit completion validation.
 - Mobile and API typecheck and lint passed; mobile has seven existing test-import warnings and zero errors.
 - Browser verified Begin Workout → spec-backed picker → side-on curl placement. Restarted Metro to load the merged watch-folder config. Preview: `Previews/FE-03-FE-04/curl-spec-placement.png`.
 - iOS, Android and web exports passed (18 static web routes). Bundling does not verify native camera hardware.
@@ -52,3 +52,11 @@ Configured `apps/api/.env` from the owner-supplied environment file and set the 
 Applied the additive onboarding migration to the configured database and verified all four onboarding columns exist. The live readiness endpoint reports database status `ok`, the authentication signing-key endpoint responds, and the profile route's browser preflight succeeds. An authenticated save through the running browser remains to be verified; adapter-to-backend saving is covered by the integration tests above.
 
 Physical iPhone checks remain: camera placement, side-on joint confidence, background/resume, native glass, VoiceOver and Dynamic Type. The strict all-17-joint framing criterion can be difficult side-on and has not been relaxed without hardware evidence.
+
+## Final review before PR
+
+The FE-03 issue criteria are implemented: four short steps, skippable injuries with a disclaimer, and BE-03 persistence. FE-04 implements the green outline for all 17 visible confident joints and side-on placement hints for squats and lunges. Later UI requests are included: highlight-only selections, compact settings buttons, the profile glass gear, visible Steady forum branding, and the glass workout figure with first-exercise autoplay.
+
+Review found and corrected a completed-profile validation gap. Partial API edits now validate the resulting completed profile under the account row lock, and completion accepts only the 12 preset goal IDs. Invalid edits fail before profile or injury writes; unrelated profile edits remain available.
+
+The outgoing branch history was scanned against private values in the supplied/local environment files, including database passwords, and for credential patterns. No private-value matches or real tracked env files were found. The only credential-pattern candidate was the placeholder URL in `.env.example`. Outgoing commit messages and fresh iOS/Android/web export artifacts also contained no private-value matches. Local env files remain ignored and exports are outside the repository. This scan does not replace the physical-device and signed-in browser checks listed above.

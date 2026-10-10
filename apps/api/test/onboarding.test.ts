@@ -61,3 +61,21 @@ it("rejects malformed cadence, bests and notes without changing profile", async 
   }
   expect((await api.get("/me/profile")).body.onboarding_completed).toBe(false);
 });
+it("keeps completed profiles loadable after partial edits", async () => {
+  const api = await t.as("completed-profile-edits");
+  const complete = {
+    goals: ["muscle", "strength", "core"],
+    experience_level: "beginner",
+    personal_bests: [],
+    training_schedule: { kind: "weekly", days: [1, 3, 5] },
+    onboarding_completed: true,
+  };
+  expect((await api.put("/me/profile", complete)).status).toBe(200);
+  for (const goals of [[], ["muscle", "strength", "unsupported"], ["core", "core", "core"]]) {
+    expect((await api.put("/me/profile", { goals })).status).toBe(400);
+    expect((await api.get("/me/profile")).body.goals).toEqual(complete.goals);
+  }
+  expect((await api.put("/me/profile", { bio: "Updated bio" })).status).toBe(200);
+  expect((await api.put("/me/profile", { ...complete, goals: ["one", "two", "three"] })).status).toBe(400);
+  expect((await api.get("/me/profile")).body.onboarding_completed).toBe(true);
+});
