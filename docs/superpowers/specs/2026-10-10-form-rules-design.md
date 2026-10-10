@@ -211,7 +211,7 @@ A screen recording of a seated shoulder press showed three problems:
 - **Shoulder press:**
   - New angle `arm_raise`: `segment_tilt` from `shoulder` to `wrist`, `side: "max"`, so the lower arm decides. 0° is the wrist straight above the shoulder.
   - Gate `{ "metric": "arm_raise", "op": "<=", "value": 60 }`.
-  - `wrist_stack` moves to `phase: "peak"`, with value 30.
+  - `wrist_stack` moves to `phase: "peak"`, with value 35 (loosened from 30 after device testing). `target` (the lockout) is 150 and `tempo` 600 ms.
 - **Validator:** checks that the gate metric exists and isn't `duration_ms` or the primary.
 
 **Primary angle reliability (engine):**
