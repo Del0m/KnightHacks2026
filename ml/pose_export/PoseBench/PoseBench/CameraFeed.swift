@@ -8,9 +8,17 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     let session = AVCaptureSession()
     /// Called on the camera queue.
     var onFrame: ((CVPixelBuffer) -> Void)?
+    /// Called on the camera queue after the session is (re)configured, e.g. a camera switch,
+    /// which rebuilds the preview layer's connection.
+    var onReconfigure: (() -> Void)?
 
     var position: AVCaptureDevice.Position = .front {
-        didSet { queue.async { self.configure() } }
+        didSet {
+            queue.async {
+                self.configure()
+                self.onReconfigure?()
+            }
+        }
     }
 
     /// Set from any thread; read on the camera queue.
@@ -28,6 +36,7 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         queue.async {
             self.configure()
             self.session.startRunning()
+            self.onReconfigure?()
         }
     }
 
@@ -49,12 +58,13 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         }
         // Rotate to portrait and keep the image unmirrored at capture, for both cameras, so the
         // model sees the real scene and labels left/right anatomically. Re-applied on every switch.
+        // Mirroring is set before rotation: toggling mirroring after rotating can flip the rotated buffer.
         if let connection = output.connection(with: .video) {
-            if connection.isVideoRotationAngleSupported(90) { connection.videoRotationAngle = 90 }
             if connection.isVideoMirroringSupported {
                 connection.automaticallyAdjustsVideoMirroring = false
                 connection.isVideoMirrored = false
             }
+            if connection.isVideoRotationAngleSupported(90) { connection.videoRotationAngle = 90 }
         }
     }
 

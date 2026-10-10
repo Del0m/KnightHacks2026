@@ -32,7 +32,7 @@ struct ContentView: View {
         ZStack {
             // Preview and overlay share one frame so OverlayGeometry's aspect-fit math lines up.
             ZStack {
-                CameraPreview(session: model.camera.session)
+                CameraPreview(camera: model.camera)
                 SkeletonOverlay(pose: model.pose, imageSize: model.frameSize, mirrored: model.cameraPosition == .front)
             }
             .ignoresSafeArea()
@@ -150,12 +150,15 @@ private struct SkeletonOverlay: View {
 }
 
 private struct CameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
+    let camera: CameraFeed
 
     func makeUIView(context: Context) -> PreviewView {
         let view = PreviewView()
-        view.previewLayer.session = session
+        view.previewLayer.session = camera.session
         view.previewLayer.videoGravity = .resizeAspect // aspect-fit, matching OverlayGeometry
+        view.lockPortrait()
+        // A camera switch rebuilds the preview connection, so re-apply portrait each time.
+        camera.onReconfigure = { [weak view] in DispatchQueue.main.async { view?.lockPortrait() } }
         return view
     }
 
@@ -164,5 +167,12 @@ private struct CameraPreview: UIViewRepresentable {
     final class PreviewView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+
+        /// Portrait, with the default automatic mirroring left on: the front preview stays a mirror.
+        func lockPortrait() {
+            if let connection = previewLayer.connection, connection.isVideoRotationAngleSupported(90) {
+                connection.videoRotationAngle = 90
+            }
+        }
     }
 }

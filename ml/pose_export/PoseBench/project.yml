@@ -32,3 +32,12 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+schemes:
+  PoseBench:
+    build:
+      targets:
+        PoseBench: all
+    # Benchmark numbers must come from an optimized build: in Debug the decode loop runs
+    # unoptimized and inflates latency.
+    run:
+      config: Release

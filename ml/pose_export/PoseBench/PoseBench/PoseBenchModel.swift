@@ -24,8 +24,11 @@ final class PoseBenchModel: ObservableObject {
     let camera = CameraFeed()
     private let processor: FrameProcessor
     private var frameTimes: [CFTimeInterval] = []
+    /// Generation of the running benchmark; nil when none. Outputs from other generations are
+    /// stale (finished on the camera queue before a cancel or restart) and their events are dropped.
+    @Published private var activeBenchmark: Int?
 
-    var isBenchmarking: Bool { benchmarkStatus != nil }
+    var isBenchmarking: Bool { activeBenchmark != nil }
 
     init() {
         var estimators: [Int: any PoseEstimating] = [:]
@@ -66,12 +69,13 @@ final class PoseBenchModel: ObservableObject {
         rows = []
         benchmarkStatus = "Point at a person"
         camera.minFrameInterval = 0 // measure the ceiling, not the throttle
-        processor.startBenchmark(sizes: availableSizes)
+        activeBenchmark = processor.startBenchmark(sizes: availableSizes)
     }
 
     func cancelBenchmark() {
         guard isBenchmarking else { return }
         processor.cancelBenchmark()
+        activeBenchmark = nil
         camera.minFrameInterval = Self.liveFrameInterval
         benchmarkStatus = nil
         errorMessage = "Benchmark cancelled because the app left the foreground. Run it again."
@@ -92,13 +96,14 @@ final class PoseBenchModel: ObservableObject {
         frameTimes.removeAll { now - $0 > 1 }
         fps = Double(frameTimes.count)
 
-        switch output.benchmark {
+        switch output.benchmarkEvent(activeGeneration: activeBenchmark) {
         case .none:
             break
         case .status(let text):
             benchmarkStatus = output.result == nil ? "Point at a person" : text
         case .finished(let stats):
             rows = stats.map { BenchmarkMath.markdownRow($0, device: Self.deviceModel, os: Self.osVersion) }
+            activeBenchmark = nil
             benchmarkStatus = nil
             camera.minFrameInterval = Self.liveFrameInterval
         }
@@ -112,86 +117,4 @@ final class PoseBenchModel: ObservableObject {
     }()
 
     private static var osVersion: String { "iOS \(UIDevice.current.systemVersion)" }
-}
-
-/// Runs on the camera queue: inference plus benchmark bookkeeping. The lock guards state that the
-/// main thread changes (live size, benchmark start/cancel).
-final class FrameProcessor: @unchecked Sendable {
-    enum BenchmarkEvent {
-        case status(String)
-        case finished([BenchmarkStats])
-    }
-
-    struct Output {
-        let result: PoseResult?
-        let latencyMs: Double
-        let frameSize: CGSize
-        let error: String?
-        let benchmark: BenchmarkEvent?
-    }
-
-    private let lock = NSLock()
-    private let estimators: [Int: any PoseEstimating]
-    private var liveSize: Int
-    private var pendingSizes: [Int] = []
-    private var run: BenchmarkRun?
-    private var finished: [BenchmarkStats] = []
-
-    init(estimators: [Int: any PoseEstimating], liveSize: Int) {
-        self.estimators = estimators
-        self.liveSize = liveSize
-    }
-
-    func setLiveSize(_ size: Int) { lock.withLock { liveSize = size } }
-
-    func startBenchmark(sizes: [Int]) {
-        lock.withLock {
-            finished = []
-            pendingSizes = Array(sizes.dropFirst())
-            run = sizes.first.map { BenchmarkRun(size: $0) }
-        }
-    }
-
-    func cancelBenchmark() {
-        lock.withLock {
-            run = nil
-            pendingSizes = []
-        }
-    }
-
-    func process(_ buffer: CVPixelBuffer) -> Output? {
-        lock.withLock {
-            let size = run?.size ?? liveSize
-            guard let estimator = estimators[size] else { return nil }
-            let frameSize = CGSize(width: CVPixelBufferGetWidth(buffer), height: CVPixelBufferGetHeight(buffer))
-            let now = CACurrentMediaTime()
-            do {
-                let (result, latency) = try estimator.estimate(buffer, timestampMs: Int64(Date().timeIntervalSince1970 * 1000))
-                return Output(result: result, latencyMs: latency, frameSize: frameSize, error: nil,
-                              benchmark: advanceBenchmark(latency: latency, personFound: result != nil, at: now))
-            } catch {
-                return Output(result: nil, latencyMs: 0, frameSize: frameSize,
-                              error: "Inference failed: \(error.localizedDescription)", benchmark: nil)
-            }
-        }
-    }
-
-    /// Caller holds the lock.
-    private func advanceBenchmark(latency: Double, personFound: Bool, at time: CFTimeInterval) -> BenchmarkEvent? {
-        guard var current = run else { return nil }
-        current.record(latencyMs: latency, personFound: personFound, at: time)
-        guard current.phase == .done else {
-            run = current
-            let phase = current.phase == .warmingUp ? "warming up" : "measuring"
-            return .status("Benchmarking \(current.size): \(phase)")
-        }
-        if let stats = current.stats { finished.append(stats) }
-        if pendingSizes.isEmpty {
-            run = nil
-            return .finished(finished)
-        }
-        let next = pendingSizes.removeFirst()
-        run = BenchmarkRun(size: next)
-        return .status("Benchmarking \(next): warming up")
-    }
 }

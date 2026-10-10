@@ -23,7 +23,7 @@ You need a Mac with Xcode, [uv](https://docs.astral.sh/uv/), an iPhone 12 or new
 
 4. **Set up signing** (once): click the PoseBench project, then the PoseBench target, then **Signing & Capabilities**. Set **Team** to your Apple ID (shown as "Personal Team"; add your account under Xcode → Settings → Accounts if it isn't listed). If Xcode says the bundle identifier is taken, change `com.del0m.posebench` to something unique, e.g. `com.<yourname>.posebench`.
 
-5. **Run on the phone:** plug it in, unlock it, pick it as the run destination at the top of Xcode, and press **Run** (⌘R).
+5. **Run on the phone:** plug it in, unlock it, pick it as the run destination at the top of Xcode, and press **Run** (⌘R). The PoseBench scheme runs a **Release** build on purpose, so the numbers aren't inflated by unoptimized code.
    - The first time, the phone asks you to turn on **Developer Mode** (Settings → Privacy & Security → Developer Mode) and restarts.
    - If the app won't open with "Untrusted Developer": on the phone go to Settings → General → VPN & Device Management, then your Apple ID, then **Trust**.
 

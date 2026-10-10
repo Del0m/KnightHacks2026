@@ -3,14 +3,8 @@ import PoseCore
 import QuartzCore
 import Vision
 
-/// Frame in, joints out. The seam for cloud offloading: a later `RemotePoseEstimator` (CONN-11)
-/// conforms to this, and nothing above it changes.
-protocol PoseEstimating: AnyObject {
-    var modelName: String { get }
-    /// `buffer` is upright and unmirrored (CameraFeed rotates at capture).
-    func estimate(_ buffer: CVPixelBuffer, timestampMs: Int64) throws -> (result: PoseResult?, latencyMs: Double)
-}
-
+/// Core ML implementation of `PoseEstimating` (defined in PoseCore, with the cloud seam).
+/// Expects upright, unmirrored frames; CameraFeed rotates at capture.
 final class CoreMLPoseEstimator: PoseEstimating {
     let modelName: String
     private let inputSize: Int

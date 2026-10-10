@@ -36,9 +36,10 @@ PoseResult (17 joints, 0–1 coordinates) → overlay, and later the rep rules
 | `PoseCore/ModelLocator.swift` | Finds the compiled models in the app bundle |
 | `PoseCore/Benchmark.swift` | Stats, benchmark timing, markdown rows |
 | `PoseCore/OverlayGeometry.swift` | Joint → screen point, including front-camera mirroring |
-| `PoseBench/PoseEstimator.swift` | `PoseEstimating` protocol plus the Vision/Core ML implementation |
+| `PoseCore/FrameProcessor.swift` | `PoseEstimating` protocol (the cloud seam) plus per-frame inference and benchmark bookkeeping |
+| `PoseBench/PoseEstimator.swift` | The Vision/Core ML implementation of `PoseEstimating` |
 | `PoseBench/CameraFeed.swift` | Capture session, rotation, throttle |
-| `PoseBench/PoseBenchModel.swift` | Wires it all together, runs the benchmark |
+| `PoseBench/PoseBenchModel.swift` | Wires camera, processor and UI state together |
 | `PoseBench/ContentView.swift` | Preview, skeleton, readout, controls |
 
 Everything in `PoseCore` is plain Swift with tests that run on a Mac (`swift test` in `PoseCore/`), no phone or simulator needed.
@@ -116,7 +117,7 @@ That number covers the model alone. PoseBench's latency also includes Vision's r
 
 ## Benchmark method
 
-"Run benchmark" in PoseBench:
+"Run benchmark" in PoseBench (the shared scheme's Run action builds **Release**, because unoptimized Debug code would inflate the decode part of the latency):
 
 1. Turns the 15 fps throttle off, so we measure the ceiling, not the cap.
 2. For each size: 2 s warm-up, discarded, because the first Core ML calls are slow while the model loads onto the Neural Engine. Then 10 s of measurement.
@@ -129,4 +130,4 @@ That number covers the model alone. PoseBench's latency also includes Vision's r
 - **`PoseCore` as-is:** add it as a local Swift package to the Expo iOS project. It's pure Swift, with no app or UI code.
 - **The `CoreMLPoseEstimator` logic:** the frame-processor plugin receives a `CVPixelBuffer` per frame, which is exactly what `estimate` takes. Copy the class, or move it into `PoseCore` if both need it.
 - **The capture rule:** configure vision-camera for portrait, unmirrored frames (or rotate before inference), and mirror only in the overlay.
-- **The `PoseEstimating` protocol:** the seam where a cloud estimator for non-iPhone users (CONN-11) plugs in.
+- **The `PoseEstimating` protocol** (in `PoseCore`): the seam where a cloud estimator for non-iPhone users (CONN-11) plugs in.
