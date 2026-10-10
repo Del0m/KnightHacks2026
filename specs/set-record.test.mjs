@@ -109,12 +109,17 @@ describe('set-record fixtures', () => {
 
 describe('set-record rejects', () => {
   const base = readJson(join(VALID_DIR, 'SetRecord', 'minimal.json'));
+  it('validates a set at the schema root', () => {
+    assert.deepEqual(validateSchema(base, schema), []);
+    assert.notDeepEqual(validateSchema({}, schema), []);
+  });
   const cases = {
     'a 1-based or negative rep_index': (r) => (r.reps[0].rep_index = -1),
     'an unknown severity': (r) => (r.reps[1].flags[0].severity = 'info'),
     'a flag without rep_index': (r) => delete r.reps[1].flags[0].rep_index,
     'a frame with 50 values': (r) => r.frames[0].kp.pop(),
     'a fractional t_ms': (r) => (r.frames[1].t_ms = 66.7),
+    'a non-finite joint': (r) => (r.frames[0].kp[0] = Infinity),
     'range_deg over 180': (r) => (r.reps[0].range_deg = 181),
     'a phone-side clean flag': (r) => (r.reps[0].clean = true),
     'a phone-side medal': (r) => (r.medal = 'gold'),

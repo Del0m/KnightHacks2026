@@ -35,6 +35,7 @@ const typeOf = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof
 function matchesType(value, type) {
   if (Array.isArray(type)) return type.some((t) => matchesType(value, t));
   if (type === 'integer') return Number.isInteger(value);
+  if (type === 'number') return typeof value === 'number' && Number.isFinite(value);
   return typeOf(value) === type;
 }
 
