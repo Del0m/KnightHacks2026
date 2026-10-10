@@ -14,7 +14,7 @@ it('packages real counted reps and rule flags without inventing model quality', 
   const record = capture.finish(summary!);
   expect(record.reps.length).toBeGreaterThan(0);
   expect(record.reps).toHaveLength(summary!.total_reps);
-  for (const rep of record.reps) { expect(rep.tempo_ms).toBeGreaterThan(0); expect(rep.quality).toBeNull(); expect(rep.end_ms).toBeGreaterThan(rep.start_ms!); }
+  for (const rep of record.reps) { expect(rep.tempo_ms).toBeGreaterThan(0); expect(rep.quality).toBeNull(); expect(rep.start_ms).toBeNull(); expect(rep.end_ms).toBeNull(); }
   expect(record.reps.filter(r => !r.flags.length)).toHaveLength(summary!.clean_reps);
   expect(setFeedback(spec, summary!).note).toContain('good');
 });
