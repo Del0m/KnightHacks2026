@@ -1,12 +1,16 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useCameraPermission } from 'react-native-vision-camera';
 import { PoseDebugScreen } from '../PoseDebugScreen';
 import { usePoseOutput } from '../usePoseOutput';
+import { benchmarkPoseModel } from 'spotter-pose';
+import { __clearPoseStoreForTests } from '../modeStore';
+import { __resetPoseModeForTests, startPoseBenchmark } from '../usePoseMode';
 
 const { act, create } = require('react-test-renderer');
 
 jest.mock('../usePoseOutput', () => ({ usePoseOutput: jest.fn() }));
+jest.mock('spotter-pose', () => ({ benchmarkPoseModel: jest.fn(), getPoseModelId: jest.fn(() => 'model-a') }));
 jest.mock('../PoseSkeleton', () => ({
   PoseSkeleton: (props: unknown) => require('react').createElement('PoseSkeleton', props),
 }));
@@ -22,6 +26,8 @@ describe('PoseDebugScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    __clearPoseStoreForTests();
+    __resetPoseModeForTests();
     frameOutput = { currentResolution: { width: 1920, height: 1080 } };
     jest.mocked(useCameraPermission).mockReturnValue({ hasPermission: true, canRequestPermission: false } as never);
     jest.mocked(usePoseOutput).mockReturnValue({ frameOutput, fps: 15, error: null, model: 'yolov8n-pose-320', dropped: 0 } as never);
@@ -78,6 +84,36 @@ describe('PoseDebugScreen', () => {
 
     act(() => toggle().props.onPress());
     expect(jest.mocked(usePoseOutput).mock.calls.at(-1)![0].engine).toBe('coreml');
+  });
+
+  it('re-runs the benchmark with the camera unmounted, then uses the size that passed', async () => {
+    let finish!: (v: unknown) => void;
+    jest.mocked(benchmarkPoseModel).mockReturnValueOnce(new Promise((r) => { finish = r; }) as never);
+    act(() => { renderer = create(React.createElement(PoseDebugScreen)); });
+    expect(renderer.root.findAllByType('Camera')).toHaveLength(1);
+
+    act(() => renderer.root.findByProps({ testID: 'pose-rerun-benchmark' }).props.onPress());
+    expect(renderer.root.findAllByType('Camera')).toHaveLength(0);
+    expect(JSON.stringify(renderer.toJSON())).toContain('Benchmarking');
+
+    await act(async () => {
+      finish({ size: 320, model: 'yolov8n-pose-320', meanMs: 9, p95Ms: 10, samples: 150 });
+    });
+    expect(renderer.root.findAllByType('Camera')).toHaveLength(1);
+    expect(jest.mocked(usePoseOutput).mock.calls.at(-1)![0].size).toBe(320);
+    expect(JSON.stringify(renderer.toJSON())).toContain('"mode ","coreml"');
+  });
+
+  it('toggles cloud consent', async () => {
+    jest.mocked(benchmarkPoseModel).mockRejectedValue(new Error('model missing'));
+    await act(() => startPoseBenchmark('ios'));
+    act(() => { renderer = create(React.createElement(PoseDebugScreen)); });
+    const text = () => renderer.root.findAllByType(Text)
+      .map((t: { props: { children: unknown } }) => [t.props.children].flat().join('')).join('\n');
+    expect(text()).toContain('consent needed');
+    act(() => renderer.root.findByProps({ testID: 'pose-consent-toggle' }).props.onPress());
+    expect(text()).toContain('consent yes');
+    expect(text()).toContain('Revoke cloud consent');
   });
 
   it('shows a rejected permission request instead of an unhandled rejection', async () => {
