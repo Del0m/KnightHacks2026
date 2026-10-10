@@ -2,6 +2,8 @@ import type { PoseResult } from '../pose/types';
 import { createMetricComputer } from './angles';
 import { JointSmoother } from './oneEuro';
 import { createRepCounter } from './repCounter';
+import { gatePasses } from './gate';
+import { assertEvaluationSpec } from './validation';
 import type {
   CounterStep,
   EngineEvent,
@@ -11,7 +13,6 @@ import type {
   ExerciseSpec,
   Metrics,
   MetricSides,
-  PrimaryGate,
   RepRecord,
   RepTiming,
   RepWindows,
@@ -49,23 +50,6 @@ const MAX_REJECTIONS = 3;
 /** Floor on the time between frames for the rate, ms, so near-duplicate timestamps don't spike it. */
 const MIN_RATE_DT_MS = 33;
 
-/** Whether `spec.primary_angle.gate` passes on these metrics. No gate always passes. */
-function gatePasses(gate: PrimaryGate | undefined, metrics: Metrics): boolean {
-  if (!gate) return true;
-  const v = metrics[gate.metric];
-  if (v === null || v === undefined) return false;
-  switch (gate.op) {
-    case '<=':
-      return v <= gate.value;
-    case '>=':
-      return v >= gate.value;
-    case '<':
-      return v < gate.value;
-    case '>':
-      return v > gate.value;
-  }
-}
-
 /**
  * Turns a stream of poses into reps for one exercise: One Euro smoothing, the spec's metrics, and
  * the rep state machine on the primary angle. Each frame the primary value goes through jump
@@ -74,6 +58,7 @@ function gatePasses(gate: PrimaryGate | undefined, metrics: Metrics): boolean {
  * docs/superpowers/specs/2026-10-10-form-engine-design.md, and §9 of the form rules design.
  */
 export function createFormEngine(spec: ExerciseSpec, options: EngineOptions = {}): FormEngine {
+  assertEvaluationSpec(spec);
   const primaryName = spec.primary_angle.name;
   const smoother = new JointSmoother({
     filter: options.filter,

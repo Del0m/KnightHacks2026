@@ -82,7 +82,7 @@ Fractional capture times round clock positions before subtraction: `tempo_ms = e
 - `upload.ts` and `score.ts` use the shared types; the stub interfaces go. `buildMetadata` returns `ExportMeta`, `buildJointsFile` writes `ExportJointsLine`s, and both take `set_index` from the set (not the array position).
 - `setInput` / `createSessionInput` zod mirror `SetRecord` / `SessionStart` and are typed against them (`z.ZodType<SetRecord, z.ZodTypeDef, unknown>`), so drift fails tsc. Unknown keys are stripped (zod default), so a client still sending `clean` or `medal` isn't rejected.
 - `buildExportSession` passes `quality` through (null stays null), `set_index` = `sets.position`, and the new fields.
-- Migration after `0006_int08_export_attempts`: rename enum value `on_device` → `coreml`, add `vision`, drop the `inference_mode` default; add `sets.end_reason text`, `sets.partial_reps integer`, `reps.lowering_ms integer`, `reps.rising_ms integer` (all nullable).
+- Migration `0008_set_record`, after main's `0007_db12_rehab`: rename enum value `on_device` → `coreml`, add `vision`, drop the `inference_mode` default; add `sets.end_reason text`, `sets.partial_reps integer`, `reps.lowering_ms integer`, `reps.rising_ms integer` (all nullable). Upgrade tests cover populated databases through both `0006` and `0007`.
 - INT-08's manual workout screen stays local until a separate manual-upload contract exists. The upload helper takes shared `SessionStart` / `SetRecord` types and preserves caller-supplied set indices and pose source.
 
 ## 5. Databricks

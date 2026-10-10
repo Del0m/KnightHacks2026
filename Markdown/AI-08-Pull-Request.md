@@ -2,7 +2,7 @@ Closes #48.
 
 A finished engine set now becomes a versioned payload shared by the phone, the API and Databricks. The phone packages AI-07's flags and per-rep measurements; the API stores aggregates in Neon and exports rounded joint arrays as gzip. Rules are not evaluated again during packaging, and the model's quality remains advisory.
 
-This includes the contract portion of INT-01 (#85). The UI catalogue's `curl` / `press` rename remains with INT-12 (#110), so this PR does not close #85. The branch includes AI-07 (#112) and main through INT-08 (`65ecfde`). Review AI-08 changes against that dependency base while #112 remains open.
+This includes the contract portion of INT-01 (#85). The UI catalogue's `curl` / `press` rename remains with INT-12 (#110), so this PR does not close #85. The branch includes main through `0bdefe1`, including AI-07 (#112) and DB-12 / BE-03 (#113).
 
 ## What gets produced
 
@@ -30,7 +30,7 @@ This includes the contract portion of INT-01 (#85). The UI catalogue's `curl` / 
 - `setRecord.ts` provides a pure builder and an event-driven collector. It keeps a one-second pose lead-in, then captures until set end with a 5,400-frame limit. Frames after that limit are dropped while aggregate collection continues.
 - Replay fixtures connect the real engine and AI-07 rules to the payload builder. The same payloads are consumed by schema and API contract tests.
 - The API adopts the shared shapes, persists the new aggregate fields, preserves sparse set indices and null quality, and forwards phone timing features to rest-time scoring. Client-supplied clean/medal fields are stripped; flags determine clean.
-- The migration follows INT-08's `0006`. It preserves existing `on_device` rows as `coreml`, adds `vision`, removes the session mode default and adds nullable aggregate columns.
+- Migration `0008_set_record` follows main's `0007_db12_rehab`. It preserves existing `on_device` rows as `coreml`, adds `vision`, removes the session mode default and adds nullable aggregate columns. Its snapshot includes the merged rehab schema.
 - The uploader keeps explicit field allowlists, server-side pseudonymisation and gzip. The synthetic Databricks exporter also validates against the shared contract.
 - `uploadWorkout` accepts shared session/set types and preserves caller-supplied indices. Manual workouts remain local, pending a separate manual-upload contract, rather than submitting unmeasured reps as pose records.
 - Root `Architecture.md`, the design contract and `docs/specs/set-record-format.md` describe the handoff and field meanings.
@@ -40,20 +40,14 @@ This includes the contract portion of INT-01 (#85). The UI catalogue's `curl` / 
 From `apps/mobile`, `npx jest --runInBand --watchman=false`:
 
 ```text
-Test Suites: 44 passed, 44 total
-Tests:       600 passed, 600 total
+Test Suites: 45 passed, 45 total
+Tests:       636 passed, 636 total
 Snapshots:   0 total
 ```
 
 The replay payload snapshots are ordinary committed JSON fixtures, so Jest reports zero built-in snapshots. All 16 clips run through engine → rules → recorder. Tests also cover rounding, both movement directions, limits, malformed input, reset, repeated finish, index/flag mismatches, and a full manual workout saved locally and undone.
 
-`npx tsc --noEmit` passes without output. `npx expo lint` retains the baseline failure:
-
-```text
-src/models/modelUpdates.ts
-  16:40  error  Unable to resolve path to module 'expo-file-system'  import/no-unresolved
-✖ 9 problems (1 error, 8 warnings)
-```
+`npm run typecheck` passes. `npm run lint` reports 0 errors and 8 existing warnings.
 
 From the root, `node --test specs/*.test.mjs`:
 
@@ -93,11 +87,11 @@ Initial Spark runs failed because Java 25 cannot run this Hadoop code and then b
 From `apps/api`, `npm test`:
 
 ```text
-Test Files  18 passed (18)
-     Tests  259 passed (259)
+Test Files  20 passed (20)
+     Tests  285 passed (285)
 ```
 
-`npm run typecheck`, `npm run lint`, Prettier checks on touched API files, and `git diff --check` pass. The API tests cover schema parity for all 17 set fixtures, required fields and bounds, stored aggregates and flags, sparse indices, null quality, server-only clean scoring, gzip/pseudonymisation and retry rebuilding without frames. Migration tests apply all migrations on a fresh PGlite database and upgrade populated `0006` data, checking that existing mode values and aggregates survive and that mode becomes required.
+`npm run typecheck`, `npm run lint`, Prettier checks on touched API files, and `git diff --check` pass. The API tests cover schema parity for all 17 set fixtures, required fields and bounds, stored aggregates and flags, sparse indices, null quality, server-only clean scoring, gzip/pseudonymisation and retry rebuilding without frames. Migration tests apply all migrations on a fresh PGlite database and upgrade populated `0006` and `0007` data, checking that existing mode values and aggregates survive and that mode becomes required.
 
 No live API request, cloud model invocation, Neon migration or Databricks deployment was performed. Device recording, Hermes performance and production Auto Loader remain unverified.
 
@@ -108,7 +102,7 @@ No live API request, cloud model invocation, Neon migration or Databricks deploy
 - Frames stop accumulating at the cap; later rep aggregates can have no matching exported frames. There is no truncation field in version 1.
 - The API's joint storage is in memory. A restart or retention expiry can leave an aggregate-only retry; Neon still contains no per-frame joints.
 - Session inference mode cannot represent a source change mid-session. Existing `on_device` history is migrated to `coreml` without recovering whether Apple Vision was originally used.
-- #113 remains a migration integration dependency: whichever branch merges later must regenerate its migration and snapshot on the then-current main.
+- #113 is integrated: its `0007_db12_rehab` migration and snapshot are preserved, and AI-08's migration/snapshot are regenerated as `0008`. Upgrade coverage includes populated databases through both `0006` and `0007`.
 - Canonical JSON rejects extra properties; the API strips them for compatibility. The API also checks timestamp syntax and cross-field relationships beyond the JSON Schema's structural constraints.
 - On native platforms the existing local workout history is in memory; this change does not add persistent manual-workout storage.
 

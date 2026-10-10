@@ -13,15 +13,21 @@ It also fixes what device testing on an iPhone turned up:
 
 Branched from `main` after #104 (AI-06) merged.
 
+## After merge
+
+- For each deployed Neon branch/environment that serves exercise specs, select its database connection, then run `npm run db:load-specs` from `apps/api`. Check `GET /exercises/shoulder_press/spec` for the `arm_raise` gate, target 150 and tempo 600, and the squat/lunge specs for side-only depth. The reload upserts spec content and updates the timestamp used by `Last-Modified`.
+- `spec_version: 1` identifies the schema format, not an exercise-content revision. INT-07 (#91) must use content modification metadata or a content revision/hash to detect updates.
+- Review follow-ups intentionally left open: unjudged-rep medal eligibility (#115), intentional-hold policy (#116), range-rule override merging (#117), and timing across jump rejections (#118). The current clean definition, still-end policy, override merge and active-time pause behavior remain until those coordinated changes land.
+
 ## What the rules produce
 
 | Consumer | Gets | Where |
 |---|---|---|
-| FE-06 amber tint | The flagged rules' `joints` for the rep that just closed. They clear on the next `rep_started` or at set end. | `useFormRules(spec).tintJoints` |
+| FE-06 amber tint | The flagged rules' `joints` for the rep that just closed. A next `rep_started` clears them after a minimum 300 ms; set end clears immediately. | `useFormRules(spec).tintJoints` |
 | INT-02 live set | `onEvent`, chained from `useFormEngine`'s `onEvent`. `summary` and `onSetFlags` fire once the set ends. | `useFormRules` |
 | AI-08 / INT-01 set record | `SetFlags`: `flags` (0-based `rep_index`), every rep's `RepResult` (each rule's status and value, detected view), `total_reps`, `clean_reps` and `reason` | `createSetRules(spec).handle(e)` |
 | INT-06 clean / medal | A rep is clean when `RepResult.flags` is empty. The rules run on the effective spec, so clean means "within your limits". | `RepResult`, `SetFlags.clean_reps` |
-| BE-07 / AI-11 rest note | Per-rule `n`, `evaluated` and `mean_value`, the `top` rule by priority, and the injury `extra_notes`. `restNote()` fills `{n}`, `{total}`, `{value}` and `{t}` for the phone's fixed fallback. | `SetFlags.rules`, `restNote(spec, set)` |
+| BE-07 / AI-11 rest note | Per-rule `n`, `evaluated` and `mean_value`, the `top` rule by safety severity then priority, and the injury `extra_notes`. `restNote()` fills `{n}`, `{total}`, `{value}` and `{t}` for the phone's fixed fallback. | `SetFlags.rules`, `restNote(spec, set)` |
 | INT-07 / AI-16 limits | `applyInjuries(spec, injuries)` returns an `EffectiveSpec`. A generated rule such as `physio_limit` added to `spec.rules` is evaluated like any other. | `overrides.ts` |
 
 ## Changes
