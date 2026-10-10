@@ -1,0 +1,132 @@
+// DB-06: social graph behind the feed (§9.2 Social, §12). DB-09: buddy matches.
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  check,
+  index,
+  jsonb,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  real,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { users } from "./users.js";
+import { sessions } from "./workouts.js";
+
+export const postKind = pgEnum("post_kind", ["session", "pr", "medal", "goal", "advice"]);
+export const buddyStatus = pgEnum("buddy_status", ["requested", "accepted", "declined"]);
+
+export const posts = pgTable(
+  "posts",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    authorId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: postKind().notNull(),
+    body: text().notNull(),
+    sessionId: uuid().references(() => sessions.id, { onDelete: "set null" }),
+    data: jsonb(), // card payload: medal tier, PR value, goal progress
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Keyset pagination: ORDER BY created_at DESC, id DESC.
+    index("posts_created_idx").on(t.createdAt.desc(), t.id.desc()),
+    index("posts_author_created_idx").on(t.authorId, t.createdAt.desc(), t.id.desc()),
+  ],
+);
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    postId: uuid()
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    // Null for AI-suggested answers (BE-11).
+    authorId: text().references(() => users.id, { onDelete: "cascade" }),
+    body: text().notNull(),
+    aiSuggested: boolean().notNull().default(false),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("comments_post_created_idx").on(t.postId, t.createdAt)],
+);
+
+export const kudos = pgTable(
+  "kudos",
+  {
+    postId: uuid()
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+
+export const follows = pgTable(
+  "follows",
+  {
+    followerId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    followeeId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.followerId, t.followeeId] }),
+    index("follows_followee_idx").on(t.followeeId),
+    check("follows_not_self", sql`${t.followerId} <> ${t.followeeId}`),
+  ],
+);
+
+// §12 safety: blocked users never appear in each other's feed or buddy suggestions.
+export const blocks = pgTable(
+  "blocks",
+  {
+    blockerId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    blockedId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.blockerId, t.blockedId] }), index("blocks_blocked_idx").on(t.blockedId)],
+);
+
+export const buddyMatches = pgTable(
+  "buddy_matches",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    aId: text() // requester
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bId: text() // recipient
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    score: real().notNull(),
+    status: buddyStatus().notNull().default("requested"),
+    reasons: jsonb().notNull().default([]),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // One row per pair, whichever side asked first.
+    uniqueIndex("buddy_matches_pair_uq").using(
+      "btree",
+      sql`least(${t.aId}, ${t.bId})`,
+      sql`greatest(${t.aId}, ${t.bId})`,
+    ),
+    index("buddy_matches_b_idx").on(t.bId),
+    check("buddy_matches_not_self", sql`${t.aId} <> ${t.bId}`),
+  ],
+);
