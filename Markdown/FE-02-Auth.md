@@ -42,12 +42,16 @@ Each request obtains a current JWT and attaches `Authorization: Bearer <JWT>` on
 
 ## Verification
 
-- Jest: 10 suites, 71 tests passed, including existing pose tests and auth/session concurrency regressions.
+- Jest: 13 suites, 93 tests passed, including existing pose tests and auth/session concurrency regressions.
 - TypeScript: passed.
 - ESLint on changed auth, routing, Me, and training files: passed.
 - Full source lint has existing pose render-time ref errors in `PoseDebugScreen.tsx` and `usePoseOutput.ts`; pose code was left intact.
 - Expo export passed for web, iOS, and Android, including 15 static web routes. This is separate from a signed native build and does not prove installation or SecureStore behavior on an iPhone.
 - Browser visual inspection was blocked by the browser tool's security policy; no visual verification is claimed.
+
+## Integration with main
+
+Merged main at `8786108`, preserving AI-04 pose benchmark work and `react-native-mmkv`. The owner approved regenerating the conflicting lockfile while keeping both dependency sets. `pnpm install` via Expo succeeded. pnpm 11.25.0 is the declared package manager. The secondary npm lock was regenerated with `npm install --package-lock-only --ignore-scripts --legacy-peer-deps` because npm automatically selected an optional Reanimated version requiring worklets 0.13.x, while pose code pins worklets 0.10.1. Use pnpm for installs; its lock resolves the compatible optional Reanimated 4.5.1. No direct dependency or pose version was removed.
 
 ## Pending live acceptance
 

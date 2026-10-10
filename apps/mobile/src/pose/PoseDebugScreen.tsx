@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Linking, Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { PoseSkeleton } from './PoseSkeleton';
 import type { PoseDetection } from './types';
 import { isBasicModeSupported } from './basic';
 import { usePoseOutput, type PoseEngine } from './usePoseOutput';
+import { usePoseMode, type PoseModeState } from './usePoseMode';
 
 type Size = { width: number; height: number };
 
@@ -13,8 +14,10 @@ const uprightSize = (r: Size | undefined): Size | null =>
   r ? { width: Math.min(r.width, r.height), height: Math.max(r.width, r.height) } : null;
 
 /**
- * Debug screen: full-screen camera, live skeleton, and fps / latency / score / model / drop readout.
- * On iPhone, a toggle switches between YOLOv8 (Core ML) and Apple Vision (basic mode) to compare them.
+ * Debug screen: full-screen camera, live skeleton, and fps / latency / score / model / drop readout,
+ * plus the pose mode, benchmark and cloud consent. Stands in for settings until a real screen exists:
+ * it re-runs the benchmark, toggles consent, and on iPhone switches the preference between automatic
+ * (YOLOv8) and Apple Vision (basic mode).
  */
 export function PoseDebugScreen() {
   const { hasPermission, canRequestPermission, requestPermission } = useCameraPermission();
@@ -49,8 +52,26 @@ export function PoseDebugScreen() {
 }
 
 function PoseCamera() {
+  const poseMode = usePoseMode();
   const [position, setPosition] = useState<'front' | 'back'>('front');
-  const [engine, setEngine] = useState<PoseEngine>('coreml');
+  // The camera's detector would compete with the benchmark for the Neural Engine, so it is unmounted.
+  if (poseMode.benchmarking) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.message}>Benchmarking…</Text>
+      </View>
+    );
+  }
+  return <LiveCamera poseMode={poseMode} position={position} setPosition={setPosition} />;
+}
+
+function LiveCamera({ poseMode, position, setPosition }: {
+  poseMode: PoseModeState;
+  position: 'front' | 'back';
+  setPosition: Dispatch<SetStateAction<'front' | 'back'>>;
+}) {
+  const { mode, benchmark, size, preference, setPreference, cloudConsent, setCloudConsent, needsCloudConsent } = poseMode;
+  const engine: PoseEngine = mode === 'vision' ? 'vision' : 'coreml';
   const device = useCameraDevice(position);
   const [detection, setDetection] = useState<PoseDetection | null>(null);
   const [viewSize, setViewSize] = useState<Size | null>(null);
@@ -63,7 +84,7 @@ function PoseCamera() {
     setDetection(d);
     setImageSize((s) => s ?? uprightSize(frameOutputRef.current?.currentResolution));
   }, []);
-  const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size: 320, maxFps: 15, onPose });
+  const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size, maxFps: 15, onPose });
   frameOutputRef.current = frameOutput;
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
@@ -76,12 +97,12 @@ function PoseCamera() {
     setImageSize(null);
     setCameraError(null);
     setPosition((p) => (p === 'front' ? 'back' : 'front'));
-  }, []);
+  }, [setPosition]);
 
   const toggleEngine = useCallback(() => {
     setDetection(null);
-    setEngine((e) => (e === 'coreml' ? 'vision' : 'coreml'));
-  }, []);
+    setPreference(preference === 'vision' ? 'auto' : 'vision');
+  }, [preference, setPreference]);
 
   const onConfigured = useCallback(() => {
     setImageSize(uprightSize(frameOutput.currentResolution));
@@ -90,7 +111,8 @@ function PoseCamera() {
 
   const mirrored = position === 'front';
   const result = detection?.result;
-  const banner = [error, cameraError].filter(Boolean).join('\n');
+  const benchmarkError = benchmark?.error ? `benchmark: ${benchmark.error}` : null;
+  const banner = [error, cameraError, benchmarkError].filter(Boolean).join('\n');
 
   return (
     <View style={styles.container} onLayout={onLayout}>
@@ -126,6 +148,13 @@ function PoseCamera() {
         <Text style={styles.readoutText}>
           {model ?? 'no model'} · dropped {dropped}
         </Text>
+        <Text style={styles.readoutText}>
+          mode {mode} · consent {cloudConsent ? 'yes' : needsCloudConsent ? 'needed' : 'no'}
+        </Text>
+        <Text style={styles.readoutText}>
+          benchmark {benchmark?.size ?? '–'} · p95 {benchmark?.p95Ms != null ? benchmark.p95Ms.toFixed(1) : '–'} ms ·{' '}
+          {benchmark?.fps != null ? benchmark.fps.toFixed(1) : '–'} fps
+        </Text>
       </View>
 
       {banner ? (
@@ -143,6 +172,22 @@ function PoseCamera() {
           <Text style={styles.buttonText}>{engine === 'coreml' ? 'Use Apple Vision' : 'Use Core ML'}</Text>
         </Pressable>
       ) : null}
+
+      <Pressable
+        testID="pose-rerun-benchmark"
+        style={[styles.button, styles.rerun]}
+        onPress={() => { poseMode.rerunBenchmark(); }}
+      >
+        <Text style={styles.buttonText}>Re-run benchmark</Text>
+      </Pressable>
+
+      <Pressable
+        testID="pose-consent-toggle"
+        style={[styles.button, styles.consent]}
+        onPress={() => setCloudConsent(!cloudConsent)}
+      >
+        <Text style={styles.buttonText}>{cloudConsent ? 'Revoke cloud consent' : 'Allow cloud'}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -164,7 +209,7 @@ const styles = StyleSheet.create({
   readoutText: { color: '#fff', fontSize: 14, fontVariant: ['tabular-nums'] },
   banner: {
     position: 'absolute',
-    top: 120,
+    top: 160,
     left: 16,
     right: 16,
     padding: 8,
@@ -175,5 +220,7 @@ const styles = StyleSheet.create({
   button: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 24, backgroundColor: '#fff' },
   flip: { position: 'absolute', bottom: 48, alignSelf: 'center' },
   engine: { position: 'absolute', bottom: 108, alignSelf: 'center' },
+  rerun: { position: 'absolute', bottom: 168, alignSelf: 'center' },
+  consent: { position: 'absolute', bottom: 228, alignSelf: 'center' },
   buttonText: { color: '#000', fontSize: 16, fontWeight: '600' },
 });
