@@ -76,6 +76,14 @@ namespace margelo::nitro::spotterpose {
       auto __value = std::move(__result.value());
       return __value;
     }
+    inline std::shared_ptr<HybridPoseDetectorSpec> createBasicPoseDetector() override {
+      auto __result = _swiftPart.createBasicPoseDetector();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
 
   private:
     SpotterPose::HybridPoseDetectorFactorySpec_cxx _swiftPart;
