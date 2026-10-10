@@ -59,7 +59,7 @@ export function FeatureScreen(props: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <Head><title>{props.section} · Spotter</title></Head>
+      <Head><title>{props.section} · Steady forum</title></Head>
       <ScrollView ref={scroll} contentContainerStyle={styles.scroll}>
         <View style={[styles.hero, { minHeight: Math.max(compact ? 710 : 640, height - 70) }]}>
           <Animated.Image
@@ -85,8 +85,8 @@ export function FeatureScreen(props: Props) {
             { opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] },
           ]}>
             <Text accessibilityRole="header" style={[
-              styles.brand, { fontSize: compact ? Math.min(96, width * 0.245) : 150, lineHeight: compact ? 112 : 170 },
-            ]}>spotter<Text style={styles.brandDot}>.</Text></Text>
+              styles.brand, { fontSize: compact ? Math.min(56, width * 0.13) : 94, lineHeight: compact ? 66 : 108 },
+            ]}>Steady forum</Text>
             <Text accessibilityRole="header" style={[
               styles.title, { fontSize: compact ? 30 : 43, lineHeight: compact ? 36 : 50, maxWidth: compact ? 330 : 470 },
             ]}>{props.title}</Text>
@@ -135,7 +135,6 @@ const styles = StyleSheet.create({
   photo: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   heroCopy: { alignItems: 'flex-start', gap: 22 },
   brand: { fontFamily: type.display, color: palette.primary, letterSpacing: -2, marginLeft: -2 },
-  brandDot: { color: '#75C8F0' },
   title: { fontFamily: type.strong, color: palette.text, letterSpacing: -1.2 },
   description: { fontFamily: type.family, fontSize: 17, lineHeight: 26, color: palette.muted },
   action: { minHeight: 52, paddingVertical: 14, paddingHorizontal: 24, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 16 },

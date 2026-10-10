@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Head from 'expo-router/head';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { colors as c, typography as t } from '@/theme/tokens';
 import { GlassChoice } from './GlassChoice';
@@ -25,9 +26,10 @@ export function SetupPage({ children, step, total, eyebrow, title, intro, action
     animation.start(); return () => animation.stop();
   }, [step, reduced, entrance]);
   return <LinearGradient colors={['#FFFFFF', '#F4FAFE', '#DFEFF9']} style={s.fill}>
+    <Head><title>{title} · Steady forum</title></Head>
     <SafeAreaView style={s.fill} edges={['top', 'bottom', 'left', 'right']}>
       <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={s.header}><Text style={s.brand}>spotter<Text style={{ color: c.primary }}>.</Text></Text><GlassChoice label="Back" onPress={onBack} compact /></View>
+        <View style={s.header}><Text style={s.brand}>Steady forum</Text><GlassChoice label="Back" onPress={onBack} compact /></View>
         <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={s.scroll}>
           <View style={[s.progress, compact && { marginBottom: 12 }]} accessibilityLabel={`Step ${step + 1} of ${total}`}>
             {Array.from({ length: total }, (_, i) => <View key={i} style={[s.progressPart, i <= step && { backgroundColor: c.primary }]} />)}
@@ -46,7 +48,7 @@ export function SetupPage({ children, step, total, eyebrow, title, intro, action
 }
 const s = StyleSheet.create({
   fill: { flex: 1 }, header: { width: '100%', maxWidth: 620, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 12, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
-  brand: { fontFamily: t.strong, fontSize: 42, letterSpacing: -1.6, color: c.text },
+  brand: { fontFamily: t.strong, fontSize: 32, flexShrink: 1, letterSpacing: -1.1, color: c.text },
   scroll: { width: '100%', maxWidth: 620, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 22, paddingBottom: 32 },
   progress: { flexDirection: 'row', gap: 7, marginBottom: 28 }, progressPart: { height: 3, flex: 1, borderRadius: 2, backgroundColor: c.border },
   eyebrow: { fontFamily: t.label, fontSize: 12, letterSpacing: 1.8, color: c.primary, textTransform: 'uppercase', marginBottom: 10 },

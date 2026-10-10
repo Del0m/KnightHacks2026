@@ -11,10 +11,10 @@ export function AppPage({ children, title = 'Train', intro, compact = false, hea
   const reduced = useReducedMotion(), [entrance] = useState(() => new Animated.Value(1));
   useEffect(() => { if (reduced !== false) return; entrance.setValue(0); const a = Animated.timing(entrance, { toValue: 1, duration: 450, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }); a.start(); return () => a.stop(); }, [entrance, reduced]);
   return <PageColors.Provider value={colors}><LinearGradient colors={['#FFFFFF', colors.background, colors.primarySoft]} style={{ flex: 1 }}>
-    <Head><title>{title} · Spotter</title></Head>
+    <Head><title>{title} · Steady forum</title></Head>
     <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}><ScrollView contentContainerStyle={ui.scroll}>
       <Animated.View style={[ui.content, compact && { gap: 8 }, { opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [7, 0] }) }] }]}>
-        <View style={ui.brandRow}><Text accessibilityRole="header" style={ui.brand}>spotter<Text style={{ color: colors.primary }}>.</Text></Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, flexShrink: 1 }}>{title !== 'Train' && <Text style={ui.sectionName}>{title}</Text>}{headerAction}</View></View>
+        <View style={ui.brandRow}><Text accessibilityRole="header" style={ui.brand}>Steady forum</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, flexShrink: 1 }}>{title !== 'Train' && <Text style={ui.sectionName}>{title}</Text>}{headerAction}</View></View>
         {intro && <Text style={ui.pageTitle} accessibilityRole="header">{intro}</Text>}{children}
       </Animated.View>
     </ScrollView></SafeAreaView>
