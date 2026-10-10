@@ -134,13 +134,15 @@ Required order:
 
 - **`view`:** the camera view is detected per rep from how far apart the shoulders and hips are across the image, relative to torso length. When it's unclear, only `any` rules run. The app can also pass the view in, for example from the setup screen, and that takes priority.
 - **Missing data:** the check reduces over the frames where the metric could be measured. If that's under half the phase's frames, the rule is skipped for that rep (no flag).
-- **Primary-angle depth and lockout:** a `peak` check using `min` for a decreasing primary angle or `max` for an increasing one reads the whole movement through the rep count. This keeps a fast turn that happened before the minimum state time, while excluding the settle tail. Other checks read their phase's frames.
+- **Primary-angle depth and lockout:** a `peak` check using `min` for a decreasing primary angle or `max` for an increasing one reads the whole movement through the rep count. This keeps a fast turn that happened before the minimum state time, while excluding the settle tail. For gated specs, only gate-passing frames supply the extreme, primary-angle depth/lockout values and the turn used for phase durations; an arms-down rest cannot supply an overhead lockout. Other checks read their phase's frames.
 - **`mid_` points:** within a phase, the check uses only frames where the midpoint was taken the same way as in most of them (from both sides, or from one), so a hip dropping out mid-rep can't add a jump.
 - **Rules not in the file** (such as physio limits) are evaluated the same way.
 
 Full behaviour: [form rules design](../superpowers/specs/2026-10-10-form-rules-design.md).
 
 **Runtime validation:** `createFormEngine` and `createSetRules` reject invalid evaluation settings with an `Invalid exercise spec` error before starting a set. Checks cover finite phase thresholds and their order, primary-angle and gate references, rule metric references, comparisons, reductions and threshold values. `evaluateRule` also checks its rule and resolves only finite thresholds before view gating or comparison, so a missing `target` cannot become a form flag. Callers receiving server or generated effective specs can call `assertEvaluationSpec` before activating them and handle the error as a spec-loading failure. These runtime checks complement the full schema, override and note checks in `node specs/validate.mjs`; they do not replace them.
+
+`useFormEngine` and `useFormRules` catch construction failures and return `error: Error | null`. With an error, their input callbacks do nothing and their published state is empty; supplying a valid spec clears the error and starts fresh evaluation. They never substitute an unrestricted bundled spec for invalid injury or physio limits. The spec-loading UI can offer a retry or a validated fallback that retains those limits. The debug screen displays the error instead of crashing.
 
 Placeholders in `rest_note`:
 

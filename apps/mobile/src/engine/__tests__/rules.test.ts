@@ -145,6 +145,19 @@ describe('phaseDuration', () => {
       expect(evaluateRule(spec, r, rep, 'side')).toEqual({ rule_id: 'tempo', status: ms >= 800 ? 'pass' : 'flag', value: ms, threshold: 800 });
     }
   });
+
+  it('ignores gate-failing frames even when they match the qualified extreme', () => {
+    const gated = { ...spec, primary_angle: { ...spec.primary_angle, gate: { metric: 'trunk', op: '<=' as const, value: 45 } } };
+    const rep = makeRep([
+      { t: 0, phase: 'outbound', m: { knee: 150, trunk: 60 } },
+      { t: 100, phase: 'outbound', m: { knee: 90, trunk: 60 } },
+      { t: 1000, phase: 'peak', m: { knee: 90, trunk: 10 } },
+      { t: 2000, phase: 'return', m: { knee: 166, trunk: 10 } },
+    ]);
+    expect(phaseDuration(gated, rep, 'outbound')).toBe(1000);
+    expect(phaseDuration(gated, rep, 'peak')).toBe(0);
+    expect(phaseDuration(gated, rep, 'return')).toBe(1000);
+  });
 });
 
 describe('evaluateRule', () => {

@@ -73,6 +73,8 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
   let peakAt: number;
   let returnAt: number;
   let extreme: number;
+  /** Whether the extreme came from a gate-passing frame in this attempt. */
+  let hasQualifiedExtreme: boolean;
   /** Range was reached on a frame whose primary gate passed, even before the dwell expired. */
   let qualifiedRange: boolean;
   let tail: Tail | null;
@@ -92,6 +94,7 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
     peakAt = 0;
     returnAt = 0;
     extreme = 0;
+    hasQualifiedExtreme = false;
     qualifiedRange = false;
     tail = null;
     still = null;
@@ -177,7 +180,10 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
       }
     }
 
-    if (state !== 'start' && deeper(v, extreme)) extreme = v;
+    if (state !== 'start' && gate && (!hasQualifiedExtreme || deeper(v, extreme))) {
+      extreme = v;
+      hasQualifiedExtreme = true;
+    }
     if (state === 'outbound' && gate && deeper(v, phases.count_min)) qualifiedRange = true;
 
     switch (state) {
@@ -189,6 +195,7 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
           enter('outbound');
           startedAt = t;
           extreme = v;
+          hasQualifiedExtreme = gate;
           qualifiedRange = gate && deeper(v, phases.count_min);
           events.push({ type: 'rep_started', t, attempt });
         }

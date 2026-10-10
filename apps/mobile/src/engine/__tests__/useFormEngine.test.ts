@@ -19,10 +19,30 @@ function mount(spec: ExerciseSpec | null, onEvent?: (e: EngineEvent) => void) {
   }
   let renderer: ReturnType<typeof create>;
   act(() => { renderer = create(React.createElement(Probe, { s: spec })); });
-  return { latest, renders: () => renders, renderer: renderer! };
+  const rerender = (s: ExerciseSpec | null) => act(() => renderer.update(React.createElement(Probe, { s })));
+  return { latest, renders: () => renders, renderer: renderer!, rerender };
 }
 
 describe('useFormEngine', () => {
+  it('exposes invalid-spec errors without rendering or counting with unrestricted limits', () => {
+    const valid = getSpec('squat')!;
+    const bad = { ...valid, phases: { ...valid.phases, target: 150 } };
+    const events: EngineEvent[] = [];
+    const { latest, renderer, rerender } = mount(bad, (e) => events.push(e));
+    expect(latest.current!.error?.message).toMatch(/Invalid exercise spec/);
+    for (const f of clip.frames) act(() => latest.current!.onPose(isAbsentFrame(f) ? { latencyMs: 5 } : { result: f, latencyMs: 5 }));
+    act(() => { latest.current!.endSet(); latest.current!.reset(); });
+    expect(latest.current).toMatchObject({ repCount: 0, primary: null, ended: false });
+    expect(events).toEqual([]);
+    rerender(valid);
+    expect(latest.current!.error).toBeNull();
+    for (const f of clip.frames) act(() => latest.current!.onPose(isAbsentFrame(f) ? { latencyMs: 5 } : { result: f, latencyMs: 5 }));
+    expect(latest.current!.repCount).toBe(clip.expected!.reps);
+    rerender(bad);
+    expect(latest.current!.error).not.toBeNull();
+    expect(latest.current).toMatchObject({ repCount: 0, primary: null, state: 'start' });
+    act(() => renderer.unmount());
+  });
   it('counts reps from detections and forwards events', () => {
     const events: EngineEvent[] = [];
     const { latest, renders, renderer } = mount(getSpec('squat')!, (e) => events.push(e));

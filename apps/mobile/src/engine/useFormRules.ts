@@ -3,6 +3,8 @@ import { createSetRules, type SetRules } from './rules';
 import type { EffectiveSpec, EngineEvent, ExerciseSpec, RepResult, SetFlags, View } from './types';
 
 export interface FormRulesState {
+  /** Invalid effective spec: evaluation is disabled until a valid spec is supplied. */
+  error: Error | null;
   /** Chain from `useFormEngine`'s `onEvent`. */
   onEvent: (e: EngineEvent) => void;
   /** The last closed rep's flagged joints; [] after `rep_started`, `set_ended` or `reset`. */
@@ -40,7 +42,13 @@ export function useFormRules(
     onSetFlagsRef.current = onSetFlags;
   }, [onSetFlags]);
 
-  const rules = useMemo(() => (spec ? createSetRules(spec, { view }) : null), [spec, view]);
+  const { rules, error } = useMemo(() => {
+    try {
+      return { rules: spec ? createSetRules(spec, { view }) : null, error: null };
+    } catch (cause) {
+      return { rules: null, error: cause instanceof Error ? cause : new Error(String(cause)) };
+    }
+  }, [spec, view]);
   const [published, setPublished] = useState<Published>(() => empty(rules));
   const current = published.rules === rules ? published : empty(rules);
   // Whether a tint may be showing, so clearing an empty tint doesn't even queue an update.
@@ -83,5 +91,5 @@ export function useFormRules(
     );
   }, [rules]);
 
-  return { onEvent, tintJoints: current.tintJoints, lastRep: current.lastRep, summary: current.summary, reset };
+  return { error, onEvent, tintJoints: current.tintJoints, lastRep: current.lastRep, summary: current.summary, reset };
 }

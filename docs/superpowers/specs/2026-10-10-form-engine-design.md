@@ -130,7 +130,7 @@ interface RepCounter {
 | `return` | `shallower(v, start_enter)` (gated) | `start` | `repCount++`, `rep_counted {index: repCount}`, `countedAt = t`, open the settle tail |
 
 **More rules:**
-- **Extreme:** it updates whenever `deeper(v, extreme)` in `outbound`, `peak` or `return`. Going deeper again during `return` doesn't change the state.
+- **Extreme:** only gate-passing frames in `outbound`, `peak` or `return` supply it (all measured frames for an ungated spec). The first passing frame replaces any unqualified starting value; later deeper passing frames update it. Going deeper again during `return` doesn't change the state.
 - **`stateMs` reset:** entering a state sets `stateMs = 0`, and the frame that entered it adds no time.
 
 **Settle tail.** It runs from the count until the rep closes. Rule windows keep collecting frames as the `return` window.

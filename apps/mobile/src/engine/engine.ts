@@ -2,6 +2,7 @@ import type { PoseResult } from '../pose/types';
 import { createMetricComputer } from './angles';
 import { JointSmoother } from './oneEuro';
 import { createRepCounter } from './repCounter';
+import { gatePasses } from './gate';
 import { assertEvaluationSpec } from './validation';
 import type {
   CounterStep,
@@ -12,7 +13,6 @@ import type {
   ExerciseSpec,
   Metrics,
   MetricSides,
-  PrimaryGate,
   RepRecord,
   RepTiming,
   RepWindows,
@@ -49,23 +49,6 @@ export const MAX_PRIMARY_DEG_PER_S = 720;
 const MAX_REJECTIONS = 3;
 /** Floor on the time between frames for the rate, ms, so near-duplicate timestamps don't spike it. */
 const MIN_RATE_DT_MS = 33;
-
-/** Whether `spec.primary_angle.gate` passes on these metrics. No gate always passes. */
-function gatePasses(gate: PrimaryGate | undefined, metrics: Metrics): boolean {
-  if (!gate) return true;
-  const v = metrics[gate.metric];
-  if (v === null || v === undefined) return false;
-  switch (gate.op) {
-    case '<=':
-      return v <= gate.value;
-    case '>=':
-      return v >= gate.value;
-    case '<':
-      return v < gate.value;
-    case '>':
-      return v > gate.value;
-  }
-}
 
 /**
  * Turns a stream of poses into reps for one exercise: One Euro smoothing, the spec's metrics, and

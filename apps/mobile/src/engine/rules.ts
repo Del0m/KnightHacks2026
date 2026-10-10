@@ -20,6 +20,7 @@ import type {
   View,
 } from './types';
 import { detectView } from './view';
+import { gatePasses } from './gate';
 import { assertEvaluationSpec, ruleThreshold } from './validation';
 
 /** A frame within this many degrees of the rep's extreme counts as at the extreme. */
@@ -39,7 +40,7 @@ export function phaseDuration(spec: ExerciseSpec, rep: RepRecord, phase: RulePha
   const name = spec.primary_angle.name;
   const near = rep.windows.rep.filter((f) => {
     const p = f.metrics[name];
-    return f.t <= rep.countedAt && p != null && Math.abs(p - rep.extreme) <= NEAR_EXTREME_DEG;
+    return f.t <= rep.countedAt && gatePasses(spec.primary_angle.gate, f.metrics) && p != null && Math.abs(p - rep.extreme) <= NEAR_EXTREME_DEG;
   });
   if (near.length === 0) return rep.durations[phase];
   const firstNear = near[0].t;
@@ -93,7 +94,7 @@ function windowValue(spec: ExerciseSpec, rule: Rule, rep: RepRecord): number | n
     metric === spec.primary_angle.name &&
     rule.check.reduce === (spec.primary_angle.direction === 'decreasing' ? 'min' : 'max');
   const frames = primaryExtreme
-    ? rep.windows.rep.filter((f) => f.t <= rep.countedAt)
+    ? rep.windows.rep.filter((f) => f.t <= rep.countedAt && gatePasses(spec.primary_angle.gate, f.metrics))
     : rep.windows[rule.phase];
   let valid = frames.filter((f) => f.metrics[metric] != null);
   if (valid.length === 0 || valid.length < MIN_COVERAGE * frames.length) return null;

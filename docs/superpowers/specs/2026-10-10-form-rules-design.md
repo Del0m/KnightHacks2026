@@ -84,7 +84,7 @@ export function evaluateRep(spec: ExerciseSpec, rep: RepRecord, opts?: { view?: 
 4. **Status:** `pass` when `value op threshold` holds, otherwise `flag`. No tolerance.
 
 **`duration_ms` (`phaseDuration`).** The engine's `durations.outbound` ends at `count_min`, which is only part of the way down, so AI-07 measures phase time from the frames instead. `rep.durations` is left as it is.
-- Let `p` be `metrics[spec.primary_angle.name]` on each frame of `rep.windows.rep` with `t <= rep.countedAt`.
+- Let `p` be `metrics[spec.primary_angle.name]` on each frame of `rep.windows.rep` with `t <= rep.countedAt` and a passing primary gate (every measured frame for an ungated spec). The counter's `rep.extreme` uses the same gate, so a rest position cannot supply the turn or tempo.
 - **`firstNear`:** the first such frame with `|p − rep.extreme| <= NEAR_EXTREME_DEG`.
 - **`lastNear`:** the last such frame with `|p − rep.extreme| <= NEAR_EXTREME_DEG`.
 
@@ -99,7 +99,7 @@ These add up to the rep. A pause at the bottom isn't counted as lowering. If no 
 
 **Reducing a window** (any metric other than `duration_ms`):
 1. **Window:** `frames = rep.windows[rule.phase]`. Take `valid`, the frames where `metrics[metric]` is not null.
-   - For a `peak` check of the primary angle's movement extreme (`min` for decreasing, `max` for increasing), use `rep.windows.rep` through `countedAt`. The minimum state time can keep the true turn in `outbound`; the settle tail after the count is excluded. Other metrics and reductions still use their phase window.
+   - For a `peak` check of the primary angle's movement extreme (`min` for decreasing, `max` for increasing), use the gate-passing frames of `rep.windows.rep` through `countedAt`. The minimum state time can keep the true turn in `outbound`; gate-failing rest positions and the settle tail after the count are excluded. Other metrics and reductions still use their phase window.
 2. **Coverage:** if `valid.length === 0` or `valid.length < MIN_COVERAGE × frames.length`, the outcome is `unmeasured` with `value: null`.
 3. **`mid_` basis:** this applies only when the metric's angle spec uses `mid_` points (`joints`, or `from`/`to`).
    - A frame is two-sided when, for every `mid_<base>` the metric uses, both `left_<base>` and `right_<base>` are non-null in `frame.joints` (index by `JOINT_NAMES`).
@@ -176,6 +176,7 @@ export function useFormRules(spec: ExerciseSpec | EffectiveSpec | null, opts?: {
 ```
 
 - **Lifetime:** one `SetRules` per `spec` and `view`, rebuilt when either changes. `onSetFlags` is read through a ref.
+- **Invalid spec:** returns `error: Error | null` instead of throwing during render. With an error, `onEvent` is inactive, there is no tint, rep or summary, and `onSetFlags` does not fire. A valid replacement clears the error and starts fresh. `useFormEngine` follows the same policy for poses and counts. Neither hook silently removes injury or physio limits by selecting a base spec.
 - **Re-renders:** only when `tintJoints`, `lastRep` or `summary` change.
 
 ## 7. Engine changes (AI-06 follow-ups)

@@ -47,6 +47,24 @@ function mount(spec: ExerciseSpec | null, opts: { view?: View; onSetFlags?: (s: 
 }
 
 describe('useFormRules', () => {
+  it('exposes invalid-spec errors and resumes only when given valid limits', () => {
+    const bad = { ...squat, phases: { ...squat.phases, target: 150 } };
+    const got: SetFlags[] = [];
+    const { latest, send, rerender, renderer } = mount(bad, { onSetFlags: (s) => got.push(s) });
+    expect(latest.current!.error?.message).toMatch(/Invalid exercise spec/);
+    send(closed(squatRep(1, 90, 60)));
+    send({ type: 'set_ended', t: 9000, reason: 'manual' });
+    expect(latest.current).toMatchObject({ tintJoints: [], lastRep: null, summary: null });
+    expect(got).toEqual([]);
+    rerender(squat);
+    expect(latest.current!.error).toBeNull();
+    send(closed(squatRep(1, 90, 60)));
+    expect(latest.current!.lastRep!.flags).toHaveLength(1);
+    rerender(bad);
+    expect(latest.current!.error).not.toBeNull();
+    expect(latest.current).toMatchObject({ tintJoints: [], lastRep: null, summary: null });
+    act(() => renderer.unmount());
+  });
   it('tints a flagged rep until the next rep starts', () => {
     const { latest, send, renders, renderer } = mount(squat);
     send({ type: 'rep_started', t: 0 });
