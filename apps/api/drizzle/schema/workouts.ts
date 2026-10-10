@@ -36,6 +36,8 @@ export const sessions = pgTable(
     formScore: real(), // clean reps / total reps, set on finish
     exportStatus: exportStatus().notNull().default("pending"),
     exportError: text(),
+    exportAttempts: integer().notNull().default(0),
+    exportStartedAt: timestamp({ withTimezone: true }),
     exportedAt: timestamp({ withTimezone: true }),
   },
   (t) => [index("sessions_user_started_idx").on(t.userId, t.startedAt.desc())],

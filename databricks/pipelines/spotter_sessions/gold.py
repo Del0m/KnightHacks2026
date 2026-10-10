@@ -61,21 +61,23 @@ def gold_user_progress_daily():
         F.sum(F.col("reps") * F.coalesce("weight_kg", F.lit(0.0))).alias("volume_kg"),
         F.max("est_1rm_kg").alias("est_1rm_kg"),
     )
+    scored = ~F.array_contains(F.col("flags"), "manual_unscored")
     per_rep = reps.groupBy("user_id", "session_date", "exercise_id").agg(
         F.count("*").alias("reps"),
-        F.sum(F.col("is_clean").cast("int")).alias("clean_reps"),
-        F.avg("range_deg").alias("avg_range_deg"),
-        F.avg("quality").alias("avg_quality"),
+        F.count(F.when(scored, 1)).alias("scored_reps"),
+        F.sum(F.when(scored, F.col("is_clean").cast("int"))).alias("clean_reps"),
+        F.avg(F.when(scored, F.col("range_deg"))).alias("avg_range_deg"),
+        F.avg(F.when(scored, F.col("quality"))).alias("avg_quality"),
         F.avg("asymmetry").alias("avg_asymmetry"),
     )
     history = Window.partitionBy("user_id", "exercise_id").orderBy("session_date") \
         .rowsBetween(Window.unboundedPreceding, -1)
     return per_rep.join(per_set, ["user_id", "session_date", "exercise_id"]).select(
         "*",
-        (F.col("clean_reps") / F.col("reps")).alias("clean_share"),
+        F.try_divide("clean_reps", "scored_reps").alias("clean_share"),
         (F.col("est_1rm_kg") > F.coalesce(F.max("est_1rm_kg").over(history), F.lit(0.0)))
         .alias("is_pr"),
-    )
+    ).drop("scored_reps")
 
 
 @dp.materialized_view(name=f"{GOLD}.gold_workout_medals",
@@ -157,7 +159,7 @@ def gold_training_features():
 @dp.materialized_view(name=f"{GOLD}.gold_injury_risk_scores",
                       comment="Heuristic training-load and form-trend score per lifter and body part. Not a diagnosis.")
 def gold_injury_risk_scores():
-    reps = spark.read.table("silver_reps").withColumn("body_part", body_part(F.col("exercise_id")))
+    reps = spark.read.table("silver_reps").filter(~F.array_contains(F.col("flags"), "manual_unscored")).withColumn("body_part", body_part(F.col("exercise_id")))
     daily = reps.groupBy("user_id", "body_part", "session_date").agg(
         F.count("*").alias("reps"),
         F.sum(F.when(F.size("flags") > 0, 1).otherwise(0)).alias("flagged_reps"),

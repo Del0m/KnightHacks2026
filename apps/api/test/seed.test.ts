@@ -2,6 +2,8 @@
 import { eq, sql } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import seedUserIds from "../../../data/demo-user-ids.json";
+import { pseudonymize } from "../src/integrations/databricks/upload.js";
 import { seedDemo, type SeedSummary } from "../scripts/seed-demo.js";
 import { schema } from "../src/db.js";
 import { setup } from "./helpers.js";
@@ -12,7 +14,11 @@ const now = new Date("2026-10-10T12:00:00Z");
 
 beforeAll(async () => {
   t = await setup();
-  summary = await seedDemo(t.db, { now, presenterUserId: "presenter-neon-id" });
+  summary = await seedDemo(t.db, {
+    now,
+    presenterUserId: "presenter-neon-id",
+    pseudonymSecret: "shared-demo-secret",
+  });
 }, 120_000);
 afterAll(() => t.close());
 
@@ -23,6 +29,11 @@ describe("seed-demo", () => {
   it("creates ~30 lifters at 2 gyms with 6 weeks of history", async () => {
     expect(summary.users).toBe(30);
     expect(await count(schema.users)).toBe(30);
+    const seededUsers = await t.db.select().from(schema.users);
+    expect(seededUsers.map((u) => u.id).sort()).toEqual(
+      ["presenter-neon-id", ...seedUserIds.slice(1)].sort(),
+    );
+    for (const user of seededUsers) expect(user.pseudonym).toBe(pseudonymize(user.id, "shared-demo-secret"));
     const gyms = await t.db.selectDistinct({ gym: schema.profiles.gymPlaceId }).from(schema.profiles);
     expect(gyms).toHaveLength(2);
 
@@ -91,7 +102,11 @@ describe("seed-demo", () => {
   });
 
   it("resets instead of duplicating when run again", async () => {
-    const again = await seedDemo(t.db, { now, presenterUserId: "presenter-neon-id" });
+    const again = await seedDemo(t.db, {
+      now,
+      presenterUserId: "presenter-neon-id",
+      pseudonymSecret: "shared-demo-secret",
+    });
     expect(again).toEqual(summary); // deterministic
     expect(await count(schema.users)).toBe(30);
     expect(await count(schema.sessions)).toBe(summary.sessions);
