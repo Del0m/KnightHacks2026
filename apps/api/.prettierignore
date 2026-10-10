@@ -1,0 +1,7 @@
+dist
+node_modules
+drizzle/migrations
+package-lock.json
+# CONN-owned files keep their authors' formatting; avoids merge conflicts with in-flight branches.
+src/integrations
+src/jobs

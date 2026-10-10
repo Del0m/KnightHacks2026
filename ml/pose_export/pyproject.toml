@@ -11,6 +11,18 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest"]
+# push_to_hub.py (CONN-10): ONNX export + checks, form model from MLflow, Hub upload
+publish = [
+    "huggingface_hub",
+    "onnx",
+    "onnxruntime",
+    "onnxslim",
+    "skl2onnx",
+    "mlflow-skinny",
+    "scikit-learn",
+    "pandas",
+    "cloudpickle",
+]
 
 [tool.uv]
 package = false

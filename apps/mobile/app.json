@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Spotter",
+    "name": "Steady forum",
     "slug": "spotter",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.knighthacks.spotter",
       "infoPlist": {
-        "NSCameraUsageDescription": "Spotter uses the camera to see your form. Video never leaves your phone."
+        "NSCameraUsageDescription": "Steady forum uses the camera to see your form. Video never leaves your phone."
       }
     },
     "android": {
@@ -50,7 +50,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Choose a photo for your Spotter profile.",
+          "photosPermission": "Choose a photo for your Steady forum profile.",
           "microphonePermission": false
         }
       ]

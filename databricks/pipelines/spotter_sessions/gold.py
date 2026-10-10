@@ -221,3 +221,68 @@ def gold_injury_risk_scores():
         F.slice(F.transform(F.filter(ranked, lambda s: s["c"] >= 0.01), lambda s: s["name"]), 1, 3)
         .alias("top_features"),
     ).withColumn("weak_label", F.col("score") >= 0.5).drop("day", "days_tracked")
+
+
+# ---- Range of motion (CONN-14, Architecture §1.1) ----
+
+ROM_PERCENTILE = 0.9  # robust weekly peak: one bad frame can't spike it
+ROM_BASELINE_WEEKS = 2  # first two calendar weeks of data (after the rehab plan's start, if any)
+ROM_MIN_WEEK_REPS = 3
+
+
+@dp.materialized_view(name=f"{GOLD}.gold_rom_trend",
+                      comment="Weekly range of motion per lifter, angle and side, vs the baseline and the healthy side")
+@dp.expect_or_drop("range_in_degrees", "peak_range_deg BETWEEN 0 AND 180")
+@dp.expect_or_drop("enough_reps", f"reps >= {ROM_MIN_WEEK_REPS}")
+def gold_rom_trend():
+    keys = ["user_id", "angle", "side"]
+    reps = spark.read.table("silver_reps")
+
+    # One row per rep and side. Ranges come from the joint frames, so reps without frames drop out.
+    sides = reps.select(
+        "user_id", "angle", "session_date", "rehab_start_on", "injured_side",
+        F.explode(F.array(
+            F.struct(F.lit("left").alias("side"), F.col("left_range_deg").alias("range_deg")),
+            F.struct(F.lit("right").alias("side"), F.col("right_range_deg").alias("range_deg")),
+        )).alias("s"),
+    ).select("user_id", "angle", "session_date", "rehab_start_on", "injured_side", "s.side", "s.range_deg") \
+     .filter(F.col("range_deg").isNotNull()) \
+     .withColumn("week", F.date_trunc("week", "session_date").cast("date"))
+
+    # Baseline window: the first two calendar weeks of data on or after the rehab plan's start, or
+    # of all data when there's no plan. Whole weeks, so the window matches the weekly rows.
+    plan = sides.groupBy("user_id").agg(F.max("rehab_start_on").alias("plan_start"))
+    window_start = sides.join(plan, "user_id") \
+        .filter(F.col("plan_start").isNull() | (F.col("session_date") >= F.col("plan_start"))) \
+        .groupBy(*keys).agg(F.min("week").alias("window_start"))
+    baseline = sides.join(window_start, keys) \
+        .filter((F.col("week") >= F.col("window_start"))
+                & (F.col("week") < F.date_add("window_start", 7 * ROM_BASELINE_WEEKS))) \
+        .groupBy(*keys).agg(F.percentile_approx("range_deg", ROM_PERCENTILE).alias("baseline_range_deg"))
+
+    weekly = sides.groupBy(*keys, "week").agg(
+        F.percentile_approx("range_deg", ROM_PERCENTILE).alias("peak_range_deg"),
+        F.count("*").alias("reps"),
+    )
+
+    # The injured side per lifter and angle, from the latest session that says so.
+    injured = sides.filter(F.col("injured_side").isin("left", "right")) \
+        .groupBy("user_id", "angle").agg(F.max_by("injured_side", "session_date").alias("injured_side"))
+    other = weekly.select(
+        "user_id", "angle", "week",
+        F.when(F.col("side") == "left", "right").otherwise("left").alias("side"),
+        F.col("peak_range_deg").alias("other_side_peak"),
+    )
+
+    return weekly.join(baseline, keys, "left") \
+        .join(other, [*keys, "week"], "left") \
+        .join(injured, ["user_id", "angle"], "left") \
+        .select(
+            "user_id", "angle", "side", "week", "reps",
+            F.round("peak_range_deg", 1).alias("peak_range_deg"),
+            F.round("baseline_range_deg", 1).alias("baseline_range_deg"),
+            # Filled in on the injured side's rows: the other (healthy) side's peak that week.
+            F.when(F.col("side") == F.col("injured_side"), F.round("other_side_peak", 1))
+            .alias("healthy_side_range_deg"),
+            F.round(F.col("peak_range_deg") - F.col("baseline_range_deg"), 1).alias("change_deg"),
+        )

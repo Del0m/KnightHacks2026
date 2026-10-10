@@ -3,37 +3,22 @@
 //
 //   spotter.gold.gold_user_progress_daily -> progress_daily   key (user_id, date, exercise_id)
 //   spotter.gold.gold_injury_risk_scores  -> risk_insights    key (user_id, body_part, as_of)
+//   spotter.gold.gold_rom_trend           -> rom_trend        key (user_id, angle, side, week)
 //
 // Databricks only knows pseudonymous ids (CONN-02), so we map them back by computing the
 // pseudonym of every Neon user. Rows for unknown pseudonyms (deleted accounts, synthetic demo
 // users) are skipped. Only the last LOOKBACK_DAYS are re-read each run; upserts make re-runs
 // and overlapping windows harmless.
 //
-// Stubs until dependencies land:
-//   - Neon tables (DB-07). DB-07 lists risk_insights; progress_daily is needed by BE-13
-//     (daily volume, form trend) and should be added there. Expected shape:
-//       CREATE TABLE progress_daily (
-//         user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-//         date date NOT NULL, exercise_id text NOT NULL,
-//         sets int, reps int, clean_reps int, clean_share real, volume_kg real,
-//         avg_range_deg real, avg_quality real, est_1rm_kg real, is_pr boolean,
-//         synced_at timestamptz NOT NULL DEFAULT now(),
-//         PRIMARY KEY (user_id, date, exercise_id));
-//       CREATE TABLE risk_insights (
-//         user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-//         body_part text NOT NULL, as_of date NOT NULL,
-//         score real NOT NULL, explanation text NOT NULL,
-//         synced_at timestamptz NOT NULL DEFAULT now(),
-//         PRIMARY KEY (user_id, body_part, as_of));
-//   - Wiring (BE-01): call startInsightSync({ db: neon(DATABASE_URL), ... }) once on boot.
-//     Runs in-process; with several API instances, run it on one only.
-//   - Env is read directly; move to the Zod env from BE-01.
+// Tables: progress_daily and risk_insights in drizzle/schema/progress.ts (DB-07, migration 0001).
+// Started from src/index.ts when insightSyncConfigured(env); run it on one API instance only.
 
 import { DBSQLClient } from "@databricks/sql";
 import { pseudonymize } from "../integrations/databricks/upload";
 
 export const SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const BATCH_SIZE = 500;
+const ROM_LOOKBACK_DAYS = 120;
 
 // ---- Config ----
 
@@ -107,9 +92,22 @@ export interface RiskRow {
   top_features: string[];
 }
 
+// CONN-14: weekly range of motion per angle and side (gold_rom_trend -> rom_trend, DB-12).
+export interface RomRow {
+  user_id: string; // pseudonym
+  angle: string; // spec angle name: knee, elbow, hip
+  side: string; // left | right
+  week: string; // Monday, YYYY-MM-DD
+  peak_range_deg: number;
+  baseline_range_deg: number | null;
+  healthy_side_range_deg: number | null;
+  change_deg: number | null;
+}
+
 export interface GoldSnapshot {
   progress: ProgressRow[];
   risk: RiskRow[];
+  rom?: RomRow[];
 }
 
 // Plain-language reasons for the app (Architecture §11.2). A trend, never a diagnosis.
@@ -145,11 +143,11 @@ async function getToken(cfg: SyncConfig): Promise<string> {
   return ((await res.json()) as { access_token: string }).access_token;
 }
 
-export async function readGold(cfg: SyncConfig): Promise<GoldSnapshot> {
+export async function readGold(cfg: SyncConfig, log: LogLike = console): Promise<GoldSnapshot> {
   const days = Math.max(1, Math.floor(cfg.lookbackDays));
   const client = new DBSQLClient();
   // The driver re-emits connection failures as 'error' events; unhandled, they crash the API.
-  client.on("error", (err) => console.error(`[insights] databricks client: ${err.message}`));
+  client.on("error", (err) => log.error(`[insights] databricks client: ${err.message}`));
   await client.connect({
     host: cfg.host.replace(/^https?:\/\//, ""),
     path: `/sql/1.0/warehouses/${cfg.warehouseId}`,
@@ -176,7 +174,13 @@ export async function readGold(cfg: SyncConfig): Promise<GoldSnapshot> {
       SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features
       FROM spotter.gold.gold_injury_risk_scores
       WHERE date >= date_sub(current_date(), ${days}) AND score IS NOT NULL`);
-    return { progress, risk };
+    // Range of motion is charted from the start of a rehab plan, so it looks further back.
+    const rom = await run<RomRow>(`
+      SELECT user_id, angle, side, CAST(week AS STRING) AS week, peak_range_deg,
+             baseline_range_deg, healthy_side_range_deg, change_deg
+      FROM spotter.gold.gold_rom_trend
+      WHERE week >= date_sub(current_date(), ${Math.max(days, ROM_LOOKBACK_DAYS)})`);
+    return { progress, risk, rom };
   } finally {
     await session.close();
     await client.close();
@@ -224,39 +228,78 @@ export async function upsertProgress(db: Db, rows: (ProgressRow & { neon_user_id
 export async function upsertRisk(db: Db, rows: (RiskRow & { neon_user_id: string })[]) {
   await inBatches(rows, (b) =>
     db.query(
-      `INSERT INTO risk_insights (user_id, body_part, as_of, score, explanation, synced_at)
-       SELECT *, now() FROM unnest($1::text[], $2::text[], $3::date[], $4::real[], $5::text[])
+      `INSERT INTO risk_insights (user_id, body_part, as_of, score, explanation, top_features, synced_at)
+       SELECT user_id, body_part, as_of, score, explanation, top_features::jsonb, now()
+       FROM unnest($1::text[], $2::text[], $3::date[], $4::real[], $5::text[], $6::text[])
+         AS t(user_id, body_part, as_of, score, explanation, top_features)
        ON CONFLICT (user_id, body_part, as_of) DO UPDATE SET
-         score = EXCLUDED.score, explanation = EXCLUDED.explanation, synced_at = now()`,
+         score = EXCLUDED.score, explanation = EXCLUDED.explanation,
+         top_features = EXCLUDED.top_features, synced_at = now()`,
       [
         b.map((r) => r.neon_user_id),
         b.map((r) => r.body_part),
         b.map((r) => r.date),
         b.map((r) => Number(r.score)),
         b.map((r) => explainRisk(r.body_part, r.top_features ?? [])),
+        b.map((r) => JSON.stringify(r.top_features ?? [])),
       ],
     ).then(() => undefined),
   );
 }
 
+export async function upsertRom(db: Db, rows: (RomRow & { neon_user_id: string })[]) {
+  await inBatches(rows, (b) =>
+    db
+      .query(
+        `INSERT INTO rom_trend (user_id, angle, side, week, peak_range_deg, baseline_range_deg,
+                                healthy_side_range_deg, change_deg, synced_at)
+         SELECT *, now() FROM unnest($1::text[], $2::text[], $3::text[], $4::date[], $5::real[], $6::real[],
+                                     $7::real[], $8::real[])
+         ON CONFLICT (user_id, angle, side, week) DO UPDATE SET
+           peak_range_deg = EXCLUDED.peak_range_deg, baseline_range_deg = EXCLUDED.baseline_range_deg,
+           healthy_side_range_deg = EXCLUDED.healthy_side_range_deg, change_deg = EXCLUDED.change_deg,
+           synced_at = now()`,
+        [
+          b.map((r) => r.neon_user_id),
+          b.map((r) => r.angle),
+          b.map((r) => r.side),
+          b.map((r) => r.week),
+          b.map((r) => num(r.peak_range_deg)),
+          b.map((r) => num(r.baseline_range_deg)),
+          b.map((r) => num(r.healthy_side_range_deg)),
+          b.map((r) => num(r.change_deg)),
+        ],
+      )
+      .then(() => undefined),
+  );
+}
+
 // ---- Job ----
+
+// Console or pino: both take a plain message.
+export interface LogLike {
+  info(msg: string): void;
+  error(msg: string): void;
+}
 
 export interface SyncDeps {
   db: Db;
   config: SyncConfig;
-  read?: (cfg: SyncConfig) => Promise<GoldSnapshot>; // injectable for tests
+  read?: (cfg: SyncConfig, log: LogLike) => Promise<GoldSnapshot>; // injectable for tests
+  log?: LogLike;
 }
 
 export interface SyncResult {
   progress: number;
   risk: number;
+  rom: number;
   skipped_unknown_users: number;
   ms: number;
 }
 
-export async function runInsightSync({ db, config, read = readGold }: SyncDeps): Promise<SyncResult> {
+export async function runInsightSync({ db, config, read = readGold, log = console }: SyncDeps): Promise<SyncResult> {
   const started = Date.now();
-  const gold = await read(config);
+  const gold = await read(config, log);
 
   const users = await rowsOf<{ id: string }>(db, "SELECT id FROM users");
   const byPseudonym = new Map(users.map((u) => [pseudonymize(String(u.id), config.pseudonymSecret), String(u.id)]));
@@ -274,25 +317,34 @@ export async function runInsightSync({ db, config, read = readGold }: SyncDeps):
 
   const progress = resolve(gold.progress);
   const risk = resolve(gold.risk);
+  const rom = resolve(gold.rom ?? []);
   await upsertProgress(db, progress);
   await upsertRisk(db, risk);
+  await upsertRom(db, rom);
 
-  return { progress: progress.length, risk: risk.length, skipped_unknown_users: skipped, ms: Date.now() - started };
+  return {
+    progress: progress.length,
+    risk: risk.length,
+    rom: rom.length,
+    skipped_unknown_users: skipped,
+    ms: Date.now() - started,
+  };
 }
 
 /** Runs once now, then every 15 minutes. Never overlaps itself. Returns a stop function. */
 export function startInsightSync(deps: SyncDeps, intervalMs = SYNC_INTERVAL_MS): () => void {
   let running = false;
+  const log = deps.log ?? console;
   const tick = async () => {
     if (running) return;
     running = true;
     try {
       const r = await runInsightSync(deps);
-      console.log(`[insights] synced ${r.progress} progress, ${r.risk} risk rows` +
+      log.info(`[insights] synced ${r.progress} progress, ${r.risk} risk, ${r.rom} range-of-motion rows` +
         ` (${r.skipped_unknown_users} rows for unknown users) in ${r.ms} ms`);
     } catch (err) {
       // Leave Neon as it was; the next tick retries.
-      console.error(`[insights] sync failed: ${err instanceof Error ? err.message : String(err)}`);
+      log.error(`[insights] sync failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       running = false;
     }

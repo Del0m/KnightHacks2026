@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { Linking, Platform, Pressable, Share, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { PoseSkeleton } from './PoseSkeleton';
@@ -67,7 +67,7 @@ export function PoseDebugScreen() {
   }
   return (
     <View style={styles.center}>
-      <Text style={styles.message}>Spotter needs the camera to see your form.</Text>
+      <Text style={styles.message}>Steady forum needs the camera to see your form.</Text>
       <Pressable style={styles.button} onPress={() => Linking.openSettings()}>
         <Text style={styles.buttonText}>Open Settings</Text>
       </Pressable>
@@ -129,7 +129,7 @@ function LiveCamera({ poseMode, position, setPosition }: {
     recorder.current?.add(d, clock.now());
   }, [formOnPose, clock]);
   const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size, maxFps: 15, onPose });
-  frameOutputRef.current = frameOutput;
+  useLayoutEffect(() => { frameOutputRef.current = frameOutput; }, [frameOutput]);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;

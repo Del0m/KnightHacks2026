@@ -23,9 +23,12 @@ import sklearn
 from mlflow.models import ModelSignature
 from mlflow.types.schema import AnyType, ColSpec, Schema
 from mlflow.tracking import MlflowClient
+from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, r2_score
 from sklearn.model_selection import GroupShuffleSplit
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
 
 MODEL_NAME = "spotter.ml.form_quality"
 SOURCE_TABLE = "spotter.raw.silver_reps"
@@ -71,7 +74,7 @@ def label_for(flags) -> str:
 def load_reps() -> pd.DataFrame:
     df = spark.read.table(SOURCE_TABLE).select("user_id", "quality", "flags", *FEATURES).toPandas()
     df["label"] = df["flags"].map(label_for)
-    df["exercise_id"] = df["exercise_id"].fillna("unknown").astype("category")
+    df["exercise_id"] = df["exercise_id"].fillna("unknown").astype(str)
     for col in NUMERIC_FEATURES:
         # Frame-derived columns are null when a session has no joints; the model handles NaN.
         df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
@@ -99,6 +102,7 @@ PARAMS = {
     "learning_rate": 0.1,
     "max_leaf_nodes": 31,
     "l2_regularization": 0.0,
+    "exercise_encoding": "one_hot",
     "test_size": 0.2,
     "split": "by_user",
     "seed": SEED,
@@ -106,18 +110,29 @@ PARAMS = {
 
 
 def train_models(train: pd.DataFrame, features: list, params: dict):
-    """Return (label classifier, quality regressor) trained on the given feature columns."""
+    """Return (label classifier, quality regressor) pipelines trained on the given feature columns.
+
+    exercise_id is one-hot encoded inside each pipeline (unseen exercises become all zeros) rather
+    than using native categorical splits, so the models convert to ONNX for the Hub (CONN-10).
+    """
     common = dict(
         max_iter=params["max_iter"],
         learning_rate=params["learning_rate"],
         max_leaf_nodes=params["max_leaf_nodes"],
         l2_regularization=params["l2_regularization"],
-        categorical_features="from_dtype",
         random_state=params["seed"],
     )
-    clf = HistGradientBoostingClassifier(class_weight="balanced", **common)
+
+    def pipeline(estimator):
+        encode = ColumnTransformer(
+            [("exercise", OneHotEncoder(handle_unknown="ignore", sparse_output=False), ["exercise_id"])],
+            remainder="passthrough",
+        )
+        return Pipeline([("encode", encode), ("model", estimator)])
+
+    clf = pipeline(HistGradientBoostingClassifier(class_weight="balanced", **common))
     clf.fit(train[features], train["label"])
-    reg = HistGradientBoostingRegressor(**common)
+    reg = pipeline(HistGradientBoostingRegressor(**common))
     reg.fit(train[features], train["quality"])
     return clf, reg
 
@@ -132,15 +147,14 @@ def train_models(train: pd.DataFrame, features: list, params: dict):
 
 
 class FormQualityModel(mlflow.pyfunc.PythonModel):
-    def __init__(self, classifier, regressor, features, exercises):
+    def __init__(self, classifier, regressor, features):
         self.classifier = classifier
         self.regressor = regressor
-        self.features = features  # columns the trees were fit on; the rest of the input is ignored
-        self.exercises = exercises  # categories seen in training, so unseen ones map to NaN
+        self.features = features  # columns the pipelines were fit on; the rest of the input is ignored
 
     def _prepare(self, df: pd.DataFrame) -> pd.DataFrame:
         X = pd.DataFrame(index=df.index)
-        X["exercise_id"] = pd.Categorical(df["exercise_id"], categories=self.exercises)
+        X["exercise_id"] = df["exercise_id"].astype(str)  # unseen exercises are ignored by the encoder
         for col in NUMERIC_FEATURES:
             X[col] = pd.to_numeric(df.get(col), errors="coerce").astype("float64")
         return X[self.features]
@@ -185,7 +199,7 @@ with mlflow.start_run(run_name="form_quality_baseline") as run:
     mlflow.log_input(mlflow.data.from_pandas(reps[FEATURES + ["label", "quality"]], name=SOURCE_TABLE), context="training")
 
     clf, reg = train_models(train, used_features, PARAMS)
-    model = FormQualityModel(clf, reg, used_features, list(reps["exercise_id"].cat.categories))
+    model = FormQualityModel(clf, reg, used_features)
     pred = model.predict(None, test[FEATURES])
 
     metrics = {

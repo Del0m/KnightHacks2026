@@ -1,0 +1,42 @@
+{
+  "name": "spotter-push-models-to-hub",
+  "description": "CONN-10: export spotter.ml.form_quality@champion (ONNX) and publish it with the manifest and model card to the Hugging Face Hub. Run after retraining the form model (CONN-04). Runs with --skip-pose: importing Ultralytics' OpenCV crashes serverless compute (SIGABRT), so the pose models (Core ML + ONNX) are published from a Mac with `uv run --group publish push_to_hub.py --skip-form`, which also runs the Core ML models before upload. Replace <workspace-folder> with the folder holding push_to_hub.py and export.py; the HF token comes from the secret spotter/hf_write_token.",
+  "max_concurrent_runs": 1,
+  "tasks": [
+    {
+      "task_key": "push_to_hub",
+      "environment_key": "publish",
+      "spark_python_task": {
+        "python_file": "<workspace-folder>/push_to_hub.py",
+        "parameters": [
+          "--repo",
+          "bubblesmal/spotter-models",
+          "--staging",
+          "/tmp/hub_staging",
+          "--skip-pose"
+        ]
+      },
+      "timeout_seconds": 3600
+    }
+  ],
+  "environments": [
+    {
+      "environment_key": "publish",
+      "spec": {
+        "environment_version": "4",
+        "dependencies": [
+          "ultralytics==8.4.175",
+          "coremltools==9.0",
+          "numpy==2.3.4",
+          "scikit-learn==1.7.2",
+          "onnx==1.23.2",
+          "onnxruntime==1.31.0",
+          "onnxslim",
+          "skl2onnx==1.20.0",
+          "huggingface_hub==2.2.0",
+          "protobuf>=6.31.1,<7"
+        ]
+      }
+    }
+  ]
+}

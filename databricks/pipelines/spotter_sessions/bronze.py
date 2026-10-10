@@ -47,7 +47,10 @@ META_SCHEMA = StructType([
     StructField("medal", StringType()),
     StructField("form_score", DoubleType()),
     StructField("experience_level", StringType()),
+    # "knee" or "knee:left": body part and a coarse side, no dates or notes (§13, CONN-14).
     StructField("injury_groups", ArrayType(StringType())),
+    # Start of the user's rehab plan (DB-12), for the range-of-motion baseline (CONN-14).
+    StructField("rehab_start_on", StringType()),
     StructField("joints_path", StringType()),
     StructField("exported_at", StringType()),
     StructField("sets", ArrayType(SET)),

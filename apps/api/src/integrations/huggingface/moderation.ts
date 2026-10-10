@@ -123,12 +123,18 @@ function isRetryable(err: unknown): boolean {
   return status === undefined || status === 408 || status === 429 || status >= 500;
 }
 
+// Console or pino: both take a plain message.
+export interface LogLike {
+  warn(msg: string): void;
+}
+
 export class Moderator {
   private readonly client: InferenceClient;
 
   constructor(
     private readonly config: ModerationConfig,
     client?: InferenceClient,
+    private readonly log: LogLike = console,
   ) {
     this.client = client ?? new InferenceClient(config.token);
   }
@@ -161,7 +167,7 @@ export class Moderator {
       }
     }
 
-    console.warn(`[moderation] ${kind} not checked, allowing: ${(lastError as Error)?.message ?? "deadline exceeded"}`);
+    this.log.warn(`[moderation] ${kind} not checked, allowing: ${(lastError as Error)?.message ?? "deadline exceeded"}`);
     return { allowed: true, checked: false, categories: [] };
   }
 }

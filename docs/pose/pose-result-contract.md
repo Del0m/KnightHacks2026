@@ -92,12 +92,14 @@ else:
 
 The frame must already be upright and unmirrored before inference, as on the phone. A server running the raw exported model instead should follow the decode steps in [how-it-works.md](how-it-works.md).
 
-## Open for CONN-11
+## Cloud mode transport (CONN-11)
 
-The output above is fixed. These are not decided yet:
+The output above is unchanged. How frames get to the cloud endpoint and back:
 
-- **Transport:** WebSocket, per Architecture §4.1.
-- **Frame encoding:** JPEG at about 320 px and about 10 fps, per §4.1, plus how orientation is conveyed (rotate on the phone before sending, or send an orientation field).
-- **Auth:** how the phone authenticates to the endpoint, which per §14 goes through the Spotter API rather than holding an HF token.
-- **Batching:** one result per frame, or a per-frame stream on one socket.
-- **Timeouts and backpressure:** what the phone does when a result is late (drop frames, not queue them, matching on-device behavior).
+- **Transport:** a WebSocket from the phone to the Spotter API at `/pose/stream`. The API forwards each frame to the Hugging Face endpoint over HTTPS (`ml/cloud_endpoint/handler.py`) and relays the result. Hugging Face custom handlers are request/response only, so the WebSocket lives in the API.
+- **Frame encoding:** one binary message per frame: an 8-byte big-endian float64 `timestamp_ms`, then a JPEG of about 320 px at about 10 fps. **The phone rotates the frame upright and unmirrored before sending**, so there is no orientation field.
+- **Auth:** the phone sends its Neon Auth token (`Authorization: Bearer`, or `?token=` where headers can't be set). The HF token stays on the API server (§14).
+- **Batching:** one result per frame on the same socket: `{"type":"pose","timestamp_ms":..,"result":<this contract or null>,"latency_ms":..,"endpoint_ms":..,"dropped":n}`.
+- **Timeouts and backpressure:** one frame in flight per connection; a newer frame replaces any waiting one, so late frames are dropped, never queued (`dropped` counts them). While the endpoint scales up from zero the API sends `{"type":"status","status":"warming"}` and forwards at most one frame every 2 s; the phone shows its "reconnecting" state.
+
+Full protocol: the header of `apps/api/src/routes/poseStream.ts`. Deploy and cost: `ml/cloud_endpoint/README.md`.

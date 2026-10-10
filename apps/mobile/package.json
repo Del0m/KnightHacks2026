@@ -9,7 +9,9 @@
     "expo-build-properties": "~57.0.22",
     "expo-constants": "~57.0.21",
     "expo-dev-client": "~57.0.19",
+    "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
+    "expo-glass-effect": "~57.0.4",
     "expo-image-picker": "~57.0.20",
     "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.12",
@@ -36,6 +38,7 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
+    "@types/node": "^22.20.5",
     "@types/react": "~19.2.2",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.2",
