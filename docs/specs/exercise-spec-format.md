@@ -20,7 +20,7 @@ Each exercise is one JSON file in `specs/exercises/`. The form engine (`apps/mob
 | `id`, `name` | snake_case id, display name |
 | `recommended_view` | `front` or `side`: the camera angle the setup screen suggests |
 | `angles` | The metrics to compute each frame (below) |
-| `primary_angle` | `{ name, direction }`: the `joint_angle` that drives the rep counter |
+| `primary_angle` | `{ name, direction, gate? }`: the `joint_angle` that drives the rep counter (below) |
 | `phases` | Rep counter thresholds (below) |
 | `rules` | Form rules (below) |
 | `injury_overrides` | `knee`, `shoulder`, `lower_back` (below) |
@@ -85,7 +85,7 @@ start ──past start_exit──▶ outbound ──past count_min──▶ peak
 | `start_enter` | Coming back past it counts the rep. Sits beyond `start_exit` (hysteresis) |
 | `reverse_deg` | How far the angle moves back from its extreme before `peak` becomes `return` |
 | `min_state_ms` | Minimum time in a state before a transition |
-| `set_end_still_ms` | Stillness in `start` that ends the set |
+| `set_end_still_ms` | Stillness (within 10°, in any position, after the first rep) that ends the set |
 
 **Rule windows close when the rep settles, not at the count.** The rep is counted the moment the angle crosses `start_enter`. The frames that rules reduce over for `return` and `rep` keep going until the angle stops moving toward the start position: it moves back by `reverse_deg`, or makes no more progress (under 1°) toward the start for `min_state_ms`, or the set ends, or the next rep starts. That way a lockout check such as "elbow max on return ≥ 160" with `start_enter` at 155 sees the top of the movement. `duration_ms` for `return` still stops at the `start_enter` crossing, so tempo isn't inflated by the pause at the top.
 
@@ -95,6 +95,17 @@ start ──past start_exit──▶ outbound ──past count_min──▶ peak
 - **Going deeper during `return`** doesn't change state. It only moves the rep's extreme.
 - **Angles are measured in the upright image** with x scaled by width ÷ height, so a right angle on a portrait frame reads 90°.
 - **The `side` of each frame** is reported alongside its metrics. `most_visible` keeps one side for the whole rep.
+- **Only reliable primary angles count.** A frame where any joint of the primary angle is low-confidence, or where the angle jumps faster than a person can move (over 720°/s), doesn't move the counter.
+
+**`gate` (optional):** `{ metric, op, value }`, where `metric` is another `angles` key. A rep can only reach `peak` on a frame where `metric op value` holds. Use it when a rest position matches the primary angle. The shoulder press's straight elbow reads the same with arms hanging down as overhead, so it gates on `arm_raise <= 60` (wrists above the shoulders):
+
+```json
+"angles": { "arm_raise": { "type": "segment_tilt", "from": "shoulder", "to": "wrist", "side": "max" } },
+"primary_angle": { "name": "elbow", "direction": "increasing",
+                   "gate": { "metric": "arm_raise", "op": "<=", "value": 60 } }
+```
+
+**Camera placement:** angles are measured in the image, so the phone works best upright at about chest height. A phone low and tilted up makes vertical lines lean in, which `segment_tilt` checks read as tilt.
 
 Full behaviour: [form engine design](../superpowers/specs/2026-10-10-form-engine-design.md).
 

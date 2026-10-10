@@ -193,3 +193,36 @@ export function useFormRules(spec: ExerciseSpec | EffectiveSpec | null, opts?: {
   - a squat with shallow and leaning reps (side view)
   - a squat with knees in, filmed 30° off square-on. Square-on, the 2D knee angle stays at 180° and no reps count, so a front-view squat needs a slight turn. Squat and lunge `depth` are `view: side`, because the turned knee angle reads shallow.
   - a push-up with hip sag
+
+## 9. Counting only real movement (follow-up from device testing)
+
+A screen recording of a seated shoulder press showed three problems:
+- **False reps.** With hands in the lap the elbow reads about 131°, which is already mid-rep, and arms hanging straight read like a lockout. Shifting in the chair, or wrists cropped at the frame edge, counted reps.
+- **No still end.** Stillness was only checked in `start`, so a set resting mid-position never ended.
+- **`wrist_stack` failed every rep,** because it reduced over the whole rep, including the lift from the lap.
+
+**Primary gate (spec format):**
+- `primary_angle.gate?: { metric, op, value }` (`PrimaryGate` in `types.ts`).
+  - `metric` is an `angles` key. It can't be `duration_ms` or the primary itself.
+  - `value` is a number.
+- The engine evaluates the gate every frame from that frame's metrics: it passes if the metric is non-null and `metric op value` holds. With no gate, it always passes.
+- The counter's `outbound → peak` transition needs the gate to pass on that frame, as well as `count_min` and `min_state_ms`. An attempt that never passes the gate returns to `start` as a partial, as before.
+- `RepCounter.step(t, value, person = true, gate = true)`.
+- **Shoulder press:**
+  - New angle `arm_raise`: `segment_tilt` from `shoulder` to `wrist`, `side: "max"`, so the lower arm decides. 0° is the wrist straight above the shoulder.
+  - Gate `{ "metric": "arm_raise", "op": "<=", "value": 60 }`.
+  - `wrist_stack` moves to `phase: "peak"`, with value 30.
+- **Validator:** checks that the gate metric exists and isn't `duration_ms` or the primary.
+
+**Primary angle reliability (engine):**
+- **Confidence:** the primary angle is null on a frame when any point it resolves (on the chosen side) has raw `c < minConfidence`, meaning it's held or missing. The 300 ms hold still feeds the other metrics. The engine passes `minConfidence` to the metric computer.
+- **Jump rejection:** a primary value is rejected (treated as null for the counter and left out of the windows) when `|v − last| / max(t − lastT, 33) × 1000 > MAX_PRIMARY_DEG_PER_S` (720).
+  - `last` and `lastT` are the last accepted value and its time.
+  - After 3 rejections in a row, the next value is accepted and becomes the reference.
+  - After a null frame there's no reference, and the next value is accepted.
+
+**Still end anywhere (counter):**
+- With `repCount >= 1`, the still hold runs in every state, not only `start`.
+- It keeps an anchor: if `|v − anchor| > STILL_BAND_DEG` (10), the anchor moves to `v` and the hold resets. Otherwise, the frame's active time is added.
+- When the hold reaches `set_end_still_ms`, the set ends `still`. An open tail closes first; an attempt in progress becomes a partial (the existing set-end behaviour).
+- State transitions no longer reset the hold. Only movement does.

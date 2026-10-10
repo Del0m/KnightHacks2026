@@ -275,6 +275,9 @@ stateDiagram-v2
 
 - **The depth target (95°) is a form rule, not a counting condition.** A rep that passes `count_min` but stops short of the target is counted *and* flagged, so the lifter sees the rep and gets a note about range.
 - A state change is accepted only after `min_state_ms` in the current state.
+- **Only real movement counts:**
+  - **Gate:** a spec can require a position for the rep to reach its peak (`primary_angle.gate`). For the shoulder press, that's the wrists above the shoulders, so arms hanging straight never read as a lockout.
+  - **Unreliable frames:** frames where the primary angle's joints are low-confidence, or where the angle jumps impossibly fast, don't move the counter.
 - The rep is counted on crossing 165°, but the frames its form rules look at run until the lifter settles at the top, so a lockout check sees the full extension.
 - **Engine (AI-06):** the engine lives in `apps/mobile/src/engine/`.
   - **Pipeline:** One Euro smoothing per joint, then the spec's metrics, measured with x scaled by the image aspect ratio, because joints are normalised per axis. Then this state machine runs on the primary angle.
@@ -286,7 +289,7 @@ stateDiagram-v2
   - A frame with no person, or without the primary angle, freezes the counter. Its time doesn't count toward `min_state_ms`, and it's left out of the rule windows.
   - `most_visible` sticks to one side during a rep.
 - **Set end:**
-  - **Still:** the lifter has been still at the start for 8 s.
+  - **Still:** the lifter has been still (within 10°) for 8 s, in any position.
   - **Absent:** no person for 8 s.
   - **Lost:** a person is in view but the primary angle can't be measured for 8 s (for example, the ankles are cropped out).
   - **Manual:** a Done button.

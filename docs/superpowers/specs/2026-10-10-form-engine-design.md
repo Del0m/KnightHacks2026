@@ -124,7 +124,7 @@ interface RepCounter {
 | From | Condition | To | Effects |
 |---|---|---|---|
 | `start` | `deeper(v, start_exit)` (gated) | `outbound` | `attempt++`, `rep_started`, `startedAt = t`, `extreme = v`. If a settle tail is open, `rep_closed` for it **first**, and this frame is not in that rep. |
-| `outbound` | `deeper(v, count_min)` (gated) | `peak` | `peakAt = t` |
+| `outbound` | `deeper(v, count_min)` and the primary `gate` passes (gated) | `peak` | `peakAt = t` |
 | `outbound` | `shallower(v, start_enter)` (gated) | `start` | `partial`, and the attempt's frames are discarded |
 | `peak` | `s * (v - extreme) >= reverse_deg` (back from the extreme, gated) | `return` | `returnAt = t` |
 | `return` | `shallower(v, start_enter)` (gated) | `start` | `repCount++`, `rep_counted {index: repCount}`, `countedAt = t`, open the settle tail |
@@ -152,7 +152,7 @@ interface RepCounter {
 Times are plain timestamp differences, null gaps included. `closedAt` is the closing frame's `t`.
 
 **Set end.** After `ended`, `step` returns the current state with no events and `window: null`.
-- **`still`:** in `start`, with `repCount >= 1`. It keeps an anchor value: if `|v - anchor| > reverse_deg` the anchor becomes `v` and the hold time goes back to 0, otherwise the frame's active time is added. Entering `start` (count or partial) resets it. When the active hold time reaches `set_end_still_ms`, the set ends. The tail always closes first, because `min_state_ms` is much shorter than `set_end_still_ms`.
+- **`still`:** in any state, with `repCount >= 1`. It keeps an anchor value: if `|v - anchor| > STILL_BAND_DEG` (10) the anchor becomes `v` and the hold time goes back to 0, otherwise the frame's active time is added. State changes don't reset it. When the active hold time reaches `set_end_still_ms`, the set ends (an attempt in progress becomes a partial). Changed in AI-07 (form rules design §9): it used to apply only in `start` with a `reverse_deg` band, so a set resting mid-position never ended. The tail always closes first, because `min_state_ms` is much shorter than `set_end_still_ms`.
 - **`absent` / `lost`:** null values continuously for `set_end_still_ms` of wall time (`t - firstNullT`), with `repCount >= 1`. `step(t, value, person = true)` is told whether a person was found; the engine's `pushAbsent` passes `false`. The reason is `lost` if strictly more than half of the run's null frames had a person (the primary angle couldn't be measured), otherwise `absent`. Added in AI-07.
 - **`manual`:** `end(t, 'manual')`.
 - **On any end:** an open tail emits `rep_closed`. An attempt still in `outbound`, `peak` or `return` emits `partial`, and the state goes back to `start`. Then `set_ended {reason}` fires.
@@ -180,7 +180,7 @@ interface FormEngine {
 **Each frame:**
 1. Smooth the joints.
 2. Compute the metrics.
-3. Step the counter with `metrics[primary_angle.name]`.
+3. Step the counter with `metrics[primary_angle.name]`, the gate result and whether a person was found. The primary is null when one of its joints is below `minConfidence` (held joints don't count), and a value moving faster than `MAX_PRIMARY_DEG_PER_S` (720°/s) from the last accepted one is rejected (accepted after 3 rejections in a row). See form rules design §9.
 4. Buffer `EngineFrame`s per attempt according to `window`. Frames with a null primary angle aren't buffered.
 
 **Events:**
