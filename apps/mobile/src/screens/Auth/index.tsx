@@ -42,6 +42,7 @@ export default function AuthScreen({ mode = 'login' }: { mode?: AuthMode }) {
       {busy && <ActivityIndicator color={c.primary} accessibilityLabel="Signing in" />}
       {verification && auth.configured && <Action secondary disabled={busy} onPress={() => { if (!validateCredentials('login', { name, email, password: 'present' })) void run(async () => { await auth.resendVerification(email); setNotice('If your account needs verification, check your email.'); }); }}>Resend verification email</Action>}
       {auth.error && auth.configured && <Action secondary disabled={busy} onPress={() => { void run(auth.refresh); }}>Retry session</Action>}
+      <Action secondary disabled={busy} onPress={() => router.replace('/')}>Continue without logging in</Action>
       <View style={styles.switch}><Text style={ui.muted}>{signup ? 'Already have an account?' : 'New to Spotter?'}</Text><PolishedPressable accessibilityRole="link" disabled={busy} onPress={() => { setPassword(''); router.replace(signup ? '/login' : '/signup'); }}><Text style={styles.link}>{signup ? 'Log in' : 'Sign up'}</Text></PolishedPressable></View>
     </KeyboardAvoidingView>
   </AppPage>;

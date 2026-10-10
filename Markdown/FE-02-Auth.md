@@ -13,7 +13,7 @@ EXPO_PUBLIC_API_URL=https://YOUR-API.example.com
 
 Use the exact Auth URL shown in Neon Console → Auth, including its path. The example hostname is a placeholder, not a working service. API URLs may include a base path. Local API development accepts HTTP only on localhost or 127.0.0.1. Do not supply database credentials, signing keys, or administrative secrets. Restart Metro after changing environment values and rebuild exports/development builds when needed.
 
-The URLs intentionally remain empty until the backend teammate supplies them. Login and account creation are disabled with a visible setup message. Protected tabs require a server-confirmed session; there is no mock login or guest bypass.
+The URLs intentionally remain empty until the backend teammate supplies them. Login and account creation are disabled with a visible setup message. Train, Plan, and workout sessions are available to guests, even while auth is restoring or unconfigured. Me (You), Feed, and Buddies remain visible but show a login/account-creation prompt until a server-confirmed session exists. Their content does not mount for guests, including direct links. Login/signup provide a continue-without-login action; there is no mock authenticated session.
 
 Configure the actual browser origin and native `spotter://` origin with the auth service. Confirm email verification, native cookie support, accepted cookie prefixes, and JWT endpoint/claims with the project's managed Neon Auth configuration. The API needs CORS for its web origin and BE-02 JWT validation. Never use a wildcard CORS origin for credentialed browser auth.
 
@@ -21,7 +21,7 @@ Configure the actual browser origin and native `spotter://` origin with the auth
 
 - Email/password sign-up and login; optional password visibility, native autofill, keyboard navigation, validation, loading/errors, and verification-email resend.
 - Better Auth client talks to Neon Auth's Better Auth endpoints. The Expo client plugin is used only on native, with Expo SecureStore for session cookies. Web uses provider-managed browser cookies. Passwords/JWTs are not written to localStorage.
-- Launch/focus restores the server session. Protected Expo Router screens expose the existing five tabs and workout only after confirmation. Successful logout and rejected JWT requests clear app access. Refresh and auth mutations are ordered to prevent stale sessions returning after logout.
+- Launch/focus restores the server session. The public Router stack exposes Train, Plan, and workout immediately. Account gates protect Me, Feed, and Buddies until confirmation. Successful logout and rejected JWT requests clear app access. Refresh and auth mutations are ordered to prevent stale sessions returning after logout.
 - Current account email/name and logout are available in Me. Local workout/profile keys are scoped to the authenticated account; the old guest key is preserved and never assigned to a new account. Native training history remains in memory, as before; cloud sync is outside FE-02.
 - The Router entry and navigation dependencies remain active. Teammates' pose App/debug sources, native modules, tests, and dependencies are preserved for later integration.
 
@@ -38,11 +38,11 @@ if (!response.ok) throw new Error('Could not load sessions.');
 const sessions = await response.json();
 ```
 
-Each request obtains a current JWT and attaches `Authorization: Bearer <JWT>` only to the configured API base. Absolute URLs, escaping paths, and redirects are rejected. A 401 returns the app to login without a retry loop. Late responses from a previous account are rejected. No production endpoint was invented; BE-02 remains a dependency.
+Each request obtains a current JWT and attaches `Authorization: Bearer <JWT>` only to the configured API base. Absolute URLs, escaping paths, and redirects are rejected. A 401 clears the account session and relocks account features without a retry loop; public training remains available. Late responses from a previous account are rejected. No production endpoint was invented; BE-02 remains a dependency.
 
 ## Verification
 
-- Jest: 13 suites, 93 tests passed, including existing pose tests and auth/session concurrency regressions.
+- Jest: 14 suites, 98 tests passed, including existing pose tests and auth/session concurrency regressions.
 - TypeScript: passed.
 - ESLint on changed auth, routing, Me, and training files: passed.
 - Full source lint has existing pose render-time ref errors in `PoseDebugScreen.tsx` and `usePoseOutput.ts`; pose code was left intact.

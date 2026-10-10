@@ -6,7 +6,6 @@ import { StatusBar } from 'expo-status-bar';
 import { TrainingProvider } from '@/state/Training';
 import { useTheme } from '@/theme/tokens';
 import { AuthProvider, useAuth } from '@/screens/Auth/session';
-import { ActivityIndicator, View } from 'react-native';
 
 export { ErrorBoundary } from 'expo-router';
 SplashScreen.preventAutoHideAsync();
@@ -28,7 +27,6 @@ export default function RootLayout() {
 }
 function AuthenticatedApp() {
   const theme = useTheme(), auth = useAuth();
-  if (auth.loading && !auth.user) return <View accessibilityLabel="Restoring your session" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background }}><ActivityIndicator color={theme.colors.primary} /></View>;
   return (
     <TrainingProvider key={auth.user?.id ?? 'signed-out'} accountId={auth.user?.id}><ThemeProvider value={{ ...DefaultTheme, colors: { ...DefaultTheme.colors,
       primary: theme.colors.primary, background: theme.colors.background,
@@ -36,9 +34,7 @@ function AuthenticatedApp() {
     } }}>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
-        <Stack.Protected guard={Boolean(auth.user)}>
-          <Stack.Screen name="(tabs)" /><Stack.Screen name="workout" />
-        </Stack.Protected>
+        <Stack.Screen name="(tabs)" /><Stack.Screen name="workout" />
         <Stack.Protected guard={!auth.user}>
           <Stack.Screen name="login" /><Stack.Screen name="signup" />
         </Stack.Protected>

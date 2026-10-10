@@ -12,7 +12,7 @@ Email sign-up/login, secure session persistence, and authenticated API requests.
 2. Confirm the team's Neon Auth configuration and current SDK/native integration, public Auth URL, allowed web origins/mobile callback configuration, API URL, email verification settings, and BE-02 JWT contract. Do not add database/admin secrets to the client.
 3. Build email/password sign-up and login screens with password visibility, field validation, loading feedback, and readable errors. Handle email verification if the project's configuration requires it. Keep onboarding and social providers outside this issue.
 4. Integrate the appropriate Neon session client. Persist native session credentials with platform secure storage; use provider-managed secure browser sessions for web. Restore sessions on launch, handle expiry, and clear sessions on logout. Do not persist passwords or place credentials in the existing local training storage.
-5. Add auth state and protected-route handling, plus a shared API request path that attaches the current JWT as a Bearer token. Handle rejected/expired authentication without retry loops. Scope or clear local workout/profile data when accounts change.
+5. Add auth state and account gates for Me, Feed, and Buddies while leaving Train, Plan, and workouts public, plus a shared API request path that attaches the current JWT as a Bearer token. Handle rejected/expired authentication without retry loops. Scope or clear local workout/profile data when accounts change.
 6. Verify sign-up, login, invalid credentials, launch/reload persistence, logout, protected routes, authenticated requests, and expiry/401 handling. Run typecheck, lint, and appropriate builds; document results before opening the FE-02 PR.
 
 ## Dependencies and acceptance
