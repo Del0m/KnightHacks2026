@@ -85,9 +85,15 @@ describe("rag/notes", () => {
 
   for (const file of files) {
     describe(file, () => {
-      const note = parseNote(file, readFileSync(path.join(NOTES_DIR, file), "utf8"));
+      // Parsed inside each test, so a malformed note fails its own tests instead of the whole file.
+      const load = () => parseNote(file, readFileSync(path.join(NOTES_DIR, file), "utf8"));
+
+      it("parses", () => {
+        expect(load).not.toThrow();
+      });
 
       it("cites only allowed sites, per section", () => {
+        const note = load();
         for (const s of note.sections) {
           if (s.team_guidance) continue;
           expect(s.sources.length, s.heading).toBeGreaterThan(0);
@@ -96,12 +102,14 @@ describe("rag/notes", () => {
       });
 
       it("ends with a sourced 'When to get checked' section", () => {
+        const note = load();
         const last = note.sections.at(-1)!;
         expect(last.heading).toBe("When to get checked");
         expect(last.team_guidance).toBe(false);
       });
 
       it("has more sourced sections than team guidance", () => {
+        const note = load();
         const guidance = note.sections.filter((s) => s.team_guidance).length;
         expect(note.sections.length - guidance).toBeGreaterThan(guidance);
       });
