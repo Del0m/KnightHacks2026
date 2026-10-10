@@ -1,0 +1,92 @@
+{
+  "$schema": "./schema.json",
+  "spec_version": 1,
+  "id": "shoulder_press",
+  "name": "Shoulder Press",
+  "recommended_view": "front",
+  "angles": {
+    "elbow": { "type": "joint_angle", "joints": ["shoulder", "elbow", "wrist"], "side": "most_visible" },
+    "trunk": { "type": "segment_tilt", "from": "mid_hip", "to": "mid_shoulder" },
+    "forearm": { "type": "segment_tilt", "from": "elbow", "to": "wrist", "side": "max" }
+  },
+  "primary_angle": { "name": "elbow", "direction": "increasing" },
+  "phases": {
+    "start_exit": 100,
+    "count_min": 135,
+    "target": 160,
+    "start_enter": 95,
+    "reverse_deg": 5,
+    "min_state_ms": 150,
+    "set_end_still_ms": 8000
+  },
+  "rules": [
+    {
+      "id": "back_arch",
+      "phase": "rep",
+      "view": "side",
+      "check": { "metric": "trunk", "reduce": "max", "op": "<=", "value": 15 },
+      "severity": "safety",
+      "priority": 1,
+      "label": "back_arch",
+      "joints": ["left_shoulder", "right_shoulder", "left_hip", "right_hip"],
+      "rest_note": "Your lower back arched on {n} reps. Ribs stacked over the hips keep the load off your lower back."
+    },
+    {
+      "id": "lockout",
+      "phase": "peak",
+      "view": "any",
+      "check": { "metric": "elbow", "reduce": "max", "op": ">=", "value": "target" },
+      "severity": "form",
+      "priority": 2,
+      "label": "incomplete_lockout",
+      "joints": ["left_elbow", "right_elbow", "left_wrist", "right_wrist"],
+      "rest_note": "Next set, try reaching until your arms are nearly straight overhead."
+    },
+    {
+      "id": "wrist_stack",
+      "phase": "rep",
+      "view": "front",
+      "check": { "metric": "forearm", "reduce": "max", "op": "<=", "value": 20 },
+      "severity": "form",
+      "priority": 3,
+      "label": "wrists_off_stack",
+      "joints": ["left_elbow", "right_elbow", "left_wrist", "right_wrist"],
+      "rest_note": "Your wrists drifted out from over your elbows on {n} reps. Stacking them makes the press steadier."
+    },
+    {
+      "id": "tempo",
+      "phase": "return",
+      "view": "any",
+      "check": { "metric": "duration_ms", "op": ">=", "value": 800 },
+      "severity": "form",
+      "priority": 4,
+      "label": "fast_lowering",
+      "joints": ["left_elbow", "right_elbow", "left_wrist", "right_wrist"],
+      "rest_note": "Your reps took about {t} s on the way down. Around 2 s gives you more control."
+    }
+  ],
+  "injury_overrides": {
+    "knee": {
+      "extra_note": "The shoulder press puts little load on the knees. A seated press takes them out of it entirely."
+    },
+    "shoulder": {
+      "phases": { "count_min": 125, "target": 145 },
+      "rules": {
+        "tempo": {
+          "value": 1200,
+          "rest_note": "Your reps took about {t} s on the way down. A slower 2 to 3 s is gentler on a recovering shoulder."
+        }
+      },
+      "extra_note": "The overhead range here is set shorter to suit a recovering shoulder. Any pain is worth raising with your physio or a doctor."
+    },
+    "lower_back": {
+      "rules": {
+        "back_arch": {
+          "value": 10,
+          "rest_note": "Your lower back arched on {n} reps. A seated press with back support takes the strain off a recovering lower back."
+        }
+      },
+      "extra_note": "The back arch limit here is set tighter to go easy on a recovering lower back. Any pain is worth raising with your physio or a doctor."
+    }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "$schema": "./schema.json",
+  "spec_version": 1,
+  "id": "bicep_curl",
+  "name": "Bicep curl",
+  "recommended_view": "side",
+  "angles": {
+    "elbow": { "type": "joint_angle", "joints": ["shoulder", "elbow", "wrist"], "side": "most_visible" },
+    "upper_arm": { "type": "joint_angle", "joints": ["hip", "shoulder", "elbow"], "side": "most_visible" },
+    "trunk": { "type": "segment_tilt", "from": "mid_hip", "to": "mid_shoulder" }
+  },
+  "primary_angle": { "name": "elbow", "direction": "decreasing" },
+  "phases": {
+    "start_exit": 145,
+    "count_min": 100,
+    "target": 60,
+    "start_enter": 150,
+    "reverse_deg": 5,
+    "min_state_ms": 150,
+    "set_end_still_ms": 8000
+  },
+  "rules": [
+    {
+      "id": "range",
+      "phase": "peak",
+      "view": "any",
+      "check": { "metric": "elbow", "reduce": "min", "op": "<=", "value": "target" },
+      "severity": "form",
+      "priority": 1,
+      "label": "partial_range",
+      "joints": ["left_elbow", "right_elbow", "left_wrist", "right_wrist"],
+      "rest_note": "Next set, try curling until your forearm comes up close to your upper arm."
+    },
+    {
+      "id": "elbow_drift",
+      "phase": "rep",
+      "view": "side",
+      "check": { "metric": "upper_arm", "reduce": "max", "op": "<=", "value": 25 },
+      "severity": "form",
+      "priority": 3,
+      "label": "elbow_drift",
+      "joints": ["left_shoulder", "right_shoulder", "left_elbow", "right_elbow"],
+      "rest_note": "Your elbows drifted forward on {n} reps. Elbows that stay by your sides keep the work in the biceps."
+    },
+    {
+      "id": "torso_swing",
+      "phase": "rep",
+      "view": "side",
+      "check": { "metric": "trunk", "reduce": "max", "op": "<=", "value": 10 },
+      "severity": "form",
+      "priority": 2,
+      "label": "torso_swing",
+      "joints": ["left_shoulder", "right_shoulder", "left_hip", "right_hip"],
+      "rest_note": "Your upper body swung on {n} reps. A still torso keeps the work in your arms."
+    },
+    {
+      "id": "tempo",
+      "phase": "return",
+      "view": "any",
+      "check": { "metric": "duration_ms", "op": ">=", "value": 800 },
+      "severity": "form",
+      "priority": 4,
+      "label": "fast_lowering",
+      "joints": ["left_elbow", "right_elbow", "left_wrist", "right_wrist"],
+      "rest_note": "Your reps took about {t} s on the way down. Around 2 s gives you more control."
+    }
+  ],
+  "injury_overrides": {
+    "knee": {
+      "extra_note": "Curls put little load on the knees. A seated curl takes the knees out of the movement entirely."
+    },
+    "shoulder": {
+      "rules": {
+        "elbow_drift": {
+          "value": 15,
+          "rest_note": "Your elbows drifted forward on {n} reps. Elbows that stay by your sides go easier on a recovering shoulder."
+        }
+      },
+      "extra_note": "The elbow position limit here is set tighter to suit a recovering shoulder. Any pain is worth raising with your physio or a doctor."
+    },
+    "lower_back": {
+      "rules": {
+        "torso_swing": {
+          "value": 6,
+          "severity": "safety",
+          "rest_note": "Your upper body swung on {n} reps. A still torso keeps the load off your lower back."
+        }
+      },
+      "extra_note": "The swing limit here is set tighter to go easy on a recovering lower back. A lighter weight often makes a still torso easier. Any pain is worth raising with your physio or a doctor."
+    }
+  }
+}
