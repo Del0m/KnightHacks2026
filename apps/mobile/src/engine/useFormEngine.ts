@@ -24,7 +24,8 @@ export interface FormEngineState {
 /**
  * Runs the form engine on pose detections. Re-renders when the rep state, count or set end changes,
  * plus the throttled primary angle. Every engine event (rep windows included) goes to `onEvent`.
- * The engine is rebuilt when `spec` or `imageAspect` changes; other options are read at that time.
+ * The engine is rebuilt when `spec` changes; other options are read at that time, except
+ * `imageAspect`, which is passed to the running engine so a set survives it.
  */
 export function useFormEngine(
   spec: ExerciseSpec | null,
@@ -38,10 +39,11 @@ export function useFormEngine(
   const optsRef = useRef(opts);
   optsRef.current = opts;
 
-  const engine = useMemo(
-    () => (spec ? createFormEngine(spec, { ...optsRef.current, imageAspect }) : null),
-    [spec, imageAspect],
-  );
+  const engine = useMemo(() => (spec ? createFormEngine(spec, optsRef.current) : null), [spec]);
+
+  useEffect(() => {
+    engine?.setImageAspect(imageAspect);
+  }, [engine, imageAspect]);
 
   const [state, setState] = useState<RepState>('start');
   const [repCount, setRepCount] = useState(0);
@@ -65,6 +67,7 @@ export function useFormEngine(
   }, []);
 
   useEffect(() => {
+    primaryAt.current = 0;
     setState('start');
     setRepCount(0);
     setEnded(false);
@@ -87,6 +90,7 @@ export function useFormEngine(
   const reset = useCallback(() => {
     if (!engine) return;
     engine.reset();
+    primaryAt.current = 0;
     setState('start');
     setRepCount(0);
     setEnded(false);

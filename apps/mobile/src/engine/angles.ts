@@ -31,6 +31,8 @@ export interface MetricComputer {
   compute(joints: SmoothedJoints): { metrics: Metrics; sides: MetricSides };
   /** Keeps every `most_visible` side fixed while true (except the null fallback). */
   setLocked(locked: boolean): void;
+  /** Replaces `imageAspect` (undefined restores the default) without touching the sticky sides. */
+  setImageAspect(aspect: number | undefined): void;
   reset(): void;
 }
 
@@ -113,7 +115,7 @@ interface SideReading {
 
 /** Computes every metric of `spec` each frame, keeping a sticky side per `most_visible` metric. */
 export function createMetricComputer(spec: ExerciseSpec, opts: MetricComputerOptions = {}): MetricComputer {
-  const imageAspect = opts.imageAspect ?? 9 / 16;
+  let imageAspect = opts.imageAspect ?? 9 / 16;
   const sideMargin = opts.sideMargin ?? 0.1;
   const minDen = opts.minRatioDenominator ?? 0.02;
   const entries = Object.entries(spec.angles).map(([name, angle]) => ({
@@ -190,6 +192,9 @@ export function createMetricComputer(spec: ExerciseSpec, opts: MetricComputerOpt
         sides[name] = side;
       }
       return { metrics, sides };
+    },
+    setImageAspect(aspect) {
+      imageAspect = aspect ?? 9 / 16;
     },
     setLocked(next) {
       locked = next;

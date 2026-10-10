@@ -25,6 +25,8 @@ export interface FormEngine {
   pushAbsent(tMs: number): EngineUpdate;
   /** Manual set end: closes or drops the open rep, then emits `set_ended`. */
   endSet(tMs: number): EngineUpdate;
+  /** Changes the upright aspect mid-set, e.g. once the camera resolution is known or after a flip. */
+  setImageAspect(aspect: number | undefined): void;
   reset(): void;
 }
 
@@ -142,6 +144,9 @@ export function createFormEngine(spec: ExerciseSpec, options: EngineOptions = {}
     },
     endSet(tMs) {
       return finish(tMs, counter.end(tMs, 'manual'), null, emptyMetrics(), {}, null);
+    },
+    setImageAspect(aspect) {
+      metricsOf.setImageAspect(aspect);
     },
     reset() {
       smoother.reset();

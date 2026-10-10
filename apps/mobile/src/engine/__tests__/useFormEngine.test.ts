@@ -46,6 +46,39 @@ describe('useFormEngine', () => {
     act(() => renderer.unmount());
   });
 
+  it('keeps a running set when the aspect changes', () => {
+    const latest: { current: FormEngineState | null } = { current: null };
+    function Probe({ aspect }: { aspect?: number }) {
+      latest.current = useFormEngine(getSpec('squat')!, { imageAspect: aspect });
+      return null;
+    }
+    const aspect = clip.image.width / clip.image.height;
+    let renderer: ReturnType<typeof create>;
+    act(() => { renderer = create(React.createElement(Probe, { aspect })); });
+    const push = (f: (typeof clip.frames)[number]) =>
+      act(() => latest.current!.onPose(isAbsentFrame(f) ? { latencyMs: 5 } : { result: f, latencyMs: 5 }));
+    const half = Math.floor(clip.frames.length / 2);
+    for (const f of clip.frames.slice(0, half)) push(f);
+    expect(latest.current!.repCount).toBeGreaterThan(0);
+    // A new resolution mid-set (e.g. the first one arriving late) must not reset the count.
+    act(() => renderer.update(React.createElement(Probe, { aspect: aspect * 1.001 })));
+    for (const f of clip.frames.slice(half)) push(f);
+    expect(latest.current!.repCount).toBe(clip.expected!.reps);
+    act(() => renderer.unmount());
+  });
+
+  it('shows the primary angle on the first pose after a reset', () => {
+    const { latest, renderer } = mount(getSpec('squat')!);
+    const poses = clip.frames.filter((f) => !isAbsentFrame(f));
+    act(() => latest.current!.onPose({ result: poses[0] as never, latencyMs: 5 }));
+    expect(latest.current!.primary).not.toBeNull();
+    act(() => latest.current!.reset());
+    expect(latest.current!.primary).toBeNull();
+    act(() => latest.current!.onPose({ result: poses[1] as never, latencyMs: 5 }));
+    expect(latest.current!.primary).not.toBeNull();
+    act(() => renderer.unmount());
+  });
+
   it('ignores detections without a spec', () => {
     const { latest, renderer } = mount(null);
     act(() => latest.current!.onPose({ latencyMs: 5 }));
