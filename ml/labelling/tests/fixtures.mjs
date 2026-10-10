@@ -1,0 +1,4 @@
+export function fixture() {
+ return {schema_version:1,clip_id:'clip-a',session_id:'session-a',participant_id:'self',exercise_id:'squat',view:'side',camera_position:'back',side:'bilateral',context:'standard',image:{width:720,height:1280},source:'coreml',model:'pose',origin:'recorded',consent:{reference:'consent-a',version:'joint-capture-v1',allowed_use:true,purpose:'private_model_development'},status:'complete',stop_reason:'manual',frames:[0,50,200].map((timestamp_ms,i)=>({timestamp_ms,score:.9,joints:Array.from({length:17},()=>({x:.2+i*.1,y:.5,c:.9}))})),annotations:[],suggestions:[]};
+}
+export function annotation() { return {rep_id:'rep-a',start_frame:0,end_frame:3,state:'accepted',human_labels:['partial_range'],primary_label:'partial_range',reviewer_id:'self',reviewed_at:'2026-10-10T19:00:00Z',boundary_provenance:'manual',revision:1}; }

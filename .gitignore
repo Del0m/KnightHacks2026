@@ -11,3 +11,6 @@ node_modules/
 # Sync conflict copies (iCloud / Finder "name 2.ext")
 * 2
 * 2.*
+
+# AI-09 private recordings, consent evidence and dataset exports
+ml/labelling/data/
