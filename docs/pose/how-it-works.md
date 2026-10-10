@@ -131,4 +131,38 @@ That number covers the model alone. PoseBench's latency also includes Vision's r
 - **`PoseCore` as-is:** add it as a local Swift package to the Expo iOS project. It's pure Swift, with no app or UI code.
 - **The `CoreMLPoseEstimator` logic:** the frame-processor plugin receives a `CVPixelBuffer` per frame, which is exactly what `estimate` takes. Copy the class, or move it into `PoseCore` if both need it.
 - **The capture rule:** configure vision-camera for portrait, unmirrored frames (or rotate before inference), and mirror only in the overlay.
-- **The `PoseEstimating` protocol** (in `PoseCore`): the seam where a cloud estimator for non-iPhone users (CONN-11) plugs in.
+- **The `PoseEstimating` protocol** (in `PoseCore`): the seam where a cloud estimator for Android and slow iPhones (CONN-11) plugs in.
+
+## Running in the Expo app
+
+Issue #42 runs this pipeline in `apps/mobile`, an Expo 57 dev build with Vision Camera v5 and a local Nitro plugin. Setup: [apps/mobile/README.md](../../apps/mobile/README.md). The app consumes the same PoseCore sources as a local CocoaPod; the Swift-package suggestion above was the earlier integration outline.
+
+At prebuild, `withPoseModels` copies both `.mlpackage` files from PoseBench's `Models/` folder into the generated iOS project. Xcode compiles them into the app bundle. If either model is missing, prebuild stops with the instruction to run `uv run export.py` in `ml/pose_export`.
+
+One processed frame follows this path:
+
+1. **Vision Camera v5 → worklet.** `usePoseOutput` receives a frame in sensor orientation, with `orientation` and `isMirrored` flags.
+2. **`detect` → `ImageOrientation`.** The hook binds its frame output to `HybridPoseDetector` before frame callbacks start. The detector takes the native pixel buffer and the output's active capture connection. `ImageOrientation.vision` uses native rotation angles plus `isMirrored` to produce a Vision orientation and upright frame size. Quarter-turn corrections swap width and height before decode.
+3. **Vision → Core ML.** `VNImageRequestHandler` receives the buffer and orientation. The `.scaleFit` request letterboxes it; compute units `.all` allow Core ML to use the Neural Engine.
+4. **`MultiArrayReader` → `PoseDecoder`.** The decoder selects one person, removes letterbox padding, and returns 17 normalized joints with confidence. The plugin returns `PoseDetection` with `result` and `latencyMs`. `FrameTimestamp` converts the sample buffer's capture timestamp to Unix milliseconds using the host-clock offset, so processing delay is not added to `timestamp_ms`. No person means `result` is `undefined`.
+5. **`scheduleOnRN` → `onPose`.** The worklet schedules the detection on the JS thread. Its `finally` block disposes the processed frame, including when inference throws. The JS callback updates the screen; per-frame errors are reported without stopping the stream.
+
+Unlike PoseBench's capture path above, this app does not request physical buffer rotation at capture. Vision Camera v5 supplies orientation and mirror metadata. The detector reads the capture connection's actual `videoRotationAngle`, rather than assuming the reported quarter-turn flag matches the sensor's mounting. It passes the remaining correction to Vision, avoiding an extra buffer rotation. The screen uses `orientationSource="interface"` in the portrait app.
+
+Front and back cameras do not necessarily share a sensor mounting or connection angle. The detector creates a detached reference connection from the active camera's input ports. Asking AVFoundation to orient that reference to the output's target gives the required angle for that camera. The reference is never added to a session and never processes frames. Only the difference between its angle and the live connection's angle is sent to Vision. A camera switch rebuilds the reference; no front/back-specific 90° constant or global flag swap is used. The reference uses the legacy `videoOrientation` setter for the interface target, then reads `videoRotationAngle`; it does not change the live connection. See [AVFoundation capture connections](https://developer.apple.com/documentation/avfoundation/avcaptureconnection) and [video rotation angles](https://developer.apple.com/documentation/avfoundation/avcaptureconnection/videorotationangle).
+
+EXIF `.right` corrects counter-clockwise-rotated pixels; `.left` corrects clockwise-rotated pixels. Mirrored quarter-turns also flip horizontally after correction. Tests check actual landmark positions for all eight combinations, plus camera-specific angle differences and already-rotated buffers. See [Apple's EXIF right orientation](https://developer.apple.com/documentation/imageio/cgimagepropertyorientation/right) and [mirrored right orientation](https://developer.apple.com/documentation/imageio/cgimagepropertyorientation/rightmirrored).
+
+**Throttle and drops:** `usePoseOutput` keeps the last processed frame time in a `createSynchronizable` value shared with the worklet. With the default `maxFps = 15`, frames arriving less than `1000 / 15` ms later are disposed immediately. A 0.001 ms tolerance prevents floating-point rounding from skipping a frame exactly on the boundary. A restarted camera timestamp resets the throttle. Frames are never queued. The hook sets Vision Camera's `dropFramesWhileBusy` to `true`, so it also drops incoming frames while the processor is busy. The fps readout counts successful detections delivered to JS in the last second, including frames with no person. The dropped readout counts camera-pipeline drops, not throttle skips.
+
+**Mirroring:** the camera uses `mirrorMode="off"`, keeping inference input unmirrored and left/right anatomical. For the front camera, the preview alone is flipped with `scaleX: -1`, and the skeleton receives `mirrored = true` to flip its drawn x coordinates. The returned joints are unchanged. See [pose-result-contract.md](pose-result-contract.md) for coordinates and COCO joint order.
+
+## Basic mode (Apple Vision)
+
+Basic mode is a manual, iPhone-only option that uses Apple Vision body pose instead of YOLOv8n-pose (Architecture §4.1).
+
+- **Same frame path.** It uses the same Vision Camera frame output, throttle and `ImageOrientation` calibration as the Core ML detector.
+- **Different request.** `VNDetectHumanBodyPoseRequest` replaces `VNCoreMLRequest`. There is no square model input, so there is no letterbox to undo.
+- **Same result.** `VisionPoseMapper` converts Vision's points to a `PoseResult` with `source = "vision"`. The joint mapping, y flip and score rule are in [pose-result-contract.md](pose-result-contract.md#apple-vision-mapping).
+- **JS entry.** `useBasicPoseOutput` in `src/pose/basic.ts`, or `usePoseOutput({ engine: 'vision' })`. Both call `createBasicPoseDetector()` from `spotter-pose`, backed by the native `HybridBasicPoseDetector`. Both detectors share `PoseFrameReader` for orientation and timestamps.
+- **Debug screen.** A Core ML / Vision toggle switches detectors on the same camera feed.

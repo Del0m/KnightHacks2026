@@ -16,6 +16,8 @@ public struct Joint: Equatable, Codable, Sendable {
 
 public enum PoseSource: String, Codable, Sendable {
     case coreml
+    /// Apple Vision body pose, the manual basic mode on iPhone.
+    case vision
     case cloud
 }
 

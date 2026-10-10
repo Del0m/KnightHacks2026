@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spotter · model preview</title><style>
+@font-face{font-family:Barlow;src:url('./Barlow.ttf')}*{box-sizing:border-box}body{margin:0;color:#153f58;background:linear-gradient(125deg,#fff,#e9f7ff);font-family:Barlow,sans-serif}main{max-width:1080px;margin:auto;padding:28px}header{display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:36px;margin:0}header span{font-size:14px;color:#527182}#stage{height:min(56vh,520px);min-height:320px;position:relative}canvas{display:block;width:100%;height:100%;touch-action:none;opacity:0;transition:opacity 650ms ease}body.ready canvas{opacity:1}#status{font-size:16px;margin:8px 0 12px;color:#527182}nav{display:block;opacity:0;transform:translateY(8px);transition:opacity 550ms ease,transform 550ms cubic-bezier(.22,1,.36,1)}body.ready nav{opacity:1;transform:translateY(0)}h2{font-size:22px;font-weight:600;margin:22px 0 14px}ul{list-style:none;padding:0;margin:0}li{border-top:1px solid #d5e6ef}li:last-child{border-bottom:1px solid #d5e6ef}button{font:inherit;text-align:left;font-size:19px;width:100%;display:flex;align-items:center;gap:18px;padding:17px 10px;border:0;border-left:3px solid transparent;border-radius:0;background:transparent;color:#153f58;cursor:pointer;position:relative;transition:background-color 350ms ease,color 350ms ease,transform 180ms cubic-bezier(.22,1,.36,1),border-color 350ms ease}button:hover{background:rgba(224,242,253,.28)}button:active{transform:scale(.985)}button[aria-pressed=true]{border-left-color:#087dba;background:rgba(224,242,253,.45)}button .number{font-size:14px;color:#527182}button small{display:block;font-size:14px;color:#527182;margin-top:4px}button .arrow{margin-left:auto;color:#087dba;transition:transform 500ms cubic-bezier(.22,1,.36,1)}button[aria-pressed=true] .arrow{transform:rotate(-90deg)}button:focus-visible{outline:3px solid #153f58;outline-offset:4px}button:disabled{opacity:.5;cursor:wait}.playback{display:flex;align-items:center;justify-content:space-between;gap:12px}#pause{width:auto;font-size:15px;padding:8px 0;color:#087dba;white-space:nowrap}#pause[hidden]{display:none}.help{font-size:15px;color:#527182}footer{font-size:12px;color:#527182;margin-top:24px}a{color:inherit}@media(prefers-reduced-motion:reduce){nav,canvas,button,button .arrow{transition:none!important;transform:none!important}}
+</style><script type="importmap">{"imports":{"three":"./three.module.js"}}</script></head><body><main><header><h1>spotter.</h1><span>3D interaction preview</span></header><div id="stage" aria-label="Interactive smooth human figure"></div><div class="playback"><div id="status" role="status">Loading model…</div><button id="pause" hidden>Pause movement</button></div><nav aria-label="Today’s workout plan"><h2>Today’s workout plan:</h2><ul><li><button data-exercise="curl" aria-pressed="false" disabled><span class="number">01</span><span>Bicep curl<small>Biceps · controlled curl</small></span><span class="arrow">↗</span></button></li><li><button data-exercise="squat" aria-pressed="false" disabled><span class="number">02</span><span>Squat<small>Quads · Controlled parallel squat</small></span><span class="arrow">↗</span></button></li><li><button data-exercise="press" aria-pressed="false" disabled><span class="number">03</span><span>Shoulder press<small>Shoulders · slow overhead reach</small></span><span class="arrow">↗</span></button></li></ul></nav><p class="help">Drag to rotate. Scroll or pinch to zoom. Choose an exercise to see it move. Click it again to zoom out and reset.</p><footer>MakeHuman CC0 base mesh · rigged smooth human figure. Preview only; not yet integrated into the app.</footer></main><script type="module">
+import * as THREE from 'three';import{OrbitControls}from'./OrbitControls.js';import{GLTFLoader}from'./GLTFLoader.js';import{createMovement}from'./movement.js';
+const stage=document.querySelector('#stage'),status=document.querySelector('#status'),buttons=[...document.querySelectorAll('[data-exercise]')],pauseButton=document.querySelector('#pause');
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(38,1,.01,20);camera.position.set(0,.93,3.2);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0xffffff,0);stage.prepend(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(0,.84,0);controls.enableDamping=true;controls.dampingFactor=.08;controls.minDistance=.25;controls.maxDistance=5;
+scene.add(new THREE.HemisphereLight(0xeef8ff,0x617888,1.5));const key=new THREE.DirectionalLight(0xffffff,1.8);key.position.set(-2,3,4);scene.add(key);const rim=new THREE.DirectionalLight(0x8ed6ff,.9);rim.position.set(3,2,-2);scene.add(rim);
+const shimmerUniform={value:0},glowUniform={value:0},armStart={value:new THREE.Vector3()},armEnd={value:new THREE.Vector3()},armStartR={value:new THREE.Vector3()},armEndR={value:new THREE.Vector3()};
+const envScene=new THREE.Scene();envScene.background=new THREE.Color(0xb7c3cd);
+for(const [x,y,z,w,h] of [[-3,2,2,2,5],[3,2,1,2,4],[0,4,-2,5,2]]){const panel=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide}));panel.position.set(x,y,z);panel.lookAt(0,1,0);envScene.add(panel);}const pmrem=new THREE.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(envScene,.15).texture;pmrem.dispose();
+const silver=new THREE.MeshStandardMaterial({color:0xb2bac1,roughness:.48,metalness:.18,envMapIntensity:.65,side:THREE.DoubleSide});
+silver.onBeforeCompile=shader=>{shader.uniforms.focusAmount=glowUniform;shader.uniforms.shimmerTime=shimmerUniform;shader.uniforms.armStart=armStart;shader.uniforms.armEnd=armEnd;shader.uniforms.armStartR=armStartR;shader.uniforms.armEndR=armEndR;shader.vertexShader='varying vec3 surfacePosition;\n'+shader.vertexShader.replace('#include <project_vertex>','surfacePosition = (modelMatrix * vec4(transformed,1.0)).xyz;\n#include <project_vertex>');shader.fragmentShader='varying vec3 surfacePosition; uniform float focusAmount; uniform float shimmerTime; uniform vec3 armStart; uniform vec3 armEnd; uniform vec3 armStartR; uniform vec3 armEndR;\n'+shader.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\nvec3 ab=armEnd-armStart;float along=clamp(dot(surfacePosition-armStart,ab)/max(dot(ab,ab),0.0001),0.0,1.0);vec3 offset=surfacePosition-(armStart+along*ab);float heat=exp(-dot(offset,offset)/0.004)*sin(along*3.14159)*focusAmount;vec3 abr=armEndR-armStartR;float ar=clamp(dot(surfacePosition-armStartR,abr)/max(dot(abr,abr),0.0001),0.0,1.0);vec3 offr=surfacePosition-(armStartR+ar*abr);heat+=exp(-dot(offr,offr)/0.004)*sin(ar*3.14159)*focusAmount;float wave=0.86+0.14*sin(shimmerTime*2.4+along*11.0);float sheen=exp(-pow((along-fract(shimmerTime*0.24))/0.16,2.0));totalEmissiveRadiance+=vec3(2.3,0.012,0.006)*heat*(wave+0.22*sheen);');};
+const focusBounds=new THREE.Box3();let animation=null,selected=null,movement=null;const reduce=matchMedia('(prefers-reduced-motion: reduce)');
+function resize(){const{width,height}=stage.getBoundingClientRect();renderer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix()}new ResizeObserver(resize).observe(stage);resize();
+controls.addEventListener('start',()=>{if(animation)animation.cameraCancelled=true});
+let statusMotion=null;
+function updateStatus(text){status.textContent=text;if(reduce.matches)return;statusMotion?.cancel();statusMotion=status.animate([{opacity:.3,transform:'translateY(3px)'},{opacity:1,transform:'translateY(0)'}],{duration:260,easing:'ease-out'});}
+function select(id){
+ const focus=Boolean(id);selected=id;movement.select(id);
+ buttons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.exercise===id)));
+ pauseButton.hidden=!focus;pauseButton.textContent=reduce.matches?'Play movement':'Pause movement';
+ if(reduce.matches&&movement.playing)movement.pause();
+ const target=id==='curl'?new THREE.Vector3(.18,1.30,.08):id==='press'?new THREE.Vector3(0,1.35,0):new THREE.Vector3(0,.8,0);
+ focusBounds.setFromCenterAndSize(target,new THREE.Vector3(.3,.3,.3));
+ const toTarget=focus?focusBounds.getCenter(new THREE.Vector3()):new THREE.Vector3(0,.84,0);
+ const toPosition=focus?toTarget.clone().add(new THREE.Vector3(id==='curl'?.45:1.0,.12,id==='curl'?1.45:2.7)):new THREE.Vector3(0,.93,3.2);
+ const fromOrbit=new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+ const toOrbit=new THREE.Spherical().setFromVector3(toPosition.clone().sub(toTarget));
+ // Follow the shorter arc, including when the user manually rotated the body.
+ toOrbit.theta=fromOrbit.theta+Math.atan2(Math.sin(toOrbit.theta-fromOrbit.theta),Math.cos(toOrbit.theta-fromOrbit.theta));
+ animation={started:performance.now(),duration:focus?900:720,fromTarget:controls.target.clone(),toTarget,fromOrbit,toOrbit,fromGlow:glowUniform.value,toGlow:focus?1:0,cameraCancelled:false};
+ updateStatus(focus?({curl:'Bicep curl',squat:'Squat',press:'Shoulder press'}[id]+' — movement preview'):'Whole body — drag to explore');
+}
+buttons.forEach(button=>button.onclick=()=>select(selected===button.dataset.exercise?null:button.dataset.exercise));
+pauseButton.onclick=()=>{const playing=movement.pause();pauseButton.textContent=playing?'Pause movement':'Resume movement';};
+try{const [gltf,dumbbell]=await Promise.all([new GLTFLoader().loadAsync('./rigged-human.glb'),new GLTFLoader().loadAsync('./dumbbell.glb')]);gltf.scene.traverse(o=>{if(o.isMesh){o.material=silver;o.frustumCulled=false;}});scene.add(gltf.scene);movement=createMovement(gltf.scene,dumbbell.scene);buttons.forEach(b=>b.disabled=false);document.body.classList.add('ready');status.textContent='Rigged human model — choose an exercise';}catch(error){status.textContent='Model could not load. Please reload the preview.';console.error(error)}
+let previous=performance.now();
+const orbit=new THREE.Spherical(),offset=new THREE.Vector3();
+renderer.setAnimationLoop(()=>{
+ const now=performance.now(),dt=Math.min((now-previous)/1000,.05);previous=now;
+ if(movement){movement.update(dt,reduce.matches&& !movement.playing);const bones=movement.bones;const start=selected==='squat'?'upperleg01.L':'upperarm01.L',end=selected==='squat'?'lowerleg01.L':'lowerarm01.L';bones[start].getWorldPosition(armStart.value);bones[end].getWorldPosition(armEnd.value);bones[start.replace('.L','.R')].getWorldPosition(armStartR.value);bones[end.replace('.L','.R')].getWorldPosition(armEndR.value);if(selected==='press'){armEnd.value.lerp(armStart.value,.65);armEndR.value.lerp(armStartR.value,.65);}}
+ shimmerUniform.value=reduce.matches?0:now/1000;
+ if(animation){
+  const t=reduce.matches?1:Math.min((now-animation.started)/animation.duration,1);
+  const ease=t*t*t*(t*(t*6-15)+10);
+  glowUniform.value=THREE.MathUtils.lerp(animation.fromGlow,animation.toGlow,ease);
+  if(!animation.cameraCancelled){
+   controls.target.lerpVectors(animation.fromTarget,animation.toTarget,ease);
+   orbit.radius=THREE.MathUtils.lerp(animation.fromOrbit.radius,animation.toOrbit.radius,ease);
+   orbit.phi=THREE.MathUtils.lerp(animation.fromOrbit.phi,animation.toOrbit.phi,ease);
+   orbit.theta=THREE.MathUtils.lerp(animation.fromOrbit.theta,animation.toOrbit.theta,ease);
+   camera.position.copy(controls.target).add(offset.setFromSpherical(orbit));
+  }
+  if(t===1)animation=null;
+ }
+ controls.update();renderer.render(scene,camera);
+});
+</script></body></html>

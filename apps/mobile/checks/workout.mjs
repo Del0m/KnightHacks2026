@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { calendarDay, streak, streakTier, readSaved, initialProfile } from '../src/data/workout.ts';
+const w = day => ({ id: day, day, finishedAt: day+'T12:00:00Z', sets: 9, reps: 96, minutes: 20 });
+const now = new Date(2026,9,10,12);
+assert.equal(calendarDay(now),'2026-10-10');
+assert.equal(streak([],now),0);
+assert.equal(streak([w('2026-10-10'),w('2026-10-10'),w('2026-10-09')],now),2);
+assert.equal(streak([w('2026-10-09'),w('2026-10-08')],now),2);
+assert.equal(streak([w('2026-10-08')],now),0);
+for(const [days,tier] of [[0,0],[1,1],[6,1],[7,2],[29,2],[30,3],[99,3],[100,4]])assert.equal(streakTier(days),tier);
+assert.equal(readSaved({profile:{...initialProfile,days:[8]},workouts:[]}),null);
+assert.equal(readSaved({profile:initialProfile,workouts:[w('2026-10-10'),{...w('2026-10-09'),reps:NaN}]}).workouts.length,1);
+console.log('Local calendar streak, repeated same-day completion, milestones, and saved-data validation pass.');
