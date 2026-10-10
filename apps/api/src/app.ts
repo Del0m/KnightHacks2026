@@ -12,6 +12,7 @@ import { feedRouter } from "./routes/feed.js";
 import { healthRouter } from "./routes/health.js";
 import { meRouter } from "./routes/me.js";
 import { progressRouter } from "./routes/progress.js";
+import { rehabRouter } from "./routes/rehab.js";
 import { sessionsRouter } from "./routes/sessions.js";
 import { socialRouter } from "./routes/social.js";
 import { disabledExportQueue, JointsBuffer, type ExportQueue } from "./services/exportQueue.js";
@@ -77,6 +78,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(meRouter(deps.db, { pseudonymSecret: deps.pseudonymSecret, onAccountDeleted: provision.forget }));
   app.use(sessionsRouter(deps.db, { exportQueue, joints, log: logger }));
   app.use(progressRouter(deps.db));
+  app.use(rehabRouter(deps.db));
   app.use(feedRouter(deps.db));
   app.use(socialRouter(deps.db, moderator));
   app.use(buddiesRouter(deps.db));
