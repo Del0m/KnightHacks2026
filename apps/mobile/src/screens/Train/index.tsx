@@ -13,10 +13,10 @@ export default function TrainScreen() {
   const { workouts } = useTraining(), reduced = useReducedMotion();
   const [selected, setSelected] = useState<ExerciseId | null>(exercises[0].id), [playing, setPlaying] = useState(false);
   const navigation = useNavigation<{ addListener(event: 'tabPress', listener: () => void): () => void }>();
-  const resetPreview = useCallback(() => { setSelected(exercises[0].id); setPlaying(false); }, []);
+  const resetPreview = useCallback(() => { setSelected(exercises[0].id); setPlaying(reduced === false); }, [reduced]);
   useFocusEffect(resetPreview);
   useEffect(() => navigation.addListener('tabPress', resetPreview), [navigation, resetPreview]);
-  function select(id: ExerciseId) { setSelected(selected === id ? null : id); setPlaying(selected !== id && reduced === false); }
+  function select(id: ExerciseId) { if (selected === id) return; setSelected(id); setPlaying(reduced === false); }
   return <AppPage compact><Streak days={streak(workouts)} />
     <View style={styles.separator} />
     <View style={{ position: 'relative' }}>
@@ -27,14 +27,15 @@ export default function TrainScreen() {
       </PolishedPressable>
     </View>
     <View style={styles.separator} />
-    <Text accessibilityRole="header" style={styles.agenda}>Todays agenda: <Text style={{ color: c.muted }}>Full body</Text></Text>
-    <View>{exercises.map((e, i) => <PolishedPressable key={e.id} testID={`exercise-${e.id}`} accessibilityRole="button" aria-pressed={selected === e.id} accessibilityHint="Select to focus and animate. Select again to zoom out." onPress={() => select(e.id)} style={({ pressed }) => [styles.row, { backgroundColor: selected === e.id || pressed ? 'rgba(255,255,255,0.65)' : 'transparent' }]}>
+    <Text accessibilityRole="header" style={styles.agenda}>Today’s workout: <Text style={{ color: c.muted }}>Full body</Text></Text>
+    <View>{exercises.map((e, i) => <PolishedPressable key={e.id} testID={`exercise-${e.id}`} accessibilityRole="button" aria-pressed={selected === e.id} accessibilityHint="Select to focus and play this exercise." onPress={() => select(e.id)} style={({ pressed }) => [styles.row, { backgroundColor: selected === e.id || pressed ? 'rgba(255,255,255,0.65)' : 'transparent' }]}>
       <Text style={[styles.number, selected === e.id && { color: c.primary }]}>{orderLabel(i + 1)}</Text>
       <Text style={[styles.name, selected === e.id && { color: c.primary }]}>{e.name}</Text>
       <View style={styles.details}><Text style={styles.reps}>{e.sets} × {e.reps} reps</Text><Text style={styles.detail}>{e.muscles}</Text></View>
     </PolishedPressable>)}</View>
-    <Action onPress={() => router.push('/workout')}>Begin Workout</Action>
-    <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>Sample routine · workout days build your streak</Text>
+    <Action onPress={() => router.push({ pathname: '/camera-setup', params: { exercise: exercises[0].id } })}>Begin Workout</Action>
+    <PolishedPressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={ui.muted}>Set goals & workout days</Text></PolishedPressable>
+    <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>Sample full-body routine</Text>
   </AppPage>;
 }
 const styles = StyleSheet.create({

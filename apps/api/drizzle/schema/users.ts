@@ -5,6 +5,7 @@ import {
   date,
   doublePrecision,
   index,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -62,6 +63,16 @@ export const profiles = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    // FE-03 answers retain their original cadence and self-reported bests.
+    personalBests: jsonb()
+      .$type<{ exercise: string; weight: number; unit: "lb" | "kg"; reps: number }[]>()
+      .notNull()
+      .default([]),
+    trainingSchedule: jsonb().$type<
+      { kind: "weekly"; days: number[] } | { kind: "interval"; every_days: number; start_date: string }
+    >(),
+    onboardingCompleted: boolean().notNull().default(false),
+    onboardingInjuryId: uuid(),
     bio: text(),
     autoPostMedals: boolean().notNull().default(false),
     autoPostPrs: boolean().notNull().default(false),

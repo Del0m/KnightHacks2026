@@ -60,7 +60,7 @@ export function usePoseOutput(opts: {
   const lastMs = useMemo(() => createSynchronizable<number | null>(null), []);
 
   const onPoseRef = useRef(onPose);
-  onPoseRef.current = onPose;
+  useLayoutEffect(() => { onPoseRef.current = onPose; }, [onPose]);
   const processedAt = useRef<number[]>([]);
   const droppedCount = useRef(0);
   const failedCount = useRef(0);

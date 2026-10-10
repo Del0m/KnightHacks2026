@@ -3,6 +3,7 @@ import { ActivityIndicator, Animated, Easing, Image, StyleSheet, Text, TextInput
 import * as ImagePicker from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
 import { AppPage, Action, pageStyles } from '@/components/AppPage';
+import { GlassChoice } from '@/components/GlassChoice';
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { Streak } from '@/components/Streak';
 import { calendarDay, streak } from '@/data/workout';
@@ -11,6 +12,9 @@ import { useAuth } from '@/screens/Auth/session';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { pageColors, typography as t, tabAccents } from '@/theme/tokens';
 import { monthCells } from './calendar';
+import { router } from 'expo-router';
+import { useOnboarding } from '@/screens/Onboarding/state';
+import { bestExercises } from '@/screens/Onboarding/model';
 
 const rose = tabAccents[4].color;
 const sections = ['Calendar', 'Videos', 'PBs'] as const;
@@ -23,6 +27,7 @@ const sectionColors = [tabAccents[0].color, tabAccents[2].color, tabAccents[4].c
 const c = pageColors('Me'), ui = pageStyles('Me');
 export default function ProgressScreen() {
   const { profile, updateProfile, workouts } = useTraining(), auth = useAuth();
+  const setup = useOnboarding();
   const [editing, setEditing] = useState(false), [name, setName] = useState(''), [bio, setBio] = useState('');
   const [photoBusy, setPhotoBusy] = useState(false), [error, setError] = useState<string | null>(null), [loggingOut, setLoggingOut] = useState(false);
   const [section, setSection] = useState(0), [tabWidth, setTabWidth] = useState(0), [slide] = useState(() => new Animated.Value(0));
@@ -49,7 +54,7 @@ export default function ProgressScreen() {
     finally { setPhotoBusy(false); }
   }
   function edit() { setName(displayName === 'Your name' ? '' : displayName); setBio(profile.bio); setEditing(true); }
-  return <AppPage title="Me">
+  return <AppPage title="Me" headerAction={<GlassChoice compact label="Settings" icon={<SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={c.text} />} onPress={() => router.push('/settings')} />}>
     <View style={styles.profile}>
       <View style={styles.identity}>
         <PolishedPressable accessibilityRole="button" accessibilityLabel="Change profile picture" disabled={photoBusy} onPress={() => { void pickPhoto(); }} style={styles.avatar}>
@@ -76,10 +81,14 @@ export default function ProgressScreen() {
       {tabWidth > 0 && <Animated.View pointerEvents="none" style={[styles.tabLine, { width: tabWidth / 3, backgroundColor: slide.interpolate({ inputRange: [0, tabWidth / 3, 2 * tabWidth / 3], outputRange: sectionColors, extrapolate: 'clamp' }), transform: [{ translateX: slide }] }]} />}
       {sections.map((label, index) => <PolishedPressable key={label} accessibilityRole="tab" accessibilityState={{ selected: index === section }} accessibilityLabel={label} onPress={() => setSection(index)} style={styles.tab}><SymbolView name={sectionIcons[index]} tintColor={sectionColors[index]} size={25} style={{ opacity: index === section ? 1 : 0.6 }} /></PolishedPressable>)}
     </View>
-    {section === 0 ? <WorkoutCalendar /> : <View style={styles.empty}>
+    {section === 0 ? <WorkoutCalendar /> : section === 2 && !!setup.profile?.personal_bests.length ? <View style={{ gap: 12, paddingVertical: 18 }}>
+      <Text style={ui.heading}>Personal bests</Text>
+      {setup.profile.personal_bests.map(best => <View key={best.exercise} style={ui.row}><Text style={ui.rowTitle}>{bestExercises.find(e => e.id === best.exercise)?.label}</Text><Text style={ui.text}>{best.weight} {best.unit} × {best.reps}</Text></View>)}
+      <Text style={ui.muted}>Self-reported during setup.</Text>
+    </View> : <View style={styles.empty}>
       <SymbolView name={section === 1 ? { ios: 'play.rectangle', android: 'video_library', web: 'video_library' } : { ios: 'trophy', android: 'emoji_events', web: 'emoji_events' }} tintColor={rose} size={34} />
       <Text style={ui.emptyTitle}>{section === 1 ? 'No videos yet' : 'No personal bests yet'}</Text>
-      <Text style={ui.muted}>{section === 1 ? 'Your workout videos will appear here.' : 'Your strength milestones will appear here.'}</Text>
+      <Text style={ui.muted}>{section === 1 ? 'Your workout videos will appear here.' : 'Add your personal bests in Settings.'}</Text>
     </View>}
     <View style={styles.account}>
       <Text style={ui.muted}>{auth.user?.email}</Text>
