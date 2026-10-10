@@ -63,7 +63,7 @@ Deletion on the phone removes linked app-managed drafts/exports and keeps a with
 
 ## Device acceptance: initial rehearsal confirmed; remaining checks pending
 
-The owner confirmed the Joint labelling screen appears and that capture, skeleton playback and human-review save worked on the installed Release build. Saved intervals and labels persisted after closing and reopening Spotter. The owner reported approximately 15 processed FPS during squat capture. Both the dataset bundle and separate private consent evidence physically arrived on the Mac. Trusted validation passed, including checksums, consent and source/training agreement. Unpack and strict reimport of the unpacked files also passed. The validated pilot contains one clip and five accepted squat annotations: four clean and one forward lean. The remaining boundary-edit, discard, interruption and privacy checks below are still pending.
+The owner confirmed the Joint labelling screen appears and that capture, skeleton playback and human-review save worked on the installed Release build. Saved intervals and labels persisted after closing and reopening Spotter. The owner reported approximately 15 processed FPS during squat capture. Both the dataset bundle and separate private consent evidence physically arrived on the Mac. Trusted validation passed, including checksums, consent and source/training agreement. Unpack and strict reimport of the unpacked files also passed. The validated pilot contains one clip and five accepted squat annotations: four clean and one forward lean. The owner subsequently confirmed that boundary edits save, discarding reduces accepted coverage, cancelling sharing preserves data, and backgrounding during capture restores an incomplete clip. The other device checks below remain pending.
 
 The unpacked pilot is at `/Users/armindelmo/Downloads/ai09-pilot-2026-10-10/`. It contains `clips.jsonl`, `training.jsonl` and `manifest.json`; the consent evidence remains separately in Downloads. No real participant data or consent evidence was committed. Remaining numeric collection deficit: 35 squat reps and 40 each for push-up, bicep curl, shoulder press and lunge, or 195 additional accepted reps.
 
@@ -73,10 +73,14 @@ Start with a **three-rep capture/export rehearsal** before bulk collection. Then
 - [ ] Confirm both camera previews/skeletons align, anatomical left/right remains correct, and no-person markers clear the replay.
 - [ ] Confirm consent rejection blocks Start; exercise/camera/model controls stay locked during capture.
 - [ ] Confirm the last rep includes its settle tail and manual partial attempts can be saved independently of counter results.
-- [ ] Background during capture and test interruption/recovery; test camera failure and leaving frame.
+- [x] Background during capture and confirm incomplete-clip recovery (owner confirmed).
+- [ ] Test camera failure and leaving frame.
 - [x] Confirm saved review intervals and labels persist after closing and reopening.
 - [ ] Confirm the 60-second cap and interrupted-draft restoration after closing and reopening.
-- [ ] Cancel sharing, confirm data persists, then physically save the file on the Mac and run the validator.
+- [x] Cancel sharing and confirm data persists (owner confirmed).
+- [x] Physically save the files on the Mac and run validation, unpack and reimport.
+- [x] Confirm editing a rep boundary saves correctly (owner confirmed).
+- [x] Confirm discarding a rep reduces accepted coverage (owner confirmed).
 - [ ] Confirm no unexpected image/video/audio file is created.
 - [ ] Confirm responsiveness and approximately 15 processed fps while capture checkpoints run; record dropped frames and failures.
 - [ ] Record actual reviewed accepted counts by exercise and the remaining collection deficit.
@@ -113,6 +117,7 @@ Actual check results belong in the delivery report. Passing automated checks ver
 - Native Release build: succeeded with zero errors and six warnings; installed successfully on iPhone 17 Pro Max, iOS 26.6.2 (23G90).
 - CoreDevice launch with `spotter://labelling`: succeeded at 5:40 p.m. Eastern; the owner confirmed the Joint labelling screen is visible.
 - Owner rehearsal: capture, skeleton playback and human-review save confirmed; saved intervals and labels persisted after close/reopen. Owner-reported capture rate: approximately 15 FPS.
+- Additional owner checks: saved boundary edits, discard/coverage reduction, cancelled sharing/data retention, and background/incomplete-clip recovery confirmed.
 - Physical dataset export and separate private consent evidence received on the Mac. Trusted validation, unpack and strict reimport passed: one clip, five accepted squat rows (four clean, one forward lean).
 - Remaining real collection: 195 additional accepted reps; the 40-per-exercise completion gate has not been met.
 
