@@ -1,0 +1,17 @@
+{
+  "name": "spotter-rag",
+  "private": true,
+  "type": "module",
+  "description": "CONN-08: embed free-exercise-db and injury notes into Neon pgvector",
+  "scripts": {
+    "rag:ingest": "tsx --env-file=../apps/api/.env ingest.ts"
+  },
+  "dependencies": {
+    "@huggingface/inference": "^4.13.0",
+    "@neondatabase/serverless": "^1.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
+    "tsx": "^4.19.2"
+  }
+}
