@@ -69,3 +69,11 @@ Still required for live acceptance: BE-03 endpoint/payload agreement and a real 
 - Goal, experience and schedule choices have stronger translucent blue surfaces, gradient highlights, inset rims and soft shadows; web also uses backdrop blur. Native iOS glass and reduced-transparency fallbacks remain supported. PB and injury inputs receive a tinted surface.
 - Me has a top-right Settings button. Settings opens Goals, Experience & personal bests, Workout schedule, and Injuries & limitations at the corresponding step with the current draft. Back dismisses to the existing Settings screen; the header wraps for larger text. Continue through the remaining questions to save the complete profile. Injury notes still follow the proposed append-only backend contract above.
 - Follow-up verification: 125 tests in 23 suites pass, typecheck passes, and lint has zero errors with the same six existing warnings. iOS, Android and web export passes (18 static web routes). Browser verified Begin Workout → camera setup and updated glass choices at 390×844. Authenticated settings and physical-iPhone checks still depend on the acceptance items above.
+
+## FE-03 copy and settings polish
+
+- Removed motivational filler from onboarding, settings, workout, planner, camera instructions and empty states. Labels now describe the question or action directly. Login’s unavailable state no longer exposes the auth vendor or team setup details.
+- Me’s Settings action is a gear in a circular 48-point glass control with an accessible Settings label. The existing native glass, reduced-transparency fallback and web treatment are reused.
+- Verified the gear on a 390×844 browser preview using an empty guest profile through a temporary local preview route. The route was removed after inspection; the normal Me account gate remains in place. Preview: `Previews/FE-03-FE-04/profile-gear-390.jpg`.
+- 125 tests pass; typecheck and lint pass with the same six existing warnings. BE-03 saving and authenticated device acceptance remain pending.
+- Latest user instruction: keep the FE-03 changes local. Do not push or create a PR until explicitly authorized again.

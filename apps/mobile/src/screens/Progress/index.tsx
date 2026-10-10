@@ -54,7 +54,7 @@ export default function ProgressScreen() {
     finally { setPhotoBusy(false); }
   }
   function edit() { setName(displayName === 'Your name' ? '' : displayName); setBio(profile.bio); setEditing(true); }
-  return <AppPage title="Me" headerAction={<GlassChoice compact label="Settings" onPress={() => router.push('/settings')} />}>
+  return <AppPage title="Me" headerAction={<GlassChoice compact label="Settings" icon={<SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={c.text} />} onPress={() => router.push('/settings')} />}>
     <View style={styles.profile}>
       <View style={styles.identity}>
         <PolishedPressable accessibilityRole="button" accessibilityLabel="Change profile picture" disabled={photoBusy} onPress={() => { void pickPhoto(); }} style={styles.avatar}>
@@ -82,13 +82,13 @@ export default function ProgressScreen() {
       {sections.map((label, index) => <PolishedPressable key={label} accessibilityRole="tab" accessibilityState={{ selected: index === section }} accessibilityLabel={label} onPress={() => setSection(index)} style={styles.tab}><SymbolView name={sectionIcons[index]} tintColor={sectionColors[index]} size={25} style={{ opacity: index === section ? 1 : 0.6 }} /></PolishedPressable>)}
     </View>
     {section === 0 ? <WorkoutCalendar /> : section === 2 && !!setup.profile?.personal_bests.length ? <View style={{ gap: 12, paddingVertical: 18 }}>
-      <Text style={ui.heading}>Your starting personal bests</Text>
+      <Text style={ui.heading}>Personal bests</Text>
       {setup.profile.personal_bests.map(best => <View key={best.exercise} style={ui.row}><Text style={ui.rowTitle}>{bestExercises.find(e => e.id === best.exercise)?.label}</Text><Text style={ui.text}>{best.weight} {best.unit} × {best.reps}</Text></View>)}
       <Text style={ui.muted}>Self-reported during setup.</Text>
     </View> : <View style={styles.empty}>
       <SymbolView name={section === 1 ? { ios: 'play.rectangle', android: 'video_library', web: 'video_library' } : { ios: 'trophy', android: 'emoji_events', web: 'emoji_events' }} tintColor={rose} size={34} />
       <Text style={ui.emptyTitle}>{section === 1 ? 'No videos yet' : 'No personal bests yet'}</Text>
-      <Text style={ui.muted}>{section === 1 ? 'Your workout videos will appear here.' : 'Your strength milestones will appear here.'}</Text>
+      <Text style={ui.muted}>{section === 1 ? 'Your workout videos will appear here.' : 'Add your personal bests in Settings.'}</Text>
     </View>}
     <View style={styles.account}>
       <Text style={ui.muted}>{auth.user?.email}</Text>

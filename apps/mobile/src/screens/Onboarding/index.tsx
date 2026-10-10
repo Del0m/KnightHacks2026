@@ -9,10 +9,10 @@ import { bestExercises, dateFromDay, goalGroups, toggleGoal, upcomingDays, valid
 import { useOnboarding } from './state';
 
 const copy = [
-  { eyebrow: 'Your goals', title: 'Make it yours.', intro: 'Pick 3 things to work toward. Mix training goals and areas you want to build.' },
-  { eyebrow: 'Your experience', title: 'Meet you where you are.', intro: 'A starting point, not a test. Choose what feels closest.' },
-  { eyebrow: 'Your rhythm', title: 'Make room to move.', intro: 'Choose a rhythm that fits your week. You can change it later.' },
-  { eyebrow: 'Your body', title: 'Anything to keep in mind?', intro: 'Tell us about an injury or movement limitation, in your own words. This is optional.' },
+  { eyebrow: 'Your goals', title: 'Choose your goals', intro: 'Pick 3 goals across both categories.' },
+  { eyebrow: 'Your experience', title: 'Training experience', intro: 'Select your experience level.' },
+  { eyebrow: 'Your schedule', title: 'Workout days', intro: 'Choose specific days or a repeating schedule.' },
+  { eyebrow: 'Injuries', title: 'Injuries & limitations', intro: 'Add any injuries or movement limitations. Optional.' },
 ];
 export default function OnboardingScreen() {
   const state = useOnboarding(), auth = useAuth();
@@ -31,22 +31,22 @@ export default function OnboardingScreen() {
     if (step < 3) { setStep(step + 1); return; }
     setFinished(await state.save(skip));
   }
-  if (finished && status === 'complete' && !state.error) return <SetupPage step={3} total={4} eyebrow="You're set" title="Your starting point is saved." intro="A little stronger, at your own pace." action={editing ? "Back to Settings" : "Back to Train"} onAction={leave} onBack={() => { setFinished(false); setStep(0); }}><Text style={s.text}>Your goals, experience and training rhythm are ready for your planner.</Text></SetupPage>;
+  if (finished && status === 'complete' && !state.error) return <SetupPage step={3} total={4} eyebrow="Setup complete" title="Profile saved" intro="You can edit your answers in Settings." action={editing ? "Back to Settings" : "Back to Train"} onAction={leave} onBack={() => { setFinished(false); setStep(0); }}><Text style={s.text}>Your planner now uses your saved goals and schedule.</Text></SetupPage>;
   const content = copy[step];
   const blocked = busy || status === 'loading';
   return <SetupPage step={step} total={4} {...content} action={busy ? 'Saving…' : step === 3 ? 'Finish setup' : 'Continue'} disabled={blocked} onAction={() => { void advance(); }} onBack={() => { if (busy) return; setNotice(null); if (editing) leave(); else if (step) setStep(step - 1); else leave(); }} secondary={step === 3 ? 'Skip injury note' : editing ? 'Back to Settings' : 'Set up later'} onSecondary={() => { if (step === 3) void advance(true); else leave(); }}>
     {status === 'loading' ? <ActivityIndicator color={c.primary} accessibilityLabel="Loading your profile" /> : <View style={{ gap: 28 }} pointerEvents={busy ? 'none' : 'auto'}>
       {step === 0 && <>
-        <View style={s.count}><Text ref={heading} accessibilityLiveRegion="polite" style={s.label}>{draft.goals.length} / 3 selected</Text><Text style={s.muted}>Choose what matters.</Text></View>
+        <View style={s.count}><Text ref={heading} accessibilityLiveRegion="polite" style={s.label}>{draft.goals.length} / 3 selected</Text></View>
         {goalGroups.map(group => <View key={group.title} style={s.group}><Text accessibilityRole="header" style={s.section}>{group.title}</Text><View style={s.wrap}>{group.goals.map(goal => <GlassChoice key={goal.id} testID={`goal-${goal.id}`} label={goal.label} selected={draft.goals.includes(goal.id)} onPress={() => {
-          if (draft.goals.length === 3 && !draft.goals.includes(goal.id)) { setNotice('Three is plenty. Deselect a goal to choose another.'); AccessibilityInfo.announceForAccessibility('Deselect a goal to choose another.'); return; }
+          if (draft.goals.length === 3 && !draft.goals.includes(goal.id)) { setNotice('Deselect a goal before choosing another.'); AccessibilityInfo.announceForAccessibility('Deselect a goal to choose another.'); return; }
           change({ goals: toggleGoal(draft.goals, goal.id) });
         }} />)}</View></View>)}
       </>}
       {step === 1 && <>
         <View style={s.experience}>{(['beginner', 'experienced', 'advanced'] as const).map(level => <GlassChoice key={level} testID={`level-${level}`} label={level[0].toUpperCase() + level.slice(1)} radio selected={draft.experience === level} onPress={() => change({ experience: level })} />)}</View>
         {draft.experience && draft.experience !== 'beginner' && <View style={s.group}>
-          <Text accessibilityRole="header" style={s.section}>Your personal bests</Text><Text style={s.muted}>Add any best you remember. Weight and reps help us understand your starting point.</Text>
+          <Text accessibilityRole="header" style={s.section}>Your personal bests</Text><Text style={s.muted}>Enter the weight and reps for any lifts you know.</Text>
           <GlassChoice label="I don’t know yet" selected={draft.unknownBests} onPress={() => change({ unknownBests: !draft.unknownBests })} />
           {!draft.unknownBests && <>
             <View style={s.wrap}>{(['lb', 'kg'] as const).map(unit => <GlassChoice compact key={unit} label={unit} selected={draft.unit === unit} radio onPress={() => {
@@ -73,11 +73,11 @@ export default function OnboardingScreen() {
       </>}
       {step === 3 && <View style={s.group}>
         <TextInput testID="injury-note" accessibilityLabel="Injury or movement limitation, optional" multiline textAlignVertical="top" placeholder="For example: My left knee bothers me during deep squats." placeholderTextColor={c.muted} value={draft.injury} onChangeText={injury => change({ injury })} maxLength={1000} style={[s.input, s.note]} />
-        <Text style={s.muted}>{draft.injury.length} / 1,000</Text><Text style={s.disclaimer}>Not medical advice. Spotter supports your fitness routine. Follow the guidance of your clinician or physio.</Text>
+        <Text style={s.muted}>{draft.injury.length} / 1,000</Text><Text style={s.disclaimer}>Not medical advice. Follow your clinician’s guidance.</Text>
       </View>}
       {(notice || state.error) && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.error}>{notice || state.error}</Text>}
       {status === 'error' && <GlassChoice compact label="Retry profile connection" onPress={() => { void state.reload(); }} />}
-      {!auth.user && <Text style={s.muted}>Explore setup now. Log in from Me to save it to your account.</Text>}
+      {!auth.user && <Text style={s.muted}>Log in to save your answers.</Text>}
     </View>}
   </SetupPage>;
 }

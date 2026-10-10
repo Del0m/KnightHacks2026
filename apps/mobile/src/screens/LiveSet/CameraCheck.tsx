@@ -22,7 +22,7 @@ function IPhoneCheck({ exercise, onContinue }: { exercise: string; onContinue: (
   useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
   useEffect(() => { const subscription = AppState.addEventListener('change', state => setForeground(state === 'active')); return () => subscription.remove(); }, []);
   if (!permission.hasPermission) return <View style={s.group}>
-    <Text style={s.heading}>Let Spotter check your framing.</Text><Text style={s.text}>Camera frames are processed on your iPhone. This setup check doesn’t record video.</Text>
+    <Text style={s.heading}>Allow camera access</Text><Text style={s.text}>Camera frames are processed on your iPhone. This setup check doesn’t record video.</Text>
     {permissionError && <Text accessibilityRole="alert" style={s.error}>{permissionError}</Text>}
     <GlassChoice label={permission.canRequestPermission ? 'Allow camera' : 'Open camera settings'} primary selected onPress={() => { setPermissionError(null); void (permission.canRequestPermission ? permission.requestPermission() : Linking.openSettings()).catch(() => setPermissionError('Could not open camera access. Please try again.')); }} />
     <GlassChoice compact label="Continue without camera" onPress={onContinue} />
@@ -88,7 +88,7 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
     <GlassChoice compact label={position === 'front' ? 'Use back camera' : 'Use front camera'} onPress={onFlip} />
     <GlassChoice label="Framing checked · continue" primary selected disabled={!valid} onPress={onContinue} />
     <GlassChoice compact label="Continue without camera" onPress={onContinue} />
-    <Text style={s.caption}>Your workout still uses manual rep tracking. Live set coaching comes next.</Text>
+    <Text style={s.caption}>Reps are tracked manually.</Text>
   </View>;
 }
 const s = StyleSheet.create({
