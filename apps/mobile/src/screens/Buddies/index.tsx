@@ -1,9 +1,10 @@
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { AppPage, Action, ui } from '@/components/AppPage';
+import { AppPage, Action, pageStyles } from '@/components/AppPage';
 import { useTraining } from '@/state/Training';
-import { colors as c } from '@/theme/tokens';
+import { pageColors } from '@/theme/tokens';
+const c = pageColors('Buddies'), ui = pageStyles('Buddies');
 export default function BuddiesScreen() {
   const { profile, updateProfile } = useTraining(), [draftTime, setTime] = useState<string | null>(null), [saved, setSaved] = useState(false);
   const time = draftTime ?? profile.buddyTime;

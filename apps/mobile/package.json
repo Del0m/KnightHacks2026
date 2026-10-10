@@ -1,41 +1,63 @@
 {
   "name": "mobile",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
+    "@better-auth/expo": "^1.7.7",
+    "better-auth": "^1.7.7",
     "expo": "~57.0.27",
     "expo-build-properties": "~57.0.22",
+    "expo-constants": "~57.0.21",
     "expo-dev-client": "~57.0.19",
+    "expo-font": "~57.0.4",
+    "expo-image-picker": "~57.0.20",
+    "expo-linear-gradient": "~57.0.2",
+    "expo-linking": "~57.0.12",
+    "expo-router": "~57.0.25",
+    "expo-secure-store": "~57.0.4",
+    "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
+    "expo-symbols": "~57.0.3",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-mmkv": "^4.3.2",
     "react-native-nitro-image": "^0.15.2",
     "react-native-nitro-modules": "^0.37.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
     "react-native-vision-camera": "^5.2.3",
     "react-native-vision-camera-worklets": "^5.2.3",
+    "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.1",
     "spotter-pose": "file:./modules/spotter-pose"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
     "jest": "^29.7.0",
     "jest-expo": "^57.0.5",
     "nitrogen": "^0.37.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
+    "start": "expo start --dev-client",
     "ios": "expo run:ios",
+    "ios:device": "expo run:ios --device",
+    "android": "expo run:android",
     "web": "expo start --web",
-    "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "expo lint",
+    "export:web": "expo export --platform web",
+    "build:ios:development": "pnpm dlx eas-cli@latest build --profile development --platform ios",
+    "test": "jest"
   },
   "private": true,
   "jest": {
     "preset": "jest-expo"
-  }
+  },
+  "packageManager": "pnpm@11.25.0"
 }
