@@ -119,8 +119,11 @@ export function sessionsRouter(db: Db, deps: FinishDeps): Router {
         rangeDeg: r.range_deg,
         tempoMs: r.tempo_ms,
         quality: r.quality,
+        startMs: r.start_ms,
+        endMs: r.end_ms,
         flags: r.flags.map((f) => ({ ruleId: f.rule_id })),
       })),
+      frames: input.frames,
     });
     deps.log?.info(
       {

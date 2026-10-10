@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:replay": "vitest run test/replay",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
@@ -23,7 +24,8 @@
     "dev:token": "tsx --env-file-if-exists=.env scripts/dev-token.ts",
     "dev:smoke": "tsx --env-file-if-exists=.env scripts/dev-smoke.ts",
     "dev:signup": "tsx --env-file-if-exists=.env scripts/dev-token.ts --sign-up",
-    "session:roundtrip": "tsx --env-file-if-exists=.env scripts/session-roundtrip.ts"
+    "session:roundtrip": "tsx --env-file-if-exists=.env scripts/session-roundtrip.ts",
+    "notes:samples": "tsx --env-file-if-exists=.env scripts/rest-note-samples.ts"
   },
   "dependencies": {
     "@databricks/sql": "^2.2.0",
