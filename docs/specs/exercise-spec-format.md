@@ -20,7 +20,7 @@ Each exercise is one JSON file in `specs/exercises/`. The form engine (`apps/mob
 | `id`, `name` | snake_case id, display name |
 | `recommended_view` | `front` or `side`: the camera angle the setup screen suggests |
 | `angles` | The metrics to compute each frame (below) |
-| `primary_angle` | `{ name, direction }`: the `joint_angle` that drives the rep counter |
+| `primary_angle` | `{ name, direction, gate? }`: the `joint_angle` that drives the rep counter (below) |
 | `phases` | Rep counter thresholds (below) |
 | `rules` | Form rules (below) |
 | `injury_overrides` | `knee`, `shoulder`, `lower_back` (below) |
@@ -52,7 +52,16 @@ All values are in degrees, except the ratio.
 - `min` or `max`: the smaller or larger of the two.
 - `most_visible`: the side whose points have the higher mean confidence.
 
-`duration_ms` is a built-in metric: the time the rep spent in the rule's phase.
+`duration_ms` is a built-in metric: the time the rep spent in the rule's phase. The form rules measure it from the rep's frames, with the extreme as the turning point:
+
+| `phase` | `duration_ms` |
+|---|---|
+| `outbound` | From leaving the start (crossing `start_exit`) to first reaching within 1° of the extreme |
+| `peak` | Time spent within 1° of the extreme |
+| `return` | From last leaving the extreme to the count (crossing `start_enter`) |
+| `rep` | From leaving the start to the count |
+
+So a squat's `outbound` covers the whole way down, not just the stretch to `count_min`, and a pause at the bottom counts as `peak`.
 
 ## Phases and the rep counter
 
@@ -76,7 +85,7 @@ start ──past start_exit──▶ outbound ──past count_min──▶ peak
 | `start_enter` | Coming back past it counts the rep. Sits beyond `start_exit` (hysteresis) |
 | `reverse_deg` | How far the angle moves back from its extreme before `peak` becomes `return` |
 | `min_state_ms` | Minimum time in a state before a transition |
-| `set_end_still_ms` | Stillness in `start` that ends the set |
+| `set_end_still_ms` | Stillness (within 10°, in any position, after the first rep) that ends the set |
 
 **Rule windows close when the rep settles, not at the count.** The rep is counted the moment the angle crosses `start_enter`. The frames that rules reduce over for `return` and `rep` keep going until the angle stops moving toward the start position: it moves back by `reverse_deg`, or makes no more progress (under 1°) toward the start for `min_state_ms`, or the set ends, or the next rep starts. That way a lockout check such as "elbow max on return ≥ 160" with `start_enter` at 155 sees the top of the movement. `duration_ms` for `return` still stops at the `start_enter` crossing, so tempo isn't inflated by the pause at the top.
 
@@ -86,6 +95,17 @@ start ──past start_exit──▶ outbound ──past count_min──▶ peak
 - **Going deeper during `return`** doesn't change state. It only moves the rep's extreme.
 - **Angles are measured in the upright image** with x scaled by width ÷ height, so a right angle on a portrait frame reads 90°.
 - **The `side` of each frame** is reported alongside its metrics. `most_visible` keeps one side for the whole rep.
+- **Only reliable primary angles count.** A frame where any joint of the primary angle is low-confidence, or where the angle jumps faster than a person can move (over 720°/s), doesn't move the counter.
+
+**`gate` (optional):** `{ metric, op, value }`, where `metric` is another `angles` key. A rep must pass `count_min` on a frame where `metric op value` also holds, and can only reach `peak` while the gate passes. Range reached with a passing gate is remembered through the minimum state time. Use it when a rest position matches the primary angle. The shoulder press's straight elbow reads the same with arms hanging down as overhead, so it gates on `arm_raise <= 60` (wrists above the shoulders):
+
+```json
+"angles": { "arm_raise": { "type": "segment_tilt", "from": "shoulder", "to": "wrist", "side": "max" } },
+"primary_angle": { "name": "elbow", "direction": "increasing",
+                   "gate": { "metric": "arm_raise", "op": "<=", "value": 60 } }
+```
+
+**Camera placement:** angles are measured in the image, so the phone works best upright at about chest height. A phone low and tilted up makes vertical lines lean in, which `segment_tilt` checks read as tilt.
 
 Full behaviour: [form engine design](../superpowers/specs/2026-10-10-form-engine-design.md).
 
@@ -103,12 +123,26 @@ Required order:
 | `view` | `front`, `side` or `any`. The rule is skipped when the detected camera view differs. |
 | `check` | `{ metric, reduce, op, value }`. `reduce` is `min`, `max`, `mean`, `first` or `last`, and is omitted for `duration_ms`. `op` is `<=`, `>=`, `<` or `>`. `value` is a number or a threshold name (`start_exit`, `count_min`, `target`, `start_enter`). |
 | `severity` | `form` or `safety`. Only `safety` may use the optional haptic. |
-| `priority` | Unique integer, where 1 is most important. The rest note covers only the top flagged rule. |
+| `priority` | Unique integer, where 1 is most important within a severity. The rest note prefers safety flags, then lowest priority. |
 | `label` | Form-model label (Architecture §6.3) |
 | `joints` | COCO joints that tint amber when the rule flags |
 | `rest_note` | Fixed note, shown when the LLM's version fails the tone check |
 
-**The rule passes when the check holds.** Otherwise the rep gets a flag `{ rule_id, severity, rep_index }`, held until the set ends.
+**The rule passes when the check holds.** Otherwise the rep gets a flag `{ rule_id, severity, rep_index }`, held until the set ends. `rep_index` is 0-based within the set (the on-screen count minus one).
+
+**How the form rules read a rule (AI-07, `apps/mobile/src/engine/rules.ts`):**
+
+- **`view`:** the camera view is detected per rep from how far apart the shoulders and hips are across the image, relative to torso length. When it's unclear, only `any` rules run. The app can also pass the view in, for example from the setup screen, and that takes priority.
+- **Missing data:** the check reduces over the frames where the metric could be measured. If that's under half the phase's frames, the rule is skipped for that rep (no flag).
+- **Primary-angle depth and lockout:** a `peak` check using `min` for a decreasing primary angle or `max` for an increasing one reads the whole movement through the rep count. This keeps a fast turn that happened before the minimum state time, while excluding the settle tail. For gated specs, only gate-passing frames supply the extreme, primary-angle depth/lockout values and the turn used for phase durations; an arms-down rest cannot supply an overhead lockout. Other checks read their phase's frames.
+- **`mid_` points:** within a phase, the check uses only frames where the midpoint was taken the same way as in most of them (from both sides, or from one), so a hip dropping out mid-rep can't add a jump.
+- **Rules not in the file** (such as physio limits) are evaluated the same way.
+
+Full behaviour: [form rules design](../superpowers/specs/2026-10-10-form-rules-design.md).
+
+**Runtime validation:** `createFormEngine` and `createSetRules` reject invalid evaluation settings with an `Invalid exercise spec` error before starting a set. Checks cover finite phase thresholds and their order, primary-angle and gate references, rule metric references, comparisons, reductions and threshold values. `evaluateRule` also checks its rule and resolves only finite thresholds before view gating or comparison, so a missing `target` cannot become a form flag. Callers receiving server or generated effective specs can call `assertEvaluationSpec` before activating them and handle the error as a spec-loading failure. These runtime checks complement the full schema, override and note checks in `node specs/validate.mjs`; they do not replace them.
+
+`useFormEngine` and `useFormRules` catch construction failures and return `error: Error | null`. With an error, their input callbacks do nothing and their published state is empty; supplying a valid spec clears the error and starts fresh evaluation. They never substitute an unrestricted bundled spec for invalid injury or physio limits. The spec-loading UI can offer a retry or a validated fallback that retains those limits. The debug screen displays the error instead of crashing.
 
 Placeholders in `rest_note`:
 
@@ -116,6 +150,8 @@ Placeholders in `rest_note`:
 - `{total}`: reps in the set
 - `{value}`: mean reduced value over the flagged reps
 - `{t}`: that value in seconds. Allowed only for `duration_ms` rules.
+
+The phone fills these for its fixed fallback note: `{t}` to 0.1 s (`0.8`, `1`), `{value}` as a whole number from 10 up and to two decimals below. The note is followed by the user's injury `extra_note`s.
 
 ## Injury overrides
 
@@ -128,7 +164,22 @@ All three keys are required in every spec. Each one has:
 | `disable_rules` | Rule ids to skip |
 | `extra_note` | Required. Shown with rest notes for users with this injury. No placeholders. |
 
-`applyOverride(spec, injury)` in `specs/validate.mjs` is the reference merge. For users with several injuries, apply `knee`, `shoulder`, `lower_back` in that order and keep the more conservative value for each threshold. Physio-entered limits (`REHAB_LIMIT`) go on top, per user.
+`applyOverride(spec, injury)` and `applyInjuries(spec, injuries)` in `specs/validate.mjs` are the reference merge. The phone's copy in `apps/mobile/src/engine/overrides.ts` is checked against them by a parity test. Physio-entered limits (`REHAB_LIMIT`) go on top, per user.
+
+For users with several injuries, the overrides apply in the order `knee`, `shoulder`, `lower_back`. When two of them set the same thing, the more conservative one wins:
+
+| What | Kept |
+|---|---|
+| `count_min`, `target` | The one asking for less range (the larger number for `decreasing`, the smaller for `increasing`) |
+| Other phase keys | The later override's |
+| A rule's numeric `value` | The stricter bound for its `op`: the larger for `>=` / `>`, the smaller for `<=` / `<` |
+| A rule's threshold-name `value` | The later override's |
+| `severity` | `safety` if either says so |
+| `rest_note` | The note from the override whose `value` was kept, else the later one |
+| `disable_rules` | Both lists |
+| `extra_note` | All of them, in order |
+
+The validator checks threshold order for every combination of injuries.
 
 ## Tone
 

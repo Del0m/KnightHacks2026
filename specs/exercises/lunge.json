@@ -22,7 +22,7 @@
     {
       "id": "depth",
       "phase": "peak",
-      "view": "any",
+      "view": "side",
       "check": { "metric": "knee", "reduce": "min", "op": "<=", "value": "target" },
       "severity": "form",
       "priority": 1,

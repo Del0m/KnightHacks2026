@@ -7,13 +7,18 @@
   "angles": {
     "elbow": { "type": "joint_angle", "joints": ["shoulder", "elbow", "wrist"], "side": "most_visible" },
     "trunk": { "type": "segment_tilt", "from": "mid_hip", "to": "mid_shoulder" },
-    "forearm": { "type": "segment_tilt", "from": "elbow", "to": "wrist", "side": "max" }
+    "forearm": { "type": "segment_tilt", "from": "elbow", "to": "wrist", "side": "max" },
+    "arm_raise": { "type": "segment_tilt", "from": "shoulder", "to": "wrist", "side": "max" }
   },
-  "primary_angle": { "name": "elbow", "direction": "increasing" },
+  "primary_angle": {
+    "name": "elbow",
+    "direction": "increasing",
+    "gate": { "metric": "arm_raise", "op": "<=", "value": 60 }
+  },
   "phases": {
     "start_exit": 100,
     "count_min": 135,
-    "target": 160,
+    "target": 150,
     "start_enter": 95,
     "reverse_deg": 5,
     "min_state_ms": 150,
@@ -44,9 +49,9 @@
     },
     {
       "id": "wrist_stack",
-      "phase": "rep",
+      "phase": "peak",
       "view": "front",
-      "check": { "metric": "forearm", "reduce": "max", "op": "<=", "value": 20 },
+      "check": { "metric": "forearm", "reduce": "max", "op": "<=", "value": 35 },
       "severity": "form",
       "priority": 3,
       "label": "wrists_off_stack",
@@ -57,7 +62,7 @@
       "id": "tempo",
       "phase": "return",
       "view": "any",
-      "check": { "metric": "duration_ms", "op": ">=", "value": 800 },
+      "check": { "metric": "duration_ms", "op": ">=", "value": 600 },
       "severity": "form",
       "priority": 4,
       "label": "fast_lowering",

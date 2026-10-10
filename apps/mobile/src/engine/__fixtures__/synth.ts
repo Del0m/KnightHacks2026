@@ -59,21 +59,44 @@ class Rng {
 export type Leg = 'left' | 'right';
 
 export type Segment =
-  /** Ease (cosine in-out) from the current angle to `to`. */
-  | { kind: 'move'; to: number; ms: number }
+  /**
+   * Ease (cosine in-out) from the current angle to `to`. Shoulder press: the upper arm's raise eases
+   * alongside, to `raise`, or to `to` when unset (a press arm, where the two match).
+   */
+  | { kind: 'move'; to: number; ms: number; raise?: number }
   | { kind: 'hold'; ms: number }
   /** Sine wobble of ±`amp` around the current angle, whole cycles so it ends where it began. */
   | { kind: 'wobble'; ms: number; amp: number; cycles: number }
   /** No person in frame; the angle holds underneath. */
   | { kind: 'absent'; ms: number }
   /** Lunge only: which leg leads from here on. Takes no time. */
-  | { kind: 'front'; leg: Leg };
+  | { kind: 'front'; leg: Leg }
+  /** Form faults from here on (unset fields are clean). Takes no time. */
+  | { kind: 'form'; form: Partial<Form> };
 
-export const move = (to: number, ms: number): Segment => ({ kind: 'move', to, ms });
+export const move = (to: number, ms: number, raise?: number): Segment => ({ kind: 'move', to, ms, raise });
 export const hold = (ms: number): Segment => ({ kind: 'hold', ms });
 export const wobble = (ms: number, amp: number, cycles: number): Segment => ({ kind: 'wobble', ms, amp, cycles });
 export const absent = (ms: number): Segment => ({ kind: 'absent', ms });
 export const front = (leg: Leg): Segment => ({ kind: 'front', leg });
+export const form = (f: Partial<Form> = {}): Segment => ({ kind: 'form', form: f });
+
+/** Per-segment knobs for the stick figures: form faults, and which way the press forearm turns. */
+export interface Form {
+  /** Squat: trunk lean from vertical per degree of knee bend, plus 5°. */
+  lean: number;
+  /** Push-up: how far the hips drop below the shoulder-ankle line at the bottom, px. */
+  sag: number;
+  /** Three-quarter squat: how far each knee moves toward the midline at 90° of bend, px. */
+  kneesIn: number;
+  /**
+   * Shoulder press: the forearm turns `up` from the upper arm (pressing) or `down` toward the lap
+   * (resting). Both read the same at an elbow angle of 0 or 180, so switch only there.
+   */
+  forearm: 'up' | 'down';
+}
+
+const CLEAN_FORM: Form = { lean: 0.35, sag: 0, kneesIn: 0, forearm: 'up' };
 
 /** One rep out to `deep` and back to `top`. */
 export function rep(deep: number, top: number, t: { downMs: number; bottomMs: number; upMs: number; topMs: number }): Segment[] {
@@ -82,8 +105,11 @@ export function rep(deep: number, top: number, t: { downMs: number; bottomMs: nu
 
 interface Sample {
   angle: number;
+  /** Shoulder press: the upper arm's angle out from hanging straight down. Holds and wobbles keep it. */
+  raise: number;
   absent: boolean;
   front: Leg;
+  form: Form;
 }
 
 const ease = (p: number) => 0.5 - 0.5 * Math.cos(Math.PI * p);
@@ -96,32 +122,43 @@ export function scriptDuration(script: Segment[]): number {
 /** The scripted angle at `t` ms after the clip start. */
 export function sampleScript(script: Segment[], startAngle: number, t: number): Sample {
   let angle = startAngle;
+  let raise = startAngle;
   let leg: Leg = 'left';
+  let f: Form = CLEAN_FORM;
   let t0 = 0;
   for (const s of script) {
     if (s.kind === 'front') {
       leg = s.leg;
       continue;
     }
+    if (s.kind === 'form') {
+      f = { ...CLEAN_FORM, ...s.form };
+      continue;
+    }
     const end = t0 + s.ms;
     if (t < end) {
       const tau = t - t0;
       switch (s.kind) {
-        case 'move':
-          return { angle: angle + (s.to - angle) * ease(tau / s.ms), absent: false, front: leg };
+        case 'move': {
+          const k = ease(tau / s.ms);
+          return { angle: angle + (s.to - angle) * k, raise: raise + ((s.raise ?? s.to) - raise) * k, absent: false, front: leg, form: f };
+        }
         case 'hold':
-          return { angle, absent: false, front: leg };
+          return { angle, raise, absent: false, front: leg, form: f };
         case 'wobble':
-          return { angle: angle + s.amp * Math.sin((2 * Math.PI * s.cycles * tau) / s.ms), absent: false, front: leg };
+          return { angle: angle + s.amp * Math.sin((2 * Math.PI * s.cycles * tau) / s.ms), raise, absent: false, front: leg, form: f };
         case 'absent':
-          return { angle, absent: true, front: leg };
+          return { angle, raise, absent: true, front: leg, form: f };
       }
     }
-    if (s.kind === 'move') angle = s.to;
+    if (s.kind === 'move') {
+      angle = s.to;
+      raise = s.raise ?? s.to;
+    }
     t0 = end;
   }
   const last = script[script.length - 1];
-  return { angle, absent: last?.kind === 'absent', front: leg };
+  return { angle, raise, absent: last?.kind === 'absent', front: leg, form: f };
 }
 
 // ---------------------------------------------------------------------------
@@ -160,14 +197,14 @@ const LIMBS = ['shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle'];
 const FAR_OFFSET: P = [-12, -5];
 
 /** Squat, side view. `theta` is the knee angle (hip-knee-ankle). Arms crossed at the chest. */
-function squatPose(theta: number, near: Leg): Pose {
+function squatPose(theta: number, near: Leg, f: Form): Pose {
   const p: Pose = {};
   const bend = 180 - theta;
   const ankle: P = [470, 1720];
   const alpha = bend * 0.42; // shin leans forward
   const knee = add(ankle, dir(alpha), 430);
   const hip = add(knee, dir(-(bend - alpha)), 440); // thigh leans back; interior angle = theta
-  const lean = bend * 0.45 + 5;
+  const lean = bend * f.lean + 5;
   const shoulder = add(hip, dir(lean), 500);
   const elbow = add(shoulder, dir(150), 270);
   const wrist = add(elbow, dir(-10), 250);
@@ -180,15 +217,55 @@ function squatPose(theta: number, near: Leg): Pose {
   return p;
 }
 
-/** Push-up, side view, head toward +x. `phi` is the elbow angle (shoulder-elbow-wrist). */
-function pushUpPose(phi: number, near: Leg): Pose {
+/** Body yaw for the three-quarter squat: 0 is square to the camera, 90 is a side view. */
+const QUARTER_YAW = 30;
+
+/**
+ * Squat, three-quarter view from the front (body turned `QUARTER_YAW`°), so the knee angle still reads
+ * while the torso is wide enough to detect as `front`. Square-on, hip, knee and ankle line up and the
+ * 2D knee angle stays at 180. `theta` is the true knee angle; the projected one is shallower (about
+ * 117 at a true 75). Built in 3D (lateral, forward, up) and projected orthographically. `f.kneesIn`
+ * pulls both knees toward the midline in proportion to depth.
+ */
+function squatQuarterPose(theta: number, f: Form): Pose {
+  const p: Pose = {};
+  const bend = 180 - theta;
+  const alpha = bend * 0.42;
+  // Sagittal plane: [forward, image y] relative to the ankle.
+  const knee = dir(alpha).map((v) => v * 430) as P;
+  const hip = add(knee, dir(-(bend - alpha)), 440);
+  const shoulder = add(hip, dir(bend * f.lean + 5), 500);
+  const cos = Math.cos(rad(QUARTER_YAW));
+  const sin = Math.sin(rad(QUARTER_YAW));
+  const at = (q: P, lateral: number): P => [540 + lateral * cos + q[0] * sin, 1720 + q[1]];
+  const kneeOut = 100 - f.kneesIn * Math.min(1, bend / 90);
+  // Unmirrored image of a lifter facing the camera: their left is on the image right.
+  for (const [side, s] of [['left', 1], ['right', -1]] as const) {
+    p[`${side}_ankle`] = at([0, 0], 105 * s);
+    p[`${side}_knee`] = at(knee, kneeOut * s);
+    p[`${side}_hip`] = at(hip, 95 * s);
+    p[`${side}_shoulder`] = at(shoulder, 135 * s);
+    p[`${side}_elbow`] = at(add(shoulder, [150, 100]), 120 * s); // arms crossed at the chest
+    p[`${side}_wrist`] = at(add(shoulder, [200, 20]), 60 * s);
+    p[`${side}_eye`] = at(add(shoulder, [60, -150]), 28 * s);
+    p[`${side}_ear`] = at(add(shoulder, [20, -140]), 62 * s);
+  }
+  p.nose = at(add(shoulder, [70, -130]), 0);
+  return p;
+}
+
+/**
+ * Push-up, side view, head toward +x. `phi` is the elbow angle (shoulder-elbow-wrist). `f.sag` drops
+ * the hips in proportion to depth, reaching the full amount at 90°.
+ */
+function pushUpPose(phi: number, near: Leg, f: Form): Pose {
   const p: Pose = {};
   const wrist: P = [720, 1250];
   const delta = (180 - phi) * 0.15; // forearm tips toward the feet
   const elbow = add(wrist, dir(-delta), 140);
   const shoulder = add(elbow, dir(180 - delta - phi), 150);
   const ankle: P = [60, 1262];
-  const hip = add(lerp(ankle, shoulder, 0.52), [0, 8]);
+  const hip = add(lerp(ankle, shoulder, 0.52), [0, 8 + f.sag * Math.min(1, (180 - phi) / 90)]);
   const knee = add(lerp(ankle, hip, 0.5), [0, 4]);
   Object.assign(p, {
     [`${near}_ankle`]: ankle, [`${near}_knee`]: knee, [`${near}_hip`]: hip,
@@ -220,16 +297,28 @@ function curlPose(phi: number, near: Leg): Pose {
   return p;
 }
 
-/** Shoulder press, front view. `phi` is the elbow angle on both arms; forearms stay vertical. */
-function pressPose(phi: number): Pose {
+/** How much shorter the resting forearm looks at most, as it points toward the camera. */
+const FOREARM_FORESHORTEN = 0.35;
+
+/**
+ * Shoulder press, front view. `phi` is the elbow angle on both arms; `raise` is the upper arm's angle
+ * out from hanging straight down (0), through level with the shoulder (90), to overhead (180). With
+ * `forearm: 'up'` and `raise = phi` the forearms stay vertical (pressing). With `forearm: 'down'` they
+ * turn down and in, toward the lap, and look shorter the more they point at the camera; an elbow
+ * angle of ~130 rests the hands in the lap, ~60 holds them at chest height.
+ */
+function pressPose(phi: number, raise: number, forearm: Form['forearm']): Pose {
   const p: Pose = {};
   // Unmirrored image of a lifter facing the camera: their left is on the image right.
   for (const [side, s] of [['left', 1], ['right', -1]] as const) {
     const shoulder: P = [540 + 135 * s, 720];
-    const elbow = add(shoulder, dir(-s * phi), -260);
+    const elbow = add(shoulder, dir(-s * raise), -260);
+    // Forearm heading, clockwise from image-up on the image-right arm.
+    const heading = forearm === 'up' ? phi - raise : 360 - raise - phi;
+    const reach = forearm === 'up' ? 240 : 240 * (1 - FOREARM_FORESHORTEN * Math.sin(rad(phi)));
     p[`${side}_shoulder`] = shoulder;
     p[`${side}_elbow`] = elbow;
-    p[`${side}_wrist`] = add(elbow, dir(0), 240);
+    p[`${side}_wrist`] = add(elbow, dir(s * heading), reach);
     p[`${side}_hip`] = [540 + 95 * s, 1150];
     p[`${side}_knee`] = [540 + 100 * s, 1440];
     p[`${side}_ankle`] = [540 + 105 * s, 1730];
@@ -292,6 +381,21 @@ function lungePose(theta: number, near: Leg, lead: Leg): Pose {
 
 export type ExerciseId = 'squat' | 'push_up' | 'bicep_curl' | 'shoulder_press' | 'lunge';
 
+export interface ExpectedFlag {
+  rule_id: string;
+  rep_index: number;
+}
+
+/** Flags in a canonical order: by rep, then rule id. */
+export const sortFlags = (flags: readonly ExpectedFlag[]): ExpectedFlag[] =>
+  flags
+    .map(({ rule_id, rep_index }) => ({ rule_id, rep_index }))
+    .sort((a, b) => a.rep_index - b.rep_index || (a.rule_id < b.rule_id ? -1 : a.rule_id > b.rule_id ? 1 : 0));
+
+/** `{ tempo: [0, 2] }` → the flag list, sorted. */
+const flagged = (byRule: Record<string, number[]>): ExpectedFlag[] =>
+  sortFlags(Object.entries(byRule).flatMap(([rule_id, reps]) => reps.map((rep_index) => ({ rule_id, rep_index }))));
+
 export interface ClipDef {
   name: string;
   exercise: ExerciseId;
@@ -317,7 +421,15 @@ export interface ClipDef {
   script: Segment[];
   /** Extra no-person windows `[startMs, durationMs]` laid over the script. */
   absentWindows: [number, number][];
-  expected: { reps: number; partials: number; set_end: 'still' | 'absent' | null };
+  /** Moves the whole figure down, px, as a lower camera does (the lap near the bottom edge). */
+  offsetY: number;
+  expected: {
+    reps: number;
+    partials: number;
+    set_end: 'still' | 'absent' | 'lost' | null;
+    /** Every rule flag with the base spec, no injuries, view detected (design AI-07 §8). */
+    flags?: ExpectedFlag[];
+  };
 }
 
 const SQUAT_TOP = 172;
@@ -337,6 +449,7 @@ const DEFAULTS = {
   farConfidence: [0.5, 0.7],
   source: 'coreml',
   absentWindows: [],
+  offsetY: 0,
 } as const satisfies Partial<ClipDef>;
 
 const NOISY_TEMPO = { downMs: 1100, bottomMs: 150, upMs: 1000, topMs: 600 };
@@ -358,6 +471,20 @@ const curlRep = (b: number) => rep(b, CURL_TOP, { downMs: 900, bottomMs: 200, up
 
 const PRESS_RACK = 85;
 const pressRep = (top: number) => rep(top, PRESS_RACK, { downMs: 1000, bottomMs: 250, upMs: 1100, topMs: 400 });
+/** Resting arm positions as (elbow angle, upper arm raise); see `pressPose`. */
+const PRESS_LAP = { phi: 131, raise: 10 };
+const PRESS_SIDES = { phi: 180, raise: 8 };
+const PRESS_CHEST = { phi: 60, raise: 25 };
+/** Hands in front of the shoulders, elbows down: where the forearm switches between up and down. */
+const PRESS_SHOULDERS = { phi: 0, raise: 30 };
+const pressTo = (at: { phi: number; raise: number }, ms: number) => move(at.phi, ms, at.raise);
+/** From the rack down to rest the hands in the lap for `ms`, then back up to the rack. */
+const pressLapRest = (ms: number) => [
+  pressTo(PRESS_SHOULDERS, 800), form({ forearm: 'down' }), pressTo(PRESS_LAP, 1100), hold(ms),
+  pressTo(PRESS_SHOULDERS, 1100), form(), move(PRESS_RACK, 800),
+];
+
+const STILL_MID_KNEE = 144;
 
 const LUNGE_TOP = 176;
 const lungeRep = (lead: Leg, b: number) => [front(lead), ...rep(b, LUNGE_TOP, { downMs: 1200, bottomMs: 200, upMs: 1100, topMs: 500 })];
@@ -371,7 +498,7 @@ export const CLIP_DEFS: readonly ClipDef[] = [
     seed: 101,
     startAngle: SQUAT_TOP,
     script: [hold(1500), ...squatReps([88, 92, 85, 90, 94, 87]), hold(9100)],
-    expected: { reps: 6, partials: 0, set_end: 'still' },
+    expected: { reps: 6, partials: 0, set_end: 'still', flags: flagged({ tempo: [2, 4, 5] }) },
   },
   {
     ...DEFAULTS,
@@ -393,7 +520,7 @@ export const CLIP_DEFS: readonly ClipDef[] = [
       [NOISY_LEAD_MS + NOISY_REP_MS + 300, 500], // rep 2, on the way down
       [NOISY_LEAD_MS + 3 * NOISY_REP_MS - 560, 500], // standing between reps 3 and 4
     ],
-    expected: { reps: 6, partials: 0, set_end: null },
+    expected: { reps: 6, partials: 0, set_end: null, flags: flagged({ tempo: [1, 5] }) },
   },
   {
     ...DEFAULTS,
@@ -413,7 +540,7 @@ export const CLIP_DEFS: readonly ClipDef[] = [
       ...hoverRep(92), hoverWobble(1),
       ...hoverRep(89), hoverWobble(1),
     ],
-    expected: { reps: 4, partials: 2, set_end: null },
+    expected: { reps: 4, partials: 2, set_end: null, flags: [] },
   },
   {
     ...DEFAULTS,
@@ -429,7 +556,7 @@ export const CLIP_DEFS: readonly ClipDef[] = [
       ...rep(90, SQUAT_TOP, BOUNCE_TEMPO),
       ...rep(87, SQUAT_TOP, BOUNCE_TEMPO),
     ],
-    expected: { reps: 4, partials: 0, set_end: null },
+    expected: { reps: 4, partials: 0, set_end: null, flags: flagged({ tempo: [1] }) },
   },
   {
     ...DEFAULTS,
@@ -439,7 +566,59 @@ export const CLIP_DEFS: readonly ClipDef[] = [
     seed: 505,
     startAngle: SQUAT_TOP,
     script: [hold(1000), ...squatReps([89, 91, 87]), hold(800), absent(9300)],
-    expected: { reps: 3, partials: 0, set_end: 'absent' },
+    expected: { reps: 3, partials: 0, set_end: 'absent', flags: flagged({ tempo: [0] }) },
+  },
+  {
+    ...DEFAULTS,
+    name: 'squat_off_form',
+    exercise: 'squat',
+    description: '6 reps, side view: reps 2 and 4 stop at ~110 (shallow), reps 3 and 5 lean the trunk to ~55',
+    seed: 515,
+    startAngle: SQUAT_TOP,
+    script: [
+      hold(1500),
+      ...squatReps([90]),
+      ...squatReps([110]),
+      form({ lean: 0.55 }), ...squatReps([88]), form(),
+      ...squatReps([112]),
+      form({ lean: 0.55 }), ...squatReps([91]), form(),
+      ...squatReps([89]),
+      hold(700),
+    ],
+    expected: {
+      reps: 6,
+      partials: 0,
+      set_end: null,
+      flags: flagged({ depth: [1, 3], trunk_lean: [2, 4], tempo: [0, 1, 3, 5] }),
+    },
+  },
+  {
+    ...DEFAULTS,
+    name: 'squat_front_knees_in',
+    exercise: 'squat',
+    description:
+      `6 reps, front three-quarter view (turned ${QUARTER_YAW}°), true knee angle ~75 at the bottom; ` +
+      'on reps 2, 4 and 6 the knees move 25 px inward',
+    seed: 525,
+    view: 'front',
+    startAngle: SQUAT_TOP,
+    script: [
+      hold(1500),
+      ...[75, 72, 78, 74, 76, 73].flatMap((b, i) => [form(i % 2 ? { kneesIn: 25 } : {}), ...squatReps([b])]),
+      form(),
+      hold(700),
+    ],
+    expected: { reps: 6, partials: 0, set_end: null, flags: flagged({ knee_tracking: [1, 3, 5], tempo: [0, 1, 2, 3, 4, 5] }) },
+  },
+  {
+    ...DEFAULTS,
+    name: 'squat_still_mid',
+    exercise: 'squat',
+    description: `3 reps, then stops halfway down (knee ~${STILL_MID_KNEE}) and holds there, wobbling ±3°, for 9.3 s`,
+    seed: 535,
+    startAngle: SQUAT_TOP,
+    script: [hold(1500), ...squatReps([89, 92, 88]), move(STILL_MID_KNEE, 900), wobble(9300, 3, 9)],
+    expected: { reps: 3, partials: 1, set_end: 'still', flags: flagged({ tempo: [1, 2] }) },
   },
   {
     ...DEFAULTS,
@@ -450,7 +629,26 @@ export const CLIP_DEFS: readonly ClipDef[] = [
     facing: -1,
     startAngle: PUSH_UP_TOP,
     script: [hold(1500), ...[85, 88, 84, 90, 86].flatMap(pushUpRep), hold(700)],
-    expected: { reps: 5, partials: 0, set_end: null },
+    expected: { reps: 5, partials: 0, set_end: null, flags: flagged({ depth: [1, 3], tempo: [0, 1, 2, 3, 4] }) },
+  },
+  {
+    ...DEFAULTS,
+    name: 'push_up_hip_sag',
+    exercise: 'push_up',
+    description: '5 reps, side view; the hips sag ~90 px below the shoulder-ankle line at the bottom of reps 2 and 4',
+    seed: 616,
+    facing: -1,
+    startAngle: PUSH_UP_TOP,
+    script: [
+      hold(1500),
+      ...pushUpRep(86),
+      form({ sag: 90 }), ...pushUpRep(88), form(),
+      ...pushUpRep(85),
+      form({ sag: 90 }), ...pushUpRep(87), form(),
+      ...pushUpRep(84),
+      hold(700),
+    ],
+    expected: { reps: 5, partials: 0, set_end: null, flags: flagged({ hip_sag: [1, 3], tempo: [0, 1, 2, 3, 4] }) },
   },
   {
     ...DEFAULTS,
@@ -461,7 +659,7 @@ export const CLIP_DEFS: readonly ClipDef[] = [
     facing: -1,
     startAngle: CURL_TOP,
     script: [hold(1500), ...[45, 48, 42, 50, 46, 44, 52, 47].flatMap(curlRep), hold(700)],
-    expected: { reps: 8, partials: 0, set_end: null },
+    expected: { reps: 8, partials: 0, set_end: null, flags: flagged({ tempo: [0, 1, 2, 3, 4, 6, 7] }) },
   },
   {
     ...DEFAULTS,
@@ -472,7 +670,7 @@ export const CLIP_DEFS: readonly ClipDef[] = [
     view: 'front',
     startAngle: PRESS_RACK,
     script: [hold(1500), ...[170, 168, 172, 169, 171, 167].flatMap(pressRep), hold(600)],
-    expected: { reps: 6, partials: 0, set_end: null },
+    expected: { reps: 6, partials: 0, set_end: null, flags: [] },
   },
   {
     ...DEFAULTS,
@@ -488,7 +686,48 @@ export const CLIP_DEFS: readonly ClipDef[] = [
     source: 'cloud',
     startAngle: PRESS_RACK,
     script: [hold(1500), ...[169, 171, 166, 170, 168, 172].flatMap(pressRep), hold(600)],
-    expected: { reps: 6, partials: 0, set_end: null },
+    expected: { reps: 6, partials: 0, set_end: null, flags: [] },
+  },
+  {
+    ...DEFAULTS,
+    name: 'shoulder_press_rest_positions',
+    exercise: 'shoulder_press',
+    description:
+      '3 reps, front view, then rests without pressing: arms drop to hang straight (elbow ~180), hands ' +
+      'to the lap (elbow ~131), chest height (elbow ~60), the sides, the lap and chest height again, ' +
+      'then rests in the lap for 9.2 s',
+    seed: 818,
+    view: 'front',
+    startAngle: PRESS_RACK,
+    script: [
+      hold(1000), ...[170, 168, 171].flatMap(pressRep),
+      pressTo(PRESS_SIDES, 1200), form({ forearm: 'down' }), hold(600),
+      pressTo(PRESS_LAP, 1000), hold(1000),
+      pressTo(PRESS_CHEST, 1100), hold(600),
+      pressTo(PRESS_SIDES, 1100), hold(600),
+      pressTo(PRESS_LAP, 1000), hold(600),
+      pressTo(PRESS_CHEST, 1000), hold(600),
+      pressTo(PRESS_LAP, 1000), hold(9200),
+    ],
+    expected: { reps: 3, partials: 3, set_end: 'still', flags: [] },
+  },
+  {
+    ...DEFAULTS,
+    name: 'shoulder_press_cropped_wrists',
+    exercise: 'shoulder_press',
+    description:
+      '4 reps, front view, camera low so the lap is near the bottom edge; between reps the hands rest in ' +
+      'the lap, where the wrists are cropped (c 0.1–0.4, mostly under 0.3, and 20–40 px jitter)',
+    seed: 828,
+    view: 'front',
+    offsetY: 700,
+    startAngle: PRESS_RACK,
+    script: [
+      hold(1000), ...pressRep(170),
+      ...[168, 171, 169].flatMap((top) => [...pressLapRest(1500), ...pressRep(top)]),
+      hold(300),
+    ],
+    expected: { reps: 4, partials: 3, set_end: null, flags: [] },
   },
   {
     ...DEFAULTS,
@@ -502,7 +741,7 @@ export const CLIP_DEFS: readonly ClipDef[] = [
       ...(['left', 'right', 'left', 'right', 'left', 'right'] as const).flatMap((l, i) => lungeRep(l, [92, 95, 90, 94, 91, 93][i])),
       hold(500),
     ],
-    expected: { reps: 6, partials: 0, set_end: null },
+    expected: { reps: 6, partials: 0, set_end: null, flags: [] },
   },
 ];
 
@@ -530,17 +769,29 @@ function buildPose(def: ClipDef, s: Sample): Pose {
   const near: Leg = def.facing === 1 ? 'right' : 'left';
   let p: Pose;
   switch (def.exercise) {
-    case 'squat': p = squatPose(s.angle, near); break;
-    case 'push_up': p = pushUpPose(s.angle, near); break;
+    case 'squat': p = def.view === 'front' ? squatQuarterPose(s.angle, s.form) : squatPose(s.angle, near, s.form); break;
+    case 'push_up': p = pushUpPose(s.angle, near, s.form); break;
     case 'bicep_curl': p = curlPose(s.angle, near); break;
-    case 'shoulder_press': p = pressPose(s.angle); break;
+    case 'shoulder_press': p = pressPose(s.angle, s.raise, s.form.forearm); break;
     case 'lunge': p = lungePose(s.angle, near, s.front); break;
   }
   if (def.view === 'side' && def.facing === -1) {
     for (const k of Object.keys(p)) p[k] = [IMAGE.width - p[k][0], p[k][1]];
   }
+  if (def.offsetY !== 0) for (const k of Object.keys(p)) p[k] = [p[k][0], p[k][1] + def.offsetY];
   return p;
 }
+
+/**
+ * How far the hand (and what it holds) reaches below the wrist, px. A wrist whose hand runs past the
+ * bottom edge is cropped: its confidence drops, mostly below 0.3 but not always, and it jumps around
+ * by `CROPPED_JITTER_PX`.
+ */
+const HAND_PX = 130;
+const CROPPED_C: [number, number] = [0.1, 0.4];
+const CROPPED_JITTER_PX: [number, number] = [20, 40];
+/** Confidence of a joint outside the image (its position is clamped to the edge). */
+const OFF_FRAME_C: [number, number] = [0.02, 0.15];
 
 const round = (v: number, places: number) => {
   const r = Math.round(v * 10 ** places) / 10 ** places;
@@ -617,7 +868,12 @@ export function generateClip(def: ClipDef, opts: GenerateOptions = {}): Clip {
       let c: number;
       const isFar = def.view === 'side' && name !== 'nose' && !name.startsWith(near);
       const isFace = /eye|ear/.test(name);
-      if (isFar) {
+      const offFrame = px < 0 || px > IMAGE.width || py < 0 || py > IMAGE.height;
+      const cropped = name.endsWith('_wrist') && py + HAND_PX > IMAGE.height;
+      if (offFrame || cropped) {
+        const [lo, hi] = offFrame ? OFF_FRAME_C : CROPPED_C;
+        c = clean ? (lo + hi) / 2 : rng.uniform(lo, hi);
+      } else if (isFar) {
         const [lo, hi] = def.farConfidence;
         c = clean ? (lo + hi) / 2 : rng.uniform(lo, hi);
         if (isFace) c *= 0.7;
@@ -629,6 +885,12 @@ export function generateClip(def: ClipDef, opts: GenerateOptions = {}): Clip {
       if (!clean && def.noise > 0) {
         x += rng.gauss() * def.noise;
         y += rng.gauss() * def.noise;
+      }
+      if (!clean && cropped) {
+        const r = rng.uniform(...CROPPED_JITTER_PX);
+        const a = rng.uniform(0, 2 * Math.PI);
+        x += (r * Math.cos(a)) / IMAGE.width;
+        y += (r * Math.sin(a)) / IMAGE.height;
       }
       if (spike && spike.joint === j) {
         x += spike.dx;

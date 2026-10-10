@@ -70,10 +70,10 @@
         "side": "right",
         "extreme_deg": 89.7,
         "durations_ms": {
-          "outbound": 259,
+          "outbound": 183,
           "peak": 939,
           "return": 620,
-          "rep": 1818
+          "rep": 1742
         }
       }
     ]
@@ -84,7 +84,7 @@
     "fps": 11.8,
     "frames": {
       "count": 234,
-      "sha256": "0ab7f0c3b253be0c"
+      "sha256": "6ae45b83e81fc5d7"
     },
     "reps": [
       {
@@ -128,11 +128,11 @@
         "flags": []
       },
       {
-        "tempo_ms": 1818,
-        "range_deg": 82.2,
+        "tempo_ms": 1742,
+        "range_deg": 82.6,
         "quality": null,
-        "start_ms": 16111,
-        "end_ms": 18251,
+        "start_ms": 16187,
+        "end_ms": 18406,
         "flags": []
       }
     ]
@@ -345,10 +345,10 @@
           "id": "<id 8>",
           "setId": "<id 1>",
           "position": 5,
-          "startMs": 16111,
-          "endMs": 18251,
-          "tempoMs": 1818,
-          "rangeDeg": 82.2,
+          "startMs": 16187,
+          "endMs": 18406,
+          "tempoMs": 1742,
+          "rangeDeg": 82.6,
           "quality": null,
           "clean": true
         }
@@ -380,7 +380,7 @@
             "frame_count": 234,
             "first_t_ms": 0,
             "last_t_ms": 19765,
-            "frames_sha256": "0ab7f0c3b253be0c"
+            "frames_sha256": "6ae45b83e81fc5d7"
           }
         ]
       },
@@ -456,10 +456,10 @@
                 },
                 {
                   "rep_index": 5,
-                  "start_ms": 16111,
-                  "end_ms": 18251,
-                  "tempo_ms": 1818,
-                  "range_deg": 82.2,
+                  "start_ms": 16187,
+                  "end_ms": 18406,
+                  "tempo_ms": 1742,
+                  "range_deg": 82.6,
                   "quality": 1,
                   "flags": []
                 }
