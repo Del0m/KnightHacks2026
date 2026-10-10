@@ -9,6 +9,9 @@ import { startInsightSync, syncConfigFromEnv } from "./jobs/syncInsights.js";
 import { neonAuthVerifier } from "./middleware/auth.js";
 import { PoseEndpointClient, poseEndpointConfigFromEnv } from "./integrations/huggingface/poseEndpoint.js";
 import { attachPoseStream } from "./routes/poseStream.js";
+import { DatabricksScorer, scoreConfigFromEnv } from "./integrations/databricks/score.js";
+import { HfLlm, llmConfigFromEnv } from "./integrations/huggingface/llm.js";
+import { RestNoteWriter } from "./services/restNote.js";
 import {
   databricksExportQueue,
   disabledExportQueue,
@@ -46,6 +49,16 @@ const stopInsightSync = insightSyncConfigured(env)
   ? startInsightSync({ db: neon(env.DATABASE_URL), config: syncConfigFromEnv(), log: logger })
   : () => {};
 
+// INT-05: rest-time scoring (CONN-05) and rest notes (CONN-07). Each is optional: without
+// Databricks the phone's rule score is used, without HF_TOKEN the spec's fixed note.
+const scoringConfigured = Boolean(
+  env.DATABRICKS_HOST && env.DATABRICKS_CLIENT_ID && env.DATABRICKS_CLIENT_SECRET,
+);
+const rest = {
+  scorer: scoringConfigured ? new DatabricksScorer(scoreConfigFromEnv(), fetch, logger) : null,
+  notes: new RestNoteWriter(env.HF_TOKEN ? new HfLlm(llmConfigFromEnv()) : null),
+};
+
 const verifyToken = neonAuthVerifier(env.NEON_AUTH_JWKS_URL, {
   issuer: env.NEON_AUTH_ISSUER,
   audience: env.NEON_AUTH_AUDIENCE,
@@ -57,6 +70,7 @@ const app = createApp({
   exportQueue,
   moderator,
   verifyToken,
+  rest,
   pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET,
   corsOrigins: env.CORS_ORIGINS?.split(",").map((s) => s.trim()),
 });
@@ -71,6 +85,8 @@ const server = app.listen(env.PORT, () => {
       insightSync: insightSyncConfigured(env),
       moderation: Boolean(env.HF_TOKEN),
       cloudPose: Boolean(poseEndpoint),
+      setScoring: scoringConfigured,
+      llmRestNotes: Boolean(env.HF_TOKEN),
     },
     "spotter api listening",
   );

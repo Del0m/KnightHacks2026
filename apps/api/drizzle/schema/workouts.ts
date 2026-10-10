@@ -1,6 +1,7 @@
 // DB-04: sessions, sets, reps and form flags. Aggregates only: per-frame joints go straight to
 // the Databricks Volume (CONN-02) and are never stored in Neon (§9.1).
 import {
+  jsonb,
   boolean,
   index,
   integer,
@@ -55,6 +56,9 @@ export const sets = pgTable(
     medal: medalTier(),
     cleanShare: real(),
     scoreSource: text(), // "databricks" | "phone" (CONN-05)
+    // INT-05: the rest-time result, saved so GET /sets/:id/rest-note returns the same thing later.
+    score: jsonb(), // SetScore from scoreSet() (integrations/databricks/score.ts)
+    restNote: jsonb(), // { text, source: "llm" | "fixed", rule_id } (services/restNote.ts)
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
