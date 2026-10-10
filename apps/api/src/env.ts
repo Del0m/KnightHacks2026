@@ -56,6 +56,9 @@ export const envSchema = z.object({
   HF_GUARD_MODEL: optional,
   HF_GUARD_PROVIDER: optional,
   HF_GUARD_TIMEOUT_MS: optionalInt,
+  // CONN-11: cloud pose endpoint (ml/cloud_endpoint). Without it, /pose/stream isn't served.
+  POSE_ENDPOINT_URL: optional.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https URL"),
+  POSE_ENDPOINT_TIMEOUT_MS: optionalInt,
 });
 
 export type Env = z.infer<typeof envSchema>;

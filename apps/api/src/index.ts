@@ -7,6 +7,8 @@ import { DatabricksUploader, uploadConfigFromEnv } from "./integrations/databric
 import { Moderator as LlamaGuard, moderationConfigFromEnv } from "./integrations/huggingface/moderation.js";
 import { startInsightSync, syncConfigFromEnv } from "./jobs/syncInsights.js";
 import { neonAuthVerifier } from "./middleware/auth.js";
+import { PoseEndpointClient, poseEndpointConfigFromEnv } from "./integrations/huggingface/poseEndpoint.js";
+import { attachPoseStream } from "./routes/poseStream.js";
 import {
   databricksExportQueue,
   disabledExportQueue,
@@ -44,18 +46,22 @@ const stopInsightSync = insightSyncConfigured(env)
   ? startInsightSync({ db: neon(env.DATABASE_URL), config: syncConfigFromEnv(), log: logger })
   : () => {};
 
+const verifyToken = neonAuthVerifier(env.NEON_AUTH_JWKS_URL, {
+  issuer: env.NEON_AUTH_ISSUER,
+  audience: env.NEON_AUTH_AUDIENCE,
+});
+
 const app = createApp({
   db,
   logger,
   exportQueue,
   moderator,
-  verifyToken: neonAuthVerifier(env.NEON_AUTH_JWKS_URL, {
-    issuer: env.NEON_AUTH_ISSUER,
-    audience: env.NEON_AUTH_AUDIENCE,
-  }),
+  verifyToken,
   pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET,
   corsOrigins: env.CORS_ORIGINS?.split(",").map((s) => s.trim()),
 });
+
+const poseEndpoint = poseEndpointConfigFromEnv();
 
 const server = app.listen(env.PORT, () => {
   logger.info(
@@ -64,14 +70,21 @@ const server = app.listen(env.PORT, () => {
       databricksExport: databricksConfigured(env),
       insightSync: insightSyncConfigured(env),
       moderation: Boolean(env.HF_TOKEN),
+      cloudPose: Boolean(poseEndpoint),
     },
     "spotter api listening",
   );
 });
 
+// CONN-11: cloud pose mode. Phones stream frames over a WebSocket; the HF token stays here.
+const stopPoseStream = poseEndpoint
+  ? attachPoseStream(server, { verifyToken, endpoint: new PoseEndpointClient(poseEndpoint), log: logger })
+  : () => {};
+
 function shutdown(signal: string) {
   logger.info({ signal }, "shutting down");
   stopInsightSync();
+  stopPoseStream();
   server.close(() => {
     close().finally(() => process.exit(0));
   });
