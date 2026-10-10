@@ -2,6 +2,7 @@ import type { PoseResult } from '../pose/types';
 import { createMetricComputer } from './angles';
 import { JointSmoother } from './oneEuro';
 import { createRepCounter } from './repCounter';
+import { assertEvaluationSpec } from './validation';
 import type {
   CounterStep,
   EngineEvent,
@@ -74,6 +75,7 @@ function gatePasses(gate: PrimaryGate | undefined, metrics: Metrics): boolean {
  * docs/superpowers/specs/2026-10-10-form-engine-design.md, and §9 of the form rules design.
  */
 export function createFormEngine(spec: ExerciseSpec, options: EngineOptions = {}): FormEngine {
+  assertEvaluationSpec(spec);
   const primaryName = spec.primary_angle.name;
   const smoother = new JointSmoother({
     filter: options.filter,

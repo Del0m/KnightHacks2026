@@ -20,6 +20,7 @@ import type {
   View,
 } from './types';
 import { detectView } from './view';
+import { assertEvaluationSpec, ruleThreshold } from './validation';
 
 /** A frame within this many degrees of the rep's extreme counts as at the extreme. */
 export const NEAR_EXTREME_DEG = 1;
@@ -125,8 +126,7 @@ function holds(value: number, op: Rule['check']['op'], threshold: number): boole
 
 /** One rule on one rep. `spec` is the effective spec, so threshold names read its phases. */
 export function evaluateRule(spec: ExerciseSpec, rule: Rule, rep: RepRecord, view: DetectedView): RuleOutcome {
-  const { value: v } = rule.check;
-  const threshold = typeof v === 'number' ? v : spec.phases[v];
+  const threshold = ruleThreshold(spec, rule);
   const base = { rule_id: rule.id, threshold };
   if (rule.view !== 'any' && rule.view !== view) return { ...base, status: 'skipped_view', value: null };
   const value =
@@ -169,6 +169,7 @@ export interface SetRules {
 
 /** Evaluates each closed rep and holds the results until the set ends; then ignores events until `reset`. */
 export function createSetRules(spec: ExerciseSpec | EffectiveSpec, opts: { view?: View } = {}): SetRules {
+  assertEvaluationSpec(spec);
   let reps: RepResult[] = [];
   let summary: SetFlags | null = null;
   return {

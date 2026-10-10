@@ -173,6 +173,7 @@ describe('createFormEngine: counting only real movement', () => {
     return {
       ...press,
       angles: {
+        ...press.angles,
         elbow: { type: 'joint_angle', joints: ['shoulder', 'elbow', 'wrist'], side: 'left' },
         knee: { type: 'joint_angle', joints: ['hip', 'knee', 'ankle'], side: 'left' },
       },

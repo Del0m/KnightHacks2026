@@ -140,6 +140,8 @@ Required order:
 
 Full behaviour: [form rules design](../superpowers/specs/2026-10-10-form-rules-design.md).
 
+**Runtime validation:** `createFormEngine` and `createSetRules` reject invalid evaluation settings with an `Invalid exercise spec` error before starting a set. Checks cover finite phase thresholds and their order, primary-angle and gate references, rule metric references, comparisons, reductions and threshold values. `evaluateRule` also checks its rule and resolves only finite thresholds before view gating or comparison, so a missing `target` cannot become a form flag. Callers receiving server or generated effective specs can call `assertEvaluationSpec` before activating them and handle the error as a spec-loading failure. These runtime checks complement the full schema, override and note checks in `node specs/validate.mjs`; they do not replace them.
+
 Placeholders in `rest_note`:
 
 - `{n}`: reps flagged

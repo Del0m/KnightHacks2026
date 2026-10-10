@@ -75,6 +75,7 @@ export function evaluateRep(spec: ExerciseSpec, rep: RepRecord, opts?: { view?: 
 `spec` is the effective spec. Any `Rule` in `spec.rules` is evaluated the same way, including generated ones such as AI-16's `physio_limit`.
 
 **Order for each rule:**
+0. **Runtime check:** reject an unknown metric, phase, comparison, reduction or threshold reference, or a non-finite threshold, with an `Invalid exercise spec` error. This happens even for a view-skipped rule. `createSetRules` and `createFormEngine` also validate phase order and primary/gate settings at construction; malformed effective specs must be handled as configuration failures, not form flags.
 1. **View:** a rule with `view` other than `any` gets `skipped_view` unless the rep's view equals it. An `unknown` view runs only `any` rules.
 2. **Threshold:** a threshold-name `value` resolves against `spec.phases`, which already has the overrides applied. That gives `threshold`.
 3. **Value:**

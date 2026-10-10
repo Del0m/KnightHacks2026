@@ -22,3 +22,4 @@ export {
 export { useFormRules, type FormRulesState } from './useFormRules';
 export { INJURY_ORDER, applyInjuries, applyOverride } from './overrides';
 export * from './types';
+export { assertEvaluationSpec } from './validation';
