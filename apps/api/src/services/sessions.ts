@@ -344,8 +344,8 @@ export async function buildExportSession(
       reps: repRows
         .filter((r) => r.setId === s.id)
         .map((r) => ({
-          start_ms: r.startMs ?? 0,
-          end_ms: r.endMs ?? 0,
+          start_ms: r.startMs ?? null, // unknown, not 0: 0..0 would fail the pipeline's bounds check
+          end_ms: r.endMs ?? null,
           tempo_ms: r.tempoMs,
           range_deg: r.rangeDeg,
           quality: r.quality ?? (r.clean ? 1 : 0),

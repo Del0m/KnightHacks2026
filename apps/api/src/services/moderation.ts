@@ -5,7 +5,14 @@
 // everything is allowed.
 import type { Moderator as LlamaGuard } from "../integrations/huggingface/moderation.js";
 
-export type ModerationResult = { allowed: true } | { allowed: false; message: string };
+// Extra fields from Llama Guard, for routes that need them (all optional):
+//   advisory  allowed, but asks for specialized (e.g. medical) advice: BE-11 should point to a
+//             professional rather than answer with AI
+//   checked   false when Llama Guard was unreachable and the text was allowed unchecked
+//   support   self-harm: show support resources rather than a plain block
+export type ModerationResult =
+  | { allowed: true; advisory?: "specialized_advice"; checked?: boolean }
+  | { allowed: false; message: string; support?: boolean };
 
 export interface Moderator {
   check(text: string, kind: "post" | "comment" | "advice"): Promise<ModerationResult>;
@@ -25,9 +32,18 @@ export function llamaGuardModerator(guard: Pick<LlamaGuard, "moderate">): Modera
   return {
     async check(text, kind) {
       const result = await guard.moderate(text, kind);
-      return result.allowed
-        ? { allowed: true }
-        : { allowed: false, message: result.message ?? BLOCKED_MESSAGE };
+      if (result.allowed) {
+        return {
+          allowed: true,
+          checked: result.checked,
+          ...(result.advisory ? { advisory: result.advisory } : {}),
+        };
+      }
+      return {
+        allowed: false,
+        message: result.message ?? BLOCKED_MESSAGE,
+        ...(result.support ? { support: true } : {}),
+      };
     },
   };
 }

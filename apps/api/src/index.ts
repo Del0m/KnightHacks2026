@@ -27,18 +27,21 @@ const logger = pino({ level: env.LOG_LEVEL });
 const { db, close } = createNeonDb(env.DATABASE_URL);
 
 const exportQueue = databricksConfigured(env)
-  ? databricksExportQueue(new DatabricksUploader(uploadConfigFromEnv(), drizzleExportStatusStore(db)), logger)
+  ? databricksExportQueue(
+      new DatabricksUploader(uploadConfigFromEnv(), drizzleExportStatusStore(db), fetch, logger),
+      logger,
+    )
   : disabledExportQueue(logger);
 
 // CONN-09: Llama Guard on posts and comments.
 const moderator = env.HF_TOKEN
-  ? llamaGuardModerator(new LlamaGuard(moderationConfigFromEnv()))
+  ? llamaGuardModerator(new LlamaGuard(moderationConfigFromEnv(), undefined, logger))
   : allowAllModerator;
 if (!env.HF_TOKEN) logger.warn("HF_TOKEN is not set; posts and comments are not moderated");
 
 // CONN-06: copy gold tables into Neon every 15 minutes. Run it on one API instance only.
 const stopInsightSync = insightSyncConfigured(env)
-  ? startInsightSync({ db: neon(env.DATABASE_URL), config: syncConfigFromEnv() })
+  ? startInsightSync({ db: neon(env.DATABASE_URL), config: syncConfigFromEnv(), log: logger })
   : () => {};
 
 const app = createApp({

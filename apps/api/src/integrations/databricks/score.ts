@@ -109,6 +109,11 @@ export function phoneScore(input: ScoreSetInput, startedAt: number, reason: stri
 
 // ---- Client ----
 
+// Console or pino: both take a plain message.
+export interface LogLike {
+  warn(msg: string): void;
+}
+
 export class DatabricksScorer {
   private token: string | null = null;
   private tokenExpiresAt = 0;
@@ -116,6 +121,7 @@ export class DatabricksScorer {
   constructor(
     private readonly config: ScoreConfig,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly log: LogLike = console,
   ) {}
 
   /** Scores a set on Databricks, or falls back to the phone's rule score. Never throws. */
@@ -141,7 +147,7 @@ export class DatabricksScorer {
         ? `timed out after ${this.config.timeoutMs} ms`
         : err instanceof Error ? err.message : String(err);
       if (/HTTP 401|HTTP 403/.test(reason)) this.token = null;
-      console.warn(`[databricks] scoring fell back to phone score: ${reason}`);
+      this.log.warn(`[databricks] scoring fell back to phone score: ${reason}`);
       return phoneScore(input, startedAt, reason);
     }
   }

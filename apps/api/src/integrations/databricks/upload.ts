@@ -29,8 +29,10 @@ export interface JointFrame {
 }
 
 export interface FinishedRep {
-  start_ms: number; // rep boundaries on the set's frame clock (JointFrame.t_ms)
-  end_ms: number;
+  // Rep boundaries on the set's frame clock (JointFrame.t_ms); null when the phone didn't send
+  // them. The pipeline keeps those reps but can't match them to frames.
+  start_ms: number | null;
+  end_ms: number | null;
   tempo_ms: number;
   range_deg: number;
   quality: number;
@@ -218,6 +220,11 @@ function isRetryable(err: unknown): boolean {
   return true; // network errors, timeouts
 }
 
+// Console or pino: both take a plain message.
+export interface LogLike {
+  error(msg: string): void;
+}
+
 export class DatabricksUploader {
   private token: string | null = null;
   private tokenExpiresAt = 0;
@@ -226,6 +233,7 @@ export class DatabricksUploader {
     private readonly config: UploadConfig,
     private readonly status: ExportStatusStore,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly log: LogLike = console,
   ) {}
 
   /** Uploads a finished session and records the outcome in Neon. Never throws. */
@@ -251,7 +259,7 @@ export class DatabricksUploader {
     }
 
     const message = lastError instanceof Error ? lastError.message : String(lastError);
-    console.error(`[databricks] export failed for session ${session.id}: ${message}`);
+    this.log.error(`[databricks] export failed for session ${session.id}: ${message}`);
     await this.status.set(session.id, "failed", message);
     return "failed";
   }

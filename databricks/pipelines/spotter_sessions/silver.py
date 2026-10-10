@@ -134,7 +134,8 @@ def silver_frames():
 
 
 @dp.materialized_view(comment="One row per rep: range, tempo split, left/right symmetry, flags, quality")
-@dp.expect_or_drop("valid_bounds", "end_ms > start_ms")
+# Reps without boundaries (the phone didn't send them) are kept; they just have no frames.
+@dp.expect_or_drop("valid_bounds", "start_ms IS NULL OR end_ms IS NULL OR end_ms > start_ms")
 @dp.expect_or_drop("range_in_degrees", "range_deg BETWEEN 0 AND 180")
 @dp.expect_or_drop("quality_0_to_1", "quality IS NULL OR quality BETWEEN 0 AND 1")
 @dp.expect("has_frames", "frame_count >= 4")

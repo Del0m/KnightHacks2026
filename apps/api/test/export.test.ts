@@ -64,7 +64,7 @@ describe("Databricks export on finish", () => {
       weight_kg: 40,
       fps: 30,
       frames: frames(3),
-      reps: [rep(), rep(["depth"])],
+      reps: [rep(), rep(["depth"], { start_ms: 0, end_ms: 2000 })],
     });
     await api.post(`/sessions/${id}/finish`);
 
@@ -78,6 +78,9 @@ describe("Databricks export on finish", () => {
     expect(JSON.stringify(meta)).not.toContain("private note");
     expect(meta.sets[0].reps).toHaveLength(2);
     expect(meta.sets[0].reps[1].flags).toEqual([{ rule_id: "depth", severity: "warn" }]);
+    // Unknown rep boundaries go out as null, not 0..0, which the pipeline's bounds check would drop.
+    expect(meta.sets[0].reps[0]).toMatchObject({ start_ms: null, end_ms: null });
+    expect(meta.sets[0].reps[1]).toMatchObject({ start_ms: 0, end_ms: 2000 });
 
     const joints = gunzipSync(puts[0]!.body)
       .toString()

@@ -148,6 +148,7 @@ describe("CONN-06 insight sync", () => {
       .from(schema.riskInsights)
       .where(eq(schema.riskInsights.userId, "sync-user"));
     expect(risk).toHaveLength(1);
+    expect(risk[0]!.topFeatures).toEqual(["flag_rate_rising"]);
 
     const insights = await api.get("/me/insights");
     expect(insights.body.insights[0]).toMatchObject({
@@ -166,5 +167,21 @@ describe("CONN-09 moderation", () => {
     expect(blocked.status).toBe(422);
     expect(blocked.body.message).toBe("We can't share posts about illegal activity.");
     expect((await api.post("/posts", { kind: "goal", body: "3 gold workouts this month" })).status).toBe(201);
+  });
+
+  it("passes Llama Guard's advisory, unchecked and support flags through the adapter", async () => {
+    const adapter = (result: Awaited<ReturnType<Parameters<typeof llamaGuardModerator>[0]["moderate"]>>) =>
+      llamaGuardModerator({ moderate: async () => result }).check("text", "advice");
+
+    expect(
+      await adapter({ allowed: true, checked: true, categories: ["S6"], advisory: "specialized_advice" }),
+    ).toEqual({ allowed: true, checked: true, advisory: "specialized_advice" });
+    expect(await adapter({ allowed: true, checked: false, categories: [] })).toEqual({
+      allowed: true,
+      checked: false,
+    });
+    expect(
+      await adapter({ allowed: false, checked: true, categories: ["S11"], support: true, message: "988" }),
+    ).toEqual({ allowed: false, message: "988", support: true });
   });
 });
