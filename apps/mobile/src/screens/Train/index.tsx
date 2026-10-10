@@ -5,9 +5,10 @@ import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { AppPage, Action, ui } from '@/components/AppPage';
 import { BodyPreview } from '@/components/BodyPreview';
 import { Streak } from '@/components/Streak';
-import { exercises, streak, type ExerciseId } from '@/data/workout';
+import { exercises, streak, completedToday, type ExerciseId } from '@/data/workout';
 import { useTraining } from '@/state/Training';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { cameraSpec } from '@/screens/LiveSet/exercises';
 import { colors as c, typography as t } from '@/theme/tokens';
 export default function TrainScreen() {
   const { workouts } = useTraining(), reduced = useReducedMotion();
@@ -31,6 +32,7 @@ export default function TrainScreen() {
     <View>{exercises.map((e, i) => <PolishedPressable key={e.id} testID={`exercise-${e.id}`} accessibilityRole="button" aria-pressed={selected === e.id} accessibilityHint="Select to focus and play this exercise." onPress={() => select(e.id)} style={({ pressed }) => [styles.row, { backgroundColor: selected === e.id || pressed ? 'rgba(255,255,255,0.65)' : 'transparent' }]}>
       <Text style={[styles.number, selected === e.id && { color: c.primary }]}>{orderLabel(i + 1)}</Text>
       <Text style={[styles.name, selected === e.id && { color: c.primary }]}>{e.name}</Text>
+      {completedToday(workouts, cameraSpec(e.id).id, e.sets) && <Text accessibilityLabel={`${e.name} completed`} style={{ color: c.primary, fontSize: 20 }}>✓</Text>}
       <View style={styles.details}><Text style={styles.reps}>{e.sets} × {e.reps} reps</Text><Text style={styles.detail}>{e.muscles}</Text></View>
     </PolishedPressable>)}</View>
     <Action onPress={() => router.push({ pathname: '/camera-setup', params: { exercise: exercises[0].id } })}>Begin Workout</Action>

@@ -33,6 +33,7 @@
     "react-native-vision-camera": "^5.2.3",
     "react-native-vision-camera-worklets": "^5.2.3",
     "react-native-web": "~0.21.0",
+    "react-native-webview": "13.16.1",
     "react-native-worklets": "0.10.1",
     "spotter-pose": "file:./modules/spotter-pose"
   },

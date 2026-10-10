@@ -11,11 +11,11 @@ import { assessFraming, FRAME_STALE_MS, updateStability, type Size } from './fra
 import { cameraSpec } from './exercises';
 import { FramingGuide } from './FramingGuide';
 
-export default function CameraCheck({ exercise, onContinue }: { exercise: string; onContinue: () => void }) {
-  if (Platform.OS !== 'ios') return <View style={s.group}><Text style={s.heading}>Live framing is available on iPhone.</Text><Text style={s.text}>Use the placement guide above, or continue with manual tracking on this device.</Text><GlassChoice label="Continue without camera" onPress={onContinue} compact /></View>;
+export default function CameraCheck({ exercise, onContinue }: { exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
+  if (Platform.OS !== 'ios') return <View style={s.group}><Text style={s.heading}>Live framing is available on iPhone.</Text><Text style={s.text}>Use the placement guide above, or continue with manual tracking on this device.</Text><GlassChoice label="Continue without camera" onPress={() => onContinue('manual')} compact /></View>;
   return <IPhoneCheck exercise={exercise} onContinue={onContinue} />;
 }
-function IPhoneCheck({ exercise, onContinue }: { exercise: string; onContinue: () => void }) {
+function IPhoneCheck({ exercise, onContinue }: { exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
   const permission = useCameraPermission();
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
@@ -26,27 +26,27 @@ function IPhoneCheck({ exercise, onContinue }: { exercise: string; onContinue: (
     <Text style={s.heading}>Allow camera access</Text><Text style={s.text}>Camera frames are processed on your iPhone. This setup check doesn’t record video.</Text>
     {permissionError && <Text accessibilityRole="alert" style={s.error}>{permissionError}</Text>}
     <GlassChoice label={permission.canRequestPermission ? 'Allow camera' : 'Open camera settings'} primary selected onPress={() => { setPermissionError(null); void (permission.canRequestPermission ? permission.requestPermission() : Linking.openSettings()).catch(() => setPermissionError('Could not open camera access. Please try again.')); }} />
-    <GlassChoice compact label="Continue without camera" onPress={onContinue} />
+    <GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />
   </View>;
   // Unmounting the live check clears all detection/stability state when backgrounded or unfocused.
   if (!foreground || !focused) return <Text style={s.text}>Camera paused. Return to Steady forum to check your framing.</Text>;
   return <ModeCheck exercise={exercise} onContinue={onContinue} />;
 }
-function ModeCheck({ exercise, onContinue }: { exercise: string; onContinue: () => void }) {
+function ModeCheck({ exercise, onContinue }: { exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
   const mode = usePoseMode();
   useEffect(() => { void startPoseBenchmark(); }, []);
-  if (mode.benchmarking || mode.mode === 'pending') return <View style={s.group}><ActivityIndicator accessibilityLabel="Preparing the camera" color={c.primary} /><Text style={s.text}>Getting the camera ready…</Text><GlassChoice compact label="Continue without camera" onPress={onContinue} /></View>;
+  if (mode.benchmarking || mode.mode === 'pending') return <View style={s.group}><ActivityIndicator accessibilityLabel="Preparing the camera" color={c.primary} /><Text style={s.text}>Getting the camera ready…</Text><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} /></View>;
   if (mode.mode !== 'coreml' && mode.mode !== 'vision') return <View style={s.group}>
     <Text style={s.heading}>Try basic on-device tracking.</Text><Text style={s.text}>The main tracker isn’t available on this phone right now. Basic tracking uses Apple Vision on your iPhone.</Text>
-    <GlassChoice label="Use basic tracking" primary selected onPress={() => mode.setPreference('vision')} /><GlassChoice compact label="Continue without camera" onPress={onContinue} />
+    <GlassChoice label="Use basic tracking" primary selected onPress={() => mode.setPreference('vision')} /><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />
   </View>;
   return <LiveCheck key={`${mode.mode}:${mode.size}`} engine={mode.mode} size={mode.size} exercise={exercise} onContinue={onContinue} />;
 }
-function LiveCheck({ engine, size, exercise, onContinue }: { engine: PoseEngine; size: 320 | 256; exercise: string; onContinue: () => void }) {
+function LiveCheck({ engine, size, exercise, onContinue }: { engine: PoseEngine; size: 320 | 256; exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
   const [position, setPosition] = useState<'front' | 'back'>('front');
   return <CameraPreview key={position} position={position} engine={engine} size={size} exercise={exercise} onFlip={() => setPosition(p => p === 'front' ? 'back' : 'front')} onContinue={onContinue} />;
 }
-function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }: { position: 'front' | 'back'; engine: PoseEngine; size: 320 | 256; exercise: string; onFlip: () => void; onContinue: () => void }) {
+function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }: { position: 'front' | 'back'; engine: PoseEngine; size: 320 | 256; exercise: string; onFlip: () => void; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
   const device = useCameraDevice(position);
   const [result, setResult] = useState<PoseResult | undefined>();
   const [view, setView] = useState<Size | null>(null), [image, setImage] = useState<Size | null>(null);
@@ -77,7 +77,7 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
   }, [now, result, output.error, cameraError]);
   const framing = image && view ? assessFraming(result, image, view, mirrored, now) : null;
   const valid = ready && framing?.kind === 'ready' && !output.error && !cameraError;
-  if (!device) return <View style={s.group}><Text style={s.heading}>This camera isn’t available.</Text><GlassChoice compact label="Switch camera" onPress={onFlip} /><GlassChoice compact label="Continue without camera" onPress={onContinue} /></View>;
+  if (!device) return <View style={s.group}><Text style={s.heading}>This camera isn’t available.</Text><GlassChoice compact label="Switch camera" onPress={onFlip} /><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} /></View>;
   return <View style={s.group}>
     <View style={s.status} accessibilityLiveRegion="polite"><Text style={[s.heading, valid && { color: '#14744C' }]}>{cameraError || output.error ? 'Camera check interrupted' : valid ? '✓ Ready' : framing?.kind === 'ready' ? 'Hold your position…' : framing?.title ?? 'Looking for you'}</Text><Text style={s.text}>{cameraError || output.error ? 'Try switching cameras, or continue with manual tracking.' : framing?.hint ?? 'Return to your exercise spot with your whole body visible.'}</Text></View>
     <View testID="framing-preview" style={s.preview} onLayout={event => { setView(event.nativeEvent.layout); stableSince.current = null; setReady(false); }}>
@@ -87,9 +87,9 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
     {(cameraSpec(exercise).recommended_view === 'side') && <Text style={s.text}>Side-on view: face across the camera, so it can see your movement from the side.</Text>}
     <Text style={s.caption}>Keep your full rep inside the frame. The eight-foot guide is approximate.</Text>
     <GlassChoice compact label={position === 'front' ? 'Use back camera' : 'Use front camera'} onPress={onFlip} />
-    <GlassChoice label="Framing checked · continue" primary selected disabled={!valid} onPress={onContinue} />
-    <GlassChoice compact label="Continue without camera" onPress={onContinue} />
-    <Text style={s.caption}>Reps are tracked manually.</Text>
+    <GlassChoice label="Framing checked · continue" primary selected disabled={!valid} onPress={() => onContinue('camera', position)} />
+    <GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />
+    <Text style={s.caption}>Your workout uses the camera to count reps.</Text>
   </View>;
 }
 const s = StyleSheet.create({

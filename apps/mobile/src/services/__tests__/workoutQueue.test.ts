@@ -1,0 +1,29 @@
+import { queueWorkout, syncWorkouts } from '../workoutQueue';
+const mockData = new Map<string, string>();
+jest.mock('react-native-mmkv', () => ({ createMMKV: () => ({ getString: (k: string) => mockData.get(k), set: (k: string, v: string) => mockData.set(k, v) }) }));
+const response = (status: number, body: object = {}) => ({ ok: status < 400, status, json: async () => body }) as Response;
+beforeEach(() => mockData.clear());
+it('retains failed saves and retries their original session without crossing accounts', async () => {
+  queueWorkout('a', { id: 'local', startedAt: '2026-10-10T12:00:00Z', sets: [{ exercise_id: 'squat', reps: [] }], checkpoint: {} });
+  const request = jest.fn().mockResolvedValueOnce(response(201, { id: 'existing' })).mockRejectedValueOnce(new Error('offline'));
+  await expect(syncWorkouts('a', request)).rejects.toThrow('offline');
+  await syncWorkouts('b', request);
+  expect(request).toHaveBeenCalledTimes(2);
+  request.mockResolvedValue(response(200));
+  await syncWorkouts('a', request);
+  expect(request.mock.calls.filter(call => call[0] === '/sessions')).toHaveLength(1);
+  await syncWorkouts('a', request);
+  expect(request).toHaveBeenCalledTimes(4);
+});
+it('persists a finished workout immediately while its rest upload settles', async () => {
+  let release!: () => void;
+  const wait = new Promise<void>(resolve => { release = resolve; });
+  queueWorkout('a', { id: 'waiting', startedAt: '2026-10-10T12:00:00Z', sets: [], checkpoint: { sessionId: 'existing' } }, wait);
+  expect([...mockData.values()].join()).toContain('waiting');
+  const request = jest.fn().mockResolvedValue(response(200));
+  await syncWorkouts('a', request);
+  expect(request).not.toHaveBeenCalled();
+  release(); await wait; await Promise.resolve();
+  await syncWorkouts('a', request);
+  expect(request).toHaveBeenCalledTimes(1);
+});

@@ -1,3 +1,5 @@
+import { GlassSurface } from '@/components/GlassSurface';
+import { SwipeTabs } from '@/components/SwipeTabs';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Tabs } from 'expo-router';
 import { Animated, Easing, Text, View } from 'react-native';
@@ -19,7 +21,8 @@ function GlassTabBar({ state, descriptors, navigation }: BarProps) {
     animation.start(); return () => animation.stop();
   }, [state.index, slot, slide, reduced]);
   return <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center' }}>
-    <View testID="glass-navigation" onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ width: '100%', maxWidth: 620, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12), paddingHorizontal: 12, flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.78)', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.95)', boxShadow: '0 -5px 24px rgba(34,99,132,0.07)' }}>
+    <View testID="glass-navigation" onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ width: '100%', maxWidth: 620, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12), paddingHorizontal: 12, flexDirection: 'row', backgroundColor: 'transparent', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.95)', boxShadow: '0 -5px 24px rgba(34,99,132,0.07)' }}>
+      <GlassSurface radius={28} />
       {width > 0 && <Animated.View pointerEvents="none" testID="tab-highlight" style={{ position: 'absolute', left: 14, top: 12, width: Math.max(0, slot - 4), height: 65, borderRadius: 20, backgroundColor: slot > 0 ? slide.interpolate({ inputRange: tabAccents.map((_, index) => index * slot), outputRange: tabAccents.map(accent => accent.glass), extrapolate: 'clamp' }) : tabAccents[0].glass, borderWidth: 1, borderColor: 'rgba(255,255,255,.9)', boxShadow: 'inset 0 1px 0 white, 0 2px 8px rgba(68,119,148,.1)', transform: [{ translateX: slide }] }} />}
       {state.routes.map((route, index) => {
         const active = state.index === index, title = descriptors[route.key].options.title ?? route.name, color = tabAccents[index]?.color ?? c.primary;
@@ -32,7 +35,7 @@ function GlassTabBar({ state, descriptors, navigation }: BarProps) {
 }
 export default function TabLayout() {
   const reduced = useReducedMotion();
-  return <Tabs screenOptions={({ route }) => ({ headerShown: false, animation: reduced === false ? 'fade' : 'none', sceneStyle: { backgroundColor: pageColors(route.name).background } })} tabBar={props => <GlassTabBar {...props} />}>
+  return <SwipeTabs><Tabs screenOptions={({ route }) => ({ headerShown: false, animation: reduced === false ? 'fade' : 'none', sceneStyle: { backgroundColor: pageColors(route.name).background } })} tabBar={props => <GlassTabBar {...props} />}>
     <Tabs.Screen name="index" options={{ title: 'Train' }} /><Tabs.Screen name="plan" options={{ title: 'Plan' }} /><Tabs.Screen name="feed" options={{ title: 'Feed' }} /><Tabs.Screen name="buddies" options={{ title: 'Buddies' }} /><Tabs.Screen name="me" options={{ title: 'Me' }} />
-  </Tabs>;
+  </Tabs></SwipeTabs>;
 }

@@ -7,23 +7,22 @@ import { MEDAL_LABEL, restCardContent, type PhoneResult, type ServerRestResult }
  * The server's result for the set (the POST /sessions/:id/sets response), kept only if it arrives
  * while `resting` is true, so the card never changes after the next set has started.
  */
-export function useServerRestResult(request: Promise<ServerRestResult> | null, resting: boolean): ServerRestResult | null {
-  const [result, setResult] = useState<ServerRestResult | null>(null);
+export function useServerRestResult(request: Promise<ServerRestResult | null> | null, resting: boolean): ServerRestResult | null {
+  const [published, setPublished] = useState<{ request: Promise<ServerRestResult | null>; result: ServerRestResult | null } | null>(null);
   const restingNow = useRef(resting);
   useEffect(() => { restingNow.current = resting; }, [resting]);
   useEffect(() => {
     if (!request) return;
     let live = true;
-    request.then((r) => { if (live && restingNow.current) setResult(r); }).catch(() => {}); // the phone result stays
+    request.then((r) => { if (live && restingNow.current) setPublished({ request, result: r }); }).catch(() => {}); // the phone result stays
     return () => { live = false; };
   }, [request]);
-  return result;
+  return published?.request === request ? published.result : null;
 }
 
 /**
  * INT-05 / FE-07 rest card: this set's medal and its one rest note. Shows the phone's result at once
- * and the server's (`server`, from useServerRestResult) once it arrives. Not wired into the live set
- * flow yet: that needs the API client (INT-03) and the rest timer (FE-07).
+ * and the server's (`server`, from useServerRestResult) once it arrives during this set's rest.
  */
 export function RestCard({ phone, server, secondsLeft }: { phone: PhoneResult; server: ServerRestResult | null; secondsLeft?: number }) {
   const content = restCardContent(phone, server, true);

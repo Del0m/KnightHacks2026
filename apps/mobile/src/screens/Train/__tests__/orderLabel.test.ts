@@ -1,5 +1,7 @@
 import { orderLabel } from '../index';
 
+jest.mock('react-native-webview', () => ({ WebView: 'WebView' }));
+
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 
 describe('orderLabel', () => {
