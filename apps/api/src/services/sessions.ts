@@ -20,7 +20,8 @@ import {
   type PrResult,
 } from "./medals.js";
 
-const { sessions, sets, reps, formFlags, medals, personalRecords, profiles, injuries, posts } = schema;
+const { sessions, sets, reps, formFlags, medals, personalRecords, profiles, injuries, posts, rehabPlans } =
+  schema;
 
 export interface NewSet {
   setIndex?: number;
@@ -347,10 +348,14 @@ export async function buildExportSession(
     .select({ level: profiles.experienceLevel })
     .from(profiles)
     .where(eq(profiles.userId, userId));
-  const injuryParts = await db
-    .selectDistinct({ part: injuries.bodyPart })
+  const injuryRows = await db
+    .selectDistinct({ part: injuries.bodyPart, side: injuries.side })
     .from(injuries)
     .where(eq(injuries.userId, userId));
+  const [activePlan] = await db
+    .select({ startOn: rehabPlans.startOn })
+    .from(rehabPlans)
+    .where(and(eq(rehabPlans.userId, userId), eq(rehabPlans.status, "active")));
 
   return {
     id: session.id,
@@ -362,10 +367,15 @@ export async function buildExportSession(
     medal: session.medal,
     form_score: session.formScore,
     experience_level: profile?.level ?? null,
-    // DB-12 adds injuries.side and rehab_plans: pass the side to injuryGroup() and set
-    // rehab_start_on from the active plan, so range of motion (CONN-14) compares the right sides.
-    injury_groups: injuryParts.map((p) => injuryGroup(p.part)),
-    rehab_start_on: null,
+    // The injured side and the rehab plan's start let range of motion (CONN-14) compare the
+    // right sides from the right baseline. Coarse tags only, never notes or dates (§13).
+    injury_groups: [...new Set(injuryRows.map((i) => injuryGroup(i.part, i.side)))],
+    // Only once the plan has started by this session's date, so ROM never gets a baseline from
+    // the future. The session's UTC date is close enough here: it only picks the baseline window.
+    rehab_start_on:
+      activePlan && activePlan.startOn <= (session.finishedAt ?? new Date()).toISOString().slice(0, 10)
+        ? activePlan.startOn
+        : null,
     sets: setRows.map((s) => ({
       exercise_id: s.exerciseId,
       weight_kg: s.weightKg,

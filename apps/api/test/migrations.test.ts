@@ -44,6 +44,9 @@ describe("migrations", () => {
         "risk_insights",
         "doc_chunks",
         "progress_daily",
+        "rehab_plans",
+        "rehab_limits",
+        "rom_trend",
       ]),
     );
   });
