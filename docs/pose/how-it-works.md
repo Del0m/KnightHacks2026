@@ -90,7 +90,8 @@ This is what `PoseDecoder.decode` does. A server running the raw model should do
 
 The camera sensor is landscape, and the front camera's preview is mirrored like a mirror. Two rules keep this simple:
 
-- **Frames are fixed at capture.** `CameraFeed` sets the video connection to `videoRotationAngle = 90` (portrait) and `isVideoMirrored = false` for both cameras. Every frame the model sees is upright and unmirrored, so Vision always gets orientation `.up`.
+- **Frames are fixed at capture.** `CameraFeed` sets the video connection's `videoRotationAngle` and `isVideoMirrored = false` for both cameras. Every frame the model sees is upright and unmirrored, so Vision always gets orientation `.up`.
+- **The angle comes from `AVCaptureDevice.RotationCoordinator`, never a constant.** Each camera is mounted at its own angle. On an iPhone 17 Pro Max (iOS 26.6) the logs show the back camera needs **90°** but the new square front sensor needs **0°**. A hardcoded 90° turned the front image on its side. The coordinator also gives the preview layer its angle, which is re-applied after every camera switch, because a switch rebuilds the preview connection. `CameraFeed` logs both angles and the first frame size under the `camera` category, which is handy when a new phone behaves differently.
 - **Why unmirrored matters:** the model decides left and right from how the body looks. In a mirrored image the lifter's real right knee looks like a left knee, and it would be labelled `left_knee`. The form rules care which knee caves in, so the contract requires anatomical left and right.
 - **Only the drawing mirrors.** The front-camera preview is mirrored, which feels natural for selfies, so `OverlayGeometry` flips x for the front camera. That keeps the drawn dot on top of the hand you see. The joint data itself is never flipped.
 

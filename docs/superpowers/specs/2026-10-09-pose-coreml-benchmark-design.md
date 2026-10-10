@@ -133,7 +133,7 @@ Steps:
 
 `export.py`'s verification also asserts row 4 and the visibility rows fall within 0–1 on a sample image, so a layout change is caught at export time.
 
-**Orientation:** the app is locked to portrait. The camera's video-data connection is set to `videoRotationAngle = 90` and `isVideoMirrored = false`, so frames arrive upright and unmirrored for both cameras, and Vision always gets `.up`. This keeps left and right anatomically correct: the model labels the lifter's real left knee `left_knee`, which the form rules depend on. The only mirroring happens in the overlay for the front camera, to line up with the mirrored preview.
+**Orientation:** the app is locked to portrait. The camera's video-data connection is set to the rotation angle from `AVCaptureDevice.RotationCoordinator` (camera mounting differs per device: on iPhone 17 the front camera needs 0° and the back 90°) and `isVideoMirrored = false`, so frames arrive upright and unmirrored for both cameras, and Vision always gets `.up`. The preview layer gets its angle from the same coordinator. This keeps left and right anatomically correct: the model labels the lifter's real left knee `left_knee`, which the form rules depend on. The only mirroring happens in the overlay for the front camera, to line up with the mirrored preview.
 
 **Readout:** model size · latency ms · effective fps · "no person" when no result.
 

@@ -156,9 +156,9 @@ private struct CameraPreview: UIViewRepresentable {
         let view = PreviewView()
         view.previewLayer.session = camera.session
         view.previewLayer.videoGravity = .resizeAspect // aspect-fit, matching OverlayGeometry
-        view.lockPortrait()
-        // A camera switch rebuilds the preview connection, so re-apply portrait each time.
-        camera.onReconfigure = { [weak view] in DispatchQueue.main.async { view?.lockPortrait() } }
+        camera.previewLayer = view.previewLayer
+        // A camera switch rebuilds the preview connection, so CameraFeed hands over the angle each time.
+        camera.onReconfigure = { [weak view] angle in DispatchQueue.main.async { view?.rotate(to: angle) } }
         return view
     }
 
@@ -168,10 +168,10 @@ private struct CameraPreview: UIViewRepresentable {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
 
-        /// Portrait, with the default automatic mirroring left on: the front preview stays a mirror.
-        func lockPortrait() {
-            if let connection = previewLayer.connection, connection.isVideoRotationAngleSupported(90) {
-                connection.videoRotationAngle = 90
+        /// Default automatic mirroring is left on, so the front preview stays a mirror.
+        func rotate(to angle: CGFloat) {
+            if let connection = previewLayer.connection, connection.isVideoRotationAngleSupported(angle) {
+                connection.videoRotationAngle = angle
             }
         }
     }
