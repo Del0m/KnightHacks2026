@@ -48,7 +48,7 @@ describe("DB-12 schema", () => {
     expect((await api.post("/me/injuries", { body_part: "knee", side: "middle" })).status).toBe(400);
   });
 
-  it("upserts rom_trend on (user_id, angle, side, week) and rejects ranges outside 0-180", async () => {
+  it("upserts rom_trend on (user_id, angle, side, week), the key CONN-14's sync relies on", async () => {
     await (await t.as("db12-rom")).get("/me/profile");
     const row = { userId: "db12-rom", angle: "knee", side: "left", week: "2026-10-05", peakRangeDeg: 90 };
     await t.db.insert(schema.romTrend).values(row);
@@ -61,11 +61,11 @@ describe("DB-12 schema", () => {
       });
     const rows = await t.db.select().from(schema.romTrend).where(eq(schema.romTrend.userId, "db12-rom"));
     expect(rows).toEqual([expect.objectContaining({ peakRangeDeg: 104, changeDeg: 14 })]);
+    // CONN-14 owns the table; a week without a peak isn't a trend point.
     await expect(
-      t.db.insert(schema.romTrend).values({ ...row, week: "2026-10-12", peakRangeDeg: 200 }),
-    ).rejects.toThrow();
-    await expect(
-      t.db.insert(schema.romTrend).values({ ...row, week: "2026-10-12", side: "middle" }),
+      t.db
+        .insert(schema.romTrend)
+        .values({ ...row, week: "2026-10-12", peakRangeDeg: null as unknown as number }),
     ).rejects.toThrow();
   });
 
@@ -74,7 +74,7 @@ describe("DB-12 schema", () => {
     await api.post("/me/rehab-plans", kneePlan);
     await t.db
       .insert(schema.romTrend)
-      .values({ userId: "db12-cascade", angle: "knee", side: "left", week: "2026-10-05" });
+      .values({ userId: "db12-cascade", angle: "knee", side: "left", week: "2026-10-05", peakRangeDeg: 80 });
     await t.db.delete(schema.users).where(eq(schema.users.id, "db12-cascade"));
     const left = async (table: typeof schema.rehabPlans | typeof schema.romTrend) =>
       (await t.db.select().from(table).where(eq(table.userId, "db12-cascade"))).length;
@@ -84,6 +84,26 @@ describe("DB-12 schema", () => {
       sql`select count(*)::int as n from rehab_limits l left join rehab_plans p on p.id = l.rehab_plan_id where p.id is null`,
     );
     expect((orphans as unknown as { rows: { n: number }[] }).rows[0]!.n).toBe(0);
+  });
+});
+
+describe("DB-12 in the Databricks export (CONN-14 hooks)", () => {
+  it("sends the injured side and the active plan's start date, never notes", async () => {
+    const api = await t.as("export-rehab");
+    await api.post("/me/injuries", { body_part: "knee", side: "left", notes: "private: torn ACL" });
+    await api.post("/me/injuries", { body_part: "lower_back" }); // no side -> bare tag
+    await api.post("/me/rehab-plans", kneePlan);
+    const { id } = (await api.post("/sessions")).body;
+    await api.post(`/sessions/${id}/sets`, {
+      exercise_id: "squat",
+      reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
+    });
+    expect((await api.post(`/sessions/${id}/finish`)).status).toBe(200);
+
+    const exported = t.queue.sessions.find((s) => s.id === id)!;
+    expect([...exported.injury_groups].sort()).toEqual(["knee:left", "lower_back"]);
+    expect(exported.rehab_start_on).toBe("2026-10-01");
+    expect(JSON.stringify(exported)).not.toContain("torn ACL");
   });
 });
 
