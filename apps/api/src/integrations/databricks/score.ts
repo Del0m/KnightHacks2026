@@ -1,0 +1,217 @@
+// CONN-05: score a finished set on the Databricks Model Serving endpoint during the rest timer.
+//
+// The endpoint serves spotter.ml.form_quality@champion (CONN-04) and returns, per rep,
+// { quality: 0-1, label: "clean" | "partial_range" | ... }. From that we pick the set's medal
+// (Architecture §8, applied to one set):
+//   gold   every rep clean
+//   silver clean share >= the lifter's own baseline (4-week average, 70% for a first workout)
+//   bronze otherwise
+//
+// Never throws and never blocks the rest timer: if the endpoint is slow (Free Edition endpoints
+// scale to zero, so the first call after idle can take minutes), down, or misconfigured, it
+// returns the phone's rule score instead (source: "phone"). A rep is clean there when the phone
+// raised no form flags.
+//
+// Job fallback (if serving isn't available on Free Edition): the phone score is shown live,
+// and the pipeline's gold_workout_medals (CONN-03) recomputes medals in batch afterwards.
+//
+// Stubs until dependencies land:
+//   - ScoreRep mirrors the AI-08 per-rep aggregates; swap for the shared type once it exists.
+//   - Env is read directly; move to the Zod env from BE-01.
+
+// ---- Input / output ----
+
+export interface ScoreRep {
+  range_deg: number;
+  tempo_ms: number;
+  flags: { rule_id: string }[]; // the phone's rule result
+  quality?: number | null; // the phone's own 0-1 score, if it has one
+  // Frame-derived features; optional until the phone computes them (the model handles nulls).
+  lowering_ms?: number | null;
+  rising_ms?: number | null;
+  asymmetry?: number | null;
+  max_trunk_angle?: number | null;
+  min_knee_ankle_ratio?: number | null;
+}
+
+export interface ScoreSetInput {
+  exercise_id: string;
+  weight_kg: number | null;
+  reps: ScoreRep[];
+  baseline_share?: number | null; // lifter's 4-week clean share; defaults to the beginner baseline
+}
+
+export type Medal = "gold" | "silver" | "bronze";
+
+export interface SetScore {
+  source: "databricks" | "phone";
+  medal: Medal;
+  clean_share: number;
+  reps: { quality: number | null; label: string; clean: boolean }[];
+  latency_ms: number;
+  fallback_reason?: string;
+}
+
+export const BEGINNER_BASELINE = 0.7;
+
+// ---- Config ----
+
+export interface ScoreConfig {
+  host: string;
+  clientId: string;
+  clientSecret: string;
+  scopes: string;
+  endpoint: string;
+  timeoutMs: number; // whole budget: token (if not cached) + invocation
+}
+
+export function scoreConfigFromEnv(env = process.env): ScoreConfig {
+  const required = ["DATABRICKS_HOST", "DATABRICKS_CLIENT_ID", "DATABRICKS_CLIENT_SECRET"] as const;
+  const missing = required.filter((k) => !env[k]);
+  if (missing.length) throw new Error(`Missing env for Databricks scoring: ${missing.join(", ")}`);
+
+  return {
+    host: env.DATABRICKS_HOST!.replace(/\/+$/, ""),
+    clientId: env.DATABRICKS_CLIENT_ID!,
+    clientSecret: env.DATABRICKS_CLIENT_SECRET!,
+    scopes: env.DATABRICKS_OAUTH_SCOPES || "all-apis",
+    endpoint: env.DATABRICKS_SERVING_ENDPOINT || "form-quality",
+    timeoutMs: Number(env.DATABRICKS_SCORE_TIMEOUT_MS) || 1200,
+  };
+}
+
+// ---- Medal ----
+
+export function pickMedal(cleanFlags: boolean[], baseline: number): { medal: Medal; clean_share: number } {
+  const total = cleanFlags.length;
+  const clean = cleanFlags.filter(Boolean).length;
+  const clean_share = total ? clean / total : 0;
+  if (total > 0 && clean === total) return { medal: "gold", clean_share };
+  // Rounded so "matched the average" isn't lost to float error (same as gold_workout_medals).
+  if (Math.round(clean_share * 1e4) >= Math.round(baseline * 1e4)) return { medal: "silver", clean_share };
+  return { medal: "bronze", clean_share };
+}
+
+export function phoneScore(input: ScoreSetInput, startedAt: number, reason: string): SetScore {
+  const reps = input.reps.map((r) => {
+    const clean = r.flags.length === 0;
+    return { quality: r.quality ?? null, label: clean ? "clean" : "flagged", clean };
+  });
+  const baseline = input.baseline_share ?? BEGINNER_BASELINE;
+  return {
+    source: "phone",
+    ...pickMedal(reps.map((r) => r.clean), baseline),
+    reps,
+    latency_ms: Date.now() - startedAt,
+    fallback_reason: reason,
+  };
+}
+
+// ---- Client ----
+
+export class DatabricksScorer {
+  private token: string | null = null;
+  private tokenExpiresAt = 0;
+
+  constructor(
+    private readonly config: ScoreConfig,
+    private readonly fetchImpl: typeof fetch = fetch,
+  ) {}
+
+  /** Scores a set on Databricks, or falls back to the phone's rule score. Never throws. */
+  async scoreSet(input: ScoreSetInput): Promise<SetScore> {
+    const startedAt = Date.now();
+    if (input.reps.length === 0) return phoneScore(input, startedAt, "no reps");
+
+    const signal = AbortSignal.timeout(this.config.timeoutMs);
+    try {
+      const predictions = await this.invoke(input, signal);
+      if (predictions.length !== input.reps.length) {
+        throw new Error(`expected ${input.reps.length} predictions, got ${predictions.length}`);
+      }
+      const reps = predictions.map((p) => ({ quality: p.quality, label: p.label, clean: p.label === "clean" }));
+      return {
+        source: "databricks",
+        ...pickMedal(reps.map((r) => r.clean), input.baseline_share ?? BEGINNER_BASELINE),
+        reps,
+        latency_ms: Date.now() - startedAt,
+      };
+    } catch (err) {
+      const reason = signal.aborted
+        ? `timed out after ${this.config.timeoutMs} ms`
+        : err instanceof Error ? err.message : String(err);
+      if (/HTTP 401|HTTP 403/.test(reason)) this.token = null;
+      console.warn(`[databricks] scoring fell back to phone score: ${reason}`);
+      return phoneScore(input, startedAt, reason);
+    }
+  }
+
+  private async invoke(input: ScoreSetInput, signal: AbortSignal) {
+    const token = await this.getToken(signal);
+    // Column names match the model signature in databricks/notebooks/form_model.py.
+    const records = input.reps.map((r) => ({
+      exercise_id: input.exercise_id,
+      weight_kg: input.weight_kg,
+      range_deg: r.range_deg,
+      tempo_ms: r.tempo_ms,
+      lowering_ms: r.lowering_ms ?? null,
+      rising_ms: r.rising_ms ?? null,
+      asymmetry: r.asymmetry ?? null,
+      max_trunk_angle: r.max_trunk_angle ?? null,
+      min_knee_ankle_ratio: r.min_knee_ankle_ratio ?? null,
+    }));
+
+    const res = await this.fetchImpl(
+      `${this.config.host}/serving-endpoints/${encodeURIComponent(this.config.endpoint)}/invocations`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ dataframe_records: records }),
+        signal,
+      },
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+
+    return parsePredictions(await res.json());
+  }
+
+  private async getToken(signal: AbortSignal): Promise<string> {
+    // Refresh a minute early so a token never expires mid-request.
+    if (this.token && Date.now() < this.tokenExpiresAt - 60_000) return this.token;
+
+    const basic = Buffer.from(`${this.config.clientId}:${this.config.clientSecret}`).toString("base64");
+    const res = await this.fetchImpl(`${this.config.host}/oidc/v1/token`, {
+      method: "POST",
+      headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "client_credentials", scope: this.config.scopes }),
+      signal,
+    });
+    if (!res.ok) throw new Error(`token HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+
+    const json = (await res.json()) as { access_token: string; expires_in: number };
+    this.token = json.access_token;
+    this.tokenExpiresAt = Date.now() + json.expires_in * 1000;
+    return this.token;
+  }
+}
+
+// Serving returns { predictions: [{quality, label}, ...] } for a DataFrame output; accept the
+// column-oriented form too ({ predictions: { quality: [...], label: [...] } }).
+export function parsePredictions(body: unknown): { quality: number | null; label: string }[] {
+  const p = (body as { predictions?: unknown })?.predictions;
+  const rows = Array.isArray(p)
+    ? p
+    : p && typeof p === "object" && Array.isArray((p as { label?: unknown }).label)
+      ? (p as { label: unknown[]; quality?: unknown[] }).label.map((label, i) => ({
+          label,
+          quality: (p as { quality?: unknown[] }).quality?.[i],
+        }))
+      : null;
+  if (!rows) throw new Error("unexpected response shape from serving endpoint");
+
+  return rows.map((row) => {
+    const { quality, label } = (row ?? {}) as { quality?: unknown; label?: unknown };
+    if (typeof label !== "string") throw new Error("prediction missing label");
+    return { quality: typeof quality === "number" ? quality : null, label };
+  });
+}
