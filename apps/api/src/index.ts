@@ -61,7 +61,7 @@ const scoringConfigured = Boolean(
 );
 const rest = {
   scorer: scoringConfigured ? new DatabricksScorer(scoreConfigFromEnv(env), fetch, logger) : null,
-  notes: new RestNoteWriter(env.HF_TOKEN ? new HfLlm(llmConfigFromEnv()) : null),
+  notes: new RestNoteWriter(env.HF_TOKEN ? new HfLlm(llmConfigFromEnv()) : null, logger),
 };
 
 const verifyToken = neonAuthVerifier(env.NEON_AUTH_JWKS_URL, {
