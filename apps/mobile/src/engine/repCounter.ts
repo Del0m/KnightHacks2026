@@ -167,7 +167,7 @@ export function createRepCounter(direction: Direction, phases: Phases): RepCount
         }
         break;
       case 'outbound':
-        if (gated && deeper(v, phases.count_min)) {
+        if (gated && deeper(extreme, phases.count_min)) {
           enter('peak');
           peakAt = t;
         } else if (gated && shallower(v, phases.start_enter)) {

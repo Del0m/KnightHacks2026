@@ -119,7 +119,8 @@ export function createMetricComputer(spec: ExerciseSpec, opts: MetricComputerOpt
   const entries = Object.entries(spec.angles).map(([name, angle]) => ({
     name,
     angle,
-    sided: angle.type !== 'width_ratio' && pointsOf(angle).some(isUnsided),
+    /** The angle again, narrowed, when it is read per side; null otherwise. */
+    sided: angle.type !== 'width_ratio' && pointsOf(angle).some(isUnsided) ? angle : null,
   }));
   const chosen = new Map<string, Side>();
   let locked = false;
@@ -176,11 +177,11 @@ export function createMetricComputer(spec: ExerciseSpec, opts: MetricComputerOpt
     compute(joints) {
       const metrics: Metrics = {};
       const sides: MetricSides = {};
-      for (const { name, angle, sided: hasSide } of entries) {
+      for (const { name, angle, sided: sidedAngle } of entries) {
         let value: number | null;
         let side: MetricSide | null;
-        if (hasSide && angle.type !== 'width_ratio') {
-          [value, side] = sided(name, angle, angle.side ?? 'most_visible', joints);
+        if (sidedAngle) {
+          [value, side] = sided(name, sidedAngle, sidedAngle.side ?? 'most_visible', joints);
         } else {
           value = read(angle, 'left', joints).value;
           side = value === null ? null : 'both';

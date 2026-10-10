@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PoseDetection } from '../pose/types';
 import { createFormEngine } from './engine';
+import { createPoseClock } from './poseClock';
 import type { EngineEvent, EngineOptions, EngineUpdate, ExerciseSpec, MetricSide, RepState } from './types';
 
 const PRIMARY_INTERVAL_MS = 250;
@@ -47,6 +48,8 @@ export function useFormEngine(
   const [ended, setEnded] = useState(false);
   const [primary, setPrimary] = useState<{ value: number | null; side: MetricSide | null }>({ value: null, side: null });
   const primaryAt = useRef(0);
+  // Rebuilt with the engine so a new engine never sees an old engine's clock.
+  const clock = useMemo(() => createPoseClock(), [engine]);
 
   const publish = useCallback((u: EngineUpdate) => {
     setState(u.state);
@@ -71,14 +74,15 @@ export function useFormEngine(
   const onPose = useCallback(
     (d: PoseDetection) => {
       if (!engine) return;
-      publish(d.result ? engine.push(d.result) : engine.pushAbsent(Date.now()));
+      if (d.result) clock.observe(d.result.timestamp_ms);
+      publish(d.result ? engine.push(d.result) : engine.pushAbsent(clock.now()));
     },
-    [engine, publish],
+    [engine, clock, publish],
   );
 
   const endSet = useCallback(() => {
-    if (engine) publish(engine.endSet(Date.now()));
-  }, [engine, publish]);
+    if (engine) publish(engine.endSet(clock.now()));
+  }, [engine, clock, publish]);
 
   const reset = useCallback(() => {
     if (!engine) return;

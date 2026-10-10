@@ -38,7 +38,7 @@ export function compactPose(r: PoseResult): PoseResult {
   };
 }
 
-/** Collects detections into a `Clip`. `nowMs` stamps no-person frames, which carry no time of their own. */
+/** Collects detections into a `Clip`. `nowMs` stamps no-person frames, which carry no time of their own; pass pose-clock time (`createPoseClock`). */
 export function createClipRecorder(meta: { exercise: string; image: { width: number; height: number } }) {
   const frames: ClipFrame[] = [];
   return {

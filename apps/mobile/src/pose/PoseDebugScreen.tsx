@@ -8,6 +8,7 @@ import { usePoseOutput, type PoseEngine } from './usePoseOutput';
 import { usePoseMode, type PoseModeState } from './usePoseMode';
 import { EXERCISE_SPECS } from '../engine/specs';
 import { useFormEngine } from '../engine/useFormEngine';
+import { createPoseClock } from '../engine/poseClock';
 import { createClipRecorder } from '../engine/recording';
 
 type Size = { width: number; height: number };
@@ -87,6 +88,7 @@ function LiveCamera({ poseMode, position, setPosition }: {
   const form = useFormEngine(spec, { imageAspect: imageSize ? imageSize.width / imageSize.height : undefined });
   const { onPose: formOnPose, reset: resetForm } = form;
   const recorder = useRef<ReturnType<typeof createClipRecorder> | null>(null);
+  const clock = useRef(createPoseClock()).current;
   const [recording, setRecording] = useState(false);
 
   // On a cold start `onConfigured` can fire before the resolution is known, so the first pose fills it in.
@@ -95,8 +97,9 @@ function LiveCamera({ poseMode, position, setPosition }: {
     setDetection(d);
     setImageSize((s) => s ?? uprightSize(frameOutputRef.current?.currentResolution));
     formOnPose(d);
-    recorder.current?.add(d, Date.now());
-  }, [formOnPose]);
+    if (d.result) clock.observe(d.result.timestamp_ms);
+    recorder.current?.add(d, clock.now());
+  }, [formOnPose, clock]);
   const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size, maxFps: 15, onPose });
   frameOutputRef.current = frameOutput;
 
@@ -233,7 +236,7 @@ function LiveCamera({ poseMode, position, setPosition }: {
         </Pressable>
       )}
 
-      {form.ended || form.repCount > 0 ? (
+      {!recording && (form.ended || form.repCount > 0) ? (
         <Pressable testID="pose-set-reset" style={[styles.button, styles.newSet]} onPress={form.reset}>
           <Text style={styles.buttonText}>New set</Text>
         </Pressable>

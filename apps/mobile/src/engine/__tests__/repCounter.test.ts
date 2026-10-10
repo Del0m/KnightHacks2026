@@ -200,8 +200,8 @@ describe('createRepCounter: min_state_ms gating', () => {
       'outbound', // t=200
       'outbound', // t=250, spike past count_min after 50 ms in outbound
       'outbound',
-      'outbound', // t=350, 150 ms but not past count_min
-      'peak', // t=400
+      'peak', // t=350, 150 ms: the frame is not past count_min but the rep's extreme is
+      'peak'
     ]);
     expect(steps[4].events).toEqual([{ type: 'rep_started', t: 200, attempt: 1 }]);
   });
@@ -211,6 +211,14 @@ describe('createRepCounter: min_state_ms gating', () => {
     const { events, last } = run(createRepCounter('decreasing', SQUAT), frames);
     expect(types(events)).toEqual(['rep_started']);
     expect(last.state).toBe('peak');
+  });
+
+  it('counts a fast rep that passed count_min only before the gate opened', () => {
+    // 10 fps push-up: 115 at t=400 is inside the 150 ms gate, and by t=500 the angle is back above count_min.
+    const frames = seq(0, 100, [170, 170, 170, 148, 115, 125, 140, 160, 170, 170, 170]);
+    const { events } = run(createRepCounter('decreasing', PUSH_UP), frames);
+    expect(types(events)).not.toContain('partial');
+    expect(ofType(events, 'rep_counted')).toHaveLength(1);
   });
 });
 
