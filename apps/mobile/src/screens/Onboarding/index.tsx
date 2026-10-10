@@ -72,8 +72,8 @@ export default function OnboardingScreen() {
         <View style={s.preview}><Text style={s.label}>Your next training days</Text><Text style={s.text}>{upcomingDays(draft).map(day => dateFromDay(day)!.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })).join('  ·  ') || 'Choose your schedule to see a preview.'}</Text></View>
       </>}
       {step === 3 && <View style={s.group}>
-        <TextInput testID="injury-note" accessibilityLabel="Injury or movement limitation, optional" multiline textAlignVertical="top" placeholder="For example: My left knee bothers me during deep squats." placeholderTextColor={c.muted} value={draft.injury} onChangeText={injury => change({ injury })} maxLength={1000} style={[s.input, s.note]} />
-        <Text style={s.muted}>{draft.injury.length} / 1,000</Text><Text style={s.disclaimer}>Not medical advice. Follow your clinician’s guidance.</Text>
+        <TextInput testID="injury-note" accessibilityLabel="Injury or movement limitation, optional" multiline textAlignVertical="top" placeholder="For example: My left knee bothers me during deep squats." placeholderTextColor={c.muted} value={draft.injury} onChangeText={injury => change({ injury })} maxLength={500} style={[s.input, s.note]} />
+        <Text style={s.muted}>{draft.injury.length} / 500</Text><Text style={s.disclaimer}>Not medical advice. Follow your clinician’s guidance.</Text>
       </View>}
       {(notice || state.error) && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={s.error}>{notice || state.error}</Text>}
       {status === 'error' && <GlassChoice compact label="Retry profile connection" onPress={() => { void state.reload(); }} />}

@@ -8,6 +8,45 @@ import { conflict, isUniqueViolation, notFound, parse, send, userId } from "../h
 
 const { users, profiles, injuries } = schema;
 
+const calendarDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    const date = new Date(`${value}T12:00:00Z`);
+    return (
+      !Number.isNaN(date.getTime()) &&
+      date.toISOString().slice(0, 10) === value &&
+      value >= "2020-01-01" &&
+      value <= "2100-12-31"
+    );
+  }, "use a valid calendar date in 2020–2100");
+const trainingSchedule = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("weekly"),
+      days: z
+        .array(z.number().int().min(0).max(6))
+        .min(1)
+        .max(7)
+        .refine((days) => new Set(days).size === days.length),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("interval"),
+      every_days: z.number().int().min(1).max(14),
+      start_date: calendarDate,
+    })
+    .strict(),
+]);
+const personalBest = z
+  .object({
+    exercise: z.enum(["squat", "bench", "deadlift"]),
+    weight: z.number().positive().max(2000),
+    unit: z.enum(["lb", "kg"]),
+    reps: z.number().int().min(1).max(100),
+  })
+  .strict();
 const scheduleSlot = z.string().regex(/^(mon|tue|wed|thu|fri|sat|sun)_(am|pm|eve)$/, "use slots like mon_am");
 
 export const profileUpdate = z
@@ -24,12 +63,37 @@ export const profileUpdate = z
     gym_lng: z.number().min(-180).max(180).nullable().optional(),
     schedule: z.array(scheduleSlot).max(21).optional(),
     goals: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
+    personal_bests: z
+      .array(personalBest)
+      .max(3)
+      .refine((bests) => new Set(bests.map((best) => best.exercise)).size === bests.length)
+      .optional(),
+    training_schedule: trainingSchedule.optional(),
+    onboarding_completed: z.boolean().optional(),
+    injury_note: z.string().trim().max(500).optional(),
     bio: z.string().max(280).nullable().optional(),
     auto_post_medals: z.boolean().optional(),
     auto_post_prs: z.boolean().optional(),
     share_injuries_for_matching: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, ctx) => {
+    if (
+      input.onboarding_completed &&
+      (!input.training_schedule ||
+        !input.experience_level ||
+        !input.personal_bests ||
+        !input.goals ||
+        input.goals.length !== 3 ||
+        new Set(input.goals).size !== 3)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Completion requires goals, experience, personal bests and training schedule",
+        path: ["onboarding_completed"],
+      });
+    }
+  });
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD");
 
@@ -56,6 +120,10 @@ export async function getProfile(db: Db, id: string) {
       gymLng: profiles.gymLng,
       schedule: profiles.schedule,
       goals: profiles.goals,
+      personalBests: profiles.personalBests,
+      trainingSchedule: profiles.trainingSchedule,
+      onboardingCompleted: profiles.onboardingCompleted,
+      injuryNote: injuries.notes,
       bio: profiles.bio,
       autoPostMedals: profiles.autoPostMedals,
       autoPostPrs: profiles.autoPostPrs,
@@ -65,6 +133,7 @@ export async function getProfile(db: Db, id: string) {
     })
     .from(users)
     .innerJoin(profiles, eq(profiles.userId, users.id))
+    .leftJoin(injuries, and(eq(injuries.id, profiles.onboardingInjuryId), eq(injuries.userId, users.id)))
     .where(eq(users.id, id));
   if (!row) throw notFound("Profile");
   return row;
@@ -89,6 +158,9 @@ export function meRouter(db: Db): Router {
       gymLng: rest.gym_lng,
       schedule: rest.schedule,
       goals: rest.goals,
+      personalBests: rest.personal_bests,
+      trainingSchedule: rest.training_schedule,
+      onboardingCompleted: rest.onboarding_completed,
       bio: rest.bio,
       autoPostMedals: rest.auto_post_medals,
       autoPostPrs: rest.auto_post_prs,
@@ -98,10 +170,28 @@ export function meRouter(db: Db): Router {
 
     try {
       await db.transaction(async (tx) => {
+        // Serialize settings edits for this account, including the managed injury note.
+        const [current] = await tx.select().from(profiles).where(eq(profiles.userId, id)).for("update");
+        if (!current) throw notFound("Profile");
+        let onboardingInjuryId = current.onboardingInjuryId;
+        if (rest.injury_note !== undefined) {
+          if (onboardingInjuryId)
+            await tx
+              .delete(injuries)
+              .where(and(eq(injuries.id, onboardingInjuryId), eq(injuries.userId, id)));
+          onboardingInjuryId = null;
+          if (rest.injury_note) {
+            const [injury] = await tx
+              .insert(injuries)
+              .values({ userId: id, bodyPart: "other", notes: rest.injury_note, isPrivate: true })
+              .returning({ id: injuries.id });
+            onboardingInjuryId = injury.id;
+          }
+        }
         if (handle) await tx.update(users).set({ handle }).where(eq(users.id, id));
         await tx
           .update(profiles)
-          .set({ ...defined, updatedAt: new Date() })
+          .set({ ...defined, onboardingInjuryId, updatedAt: new Date() })
           .where(eq(profiles.userId, id));
       });
     } catch (err) {

@@ -1,46 +1,24 @@
-import { saveOnboarding } from '../api';
+import { loadProfile, saveOnboarding } from '../api';
 import { createDraft } from '../model';
-
-const draft = { ...createDraft(), goals: ['muscle', 'strength', 'core'], experience: 'beginner' as const, injury: 'My left knee bothers me.' };
-test('a retry reconciles an injury already written before a failed completion save', async () => {
-  const calls: string[] = [];
-  let injuries: { description: string }[] = [];
-  let failCompletion = true;
-  const request = async (path: string, init?: RequestInit) => {
-    calls.push(`${init?.method ?? 'GET'} ${path}`);
-    const body = init?.body ? JSON.parse(String(init.body)) : null;
-    if (path === '/me/injuries' && !init?.method) return new Response(JSON.stringify(injuries));
-    if (path === '/me/injuries') { injuries.push(body); return new Response(JSON.stringify(body), { status: 201 }); }
-    if (body.onboarding_completed && failCompletion) return new Response('', { status: 500 });
-    return new Response(JSON.stringify(body));
-  };
-  await expect(saveOnboarding(request, draft)).rejects.toThrow();
-  failCompletion = false;
-  await expect(saveOnboarding(request, draft)).resolves.toBeDefined();
-  expect(calls.filter(c => c === 'POST /me/injuries')).toHaveLength(1);
+const draft = { ...createDraft(), goals: ['muscle', 'strength', 'core'], experience: 'experienced' as const, unknownBests: true, injury: 'My left knee bothers me.' };
+const response = (body: object) => new Response(JSON.stringify({ schedule: [], ...body }));
+test('saves BE-03 casing, level and cadence, and confirms the private note', async () => {
+  const request = jest.fn(async (_path: string, init?: RequestInit) => response(JSON.parse(String(init?.body))));
+  const saved = await saveOnboarding(request, draft);
+  expect(saved.experience_level).toBe('experienced');
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toMatchObject({ experience_level: 'intermediate', training_schedule: { kind: 'weekly', days: [1, 3, 5] }, injury_note: draft.injury });
 });
-
-test('unsupported or failed backend responses never count as successful onboarding', async () => {
-  await expect(saveOnboarding(async () => new Response('{}'), { ...draft, injury: '' })).rejects.toThrow();
-  await expect(saveOnboarding(async () => new Response('', { status: 404 }), draft)).rejects.toThrow();
+test('loads a new account and restores injury notes and interval schedules', async () => {
+  const fresh = await loadProfile(async () => response({ goals: [], experience_level: 'beginner', personal_bests: [], training_schedule: null, onboarding_completed: false, injury_note: null }));
+  expect(fresh?.onboarding_completed).toBe(false);
+  const interval = { ...draft, scheduleMode: 'interval' as const };
+  const saved = await saveOnboarding(async (_path, init) => response(JSON.parse(String(init?.body))), interval);
+  expect(saved.schedule).toEqual({ kind: 'interval', every_days: 3, start_date: draft.startDate });
+  expect(saved.injury_note).toBe(draft.injury);
 });
-
-test('a backend can reorder JSON object keys without changing the confirmed profile', async () => {
-  const request = async (_path: string, init?: RequestInit) => {
-    const body = JSON.parse(String(init?.body));
-    body.schedule = { days: body.schedule.days, kind: body.schedule.kind };
-    return new Response(JSON.stringify(body));
-  };
-  await expect(saveOnboarding(request, { ...draft, injury: '' })).resolves.toBeDefined();
-});
-
-test('an injury write must acknowledge the note before setup is completed', async () => {
-  let completed = false;
-  const request = async (path: string, init?: RequestInit) => {
-    if (path === '/me/injuries') return new Response(init?.method ? '{}' : '[]');
-    const body = JSON.parse(String(init?.body)); completed ||= body.onboarding_completed;
-    return new Response(JSON.stringify(body));
-  };
-  await expect(saveOnboarding(request, draft)).rejects.toThrow();
-  expect(completed).toBe(false);
+test('failed or ignored writes never count as completion', async () => {
+  await expect(saveOnboarding(async () => new Response('{}'), draft)).rejects.toThrow();
+  await expect(saveOnboarding(async () => new Response('', { status: 400 }), draft)).rejects.toThrow();
+  await expect(saveOnboarding(async (_path, init) => response({ ...JSON.parse(String(init?.body)), injury_note: '' }), draft)).rejects.toThrow();
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PoseDetection } from '../pose/types';
 import { createFormEngine } from './engine';
 import { createPoseClock } from './poseClock';
@@ -37,9 +37,11 @@ export function useFormEngine(
 ): FormEngineState {
   const { imageAspect } = opts;
   const optsRef = useRef(opts);
-  optsRef.current = opts;
+  useLayoutEffect(() => { optsRef.current = opts; }, [opts]);
 
-  const engine = useMemo(() => (spec ? createFormEngine(spec, optsRef.current) : null), [spec]);
+  // Configuration is captured when the spec changes; imageAspect updates the active engine below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const engine = useMemo(() => (spec ? createFormEngine(spec, opts) : null), [spec]);
 
   useEffect(() => {
     engine?.setImageAspect(imageAspect);
@@ -51,7 +53,7 @@ export function useFormEngine(
   const [primary, setPrimary] = useState<{ value: number | null; side: MetricSide | null }>({ value: null, side: null });
   const primaryAt = useRef(0);
   // Rebuilt with the engine so a new engine never sees an old engine's clock.
-  const clock = useMemo(() => createPoseClock(), [engine]);
+  const clock = useMemo(() => ({ engine, clock: createPoseClock() }), [engine]).clock;
 
   const publish = useCallback((u: EngineUpdate) => {
     setState(u.state);
@@ -66,13 +68,15 @@ export function useFormEngine(
     optsRef.current.onUpdate?.(u);
   }, []);
 
-  useEffect(() => {
-    primaryAt.current = 0;
+  const [previousEngine, setPreviousEngine] = useState(engine);
+  if (previousEngine !== engine) {
+    setPreviousEngine(engine);
     setState('start');
     setRepCount(0);
     setEnded(false);
     setPrimary({ value: null, side: null });
-  }, [engine]);
+  }
+  useLayoutEffect(() => { primaryAt.current = 0; }, [engine]);
 
   const onPose = useCallback(
     (d: PoseDetection) => {

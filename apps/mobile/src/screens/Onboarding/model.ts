@@ -1,4 +1,4 @@
-import { calendarDay } from '@/data/workout';
+import { calendarDay } from '../../data/workout';
 
 export const goalGroups = [
   { title: 'What you want to achieve', goals: [
@@ -17,7 +17,7 @@ export const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export type Experience = 'beginner' | 'experienced' | 'advanced';
 export type Schedule = { kind: 'weekly'; days: number[] } | { kind: 'interval'; every_days: number; start_date: string };
 export type PersonalBest = { exercise: string; weight: number; unit: 'lb' | 'kg'; reps: number };
-export type OnboardingProfile = { goals: string[]; experience_level: Experience; personal_bests: PersonalBest[]; schedule: Schedule; onboarding_completed: boolean };
+export type OnboardingProfile = { goals: string[]; experience_level: Experience; personal_bests: PersonalBest[]; schedule: Schedule; onboarding_completed: boolean; injury_note?: string };
 export type Draft = {
   goals: string[]; experience: Experience | null; unknownBests: boolean; unit: 'lb' | 'kg';
   bests: { exercise: string; weight: string; reps: string }[];
@@ -52,7 +52,7 @@ export function validateStep(draft: Draft, step: number): string | null {
     if (draft.scheduleMode === 'weekly' && (!draft.days.length || draft.days.some(d => !Number.isInteger(d) || d < 0 || d > 6))) return 'Choose at least one training day.';
     if (draft.scheduleMode === 'interval' && (!/^\d+$/.test(draft.interval) || Number(draft.interval) < 1 || Number(draft.interval) > 14 || !dateFromDay(draft.startDate) || Number(draft.startDate.slice(0, 4)) > 2100)) return 'Choose an interval from 1–14 days and a valid starting date in 2020–2100 (YYYY-MM-DD).';
   }
-  if (step === 3 && draft.injury.length > 1000) return 'Keep your injury note under 1,000 characters.';
+  if (step === 3 && draft.injury.length > 500) return 'Keep your injury note under 500 characters.';
   return null;
 }
 export function profilePayload(draft: Draft, completed: boolean): OnboardingProfile {
@@ -79,22 +79,24 @@ export function upcomingDays(draft: Draft, from = new Date()): string[] {
   }
   return dates;
 }
-/** Proposed BE-03 response contract; reject silently ignored or malformed fields. */
+/** Normalized app profile; transport casing and level mapping live in api.ts. */
 export function parseProfile(value: unknown): OnboardingProfile | null {
   if (!value || typeof value !== 'object') return null;
   const p = value as OnboardingProfile;
   if (!Array.isArray(p.goals) || !Array.isArray(p.personal_bests) || typeof p.onboarding_completed !== 'boolean' || !p.schedule || typeof p.schedule !== 'object') return null;
   if (!['beginner', 'experienced', 'advanced'].includes(p.experience_level)) return null;
+  if (p.goals.length > 3 || new Set(p.goals).size !== p.goals.length || p.goals.some(id => !goalGroups.some(group => group.goals.some(goal => goal.id === id)))) return null;
+  if (p.injury_note !== undefined && (typeof p.injury_note !== 'string' || p.injury_note.length > 500)) return null;
   if (p.personal_bests.some(b => !b || !bestExercises.some(e => e.id === b.exercise) || !['lb', 'kg'].includes(b.unit) || !Number.isFinite(b.weight) || b.weight <= 0 || b.weight > 2000 || !Number.isInteger(b.reps) || b.reps < 1 || b.reps > 100)) return null;
   if (p.schedule.kind !== 'weekly' && p.schedule.kind !== 'interval') return null;
   if (p.schedule.kind === 'weekly' && !Array.isArray(p.schedule.days)) return null;
   if (p.schedule.kind === 'interval' && (typeof p.schedule.start_date !== 'string' || !Number.isInteger(p.schedule.every_days))) return null;
   const draft = draftFromProfile(p);
-  return [0, 1, 2].some(step => validateStep(draft, step)) ? null : p;
+  return validateStep(draft, 2) || (p.onboarding_completed && [0, 1].some(step => validateStep(draft, step))) ? null : p;
 }
 export function draftFromProfile(p: OnboardingProfile): Draft {
   const draft = createDraft();
-  return { ...draft, goals: p.goals, experience: p.experience_level, unknownBests: !p.personal_bests.length,
+  return { ...draft, injury: p.injury_note ?? '', goals: p.goals, experience: p.experience_level, unknownBests: !p.personal_bests.length,
     unit: p.personal_bests[0]?.unit ?? 'lb',
     bests: draft.bests.map(b => { const best = p.personal_bests.find(pb => pb.exercise === b.exercise); return best ? { exercise: b.exercise, weight: String(best.unit === (p.personal_bests[0]?.unit ?? 'lb') ? best.weight : best.unit === 'kg' ? Math.round(best.weight * 2.20462 * 100) / 100 : Math.round(best.weight / 2.20462 * 100) / 100), reps: String(best.reps) } : b; }),
     scheduleMode: p.schedule.kind, days: p.schedule.kind === 'weekly' ? p.schedule.days : draft.days,

@@ -8,6 +8,7 @@ import { startPoseBenchmark, usePoseMode } from '@/pose/usePoseMode';
 import type { PoseResult } from '@/pose/types';
 import { colors as c, typography as t } from '@/theme/tokens';
 import { assessFraming, FRAME_STALE_MS, updateStability, type Size } from './framing';
+import { cameraSpec } from './exercises';
 import { FramingGuide } from './FramingGuide';
 
 export default function CameraCheck({ exercise, onContinue }: { exercise: string; onContinue: () => void }) {
@@ -83,7 +84,7 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
       <Camera style={[StyleSheet.absoluteFill, mirrored && { transform: [{ scaleX: -1 }] }]} device={device} outputs={[output.frameOutput]} isActive mirrorMode="off" orientationSource="interface" resizeMode="cover" onConfigured={() => { resolution(); setCameraError(false); stableSince.current = null; setReady(false); setResult(undefined); }} onError={() => { setCameraError(true); stableSince.current = null; setReady(false); }} />
       <FramingGuide ready={Boolean(valid)} />
     </View>
-    {(exercise === 'squat' || exercise === 'lunge') && <Text style={s.text}>Side-on view: face across the camera, so it can see your movement from the side.</Text>}
+    {(cameraSpec(exercise).recommended_view === 'side') && <Text style={s.text}>Side-on view: face across the camera, so it can see your movement from the side.</Text>}
     <Text style={s.caption}>Keep your full rep inside the frame. The eight-foot guide is approximate.</Text>
     <GlassChoice compact label={position === 'front' ? 'Use back camera' : 'Use front camera'} onPress={onFlip} />
     <GlassChoice label="Framing checked · continue" primary selected disabled={!valid} onPress={onContinue} />
