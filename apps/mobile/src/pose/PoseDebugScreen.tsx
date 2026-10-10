@@ -8,6 +8,8 @@ import { usePoseOutput, type PoseEngine } from './usePoseOutput';
 import { usePoseMode, type PoseModeState } from './usePoseMode';
 import { EXERCISE_SPECS } from '../engine/specs';
 import { useFormEngine } from '../engine/useFormEngine';
+import { useFormRules } from '../engine/useFormRules';
+import { restNote } from '../engine/rules';
 import { createPoseClock } from '../engine/poseClock';
 import { createClipRecorder } from '../engine/recording';
 
@@ -85,8 +87,17 @@ function LiveCamera({ poseMode, position, setPosition }: {
 
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const spec = EXERCISE_SPECS[exerciseIndex];
-  const form = useFormEngine(spec, { imageAspect: imageSize ? imageSize.width / imageSize.height : undefined });
-  const { onPose: formOnPose, reset: resetForm } = form;
+  const rules = useFormRules(spec);
+  const form = useFormEngine(spec, {
+    imageAspect: imageSize ? imageSize.width / imageSize.height : undefined,
+    onEvent: rules.onEvent,
+  });
+  const { onPose: formOnPose, reset: resetEngine } = form;
+  const { reset: resetRules } = rules;
+  const resetForm = useCallback(() => {
+    resetEngine();
+    resetRules();
+  }, [resetEngine, resetRules]);
   const recorder = useRef<ReturnType<typeof createClipRecorder> | null>(null);
   const clock = useRef(createPoseClock()).current;
   const [recording, setRecording] = useState(false);
@@ -171,7 +182,14 @@ function LiveCamera({ poseMode, position, setPosition }: {
       )}
 
       {imageSize && viewSize ? (
-        <PoseSkeleton result={result} imageSize={imageSize} viewSize={viewSize} mirrored={mirrored} fit="cover" />
+        <PoseSkeleton
+          result={result}
+          imageSize={imageSize}
+          viewSize={viewSize}
+          mirrored={mirrored}
+          fit="cover"
+          highlight={rules.tintJoints}
+        />
       ) : null}
 
       {/* The banner stacks under the readout, so a longer or wrapped readout never hides behind it. */}
@@ -195,6 +213,19 @@ function LiveCamera({ poseMode, position, setPosition }: {
             {spec.name} · {form.state} · reps {form.repCount}{form.ended ? ' · set ended' : ''} ·{' '}
             {form.primary != null ? `${form.primary.toFixed(0)}°` : '–'} {form.primarySide ?? ''}
           </Text>
+          <Text style={styles.readoutText} testID="pose-rules-readout">
+            {rules.lastRep
+              ? `rep ${rules.lastRep.rep_index + 1} (${rules.lastRep.view}): ${
+                  rules.lastRep.flags.map((f) => f.rule_id).join(', ') || 'clean'
+                }`
+              : 'no rep yet'}
+          </Text>
+          {rules.summary ? (
+            <Text style={styles.readoutText} testID="pose-set-summary">
+              set ({rules.summary.reason}): clean {rules.summary.clean_reps}/{rules.summary.total_reps}
+              {rules.summary.top ? ` · ${restNote(spec, rules.summary)}` : ''}
+            </Text>
+          ) : null}
         </View>
 
         {banner ? (
@@ -237,7 +268,7 @@ function LiveCamera({ poseMode, position, setPosition }: {
       )}
 
       {!recording && (form.ended || form.repCount > 0) ? (
-        <Pressable testID="pose-set-reset" style={[styles.button, styles.newSet]} onPress={form.reset}>
+        <Pressable testID="pose-set-reset" style={[styles.button, styles.newSet]} onPress={resetForm}>
           <Text style={styles.buttonText}>New set</Text>
         </Pressable>
       ) : null}
