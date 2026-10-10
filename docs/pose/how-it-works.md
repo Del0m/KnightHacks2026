@@ -1,0 +1,132 @@
+# How on-device pose works
+
+How a camera frame becomes 17 joints on the phone, in the PoseBench test app (issue #41). The same pipeline goes into the real app through the vision-camera frame-processor plugin (AI-02), so this is written to be reused.
+
+For the output format, see [pose-result-contract.md](pose-result-contract.md). For measured numbers, see [benchmark-results.md](benchmark-results.md).
+
+## The path
+
+```
+yolov8n-pose.pt
+  │  export.py: Ultralytics → Core ML, FP16, no NMS, at 320 and 256 px
+  ▼
+yolov8n-pose-{320,256}.mlpackage          (PoseBench/PoseBench/Models/, gitignored)
+  │  Xcode compiles each into .mlmodelc at build time
+  ▼
+Camera (720p, upright, unmirrored)
+  │  throttled to 15 fps: late frames are dropped, never queued
+  ▼
+Vision VNCoreMLRequest, .scaleFit  → letterboxes the frame into a square with centered padding
+  │  Core ML runs the model, compute units .all (Neural Engine when it can)
+  ▼
+raw output [1, 56, N]
+  │  MultiArrayReader: handles FP16 and padded strides → flat [56][N] floats
+  ▼
+PoseDecoder: pick the best candidate → undo padding → normalize
+  ▼
+PoseResult (17 joints, 0–1 coordinates) → overlay, and later the rep rules
+```
+
+| File | Job |
+|---|---|
+| `ml/pose_export/export.py` | Export and verify both sizes, copy them into the app |
+| `PoseCore/PoseResult.swift` | The contract |
+| `PoseCore/PoseDecoder.swift` | Raw tensor → `PoseResult`. A pure function. |
+| `PoseCore/MultiArrayReader.swift` | `MLMultiArray` → `[Float]` |
+| `PoseCore/ModelLocator.swift` | Finds the compiled models in the app bundle |
+| `PoseCore/Benchmark.swift` | Stats, benchmark timing, markdown rows |
+| `PoseCore/OverlayGeometry.swift` | Joint → screen point, including front-camera mirroring |
+| `PoseBench/PoseEstimator.swift` | `PoseEstimating` protocol plus the Vision/Core ML implementation |
+| `PoseBench/CameraFeed.swift` | Capture session, rotation, throttle |
+| `PoseBench/PoseBenchModel.swift` | Wires it all together, runs the benchmark |
+| `PoseBench/ContentView.swift` | Preview, skeleton, readout, controls |
+
+Everything in `PoseCore` is plain Swift with tests that run on a Mac (`swift test` in `PoseCore/`), no phone or simulator needed.
+
+## The raw output
+
+YOLOv8n-pose looks at the image at three scales (strides 8, 16 and 32 pixels). Each grid cell at each scale proposes one candidate person:
+
+| Input | Grid cells | N (candidates) |
+|---|---|---|
+| 320 px | 40² + 20² + 10² | 2100 |
+| 256 px | 32² + 16² + 8² | 1344 |
+
+Each candidate is one column of 56 numbers:
+
+| Rows | Meaning | Units |
+|---|---|---|
+| 0–3 | Box centre x, centre y, width, height | input pixels |
+| 4 | Person confidence | 0–1 |
+| 5 + 3k | Joint k, x | input pixels |
+| 6 + 3k | Joint k, y | input pixels |
+| 7 + 3k | Joint k, visibility | 0–1 |
+
+Joint k follows COCO order (k = 0 is the nose, k = 16 the right ankle).
+
+The confidence and visibility values come out of the exported model already squashed to 0–1. `export.py` checks this on a real image after every export, so if a future Ultralytics version changes it, the export fails instead of the skeleton silently going wrong.
+
+## Decoding, step by step
+
+This is what `PoseDecoder.decode` does. A server running the raw model should do the same.
+
+1. **Pick one person.** Take the column with the highest row-4 value. Spotter tracks one lifter, so there's no need for non-maximum suppression (the usual step that merges overlapping detections of several people).
+2. **Threshold.** If that confidence is below **0.25**, there's no person: return nothing.
+3. **Undo the letterbox.** Vision's `.scaleFit` shrank the frame to fit inside the square input and padded the rest equally on both sides. With frame size `W × H` and input size `S`:
+
+   ```
+   scale    = S / max(W, H)
+   contentW = W × scale        padX = (S − contentW) / 2
+   contentH = H × scale        padY = (S − contentH) / 2
+   x = clamp((px − padX) / contentW, 0, 1)
+   y = clamp((py − padY) / contentH, 0, 1)
+   ```
+
+   Example: a 720 × 1280 portrait frame into 256. The scale is 0.2, the content is 144 × 256, and there are 56 px of padding on the left and right. A joint at input x = 128 maps to (128 − 56) / 144 = 0.5, the middle of the frame.
+4. **Build the result.** 17 joints with x, y and visibility as `c`, plus the person confidence as `score`.
+
+## Orientation and mirroring
+
+The camera sensor is landscape, and the front camera's preview is mirrored like a mirror. Two rules keep this simple:
+
+- **Frames are fixed at capture.** `CameraFeed` sets the video connection to `videoRotationAngle = 90` (portrait) and `isVideoMirrored = false` for both cameras. Every frame the model sees is upright and unmirrored, so Vision always gets orientation `.up`.
+- **Why unmirrored matters:** the model decides left and right from how the body looks. In a mirrored image the lifter's real right knee looks like a left knee, and it would be labelled `left_knee`. The form rules care which knee caves in, so the contract requires anatomical left and right.
+- **Only the drawing mirrors.** The front-camera preview is mirrored, which feels natural for selfies, so `OverlayGeometry` flips x for the front camera. That keeps the drawn dot on top of the hand you see. The joint data itself is never flipped.
+
+AI-02 needs the same rule: rotate and un-mirror before inference, and mirror only in the UI.
+
+## Core ML output quirks
+
+`MultiArrayReader` exists because Core ML's output array isn't guaranteed to be a plain float buffer:
+
+- It may be **FP16** (half precision) rather than FP32, depending on the model and device.
+- Its **strides** may include padding, meaning rows are longer in memory than they are logically, for alignment. Reading it as a dense array scrambles the joints.
+
+The reader indexes every element through the array's strides and converts to `Float`. Tests cover FP32, FP16 and padded strides.
+
+## Is it actually on the Neural Engine?
+
+Compute units `.all` *allows* the Neural Engine. Core ML still decides per layer and may run some layers on the GPU or CPU. To see the actual placement:
+
+1. Open `ml/pose_export/PoseBench/PoseBench/Models/yolov8n-pose-320.mlpackage` in Xcode.
+2. Go to the **Performance** tab, then the **+** button, pick your connected iPhone, and run the report.
+3. The report shows the median prediction time and which compute unit each layer ran on.
+
+That number covers the model alone. PoseBench's latency also includes Vision's resize and our decode, the real per-frame cost.
+
+## Benchmark method
+
+"Run benchmark" in PoseBench:
+
+1. Turns the 15 fps throttle off, so we measure the ceiling, not the cap.
+2. For each size: 2 s warm-up, discarded, because the first Core ML calls are slow while the model loads onto the Neural Engine. Then 10 s of measurement.
+3. The measurement clock only runs while a person is in frame, because the decode path is only fully exercised with a person. Walking out pauses it.
+4. Latency is the time from handing the frame to Vision until the decoded `PoseResult` returns.
+5. It reports mean and p95 (95th percentile, nearest-rank) latency, max fps (1000 ÷ mean), and **holds 15 fps** (p95 < 66.7 ms, the time budget per frame at 15 fps).
+
+## Reusing this in the real app (AI-02)
+
+- **`PoseCore` as-is:** add it as a local Swift package to the Expo iOS project. It's pure Swift, with no app or UI code.
+- **The `CoreMLPoseEstimator` logic:** the frame-processor plugin receives a `CVPixelBuffer` per frame, which is exactly what `estimate` takes. Copy the class, or move it into `PoseCore` if both need it.
+- **The capture rule:** configure vision-camera for portrait, unmirrored frames (or rotate before inference), and mirror only in the overlay.
+- **The `PoseEstimating` protocol:** the seam where a cloud estimator for non-iPhone users (CONN-11) plugs in.
