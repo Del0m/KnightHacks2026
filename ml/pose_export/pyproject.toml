@@ -1,0 +1,20 @@
+[project]
+name = "pose-export"
+version = "0.1.0"
+description = "Export YOLOv8n-pose to Core ML for the PoseBench iPhone app"
+requires-python = "==3.11.*"
+dependencies = [
+    "ultralytics",
+    "coremltools",
+    "numpy<=2.3.5",  # Ultralytics' Core ML export requirement
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
