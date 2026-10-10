@@ -101,6 +101,7 @@ export const REPUTABLE_SOURCE_HOSTS: readonly string[] = [
   "cdc.gov",
   "who.int",
   "orthoinfo.aaos.org",
+  "orthoinfo.org", // AAOS OrthoInfo's current host
   "acsm.org",
   "choosept.com",
   "csp.org.uk",
