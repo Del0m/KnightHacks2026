@@ -31,7 +31,8 @@ const rep = z.object({
   tempo_ms: z.number().nonnegative().max(120_000),
   range_deg: z.number().min(0).max(360),
   quality: z.number().min(0).max(1).nullable().optional(),
-  clean: z.boolean().optional(), // from set scoring (CONN-05); otherwise clean = no flags
+  // Accepted for older clients but ignored (INT-06): a rep is clean when it has no rule flags.
+  clean: z.boolean().optional(),
   start_ms: z.number().int().nonnegative().nullable().optional(),
   end_ms: z.number().int().nonnegative().nullable().optional(),
   flags: z.array(flag).max(20).default([]),
@@ -52,6 +53,8 @@ export const setInput = z.object({
     .max(60),
   weight_kg: z.number().min(0).max(1000).nullable().default(null),
   medal: z.enum(["bronze", "silver", "gold"]).nullable().optional(),
+  // Accepted for older clients but ignored (INT-06): the server derives the set's clean share
+  // from the rule flags, and its medal from that (INT-05 rest-time result).
   clean_share: z.number().min(0).max(1).nullable().optional(),
   score_source: z.enum(["databricks", "phone"]).nullable().optional(),
   fps: z.number().positive().max(240).optional(),
