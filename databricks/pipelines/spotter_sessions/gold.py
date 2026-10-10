@@ -1,0 +1,223 @@
+# CONN-03 gold: tables synced to Neon (CONN-06), used by dashboards, Genie and MLflow.
+# Published to spotter.gold; bronze and silver stay in the pipeline's default schema (spotter.raw).
+
+from pyspark import pipelines as dp
+from pyspark.sql import Window
+from pyspark.sql import functions as F
+
+GOLD = "spotter.gold"
+BEGINNER_BASELINE = 0.70  # Architecture §8: first workout is compared with 70% clean
+WINDOW_FRAMES = 32  # Architecture §6.3: form model input is 32 frames x 17 joints x 2
+
+# Rule id -> form-model label (Architecture §6.3). First match wins.
+LABELS = [
+    ("depth", "partial_range"),
+    ("knee_tracking", "knees_in"),
+    ("trunk_lean", "forward_lean"),
+    ("tempo", "fast_lowering"),
+]
+
+BODY_PART = {
+    "knee": ["squat", "lunge", "split_squat", "leg_press", "step_up"],
+    "lower_back": ["deadlift", "romanian_deadlift", "good_morning", "row", "hip_thrust"],
+    "shoulder": ["bench_press", "overhead_press", "push_up", "dip"],
+}
+
+# Weak-label risk score (Architecture §11.2). A training-load and form-trend score,
+# not a diagnosis. Each component is scaled to 0-1, then weighted.
+RISK_WEIGHTS = {
+    "flag_rate_rising": 0.30,
+    "range_shrinking": 0.20,
+    "asymmetry": 0.20,
+    "acute_chronic_load": 0.20,
+    "tempo_speeding_up": 0.10,
+}
+
+
+def clip01(col):
+    # greatest/least skip nulls, so guard explicitly: missing data means no risk, not max risk.
+    return F.when(col.isNotNull(), F.greatest(F.lit(0.0), F.least(F.lit(1.0), col)))
+
+
+def body_part(col):
+    expr = F.lit("general")
+    for part, exercises in BODY_PART.items():
+        expr = F.when(col.isin(exercises), F.lit(part)).otherwise(expr)
+    return expr
+
+
+@dp.materialized_view(name=f"{GOLD}.gold_user_progress_daily",
+                      comment="Per lifter, day and exercise: reps, volume, range, quality, estimated 1RM and PRs")
+def gold_user_progress_daily():
+    reps = spark.read.table("silver_reps")
+    sets = reps.groupBy("user_id", "session_date", "exercise_id", "session_id", "set_index").agg(
+        F.count("*").alias("reps"),
+        F.first("weight_kg", ignorenulls=True).alias("weight_kg"),
+    ).withColumn(  # Epley
+        "est_1rm_kg", F.col("weight_kg") * (1 + F.col("reps") / 30)
+    )
+    per_set = sets.groupBy("user_id", "session_date", "exercise_id").agg(
+        F.count("*").alias("sets"),
+        F.sum(F.col("reps") * F.coalesce("weight_kg", F.lit(0.0))).alias("volume_kg"),
+        F.max("est_1rm_kg").alias("est_1rm_kg"),
+    )
+    per_rep = reps.groupBy("user_id", "session_date", "exercise_id").agg(
+        F.count("*").alias("reps"),
+        F.sum(F.col("is_clean").cast("int")).alias("clean_reps"),
+        F.avg("range_deg").alias("avg_range_deg"),
+        F.avg("quality").alias("avg_quality"),
+        F.avg("asymmetry").alias("avg_asymmetry"),
+    )
+    history = Window.partitionBy("user_id", "exercise_id").orderBy("session_date") \
+        .rowsBetween(Window.unboundedPreceding, -1)
+    return per_rep.join(per_set, ["user_id", "session_date", "exercise_id"]).select(
+        "*",
+        (F.col("clean_reps") / F.col("reps")).alias("clean_share"),
+        (F.col("est_1rm_kg") > F.coalesce(F.max("est_1rm_kg").over(history), F.lit(0.0)))
+        .alias("is_pr"),
+    )
+
+
+@dp.materialized_view(name=f"{GOLD}.gold_workout_medals",
+                      comment="Workout medal vs the lifter's own 4-week average (Architecture §8)")
+def gold_workout_medals():
+    sessions = spark.read.table("silver_reps").groupBy("session_id", "user_id", "session_date").agg(
+        F.max("finished_at").alias("finished_at"),
+        F.count("*").alias("total_reps"),
+        F.sum(F.col("is_clean").cast("int")).alias("clean_reps"),
+    ).withColumn("clean_share", F.col("clean_reps") / F.col("total_reps"))
+
+    # Previous 28 days, excluding this session.
+    four_weeks = Window.partitionBy("user_id").orderBy(F.col("finished_at").cast("long")) \
+        .rangeBetween(-28 * 86400, -1)
+    baseline = F.coalesce(F.avg("clean_share").over(four_weeks), F.lit(BEGINNER_BASELINE))
+
+    return sessions.withColumn("baseline_share", baseline).withColumn(
+        "tier",
+        F.when(F.col("clean_reps") == F.col("total_reps"), "gold")
+        # Rounded so "matched the average" isn't lost to float error.
+        .when(F.round("clean_share", 4) >= F.round("baseline_share", 4), "silver")
+        .otherwise("bronze"),
+    )
+
+
+@dp.materialized_view(name=f"{GOLD}.gold_form_summary",
+                      comment="Flag rate per exercise and rule, by experience level and injury group")
+def gold_form_summary():
+    keys = ["exercise_id", "experience_level", "injury_group"]
+    reps = spark.read.table("silver_reps").select(
+        "rep_id", "user_id", "exercise_id", "flags",
+        F.coalesce("experience_level", F.lit("unknown")).alias("experience_level"),
+        F.explode_outer("injury_groups").alias("injury_group"),
+    ).withColumn("injury_group", F.coalesce("injury_group", F.lit("none")))
+
+    totals = reps.groupBy(*keys).agg(
+        F.count("*").alias("reps"),
+        F.countDistinct("user_id").alias("lifters"),
+    )
+    flagged = reps.select(*keys, "rep_id", F.explode(F.array_distinct("flags")).alias("rule_id")) \
+        .groupBy(*keys, "rule_id").agg(F.count("*").alias("flagged_reps"))
+
+    return flagged.join(totals, keys).withColumn(
+        "flag_rate", F.col("flagged_reps") / F.col("reps")
+    )
+
+
+@dp.materialized_view(name=f"{GOLD}.gold_training_features",
+                      comment="32-frame normalised rep windows (17 joints x 2) with quality and label")
+@dp.expect_or_drop("enough_frames", "frame_count >= 8")
+def gold_training_features():
+    frames = spark.read.table("silver_frames").groupBy("rep_id").agg(
+        F.array_sort(F.collect_list(F.struct("t_ms", "kp_norm"))).alias("frames"),
+    )
+    # Nearest-frame resample to a fixed length.
+    window = F.expr(
+        f"transform(sequence(0, {WINDOW_FRAMES - 1}), "
+        f"i -> frames[cast(round(i * (size(frames) - 1) / {WINDOW_FRAMES - 1}) as int)].kp_norm)"
+    )
+
+    label = F.lit("other")
+    for rule_id, name in reversed(LABELS):
+        label = F.when(F.array_contains("flags", rule_id), name).otherwise(label)
+    label = F.when(F.size("flags") == 0, "clean").otherwise(label)
+
+    reps = spark.read.table("silver_reps").select(
+        "rep_id", "user_id", "session_date", "exercise_id", "experience_level",
+        "frame_count", "quality", "flags",
+    )
+    return reps.join(frames, "rep_id").select(
+        "rep_id", "user_id", "session_date", "exercise_id", "experience_level", "frame_count",
+        window.alias("window"),
+        "quality", "flags", label.alias("label"),
+    )
+
+
+@dp.materialized_view(name=f"{GOLD}.gold_injury_risk_scores",
+                      comment="Heuristic training-load and form-trend score per lifter and body part. Not a diagnosis.")
+def gold_injury_risk_scores():
+    reps = spark.read.table("silver_reps").withColumn("body_part", body_part(F.col("exercise_id")))
+    daily = reps.groupBy("user_id", "body_part", "session_date").agg(
+        F.count("*").alias("reps"),
+        F.sum(F.when(F.size("flags") > 0, 1).otherwise(0)).alias("flagged_reps"),
+        # Bodyweight sets count each rep as 1 kg so they still add load.
+        F.sum(F.coalesce("weight_kg", F.lit(1.0))).alias("volume"),
+        F.sum(F.least("left_range_deg", "right_range_deg")).alias("sum_min_range"),
+        F.count(F.least("left_range_deg", "right_range_deg")).alias("n_range"),
+        F.sum("asymmetry").alias("sum_asym"),
+        F.count("asymmetry").alias("n_asym"),
+        F.sum("lowering_ms").alias("sum_lowering"),
+        F.count("lowering_ms").alias("n_lowering"),
+    ).withColumn("day", F.datediff("session_date", F.lit("2020-01-01")))
+
+    def roll(days):
+        return Window.partitionBy("user_id", "body_part").orderBy("day").rangeBetween(-(days - 1), 0)
+
+    def ratio(num, den, w):
+        return F.try_divide(F.sum(num).over(w), F.sum(den).over(w))
+
+    w7, w28 = roll(7), roll(28)
+    feats = daily.select(
+        "user_id", "body_part", "day", F.col("session_date").alias("date"),
+        ratio("flagged_reps", "reps", w7).alias("flag_rate_7d"),
+        ratio("flagged_reps", "reps", w28).alias("flag_rate_28d"),
+        ratio("sum_min_range", "n_range", w7).alias("range_7d"),
+        ratio("sum_min_range", "n_range", w28).alias("range_28d"),
+        ratio("sum_asym", "n_asym", w7).alias("asymmetry_7d"),
+        F.sum("volume").over(w7).alias("volume_7d"),
+        F.sum("volume").over(w28).alias("volume_28d"),
+        ratio("sum_lowering", "n_lowering", w7).alias("lowering_ms_7d"),
+        ratio("sum_lowering", "n_lowering", w28).alias("lowering_ms_28d"),
+    ).withColumn(
+        "days_tracked", F.col("day") - F.min("day").over(Window.partitionBy("user_id", "body_part")) + 1
+    ).withColumn(
+        # Acute (7 d) vs chronic (weekly average over up to 28 d). Needs 3 weeks of history,
+        # or a new lifter's first week looks like a load spike.
+        "acwr",
+        F.when(
+            F.col("days_tracked") >= 21,
+            F.try_divide(F.col("volume_7d"),
+                         F.col("volume_28d") / (F.least(F.col("days_tracked"), F.lit(28)) / 7)),
+        ),
+    )
+
+    parts = {
+        "flag_rate_rising": clip01((F.col("flag_rate_7d") - F.col("flag_rate_28d")) / 0.2),
+        "range_shrinking": clip01(F.try_divide(F.col("range_28d") - F.col("range_7d"), F.col("range_28d")) / 0.2),
+        "asymmetry": clip01((F.col("asymmetry_7d") - 0.15) / 0.15),
+        "acute_chronic_load": clip01((F.col("acwr") - 1.3) / 0.5),
+        "tempo_speeding_up": clip01(F.try_divide(F.col("lowering_ms_28d") - F.col("lowering_ms_7d"),
+                                                 F.col("lowering_ms_28d")) / 0.3),
+    }
+    contribs = [
+        F.struct(F.coalesce(expr * weight, F.lit(0.0)).alias("c"), F.lit(name).alias("name"))
+        for name, weight in RISK_WEIGHTS.items()
+        for expr in [parts[name]]
+    ]
+    ranked = F.sort_array(F.array(*contribs), asc=False)
+
+    return feats.select(
+        "*",
+        F.aggregate(ranked, F.lit(0.0), lambda acc, s: acc + s["c"]).alias("score"),
+        F.slice(F.transform(F.filter(ranked, lambda s: s["c"] >= 0.01), lambda s: s["name"]), 1, 3)
+        .alias("top_features"),
+    ).withColumn("weak_label", F.col("score") >= 0.5).drop("day", "days_tracked")
