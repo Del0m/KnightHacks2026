@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreML
 import CoreMedia
 import NitroModules
@@ -12,6 +13,11 @@ final class HybridPoseDetector: HybridPoseDetectorSpec {
   let model: String
   private let inputSize: Int
   private let request: VNCoreMLRequest
+  private weak var frameOutput: (any HybridCameraFrameOutputSpec)?
+  private weak var calibratedConnection: AVCaptureConnection?
+  private var calibratedOrientation: CameraOrientation?
+  private let referenceOutput = AVCaptureVideoDataOutput()
+  private var referenceConnection: AVCaptureConnection?
 
   /// Same model setup as PoseBench's `CoreMLPoseEstimator`.
   /// Throws `PoseError.modelMissing` when the model is not in the app bundle, or Core ML's own load error.
@@ -27,6 +33,10 @@ final class HybridPoseDetector: HybridPoseDetectorSpec {
     super.init()
   }
 
+  func setFrameOutput(output: any HybridCameraFrameOutputSpec) throws {
+    frameOutput = output
+  }
+
   func detect(frame: any HybridFrameSpec) throws -> PoseDetection {
     guard let nativeFrame = frame as? any NativeFrame else {
       throw RuntimeError.error(withMessage: "Frame is not a NativeFrame")
@@ -36,11 +46,38 @@ final class HybridPoseDetector: HybridPoseDetectorSpec {
       throw RuntimeError.error(withMessage: "Frame has no pixel buffer; it may already be disposed")
     }
 
-    let vision = ImageOrientation.vision(rotation: Self.rotation(frame.orientation),
+    guard let frameOutput, let output = frameOutput as? any NativeCameraOutput,
+          let connection = output.output.connection(with: .video) else {
+      throw RuntimeError.error(withMessage: "Pose detector has no active camera frame output")
+    }
+    if calibratedConnection !== connection || calibratedOrientation != frameOutput.outputOrientation
+        || referenceConnection?.isVideoMirrored != connection.isVideoMirrored {
+      let reference = AVCaptureConnection(inputPorts: connection.inputPorts, output: referenceOutput)
+      guard reference.isVideoOrientationSupported else {
+        throw RuntimeError.error(withMessage: "Camera does not support pose orientation calibration")
+      }
+      if reference.isVideoMirroringSupported {
+        reference.automaticallyAdjustsVideoMirroring = false
+        reference.isVideoMirrored = connection.isVideoMirrored
+      }
+      reference.videoOrientation = Self.captureOrientation(frameOutput.outputOrientation)
+      referenceConnection = reference
+      calibratedConnection = connection
+      calibratedOrientation = frameOutput.outputOrientation
+      print("Pose orientation: target \(reference.videoRotationAngle), buffer \(connection.videoRotationAngle), flag \(frame.orientation), mirrored \(frame.isMirrored)")
+    }
+    guard let referenceConnection else {
+      throw RuntimeError.error(withMessage: "Pose orientation calibration is unavailable")
+    }
+    let vision = ImageOrientation.vision(captureRotationDegrees: Double(referenceConnection.videoRotationAngle),
+                                         bufferRotationDegrees: Double(connection.videoRotationAngle),
                                          mirrored: frame.isMirrored,
                                          width: CVPixelBufferGetWidth(pixelBuffer),
                                          height: CVPixelBufferGetHeight(pixelBuffer))
-    let timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
+    let timestampMs = try FrameTimestamp.unixMilliseconds(
+      presentationSeconds: CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer)),
+      hostSeconds: CMTimeGetSeconds(CMClockGetTime(CMClockGetHostTimeClock())),
+      unixSeconds: Date().timeIntervalSince1970)
 
     let start = CACurrentMediaTime()
     try VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: vision.orientation).perform([request])
@@ -57,14 +94,12 @@ final class HybridPoseDetector: HybridPoseDetectorSpec {
     return PoseDetection(result: decoded.map(Self.toNitro), latencyMs: latencyMs)
   }
 
-  /// Vision Camera's `orientation` is how the pixel data is rotated relative to upright,
-  /// which is exactly what `FrameRotation` describes.
-  private static func rotation(_ orientation: CameraOrientation) -> FrameRotation {
+  private static func captureOrientation(_ orientation: CameraOrientation) -> AVCaptureVideoOrientation {
     switch orientation {
-    case .up: return .up
-    case .down: return .down
-    case .left: return .left
-    case .right: return .right
+    case .up: return .portrait
+    case .down: return .portraitUpsideDown
+    case .left: return .landscapeRight
+    case .right: return .landscapeLeft
     }
   }
 

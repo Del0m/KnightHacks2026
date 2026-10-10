@@ -131,6 +131,21 @@ open class HybridPoseDetectorSpec_cxx {
 
   // Methods
   @inline(__always)
+  public final func setFrameOutput(output: bridge.std__shared_ptr_margelo__nitro__camera__HybridCameraFrameOutputSpec_) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.setFrameOutput(output: { () -> any HybridCameraFrameOutputSpec in
+        let __unsafePointer = bridge.get_std__shared_ptr_margelo__nitro__camera__HybridCameraFrameOutputSpec_(output)
+        let __instance = HybridCameraFrameOutputSpec_cxx.fromUnsafe(__unsafePointer)
+        return __instance.getHybridCameraFrameOutputSpec()
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func detect(frame: bridge.std__shared_ptr_margelo__nitro__camera__HybridFrameSpec_) -> bridge.Result_PoseDetection_ {
     do {
       let __result = try self.__implementation.detect(frame: { () -> any HybridFrameSpec in

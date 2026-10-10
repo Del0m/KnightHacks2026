@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-10-pose-frame-processor-design.md`
 
+## Current Progress
+
+Tasks 1–6 and Task 7's documentation are implemented. The completion review fixes frame disposal around throttle-state errors, floating-point throttle boundaries, camera-switch overlay dimensions and capture timestamps. The owner confirms both-camera alignment, sustained 15 fps for 60 seconds, correct left-arm tracking and no-person clearing. Results are recorded in `docs/pose/frame-processor-validation.md`. A PR draft is prepared without staging, committing or publishing. Current main now includes FE-01; integration must preserve its Router/pnpm scaffold and needs separate validation.
+
 ## Global Constraints
 
 - iOS only. iOS deployment target 17.0 (PoseCore's floor).

@@ -12,6 +12,8 @@
 // Forward declaration of `HybridPoseDetectorSpec_cxx` to properly resolve imports.
 namespace SpotterPose { class HybridPoseDetectorSpec_cxx; }
 
+// Forward declaration of `HybridCameraFrameOutputSpec` to properly resolve imports.
+namespace margelo::nitro::camera { class HybridCameraFrameOutputSpec; }
 // Forward declaration of `PoseDetection` to properly resolve imports.
 namespace margelo::nitro::spotterpose { struct PoseDetection; }
 // Forward declaration of `PoseResult` to properly resolve imports.
@@ -22,12 +24,13 @@ namespace margelo::nitro::spotterpose { struct Joint; }
 namespace margelo::nitro::camera { class HybridFrameSpec; }
 
 #include <string>
+#include <memory>
+#include <VisionCamera/HybridCameraFrameOutputSpec.hpp>
 #include "PoseDetection.hpp"
 #include "PoseResult.hpp"
 #include <optional>
 #include "Joint.hpp"
 #include <vector>
-#include <memory>
 #include <VisionCamera/HybridFrameSpec.hpp>
 
 #include "SpotterPose-Swift-Cxx-Umbrella.hpp"
@@ -83,6 +86,12 @@ namespace margelo::nitro::spotterpose {
 
   public:
     // Methods
+    inline void setFrameOutput(const std::shared_ptr<margelo::nitro::camera::HybridCameraFrameOutputSpec>& output) override {
+      auto __result = _swiftPart.setFrameOutput(output);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
     inline PoseDetection detect(const std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>& frame) override {
       auto __result = _swiftPart.detect(frame);
       if (__result.hasError()) [[unlikely]] {

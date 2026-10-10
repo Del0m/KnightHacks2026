@@ -14,6 +14,7 @@ public protocol HybridPoseDetectorSpec_protocol: HybridObject {
   var model: String { get }
 
   // Methods
+  func setFrameOutput(output: (any HybridCameraFrameOutputSpec)) throws -> Void
   func detect(frame: (any HybridFrameSpec)) throws -> PoseDetection
 }
 

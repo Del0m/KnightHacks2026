@@ -1,5 +1,5 @@
 import type { HybridObject } from 'react-native-nitro-modules'
-import type { Frame } from 'react-native-vision-camera'
+import type { CameraFrameOutput, Frame } from 'react-native-vision-camera'
 
 export interface Joint { x: number; y: number; c: number }
 
@@ -18,6 +18,7 @@ export interface PoseDetection {
 
 export interface PoseDetector extends HybridObject<{ ios: 'swift' }> {
   readonly model: string
+  setFrameOutput(output: CameraFrameOutput): void
   detect(frame: Frame): PoseDetection
 }
 

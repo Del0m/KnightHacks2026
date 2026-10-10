@@ -13,14 +13,17 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
+// Forward declaration of `HybridCameraFrameOutputSpec` to properly resolve imports.
+namespace margelo::nitro::camera { class HybridCameraFrameOutputSpec; }
 // Forward declaration of `PoseDetection` to properly resolve imports.
 namespace margelo::nitro::spotterpose { struct PoseDetection; }
 // Forward declaration of `HybridFrameSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridFrameSpec; }
 
 #include <string>
-#include "PoseDetection.hpp"
 #include <memory>
+#include <VisionCamera/HybridCameraFrameOutputSpec.hpp>
+#include "PoseDetection.hpp"
 #include <VisionCamera/HybridFrameSpec.hpp>
 
 namespace margelo::nitro::spotterpose {
@@ -54,6 +57,7 @@ namespace margelo::nitro::spotterpose {
 
     public:
       // Methods
+      virtual void setFrameOutput(const std::shared_ptr<margelo::nitro::camera::HybridCameraFrameOutputSpec>& output) = 0;
       virtual PoseDetection detect(const std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>& frame) = 0;
 
     protected:
