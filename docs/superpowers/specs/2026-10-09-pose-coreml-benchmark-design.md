@@ -27,7 +27,7 @@ From a fresh clone, get YOLOv8n-pose running live on an iPhone in a few minutes:
 | Controls | Model size 320/256, camera front/back (default front) |
 | Results | "Run benchmark" button, then "Copy row" with a markdown row for the PR |
 | Python | uv, Python 3.11, dependencies locked in `uv.lock` |
-| Docs | `docs/pose/`: shared knowledge for the team and Claude |
+| Docs | `docs/pose/`: shared knowledge for the team |
 
 ## 3. Non-iPhone users (constraint from outside this issue)
 

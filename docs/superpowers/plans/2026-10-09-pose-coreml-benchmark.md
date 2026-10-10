@@ -1,6 +1,6 @@
 # YOLOv8n-pose Core ML + PoseBench Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Work through the tasks in order. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Export YOLOv8n-pose to Core ML at 320 and 256 px and ship a SwiftUI app (PoseBench) that shows a live skeleton, latency and fps on an iPhone, and copies benchmark rows for the PR.
 
