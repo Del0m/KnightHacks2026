@@ -1,0 +1,95 @@
+{
+  "$schema": "./schema.json",
+  "spec_version": 1,
+  "id": "push_up",
+  "name": "Push-up",
+  "recommended_view": "side",
+  "angles": {
+    "elbow": { "type": "joint_angle", "joints": ["shoulder", "elbow", "wrist"], "side": "most_visible" },
+    "body_line": { "type": "joint_angle", "joints": ["shoulder", "hip", "ankle"], "side": "most_visible" }
+  },
+  "primary_angle": { "name": "elbow", "direction": "decreasing" },
+  "phases": {
+    "start_exit": 150,
+    "count_min": 120,
+    "target": 90,
+    "start_enter": 155,
+    "reverse_deg": 5,
+    "min_state_ms": 150,
+    "set_end_still_ms": 8000
+  },
+  "rules": [
+    {
+      "id": "depth",
+      "phase": "peak",
+      "view": "any",
+      "check": { "metric": "elbow", "reduce": "min", "op": "<=", "value": "target" },
+      "severity": "form",
+      "priority": 2,
+      "label": "partial_range",
+      "joints": ["left_shoulder", "right_shoulder", "left_elbow", "right_elbow"],
+      "rest_note": "Next set, try lowering until your elbows reach about a right angle."
+    },
+    {
+      "id": "hip_sag",
+      "phase": "rep",
+      "view": "side",
+      "check": { "metric": "body_line", "reduce": "min", "op": ">=", "value": 160 },
+      "severity": "form",
+      "priority": 1,
+      "label": "hip_sag",
+      "joints": ["left_shoulder", "right_shoulder", "left_hip", "right_hip", "left_ankle", "right_ankle"],
+      "rest_note": "Your hips dipped on {n} reps. A straight line from shoulders to ankles keeps the effort in your chest and arms."
+    },
+    {
+      "id": "lockout",
+      "phase": "return",
+      "view": "any",
+      "check": { "metric": "elbow", "reduce": "max", "op": ">=", "value": 160 },
+      "severity": "form",
+      "priority": 3,
+      "label": "incomplete_lockout",
+      "joints": ["left_elbow", "right_elbow"],
+      "rest_note": "Your arms stopped short of straight at the top on {n} reps. Finishing with straight arms completes each rep."
+    },
+    {
+      "id": "tempo",
+      "phase": "outbound",
+      "view": "any",
+      "check": { "metric": "duration_ms", "op": ">=", "value": 800 },
+      "severity": "form",
+      "priority": 4,
+      "label": "fast_lowering",
+      "joints": ["left_shoulder", "right_shoulder", "left_elbow", "right_elbow"],
+      "rest_note": "Your reps took about {t} s on the way down. Around 2 s gives you more control."
+    }
+  ],
+  "injury_overrides": {
+    "knee": {
+      "extra_note": "A push-up puts little load on the knees. A folded mat under them makes the kneeling version more comfortable."
+    },
+    "shoulder": {
+      "phases": { "target": 110, "count_min": 125 },
+      "rules": {
+        "depth": {
+          "rest_note": "Next set, try lowering a little further, within a range that feels comfortable for your shoulder."
+        },
+        "tempo": {
+          "value": 1200,
+          "rest_note": "Your reps took about {t} s on the way down. A slower 2 to 3 s is gentler on a recovering shoulder."
+        }
+      },
+      "extra_note": "The depth here is set shorter to suit a recovering shoulder. Any pain is worth raising with your physio or a doctor."
+    },
+    "lower_back": {
+      "rules": {
+        "hip_sag": {
+          "value": 165,
+          "severity": "safety",
+          "rest_note": "Your hips dipped on {n} reps. A straight line from shoulders to ankles keeps the load off your lower back."
+        }
+      },
+      "extra_note": "The hip line limit here is set tighter to go easy on a recovering lower back. Any pain is worth raising with your physio or a doctor."
+    }
+  }
+}

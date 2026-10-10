@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spotter.app/specs/exercise.schema.json",
+  "title": "Spotter exercise spec",
+  "description": "Declarative rep-counting and form-rule spec for one exercise. Format: docs/specs/exercise-spec-format.md.",
+  "type": "object",
+  "required": ["spec_version", "id", "name", "recommended_view", "angles", "primary_angle", "phases", "rules", "injury_overrides"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "spec_version": { "const": 1 },
+    "id": { "$ref": "#/$defs/snakeId" },
+    "name": { "type": "string", "minLength": 1 },
+    "recommended_view": { "enum": ["front", "side"] },
+    "angles": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/snakeId" },
+      "additionalProperties": { "$ref": "#/$defs/angle" }
+    },
+    "primary_angle": {
+      "type": "object",
+      "required": ["name", "direction"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/snakeId" },
+        "direction": { "enum": ["decreasing", "increasing"] }
+      }
+    },
+    "phases": {
+      "type": "object",
+      "required": ["start_exit", "count_min", "target", "start_enter", "reverse_deg", "min_state_ms", "set_end_still_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "start_exit": { "$ref": "#/$defs/degrees" },
+        "count_min": { "$ref": "#/$defs/degrees" },
+        "target": { "$ref": "#/$defs/degrees" },
+        "start_enter": { "$ref": "#/$defs/degrees" },
+        "reverse_deg": { "type": "number", "exclusiveMinimum": 0, "maximum": 45 },
+        "min_state_ms": { "type": "integer", "minimum": 0 },
+        "set_end_still_ms": { "type": "integer", "minimum": 1000 }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/rule" }
+    },
+    "injury_overrides": {
+      "type": "object",
+      "required": ["knee", "shoulder", "lower_back"],
+      "additionalProperties": false,
+      "properties": {
+        "knee": { "$ref": "#/$defs/override" },
+        "shoulder": { "$ref": "#/$defs/override" },
+        "lower_back": { "$ref": "#/$defs/override" }
+      }
+    }
+  },
+  "$defs": {
+    "snakeId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "degrees": { "type": "number", "minimum": 0, "maximum": 180 },
+    "cocoJoint": {
+      "enum": [
+        "nose", "left_eye", "right_eye", "left_ear", "right_ear",
+        "left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
+        "left_wrist", "right_wrist", "left_hip", "right_hip",
+        "left_knee", "right_knee", "left_ankle", "right_ankle"
+      ]
+    },
+    "point": {
+      "description": "A COCO joint name, an unsided base name resolved by `side`, or mid_<base>.",
+      "type": "string",
+      "pattern": "^(nose|(left_|right_|mid_)?(eye|ear|shoulder|elbow|wrist|hip|knee|ankle))$"
+    },
+    "side": { "enum": ["left", "right", "both_avg", "min", "max", "most_visible"] },
+    "angle": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "joints"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "joint_angle" },
+            "joints": { "type": "array", "items": { "$ref": "#/$defs/point" }, "minItems": 3, "maxItems": 3 },
+            "side": { "$ref": "#/$defs/side" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "from", "to"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "segment_tilt" },
+            "from": { "$ref": "#/$defs/point" },
+            "to": { "$ref": "#/$defs/point" },
+            "side": { "$ref": "#/$defs/side" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "numerator", "denominator"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "width_ratio" },
+            "numerator": { "type": "array", "items": { "$ref": "#/$defs/cocoJoint" }, "minItems": 2, "maxItems": 2 },
+            "denominator": { "type": "array", "items": { "$ref": "#/$defs/cocoJoint" }, "minItems": 2, "maxItems": 2 }
+          }
+        }
+      ]
+    },
+    "checkValue": {
+      "oneOf": [
+        { "type": "number" },
+        { "enum": ["start_exit", "count_min", "target", "start_enter"] }
+      ]
+    },
+    "severity": { "enum": ["form", "safety"] },
+    "label": {
+      "enum": [
+        "partial_range", "knees_in", "forward_lean", "fast_lowering", "hip_sag",
+        "incomplete_lockout", "elbow_drift", "torso_swing", "back_arch", "wrists_off_stack"
+      ]
+    },
+    "note": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "rule": {
+      "type": "object",
+      "required": ["id", "phase", "view", "check", "severity", "priority", "label", "joints", "rest_note"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/snakeId" },
+        "phase": { "enum": ["outbound", "peak", "return", "rep"] },
+        "view": { "enum": ["front", "side", "any"] },
+        "check": {
+          "type": "object",
+          "required": ["metric", "op", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "metric": { "$ref": "#/$defs/snakeId" },
+            "reduce": { "enum": ["min", "max", "mean", "first", "last"] },
+            "op": { "enum": ["<=", ">=", "<", ">"] },
+            "value": { "$ref": "#/$defs/checkValue" }
+          }
+        },
+        "severity": { "$ref": "#/$defs/severity" },
+        "priority": { "type": "integer", "minimum": 1 },
+        "label": { "$ref": "#/$defs/label" },
+        "joints": { "type": "array", "items": { "$ref": "#/$defs/cocoJoint" }, "minItems": 1, "uniqueItems": true },
+        "rest_note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "override": {
+      "type": "object",
+      "required": ["extra_note"],
+      "additionalProperties": false,
+      "properties": {
+        "phases": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start_exit": { "$ref": "#/$defs/degrees" },
+            "count_min": { "$ref": "#/$defs/degrees" },
+            "target": { "$ref": "#/$defs/degrees" },
+            "start_enter": { "$ref": "#/$defs/degrees" },
+            "reverse_deg": { "type": "number", "exclusiveMinimum": 0, "maximum": 45 },
+            "min_state_ms": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "rules": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/snakeId" },
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": false,
+            "properties": {
+              "value": { "$ref": "#/$defs/checkValue" },
+              "severity": { "$ref": "#/$defs/severity" },
+              "rest_note": { "$ref": "#/$defs/note" }
+            }
+          }
+        },
+        "disable_rules": { "type": "array", "items": { "$ref": "#/$defs/snakeId" }, "uniqueItems": true },
+        "extra_note": { "$ref": "#/$defs/note" }
+      }
+    }
+  }
+}
