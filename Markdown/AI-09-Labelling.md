@@ -59,7 +59,9 @@ Deletion on the phone removes linked app-managed drafts/exports and keeps a with
 
 ## Device acceptance: initial rehearsal confirmed; remaining checks pending
 
-The owner confirmed the Joint labelling screen appears and that the initial capture, skeleton playback and human-review save worked on the installed Release build. Exercise, accepted count and measured FPS have not yet been reported. Close/reopen persistence, physical export and Mac validation, and the remaining interruption/privacy checks below are still pending.
+The owner confirmed the Joint labelling screen appears and that capture, skeleton playback and human-review save worked on the installed Release build. Saved intervals and labels persisted after closing and reopening Spotter. The owner reported approximately 15 processed FPS during squat capture. Both the dataset bundle and separate private consent evidence physically arrived on the Mac. Trusted validation passed, including checksums, consent and source/training agreement. Unpack and strict reimport of the unpacked files also passed. The validated pilot contains one clip and five accepted squat annotations: four clean and one forward lean. The remaining boundary-edit, discard, interruption and privacy checks below are still pending.
+
+The unpacked pilot is at `/Users/armindelmo/Downloads/ai09-pilot-2026-10-10/`. It contains `clips.jsonl`, `training.jsonl` and `manifest.json`; the consent evidence remains separately in Downloads. No real participant data or consent evidence was committed. Remaining numeric collection deficit: 35 squat reps and 40 each for push-up, bicep curl, shoulder press and lunge, or 195 additional accepted reps.
 
 Start with a **three-rep capture/export rehearsal** before bulk collection. Then perform the five-rep annotation pilot: three comfortable clean reps and two comfortable modified-range attempts. Review all intervals, edit one boundary, discard one rep, save, close/reopen the app, and confirm the exact labels/boundaries persist. Transfer the bundle and consent evidence to the Mac, validate, unpack/reimport offline, and verify accepted counts. Synthetic tests do not supply this evidence.
 
@@ -68,7 +70,8 @@ Start with a **three-rep capture/export rehearsal** before bulk collection. Then
 - [ ] Confirm consent rejection blocks Start; exercise/camera/model controls stay locked during capture.
 - [ ] Confirm the last rep includes its settle tail and manual partial attempts can be saved independently of counter results.
 - [ ] Background during capture and test interruption/recovery; test camera failure and leaving frame.
-- [ ] Confirm the 60-second cap and draft/review restoration after closing and reopening.
+- [x] Confirm saved review intervals and labels persist after closing and reopening.
+- [ ] Confirm the 60-second cap and interrupted-draft restoration after closing and reopening.
 - [ ] Cancel sharing, confirm data persists, then physically save the file on the Mac and run the validator.
 - [ ] Confirm no unexpected image/video/audio file is created.
 - [ ] Confirm responsiveness and approximately 15 processed fps while capture checkpoints run; record dropped frames and failures.
@@ -105,7 +108,9 @@ Actual check results belong in the delivery report. Passing automated checks ver
 - `npx expo export --platform ios --output-dir /private/tmp/ai09-ios-export`: passed.
 - Native Release build: succeeded with zero errors and six warnings; installed successfully on iPhone 17 Pro Max, iOS 26.6.2 (23G90).
 - CoreDevice launch with `spotter://labelling`: succeeded at 5:40 p.m. Eastern; the owner confirmed the Joint labelling screen is visible.
-- Owner rehearsal: capture, skeleton playback and human-review save confirmed. Review recovery, physical export, accepted counts and capture FPS remain unverified.
+- Owner rehearsal: capture, skeleton playback and human-review save confirmed; saved intervals and labels persisted after close/reopen. Owner-reported capture rate: approximately 15 FPS.
+- Physical dataset export and separate private consent evidence received on the Mac. Trusted validation, unpack and strict reimport passed: one clip, five accepted squat rows (four clean, one forward lean).
+- Remaining real collection: 195 additional accepted reps; the 40-per-exercise completion gate has not been met.
 
 Tests were added before the modules existed and failed with missing-module errors. Additional hardening regressions failed on existing behaviour before their fixes, including invalid consent, revision recovery/pruning, shared closure frames, confidence thresholds and impossible calendar dates. Mobile environment setup was corrected to simulate a foreground iPhone; expected capture/privacy outcomes were retained.
 
