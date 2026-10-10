@@ -1,0 +1,20 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["spotterpose"],
+  "ios": {
+    "iosModuleName": "SpotterPose"
+  },
+  "android": {
+    "androidNamespace": ["spotterpose"],
+    "androidCxxLibName": "SpotterPose"
+  },
+  "autolinking": {
+    "PoseDetectorFactory": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridPoseDetectorFactory"
+      }
+    }
+  },
+  "ignorePaths": ["**/node_modules"]
+}
