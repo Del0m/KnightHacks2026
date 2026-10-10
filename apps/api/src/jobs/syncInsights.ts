@@ -3,6 +3,7 @@
 //
 //   spotter.gold.gold_user_progress_daily -> progress_daily   key (user_id, date, exercise_id)
 //   spotter.gold.gold_injury_risk_scores  -> risk_insights    key (user_id, body_part, as_of)
+//   spotter.gold.gold_rom_trend           -> rom_trend        key (user_id, angle, side, week)
 //
 // Databricks only knows pseudonymous ids (CONN-02), so we map them back by computing the
 // pseudonym of every Neon user. Rows for unknown pseudonyms (deleted accounts, synthetic demo
@@ -17,6 +18,7 @@ import { pseudonymize } from "../integrations/databricks/upload";
 
 export const SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const BATCH_SIZE = 500;
+const ROM_LOOKBACK_DAYS = 120;
 
 // ---- Config ----
 
@@ -90,9 +92,22 @@ export interface RiskRow {
   top_features: string[];
 }
 
+// CONN-14: weekly range of motion per angle and side (gold_rom_trend -> rom_trend, DB-12).
+export interface RomRow {
+  user_id: string; // pseudonym
+  angle: string; // spec angle name: knee, elbow, hip
+  side: string; // left | right
+  week: string; // Monday, YYYY-MM-DD
+  peak_range_deg: number;
+  baseline_range_deg: number | null;
+  healthy_side_range_deg: number | null;
+  change_deg: number | null;
+}
+
 export interface GoldSnapshot {
   progress: ProgressRow[];
   risk: RiskRow[];
+  rom?: RomRow[];
 }
 
 // Plain-language reasons for the app (Architecture §11.2). A trend, never a diagnosis.
@@ -159,7 +174,13 @@ export async function readGold(cfg: SyncConfig, log: LogLike = console): Promise
       SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features
       FROM spotter.gold.gold_injury_risk_scores
       WHERE date >= date_sub(current_date(), ${days}) AND score IS NOT NULL`);
-    return { progress, risk };
+    // Range of motion is charted from the start of a rehab plan, so it looks further back.
+    const rom = await run<RomRow>(`
+      SELECT user_id, angle, side, CAST(week AS STRING) AS week, peak_range_deg,
+             baseline_range_deg, healthy_side_range_deg, change_deg
+      FROM spotter.gold.gold_rom_trend
+      WHERE week >= date_sub(current_date(), ${Math.max(days, ROM_LOOKBACK_DAYS)})`);
+    return { progress, risk, rom };
   } finally {
     await session.close();
     await client.close();
@@ -226,6 +247,33 @@ export async function upsertRisk(db: Db, rows: (RiskRow & { neon_user_id: string
   );
 }
 
+export async function upsertRom(db: Db, rows: (RomRow & { neon_user_id: string })[]) {
+  await inBatches(rows, (b) =>
+    db
+      .query(
+        `INSERT INTO rom_trend (user_id, angle, side, week, peak_range_deg, baseline_range_deg,
+                                healthy_side_range_deg, change_deg, synced_at)
+         SELECT *, now() FROM unnest($1::text[], $2::text[], $3::text[], $4::date[], $5::real[], $6::real[],
+                                     $7::real[], $8::real[])
+         ON CONFLICT (user_id, angle, side, week) DO UPDATE SET
+           peak_range_deg = EXCLUDED.peak_range_deg, baseline_range_deg = EXCLUDED.baseline_range_deg,
+           healthy_side_range_deg = EXCLUDED.healthy_side_range_deg, change_deg = EXCLUDED.change_deg,
+           synced_at = now()`,
+        [
+          b.map((r) => r.neon_user_id),
+          b.map((r) => r.angle),
+          b.map((r) => r.side),
+          b.map((r) => r.week),
+          b.map((r) => num(r.peak_range_deg)),
+          b.map((r) => num(r.baseline_range_deg)),
+          b.map((r) => num(r.healthy_side_range_deg)),
+          b.map((r) => num(r.change_deg)),
+        ],
+      )
+      .then(() => undefined),
+  );
+}
+
 // ---- Job ----
 
 // Console or pino: both take a plain message.
@@ -244,6 +292,7 @@ export interface SyncDeps {
 export interface SyncResult {
   progress: number;
   risk: number;
+  rom: number;
   skipped_unknown_users: number;
   ms: number;
 }
@@ -268,10 +317,18 @@ export async function runInsightSync({ db, config, read = readGold, log = consol
 
   const progress = resolve(gold.progress);
   const risk = resolve(gold.risk);
+  const rom = resolve(gold.rom ?? []);
   await upsertProgress(db, progress);
   await upsertRisk(db, risk);
+  await upsertRom(db, rom);
 
-  return { progress: progress.length, risk: risk.length, skipped_unknown_users: skipped, ms: Date.now() - started };
+  return {
+    progress: progress.length,
+    risk: risk.length,
+    rom: rom.length,
+    skipped_unknown_users: skipped,
+    ms: Date.now() - started,
+  };
 }
 
 /** Runs once now, then every 15 minutes. Never overlaps itself. Returns a stop function. */
@@ -283,7 +340,7 @@ export function startInsightSync(deps: SyncDeps, intervalMs = SYNC_INTERVAL_MS):
     running = true;
     try {
       const r = await runInsightSync(deps);
-      log.info(`[insights] synced ${r.progress} progress, ${r.risk} risk rows` +
+      log.info(`[insights] synced ${r.progress} progress, ${r.risk} risk, ${r.rom} range-of-motion rows` +
         ` (${r.skipped_unknown_users} rows for unknown users) in ${r.ms} ms`);
     } catch (err) {
       // Leave Neon as it was; the next tick retries.

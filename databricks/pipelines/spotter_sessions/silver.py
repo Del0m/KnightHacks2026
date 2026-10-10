@@ -13,10 +13,18 @@ from pyspark.sql import functions as F
 L_SHOULDER, R_SHOULDER, L_ELBOW, R_ELBOW, L_WRIST, R_WRIST = 5, 6, 7, 8, 9, 10
 L_HIP, R_HIP, L_KNEE, R_KNEE, L_ANKLE, R_ANKLE = 11, 12, 13, 14, 15, 16
 
-# Which angle defines depth for each exercise. Anything unlisted uses the knee.
+# Which angle defines depth for each exercise, named as in the specs (specs/exercises/*.json
+# primary_angle) so they match rehab limits (DB-12). Anything unlisted uses the knee.
 PRIMARY_ANGLE = {
     "hip": ["deadlift", "romanian_deadlift", "hip_thrust", "good_morning"],
-    "elbow": ["bench_press", "overhead_press", "push_up", "bicep_curl", "row", "dip"],
+    "elbow": ["shoulder_press", "bench_press", "overhead_press", "push_up", "bicep_curl", "row", "dip"],
+}
+
+# Injured body parts that a range-of-motion angle reflects (CONN-14).
+ANGLE_BODY_PARTS = {
+    "knee": ["knee"],
+    "hip": ["hip", "lower_back"],
+    "elbow": ["elbow", "shoulder", "wrist"],
 }
 
 
@@ -43,6 +51,22 @@ def primary(prefix_l, prefix_r):
     return expr_l, expr_r
 
 
+def primary_angle_name():
+    expr = F.lit("knee")
+    for name, exercises in PRIMARY_ANGLE.items():
+        expr = F.when(F.col("exercise_id").isin(exercises), F.lit(name)).otherwise(expr)
+    return expr
+
+
+def injured_side_for(angle_col):
+    """Side of the first injury (tags like "knee:left") that this angle reflects, else null."""
+    expr = F.lit(None).cast("string")
+    for name, parts in reversed(list(ANGLE_BODY_PARTS.items())):
+        tags = F.filter("injury_tags", lambda t: F.split(t, ":")[0].isin(parts) & (F.size(F.split(t, ":")) > 1))
+        expr = F.when((angle_col == name) & (F.size(tags) > 0), F.split(tags[0], ":")[1]).otherwise(expr)
+    return expr
+
+
 def latest(df, keys):
     """Keep the newest upload per key, so retries and re-exports don't duplicate."""
     w = Window.partitionBy(*keys).orderBy(F.col("ingested_at").desc())
@@ -55,6 +79,7 @@ def rep_bounds():
     sets = sessions.select(
         "session_id", "user_id", "experience_level", "injury_groups", "device", "inference_mode",
         F.to_date("finished_at").alias("session_date"), "finished_at",
+        F.to_date("rehab_start_on").alias("rehab_start_on"),
         F.explode("sets").alias("s"),
     )
     return sets.select(
@@ -62,8 +87,11 @@ def rep_bounds():
     ).select(
         F.concat_ws("-", "session_id", "s.set_index", "r.rep_index").alias("rep_id"),
         "session_id", "user_id", "experience_level",
-        F.coalesce("injury_groups", F.array().cast("array<string>")).alias("injury_groups"),
-        "device", "inference_mode", "session_date", "finished_at",
+        # Tags are "knee" or, since CONN-14, "knee:left" (body part and a coarse side).
+        F.transform(F.coalesce("injury_groups", F.array().cast("array<string>")), lambda g: F.split(g, ":")[0])
+        .alias("injury_groups"),
+        F.coalesce("injury_groups", F.array().cast("array<string>")).alias("injury_tags"),
+        "device", "inference_mode", "session_date", "finished_at", "rehab_start_on",
         F.col("s.set_index").alias("set_index"),
         F.col("s.exercise_id").alias("exercise_id"),
         F.col("s.weight_kg").alias("weight_kg"),
@@ -150,6 +178,8 @@ def silver_reps():
         F.min("knee_ankle_ratio").alias("min_knee_ankle_ratio"),
     )
     reps = spark.read.table("rep_bounds").join(per_rep, "rep_id", "left")
+    reps = reps.withColumn("angle", primary_angle_name())  # the angle left/right_range_deg measure
+    reps = reps.withColumn("injured_side", injured_side_for(F.col("angle"))).drop("injury_tags")
     duration = F.col("end_ms") - F.col("start_ms")
     return reps.select(
         "*",

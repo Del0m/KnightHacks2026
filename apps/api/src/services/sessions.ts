@@ -4,6 +4,7 @@ import { and, asc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm"
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { conflict, isUniqueViolation, notFound } from "../http.js";
+import { injuryGroup } from "../integrations/databricks/upload.js";
 import type { ExportQueue, ExportSession, JointsBuffer } from "./exportQueue.js";
 import {
   BASELINE_WINDOW_DAYS,
@@ -334,7 +335,10 @@ export async function buildExportSession(
     medal: session.medal,
     form_score: session.formScore,
     experience_level: profile?.level ?? null,
-    injury_groups: injuryParts.map((p) => p.part),
+    // DB-12 adds injuries.side and rehab_plans: pass the side to injuryGroup() and set
+    // rehab_start_on from the active plan, so range of motion (CONN-14) compares the right sides.
+    injury_groups: injuryParts.map((p) => injuryGroup(p.part)),
+    rehab_start_on: null,
     sets: setRows.map((s) => ({
       exercise_id: s.exerciseId,
       weight_kg: s.weightKg,

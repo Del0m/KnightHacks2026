@@ -22,6 +22,13 @@
       "when": 1791653195499,
       "tag": "0002_conn13_deletion_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791654189335,
+      "tag": "0003_conn14_rom_trend",
+      "breakpoints": true
     }
   ]
 }
