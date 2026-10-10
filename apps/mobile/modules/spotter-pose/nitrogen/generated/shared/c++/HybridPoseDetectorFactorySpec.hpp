@@ -15,9 +15,14 @@
 
 // Forward declaration of `HybridPoseDetectorSpec` to properly resolve imports.
 namespace margelo::nitro::spotterpose { class HybridPoseDetectorSpec; }
+// Forward declaration of `PoseBenchmark` to properly resolve imports.
+namespace margelo::nitro::spotterpose { struct PoseBenchmark; }
 
 #include <memory>
 #include "HybridPoseDetectorSpec.hpp"
+#include <string>
+#include "PoseBenchmark.hpp"
+#include <NitroModules/Promise.hpp>
 
 namespace margelo::nitro::spotterpose {
 
@@ -52,6 +57,8 @@ namespace margelo::nitro::spotterpose {
       // Methods
       virtual std::shared_ptr<HybridPoseDetectorSpec> createPoseDetector(double size) = 0;
       virtual std::shared_ptr<HybridPoseDetectorSpec> createBasicPoseDetector() = 0;
+      virtual std::string poseModelId() = 0;
+      virtual std::shared_ptr<Promise<PoseBenchmark>> benchmarkPoseModel(double size, double warmUpMs, double measureMs) = 0;
 
     protected:
       // Hybrid Setup

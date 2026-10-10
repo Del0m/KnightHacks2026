@@ -176,6 +176,12 @@ flowchart LR
 ```
 
 - **iPhone:** on first launch the app runs YOLOv8n-pose for two seconds. If it holds about 12 fps and the model loads, it uses on-device mode (`coreml`), the default. Otherwise it offers cloud mode.
+- **Benchmark (AI-04):** runs silently at app start, on a synthetic frame. It needs no camera permission or person in frame.
+  - **Timing:** the first inference is discarded, because the model is still loading onto the Neural Engine. Then 0.5 s of warm-up is discarded and 1.5 s is measured.
+  - **Pass mark:** sustained fps is 1000 ÷ p95 latency, so slow frames count. The bar is 12 fps.
+  - **Sizes:** if 320 px falls short, it retries at 256 px (§18), and the live detector uses whichever size passed.
+  - **Caching:** the result is cached on the phone (MMKV) and re-runs only when the bundled model changes (new export or Hub download) or the user re-runs it from settings.
+  - **Before it finishes:** the mode is `pending`, unless the user picked basic mode, which doesn't need the benchmark.
 - **Android:** always cloud mode. Android runs no pose model on the phone.
 - **Consent:** cloud mode needs explicit one-time consent. If the user declines, Live Set is unavailable on that phone; manual set logging still works.
 - **Manual choices:** on iPhone the user can switch from on-device to cloud in settings (still needs consent), or pick basic mode.
@@ -185,7 +191,7 @@ flowchart LR
 - **Privacy:** this is the only mode where video leaves the phone, so it needs the explicit consent above. Frames are processed in memory on the endpoint and never stored.
 - **Cost:** endpoints are billed while running, from the team's HF credits. Set scale-to-zero so it only costs money while someone is mid-workout. A Gradio Space is not a good fit here, because it queues requests instead of streaming.
 - **Basic mode (iPhone, manual only):** Apple Vision body pose (`VNDetectHumanBodyPoseRequest`, source `vision`) runs fully on-device. The user picks it in settings, e.g. "Basic, on-device"; it is never chosen automatically. It maps Vision's 19 points to the same 17 COCO joints (neck and root dropped). It's less accurate but enough for rep counting and the main form rules.
-- **Code:** the selection logic is a pure function, `selectPoseMode` in `apps/mobile/src/pose/mode.ts`, returning `'coreml' | 'vision' | 'cloud' | 'paused' | 'unavailable'`. AI-04 wires the real benchmark into it. The Apple Vision detector is `apps/mobile/src/pose/basic.ts` plus the native `HybridBasicPoseDetector` in `modules/spotter-pose`; the joint mapping is `VisionPoseMapper.swift` in PoseCore.
+- **Code:** the selection logic is a pure function, `selectPoseMode` in `apps/mobile/src/pose/mode.ts`, returning `'coreml' | 'vision' | 'cloud' | 'paused' | 'unavailable'`. The benchmark is `benchmark.ts`, and `usePoseMode.ts` caches its result with the user's preference and cloud consent and feeds them to `selectPoseMode`. It also exposes `needsCloudConsent` for the consent prompt (FE-15) and `rerunBenchmark` for settings. The native side is `benchmarkPoseModel` in `modules/spotter-pose`. The Apple Vision detector is `apps/mobile/src/pose/basic.ts` plus the native `HybridBasicPoseDetector` in `modules/spotter-pose`; the joint mapping is `VisionPoseMapper.swift` in PoseCore.
 
 ---
 

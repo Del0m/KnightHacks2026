@@ -14,9 +14,14 @@ namespace SpotterPose { class HybridPoseDetectorFactorySpec_cxx; }
 
 // Forward declaration of `HybridPoseDetectorSpec` to properly resolve imports.
 namespace margelo::nitro::spotterpose { class HybridPoseDetectorSpec; }
+// Forward declaration of `PoseBenchmark` to properly resolve imports.
+namespace margelo::nitro::spotterpose { struct PoseBenchmark; }
 
 #include <memory>
 #include "HybridPoseDetectorSpec.hpp"
+#include <string>
+#include "PoseBenchmark.hpp"
+#include <NitroModules/Promise.hpp>
 
 #include "SpotterPose-Swift-Cxx-Umbrella.hpp"
 
@@ -78,6 +83,22 @@ namespace margelo::nitro::spotterpose {
     }
     inline std::shared_ptr<HybridPoseDetectorSpec> createBasicPoseDetector() override {
       auto __result = _swiftPart.createBasicPoseDetector();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::string poseModelId() override {
+      auto __result = _swiftPart.poseModelId();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<PoseBenchmark>> benchmarkPoseModel(double size, double warmUpMs, double measureMs) override {
+      auto __result = _swiftPart.benchmarkPoseModel(std::forward<decltype(size)>(size), std::forward<decltype(warmUpMs)>(warmUpMs), std::forward<decltype(measureMs)>(measureMs));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

@@ -16,6 +16,14 @@ export interface PoseDetection {
   latencyMs: number
 }
 
+export interface PoseBenchmark {
+  size: number          // 320 or 256
+  model: string         // "yolov8n-pose-320"
+  meanMs: number
+  p95Ms: number         // nearest-rank
+  samples: number       // measured inferences, after warm-up
+}
+
 export interface PoseDetector extends HybridObject<{ ios: 'swift' }> {
   readonly model: string
   setFrameOutput(output: CameraFrameOutput): void
@@ -25,4 +33,6 @@ export interface PoseDetector extends HybridObject<{ ios: 'swift' }> {
 export interface PoseDetectorFactory extends HybridObject<{ ios: 'swift' }> {
   createPoseDetector(size: number): PoseDetector  // 320 or 256; anything else throws
   createBasicPoseDetector(): PoseDetector         // Apple Vision body pose; no bundled model
+  poseModelId(): string                           // fingerprint of the bundled YOLOv8 models; never throws
+  benchmarkPoseModel(size: number, warmUpMs: number, measureMs: number): Promise<PoseBenchmark>  // synthetic frame, off the JS thread
 }
