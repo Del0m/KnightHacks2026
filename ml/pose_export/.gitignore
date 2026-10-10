@@ -7,3 +7,5 @@ runs/
 .swiftpm/
 xcuserdata/
 DerivedData/
+hub_staging/
+*.onnx

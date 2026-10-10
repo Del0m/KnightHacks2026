@@ -3,6 +3,7 @@ import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { checkForModelUpdates } from '@/models/modelUpdates';
 import { TrainingProvider } from '@/state/Training';
 import { useTheme } from '@/theme/tokens';
 import { AuthProvider, useAuth } from '@/screens/Auth/session';
@@ -20,6 +21,13 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded || error) SplashScreen.hideAsync();
   }, [loaded, error]);
+  useEffect(() => {
+    // CONN-10: fetch newer pose models in the background; the app keeps using its bundled ones meanwhile.
+    checkForModelUpdates().then((r) => {
+      if (r.status === 'updated') console.log(`[models] downloaded v${r.version}: ${r.models?.join(', ')}`);
+      if (r.status === 'failed') console.warn(`[models] update check failed: ${r.error}`);
+    });
+  }, []);
   if (error) throw error;
   if (!loaded) return null;
 
