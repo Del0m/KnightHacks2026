@@ -81,6 +81,8 @@ def gold_user_progress_daily():
 @dp.materialized_view(name=f"{GOLD}.gold_workout_medals",
                       comment="Workout medal vs the lifter's own 4-week average (Architecture §8)")
 def gold_workout_medals():
+    # INT-06: is_clean comes from the phone's rule flags (silver_reps), never the model's quality.
+    # Same rules as the API's medals.ts; specs/set-record/fixtures/medals/ checks they agree.
     sessions = spark.read.table("silver_reps").groupBy("session_id", "user_id", "session_date").agg(
         F.max("finished_at").alias("finished_at"),
         F.count("*").alias("total_reps"),

@@ -1,0 +1,297 @@
+{
+  "name": "baseline_window",
+  "description": "Only workouts in the previous 28 days count towards the baseline. A perfect workout 40 days ago is ignored, so a 6/8 workout today is compared with the 0.70 beginner baseline (silver), not with 1.0 (which would be bronze). Matching the average exactly is silver.",
+  "user": "fixture-baseline-window",
+  "sessions": [
+    {
+      "days_ago": 40,
+      "sets": [
+        {
+          "exercise_id": "squat",
+          "reps": [
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "set_medals": [
+          "gold"
+        ],
+        "workout_medal": "gold",
+        "form_score": 1.0,
+        "baseline": 0.7
+      }
+    },
+    {
+      "days_ago": 3,
+      "sets": [
+        {
+          "exercise_id": "squat",
+          "reps": [
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [
+                {
+                  "rule_id": "knee_tracking",
+                  "severity": "form"
+                }
+              ],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [
+                {
+                  "rule_id": "knee_tracking",
+                  "severity": "form"
+                }
+              ],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "set_medals": [
+          "silver"
+        ],
+        "workout_medal": "silver",
+        "form_score": 0.75,
+        "baseline": 0.7
+      }
+    },
+    {
+      "days_ago": 1,
+      "sets": [
+        {
+          "exercise_id": "squat",
+          "reps": [
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [
+                {
+                  "rule_id": "knee_tracking",
+                  "severity": "form"
+                }
+              ],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [
+                {
+                  "rule_id": "knee_tracking",
+                  "severity": "form"
+                }
+              ],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            },
+            {
+              "tempo_ms": 2000,
+              "range_deg": 92.0,
+              "flags": [],
+              "model": {
+                "quality": 0.92,
+                "label": "clean"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "set_medals": [
+          "silver"
+        ],
+        "workout_medal": "silver",
+        "form_score": 0.75,
+        "baseline": 0.75
+      }
+    }
+  ]
+}

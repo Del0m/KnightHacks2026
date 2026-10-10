@@ -6,6 +6,7 @@ import { schema } from "../db.js";
 import { conflict, isUniqueViolation, notFound } from "../http.js";
 import type { Logger } from "pino";
 import { injuryGroup } from "../integrations/databricks/upload.js";
+import type { RestTimeDeps } from "./restTime.js";
 import type { BufferedSetJoints, ExportQueue, ExportSession, JointsBuffer } from "./exportQueue.js";
 import {
   BASELINE_WINDOW_DAYS,
@@ -93,7 +94,8 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
         tempoMs: Math.round(r.tempoMs),
         rangeDeg: r.rangeDeg,
         quality: r.quality ?? null,
-        clean: r.clean ?? r.flags.length === 0,
+        // INT-06: clean means the phone raised no rule flags, whatever else the client sent.
+        clean: r.flags.length === 0,
         startMs: r.startMs ?? null,
         endMs: r.endMs ?? null,
       }));
@@ -108,7 +110,7 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
           reps: repRows.length,
           weightKg: input.weightKg,
           medal: input.medal ?? null,
-          cleanShare: input.cleanShare ?? (repRows.length ? cleanCount / repRows.length : null),
+          cleanShare: repRows.length ? cleanCount / repRows.length : null, // INT-06: from the flags
           scoreSource: input.scoreSource ?? null,
         })
         .returning();
@@ -144,7 +146,8 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
 export interface FinishDeps {
   exportQueue: ExportQueue;
   joints: JointsBuffer;
-  log?: Pick<Logger, "error">;
+  log?: Pick<Logger, "error" | "info">;
+  rest?: RestTimeDeps; // INT-05 scoring and rest note; without it, phone score and fixed note
 }
 
 export async function finishSession(

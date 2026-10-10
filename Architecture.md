@@ -230,7 +230,7 @@ flowchart LR
 |---|---|---|---|
 | Joint detection | Phone neural processor (iPhone); HF Inference Endpoint in cloud mode (Android, slow iPhones) | YOLOv8n-pose (ours, optionally fine-tuned) | Lower input size or frame rate; cloud mode with consent |
 | Rep counting, live form tint | Phone | Rule engine (JSON specs) | n/a, always local |
-| Per-rep quality score, set medal | Databricks Model Serving (CPU) | Small GRU or gradient-boosted model on rep features, registered in Unity Catalog via MLflow | The phone's rule-based score decides the medal |
+| Per-rep quality score and label (advice) | Databricks Model Serving (CPU) | Small GRU or gradient-boosted model on rep features, registered in Unity Catalog via MLflow | Skipped: the set medal comes from the phone's rule flags either way (§8) |
 | Deep re-check of a flagged set (optional) | HF Inference Endpoint or Gradio Space (GPU) | Larger pose model run on the set's joints and rep features | Skip; use the phone result |
 | Rest note, weekly plan, advice answer | HF Inference Providers | `openai/gpt-oss-120b` (fallback `gpt-oss-20b`) | Template sentence from the scores |
 | Retraining | Databricks jobs + MLflow | Form-quality model and optional YOLOv8 fine-tune | Ship the last good model |
@@ -416,6 +416,8 @@ The Databricks pipeline layers and the lifter's medals share names: raw data bec
 
 Every workout gets a **form score**: the share of reps that were clean, judged against the person's own limits. The medal compares that score with **the lifter's own average over the last four weeks**, so people are measured against themselves, not against other lifters. A first workout is compared with a beginner baseline of 70%.
 
+**What counts as clean.** A rep is clean when the phone raised no rule flags for it. The rules run with the lifter's injury overrides and physio limits applied, so clean means "within your own limits". The rules decide; the Databricks form-quality model only advises. Its per-rep quality and label are stored, shown and used for the dashboard and retraining, but never decide clean, the form score or a medal. That keeps every medal explainable (each rep that isn't clean has a named rule), consistent with the amber tint the lifter saw mid-set, and true to their physio's limits. The API, the pipeline and the rest card all use this one definition, and shared fixtures (`specs/set-record/fixtures/medals/`) check that they agree.
+
 | Medal | Earned when | Feed post |
 |---|---|---|
 | **Bronze workout** | The workout was finished, with a form score below the lifter's average. Showing up counts. | Optional |
@@ -424,7 +426,7 @@ Every workout gets a **form score**: the share of reps that were clean, judged a
 
 - "Clean" uses each person's own limits, so someone with a knee injury who keeps to their adjusted range can still earn gold.
 - As a lifter improves, their average rises, so silver keeps meaning "your normal" rather than getting easier over time.
-- Set-level scores come from the Databricks scorer, or from the phone's rule score if Databricks is slow. The workout medal is computed when the session finishes, from `gold_user_progress_daily`.
+- Each set gets its own medal during the rest, by the same rules against the lifter's average; the rest card labels it as that set's medal. The workout medal is computed by the API when the session finishes (`services/medals.ts`), and the pipeline's `gold_workout_medals` follows the same rules.
 - Medals feed streaks and goals ("3 gold workouts this month") and appear on profiles.
 
 ---
