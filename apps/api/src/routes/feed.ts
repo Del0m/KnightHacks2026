@@ -6,8 +6,9 @@ import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { badRequest, parse, send, userId } from "../http.js";
+import { notBlocked } from "../services/blocks.js";
 
-const { posts, users, profiles, follows, blocks, kudos, comments } = schema;
+const { posts, users, profiles, follows, kudos, comments } = schema;
 
 export const FEED_PAGE_SIZE = 20;
 
@@ -37,10 +38,7 @@ export function visiblePostsFilter(me: string) {
       sql`${posts.authorId} in (select ${follows.followeeId} from ${follows} where ${follows.followerId} = ${me})`,
       and(eq(profiles.experienceLevel, "beginner"), sql`${profiles.gymPlaceId} = ${myGym}`),
     ),
-    sql`not exists (
-      select 1 from ${blocks}
-      where (${blocks.blockerId} = ${me} and ${blocks.blockedId} = ${posts.authorId})
-         or (${blocks.blockerId} = ${posts.authorId} and ${blocks.blockedId} = ${me}))`,
+    notBlocked(me, posts.authorId),
   );
 }
 

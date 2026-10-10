@@ -75,7 +75,7 @@ export function createApp(deps: AppDeps): express.Express {
   const provision = userProvisioner(deps.db, deps.pseudonymSecret);
   app.use(requireAuth(deps.verifyToken, provision));
   app.use(meRouter(deps.db, { pseudonymSecret: deps.pseudonymSecret, onAccountDeleted: provision.forget }));
-  app.use(sessionsRouter(deps.db, { exportQueue, joints }));
+  app.use(sessionsRouter(deps.db, { exportQueue, joints, log: logger }));
   app.use(progressRouter(deps.db));
   app.use(feedRouter(deps.db));
   app.use(socialRouter(deps.db, moderator));

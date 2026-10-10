@@ -5,7 +5,8 @@ import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { badRequest, conflict, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
-import { isBlockedEitherWay, scoreForPair, suggestBuddies } from "../services/matching.js";
+import { isBlockedEitherWay } from "../services/blocks.js";
+import { scoreForPair, suggestBuddies } from "../services/matching.js";
 
 const { buddyMatches, users } = schema;
 const otherId = z.string().min(1).max(200);

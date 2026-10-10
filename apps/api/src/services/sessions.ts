@@ -4,8 +4,9 @@ import { and, asc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm"
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { conflict, isUniqueViolation, notFound } from "../http.js";
+import type { Logger } from "pino";
 import { injuryGroup } from "../integrations/databricks/upload.js";
-import type { ExportQueue, ExportSession, JointsBuffer } from "./exportQueue.js";
+import type { BufferedSetJoints, ExportQueue, ExportSession, JointsBuffer } from "./exportQueue.js";
 import {
   BASELINE_WINDOW_DAYS,
   baselineShare,
@@ -63,19 +64,28 @@ async function ownSession(db: Db, userId: string, sessionId: string) {
 }
 
 export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessionId: string, input: NewSet) {
-  const session = await ownSession(db, userId, sessionId);
-  if (session.finishedAt) throw conflict("This session is already finished");
-
+  let position = input.setIndex;
   try {
     const result = await db.transaction(async (tx) => {
-      const position =
-        input.setIndex ??
-        (
-          await tx
-            .select({ n: sql<number>`count(*)::int` })
-            .from(sets)
-            .where(eq(sets.sessionId, sessionId))
-        )[0]!.n;
+      // Lock the session row. Concurrent sets for the same session then take turns, so they can't
+      // pick the same position, and none can land after finishSession (which takes the same lock)
+      // has computed the medal.
+      const [session] = await tx
+        .select({ finishedAt: sessions.finishedAt })
+        .from(sessions)
+        .where(and(eq(sessions.id, sessionId), eq(sessions.userId, userId)))
+        .for("update")
+        .limit(1);
+      if (!session) throw notFound("Session");
+      if (session.finishedAt) throw conflict("This session is already finished");
+
+      // After the highest position, not count(*): explicit set_index values can leave gaps.
+      position ??= (
+        await tx
+          .select({ next: sql<number>`coalesce(max(${sets.position}) + 1, 0)::int` })
+          .from(sets)
+          .where(eq(sets.sessionId, sessionId))
+      )[0]!.next;
 
       const repRows = input.reps.map((r, i) => ({
         position: i,
@@ -124,7 +134,8 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
     }
     return result;
   } catch (err) {
-    if (isUniqueViolation(err)) throw conflict(`Set ${input.setIndex} was already recorded for this session`);
+    // Only an explicit set_index can collide now; auto positions are assigned under the lock.
+    if (isUniqueViolation(err)) throw conflict(`Set ${position} was already recorded for this session`);
     throw err;
   }
 }
@@ -132,6 +143,7 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
 export interface FinishDeps {
   exportQueue: ExportQueue;
   joints: JointsBuffer;
+  log?: Pick<Logger, "error">;
 }
 
 export async function finishSession(
@@ -141,7 +153,7 @@ export async function finishSession(
   sessionId: string,
   finishedAt = new Date(),
 ): Promise<FinishResult> {
-  const result = await db.transaction(async (tx) => {
+  const { result, exportSession } = await db.transaction(async (tx) => {
     // Lock the row so two concurrent finish calls can't both award a medal.
     const [session] = await tx
       .select()
@@ -266,7 +278,12 @@ export async function finishSession(
       ? await tx.insert(posts).values(newPosts).returning({ id: posts.id, kind: posts.kind })
       : [];
 
-    return {
+    // Built inside the transaction: if any of these reads fail, the finish rolls back and the
+    // client can retry, instead of the session being finished without the client ever seeing
+    // its medal. Joints are only peeked here and drained after commit, so a retry still has them.
+    const exportSession = await buildExportSession(tx, userId, sessionId, deps.joints.peek(sessionId));
+
+    const result: FinishResult = {
       sessionId,
       finishedAt,
       medal: tier,
@@ -276,11 +293,19 @@ export async function finishSession(
       cleanReps,
       personalRecords: prs,
       posts: createdPosts,
-    } satisfies FinishResult;
+    };
+    return { result, exportSession };
   });
 
-  // After commit: never upload a session whose finish rolled back.
-  deps.exportQueue.enqueue(await buildExportSession(db, userId, sessionId, deps.joints));
+  // After commit, nothing touches the database, so a finished session can't turn into a 500.
+  // The queue only uploads sessions whose finish committed.
+  deps.joints.take(sessionId);
+  try {
+    deps.exportQueue.enqueue(exportSession);
+  } catch (err) {
+    // The medal is saved and export_status stays "pending", so the session can be re-exported later.
+    deps.log?.error({ err, sessionId }, "could not queue databricks export");
+  }
   return result;
 }
 
@@ -288,7 +313,7 @@ export async function buildExportSession(
   db: Db,
   userId: string,
   sessionId: string,
-  joints: JointsBuffer,
+  frames: ReadonlyMap<number, BufferedSetJoints> = new Map(),
 ): Promise<ExportSession> {
   const session = await ownSession(db, userId, sessionId);
   const setRows = await db
@@ -323,7 +348,6 @@ export async function buildExportSession(
     .selectDistinct({ part: injuries.bodyPart })
     .from(injuries)
     .where(eq(injuries.userId, userId));
-  const frames = joints.take(sessionId);
 
   return {
     id: session.id,

@@ -6,8 +6,9 @@
 import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
+import { notBlocked } from "./blocks.js";
 
-const { profiles, users, blocks, buddyMatches, sessions } = schema;
+const { profiles, users, buddyMatches, sessions } = schema;
 
 export const WEIGHTS = { goals: 0.4, schedule: 0.3, level: 0.2, streak: 0.1 } as const;
 export const MAX_DISTANCE_KM = 5;
@@ -111,13 +112,6 @@ function weeklySessionsSql(userIdCol: SQL | typeof profiles.userId): SQL<number>
       and ${sessions.finishedAt} >= now() - interval '28 days')`;
 }
 
-function notBlockedSql(me: string, other: SQL | typeof profiles.userId): SQL {
-  return sql`not exists (
-    select 1 from ${blocks}
-    where (${blocks.blockerId} = ${me} and ${blocks.blockedId} = ${other})
-       or (${blocks.blockerId} = ${other} and ${blocks.blockedId} = ${me}))`;
-}
-
 const profileColumns = {
   userId: profiles.userId,
   handle: users.handle,
@@ -189,7 +183,7 @@ export async function suggestBuddies(db: Db, userId: string) {
         ne(profiles.userId, userId),
         inArray(profiles.experienceLevel, nearbyLevels),
         sql`(${sql.join(nearby, sql` or `)})`,
-        notBlockedSql(userId, profiles.userId),
+        notBlocked(userId, profiles.userId),
         sql`not exists (
           select 1 from ${buddyMatches}
           where least(${buddyMatches.aId}, ${buddyMatches.bId}) = least(${userId}, ${profiles.userId})
@@ -243,15 +237,4 @@ export function cosineSimilarity(a: readonly number[], b: readonly number[]): nu
     nb += b[i]! * b[i]!;
   }
   return na && nb ? dot / Math.sqrt(na * nb) : 0;
-}
-
-export async function isBlockedEitherWay(db: Db, a: string, b: string): Promise<boolean> {
-  const [row] = await db
-    .select({ one: sql`1` })
-    .from(blocks)
-    .where(
-      sql`(${blocks.blockerId} = ${a} and ${blocks.blockedId} = ${b}) or (${blocks.blockerId} = ${b} and ${blocks.blockedId} = ${a})`,
-    )
-    .limit(1);
-  return Boolean(row);
 }
