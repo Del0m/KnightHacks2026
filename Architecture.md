@@ -259,49 +259,91 @@ flowchart LR
 
 ### 6.1 Rep state machine (squat example)
 
-Hysteresis and minimum time in each state stop jitter from double-counting.
+Hysteresis and minimum time in each state stop jitter from double-counting. Every exercise uses the same four states, `start → outbound → peak → return`, driven by its primary angle. The squat names them Standing, Lowering, Bottom and Rising. The shoulder press runs the other way (`direction: "increasing"`, so the elbow angle rises), with the same states.
 
 ```mermaid
 stateDiagram-v2
     direction LR
     [*] --> Standing
-    Standing --> Lowering: knee below 160°
-    Lowering --> Bottom: reaches depth target
+    Standing --> Lowering: knee below 160° (start_exit)
+    Lowering --> Bottom: knee below 135° (count_min)
     Lowering --> Standing: back up early (partial, not counted)
-    Bottom --> Rising: knee angle increasing
-    Rising --> Standing: knee above 165° (rep counted)
+    Bottom --> Rising: knee angle back up by 5° (reverse_deg)
+    Rising --> Standing: knee above 165° (start_enter, rep counted)
     Standing --> [*]: still for 8 s (set ends)
 ```
 
+- **The depth target (95°) is a form rule, not a counting condition.** A rep that passes `count_min` but stops short of the target is counted *and* flagged, so the lifter sees the rep and gets a note about range.
+- A state change is accepted only after `min_state_ms` in the current state.
+- The rep is counted on crossing 165°, but the frames its form rules look at run until the lifter settles at the top, so a lockout check sees the full extension.
+
 ### 6.2 Example exercise spec
 
-Each rule has a `rest_note` that the LLM may rephrase. Notes describe the movement, never the person, and never give commands.
+Specs live in `specs/exercises/<id>.json`: `squat`, `push_up`, `bicep_curl`, `shoulder_press`, `lunge`.
+
+- **Shape:** `specs/exercises/schema.json`.
+- **Validation:** `node specs/validate.mjs` checks the shape, references, threshold order (with every injury override applied) and the tone of every note.
+- **Full format:** [docs/specs/exercise-spec-format.md](docs/specs/exercise-spec-format.md).
+
+Each rule has a `rest_note` that the LLM may rephrase. Notes describe the movement, never the person, and never give commands. Shortened squat spec:
 
 ```json
 {
   "id": "squat",
-  "primary_angle": { "name": "knee", "joints": ["hip", "knee", "ankle"], "side": "both_avg" },
-  "phases": { "top": 165, "lowering_start": 160, "depth_target": 95 },
+  "recommended_view": "side",
+  "angles": {
+    "knee":  { "type": "joint_angle", "joints": ["hip", "knee", "ankle"], "side": "most_visible" },
+    "trunk": { "type": "segment_tilt", "from": "mid_hip", "to": "mid_shoulder" },
+    "knee_width_ratio": { "type": "width_ratio", "numerator": ["left_knee", "right_knee"],
+                          "denominator": ["left_ankle", "right_ankle"] }
+  },
+  "primary_angle": { "name": "knee", "direction": "decreasing" },
+  "phases": { "start_exit": 160, "count_min": 135, "target": 95, "start_enter": 165,
+              "reverse_deg": 5, "min_state_ms": 150, "set_end_still_ms": 8000 },
   "rules": [
-    { "id": "depth",         "phase": "bottom", "check": "knee <= depth_target",
+    { "id": "depth", "phase": "peak", "view": "any",
+      "check": { "metric": "knee", "reduce": "min", "op": "<=", "value": "target" },
+      "severity": "form", "priority": 1, "label": "partial_range",
+      "joints": ["left_hip", "right_hip", "left_knee", "right_knee"],
       "rest_note": "Next set, try lowering until your hips are level with your knees." },
-    { "id": "knee_tracking", "phase": "rising", "check": "knee_width / ankle_width >= 0.9",
+    { "id": "knee_tracking", "phase": "rep", "view": "front",
+      "check": { "metric": "knee_width_ratio", "reduce": "min", "op": ">=", "value": 0.9 },
+      "severity": "form", "priority": 2, "label": "knees_in", "joints": ["left_knee", "right_knee"],
       "rest_note": "Your knees drifted inward on {n} reps. Pointing them over your toes keeps them comfortable." },
-    { "id": "trunk_lean",    "phase": "bottom", "check": "trunk_angle <= 45",
+    { "id": "trunk_lean", "phase": "peak", "view": "side",
+      "check": { "metric": "trunk", "reduce": "max", "op": "<=", "value": 45 },
+      "severity": "form", "priority": 3, "label": "forward_lean",
+      "joints": ["left_shoulder", "right_shoulder", "left_hip", "right_hip"],
       "rest_note": "Keeping your chest a little taller makes this easier on your back." },
-    { "id": "tempo",         "phase": "lowering", "check": "duration_ms >= 800",
+    { "id": "tempo", "phase": "outbound", "view": "any",
+      "check": { "metric": "duration_ms", "op": ">=", "value": 800 },
+      "severity": "form", "priority": 4, "label": "fast_lowering",
+      "joints": ["left_hip", "right_hip", "left_knee", "right_knee"],
       "rest_note": "Your reps took about {t} s on the way down. Around 2 s gives you more control." }
   ],
   "injury_overrides": {
-    "knee": { "depth_target": 110, "extra_note": "Stop the range wherever you feel discomfort." }
+    "knee": { "phases": { "target": 110 }, "rules": { "tempo": { "value": 1500 } },
+              "extra_note": "The depth here is set shorter to suit a recovering knee. Any pain is worth raising with your physio or a doctor." },
+    "shoulder":   { "extra_note": "..." },
+    "lower_back": { "phases": { "target": 105 }, "rules": { "trunk_lean": { "value": 35, "severity": "safety" } },
+                    "extra_note": "..." }
   }
 }
 ```
 
+- **Checks are structured, not expressions.** A rule passes when `metric` (reduced over the rule's `phase` with `min`, `max`, `mean`, `first` or `last`) meets `op value`. Otherwise it flags that rep. `value` can name a threshold (`"target"`), so an injury override's phase changes carry through to the rules.
+- **`view`** is `front`, `side` or `any`. Rules that need a particular camera angle are skipped when the lifter is filmed from the other one, so a side-on squat never raises knee-tracking flags.
+- **`severity`, `priority`, `label` and `joints`:**
+  - `severity`: `safety` is the only one that may use the optional haptic.
+  - `priority`: picks the one note shown during rest.
+  - `label`: the §6.3 model label.
+  - `joints`: what tints amber on the skeleton.
+- **Injury overrides:** every spec has `knee`, `shoulder` and `lower_back`. An override can change thresholds, patch a rule's value, severity or note, and disable rules. Every override has an `extra_note`. These are fixed per body part. A physio's own limits (`REHAB_LIMIT`) are applied per user, on top.
+
 ### 6.3 Form-quality model and our dataset (Hugging Face + Databricks)
 
 - **Input:** one rep's joints, normalised and resampled to 32 frames × 17 joints × 2.
-- **Model:** a small GRU, or gradient-boosted trees on rep features (range, tempo, symmetry, knee tracking). Output: quality 0–1 plus a label (`clean`, `partial_range`, `knees_in`, `forward_lean`, `fast_lowering`).
+- **Model:** a small GRU, or gradient-boosted trees on rep features (range, tempo, symmetry, knee tracking). Output: quality 0–1 plus a label: `clean`, or one of the rule labels in the specs (`partial_range`, `knees_in`, `forward_lean`, `fast_lowering`, `hip_sag`, `incomplete_lockout`, `elbow_drift`, `torso_swing`, `back_arch`, `wrists_off_stack`).
 - **Data:**
   1. Bootstrap with public landmark data such as `Cuong2004/gym-exercise-landmarks` (check its license; convert MediaPipe 33-point data to the 17 COCO joints).
   2. **Record and label our own clips at the hackathon**: teammates doing deliberate clean and off-form reps, filmed on a phone.
@@ -349,7 +391,7 @@ sequenceDiagram
 | Some reps weren't clean | "6 of 8 reps were clean. Nice work." | Good news first; never "bad" or "wrong" |
 | Several issues in one set | Only the most important one | Easy to act on |
 
-The LLM prompt includes these rules, and its output is checked against a list of banned commanding phrases before it's shown; if it fails, the rule's fixed `rest_note` is shown instead. Sound is off by default. Users who want audio can enable earbud-only notes, which play only during rest.
+The LLM prompt includes these rules, and its output is checked against the banned commanding phrases and imperative sentence openers in `specs/banned-phrases.json` before it's shown (the fixed notes in the specs pass the same check); if it fails, the rule's fixed `rest_note` is shown instead. Sound is off by default. Users who want audio can enable earbud-only notes, which play only during rest.
 
 ---
 
@@ -666,7 +708,10 @@ spotter/
 │       ├── src/services/      # sessions, planner (RAG), social, matching, moderation
 │       ├── src/integrations/  # neon, huggingface, databricks
 │       └── drizzle/           # schema + migrations
-├── specs/exercises/*.json     # declarative exercise + form-rule specs
+├── specs/
+│   ├── exercises/*.json       # declarative exercise + form-rule specs, schema.json
+│   ├── banned-phrases.json    # rest-note tone check, shared with the LLM
+│   └── validate.mjs           # node specs/validate.mjs
 ├── ml/
 │   ├── labelling/             # record + label clips, extract landmarks
 │   ├── form_classifier/       # train, export ONNX, push to Hub

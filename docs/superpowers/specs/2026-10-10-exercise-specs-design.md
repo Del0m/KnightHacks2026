@@ -101,6 +101,8 @@ start ──past start_exit──▶ outbound ──past count_min──▶ peak
 | `min_state_ms` | Minimum time in a state before a transition is accepted. Stops jitter from double counting. |
 | `set_end_still_ms` | Time in `start` without movement that ends the set (§6.1: 8 s). |
 
+**Rule windows close when the rep settles, not at the count.** The rep is counted the moment the angle crosses `start_enter`. The frames that rules reduce over for `return` and `rep` keep going until the angle stops moving toward the start position: it moves back by `reverse_deg`, or holds within `reverse_deg` for `min_state_ms`, or the set ends, or the next rep starts. That way a lockout check such as "elbow max on return ≥ 160" with `start_enter` at 155 sees the top of the movement. `duration_ms` for `return` still stops at the `start_enter` crossing, so tempo isn't inflated by the pause at the top.
+
 Required ordering:
 
 - **`decreasing`:** `target ≤ count_min < start_exit < start_enter`
@@ -194,7 +196,7 @@ These are starting values, not tuned on recorded clips. Each spec's rules:
 | Spec | View | Primary | Rules (id: metric, label) |
 |---|---|---|---|
 | `squat` | side | knee `hip-knee-ankle`, most_visible, decreasing | `depth`: knee ≤ target, partial_range · `knee_tracking` (front): knee/ankle width ≥ 0.9, knees_in · `trunk_lean` (side): trunk tilt ≤ 45, forward_lean · `tempo`: outbound ≥ 800 ms, fast_lowering |
-| `push_up` | side | elbow `shoulder-elbow-wrist`, most_visible, decreasing | `depth`: elbow ≤ target, partial_range · `hip_sag` (side): `shoulder-hip-ankle` min ≥ 160, hip_sag · `lockout`: elbow max on return ≥ ~155, incomplete_lockout · `tempo`: outbound ≥ 800 ms, fast_lowering |
+| `push_up` | side | elbow `shoulder-elbow-wrist`, most_visible, decreasing | `depth`: elbow ≤ target, partial_range · `hip_sag` (side): `shoulder-hip-ankle` min ≥ 160, hip_sag · `lockout`: elbow max on return ≥ 160, incomplete_lockout · `tempo`: outbound ≥ 800 ms, fast_lowering |
 | `bicep_curl` | side | elbow, most_visible, decreasing | `range`: elbow ≤ target, partial_range · `elbow_drift`: `hip-shoulder-elbow` max ≤ ~25, elbow_drift · `torso_swing` (side): trunk tilt max ≤ ~10, torso_swing · `tempo`: **return** ≥ 800 ms (lowering is the return half), fast_lowering |
 | `shoulder_press` | front | elbow, most_visible, increasing | `lockout`: elbow max ≥ target, incomplete_lockout · `back_arch` (side): trunk tilt max ≤ ~15, back_arch, safety · `wrist_stack` (front): forearm tilt `elbow→wrist` max ≤ ~20, wrists_off_stack · `tempo`: return ≥ 800 ms, fast_lowering |
 | `lunge` | side | knee, side `min` (the front, more-bent knee), decreasing | `depth`: knee ≤ target, partial_range · `trunk_lean` (side): trunk tilt ≤ ~20, forward_lean · `tempo`: outbound ≥ 800 ms, fast_lowering |
