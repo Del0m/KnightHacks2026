@@ -1,6 +1,6 @@
 # Pose result contract
 
-This is the one shape for "the joints of one person in one frame". Every pose source produces it: the on-device Core ML path (issue #41, `PoseCore/PoseResult.swift`) today, and the cloud endpoint for non-iPhone users (CONN-11) later. The rep counter and form rules (AI-06, AI-07) consume only this, so they can't tell which source the joints came from.
+This is the one shape for "the joints of one person in one frame". Every pose source produces it: the on-device Core ML path (issue #41, `PoseCore/PoseResult.swift`), Apple Vision body pose (manual basic mode on iPhone), and the cloud endpoint for Android and slow iPhones (CONN-11). The rep counter and form rules (AI-06, AI-07) consume only this, so they can't tell which source the joints came from.
 
 ## Shape
 
@@ -16,8 +16,8 @@ This is the one shape for "the joints of one person in one frame". Every pose so
 
 | Field | Meaning |
 |---|---|
-| `source` | `"coreml"` (on-device) or `"cloud"` (CONN-11) |
-| `model` | Which model produced it, e.g. `yolov8n-pose-256` |
+| `source` | `"coreml"` (on-device YOLOv8), `"vision"` (Apple Vision body pose, manual basic mode on iPhone) or `"cloud"` (CONN-11) |
+| `model` | Which model produced it, e.g. `yolov8n-pose-256`; `apple-vision-body-pose` for `"vision"` |
 | `timestamp_ms` | Frame time, Unix milliseconds |
 | `score` | Person-detection confidence, 0–1 |
 | `joints` | Always 17 entries, in the order below |
@@ -44,6 +44,30 @@ This is the one shape for "the joints of one person in one frame". Every pose so
 | 6 | right_shoulder | 15 | left_ankle |
 | 7 | left_elbow | 16 | right_ankle |
 | 8 | right_elbow | | |
+
+## Apple Vision mapping
+
+The `"vision"` source (`PoseCore/VisionPoseMapper.swift`) converts `VNDetectHumanBodyPoseRequest` output to this shape.
+
+| Vision joint | COCO index | Vision joint | COCO index |
+|---|---|---|---|
+| `.nose` | 0 | `.rightWrist` | 10 |
+| `.leftEye` | 1 | `.leftHip` | 11 |
+| `.rightEye` | 2 | `.rightHip` | 12 |
+| `.leftEar` | 3 | `.leftKnee` | 13 |
+| `.rightEar` | 4 | `.rightKnee` | 14 |
+| `.leftShoulder` | 5 | `.leftAnkle` | 15 |
+| `.rightShoulder` | 6 | `.rightAnkle` | 16 |
+| `.leftElbow` | 7 | `.neck` | dropped |
+| `.rightElbow` | 8 | `.root` | dropped |
+| `.leftWrist` | 9 | | |
+
+- **y is flipped.** Vision's origin is bottom-left, so `y = 1 - vy`. x is unchanged.
+- **Missing joints** (not returned by Vision, or returned with confidence 0, which Vision places at its origin) get `x = 0`, `y = 0`, `c = 0`.
+- **Out-of-range points** are clamped to 0–1.
+- **`score`** is the mean confidence of the 17 mapped joints, with missing joints counted as 0. Below 0.25 means no person, the same threshold as `PoseDecoder.minScore`.
+- **Several people:** the highest `score` wins.
+- **Orientation and mirroring** follow the same rule as Core ML. Vision gets the same orientation from `ImageOrientation`, so its normalized points are already in the upright, unmirrored frame.
 
 ## Producing it on a server
 

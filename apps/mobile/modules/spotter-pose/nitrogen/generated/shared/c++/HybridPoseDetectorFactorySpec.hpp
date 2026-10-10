@@ -51,6 +51,7 @@ namespace margelo::nitro::spotterpose {
     public:
       // Methods
       virtual std::shared_ptr<HybridPoseDetectorSpec> createPoseDetector(double size) = 0;
+      virtual std::shared_ptr<HybridPoseDetectorSpec> createBasicPoseDetector() = 0;
 
     protected:
       // Hybrid Setup

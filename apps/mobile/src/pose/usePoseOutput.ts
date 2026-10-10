@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPoseDetector } from 'spotter-pose';
+import { createBasicPoseDetector, createPoseDetector } from 'spotter-pose';
 import type { CameraFrameOutput, Frame } from 'react-native-vision-camera';
 import { useFrameOutput } from 'react-native-vision-camera';
 import { createSynchronizable, scheduleOnRN } from 'react-native-worklets';
@@ -7,6 +7,9 @@ import { shouldProcess } from './throttle';
 import type { PoseDetection } from './types';
 
 const FPS_WINDOW_MS = 1000;
+
+/** `coreml` runs YOLOv8n-pose; `vision` runs Apple Vision body pose (basic mode, see `basic.ts`). */
+export type PoseEngine = 'coreml' | 'vision';
 const STATS_INTERVAL_MS = 500;
 
 export interface PoseOutput {
@@ -16,7 +19,7 @@ export interface PoseOutput {
   fps: number;
   /** Detector creation error, or the last per-frame error. The stream keeps running either way. */
   error: string | null;
-  /** Model name, e.g. `yolov8n-pose-320`; null when the detector could not be created. */
+  /** Model name, e.g. `yolov8n-pose-320` or `apple-vision-body-pose`; null when the detector could not be created. */
   model: string | null;
   /** Frames the camera pipeline dropped (`onFrameDropped`), since mount. */
   dropped: number;
@@ -31,19 +34,22 @@ export interface PoseOutput {
  * joints keep anatomical left/right. Mirroring happens only when drawing.
  */
 export function usePoseOutput(opts: {
+  engine?: PoseEngine;
+  /** YOLOv8 input size; ignored by the `vision` engine. */
   size?: 320 | 256;
   maxFps?: number;
   onPose: (d: PoseDetection) => void;
 }): PoseOutput {
-  const { size = 320, maxFps = 15, onPose } = opts;
+  const { engine = 'coreml', size = 320, maxFps = 15, onPose } = opts;
 
   const created = useMemo(() => {
     try {
-      return { detector: createPoseDetector(size), createError: null };
+      const detector = engine === 'vision' ? createBasicPoseDetector() : createPoseDetector(size);
+      return { detector, createError: null };
     } catch (e) {
       return { detector: null, createError: String(e) };
     }
-  }, [size]);
+  }, [engine, size]);
   const { detector, createError } = created;
 
   const [frameError, setFrameError] = useState<string | null>(null);
@@ -76,7 +82,7 @@ export function usePoseOutput(opts: {
         const nowMs = frame.timestamp * 1000;
         if (detector == null || !shouldProcess(nowMs, lastMs.getDirty(), maxFps)) return;
         lastMs.setBlocking(nowMs);
-        // Native always sets source "coreml"; the Nitro spec types it as string.
+        // Native sets source "coreml" or "vision"; the Nitro spec types it as string.
         const d = detector.detect(frame) as PoseDetection;
         scheduleOnRN(handleDetection, d);
       } catch (e) {

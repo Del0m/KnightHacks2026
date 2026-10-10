@@ -60,7 +60,7 @@ AI rep counters are a common hackathon project. Leading with injury recovery mak
 
 **Stretch goals**
 
-- Android build (same model exported to TFLite).
+- Android build. Android runs no pose model on the phone; every frame goes through cloud mode ([§4.1](#41-pose-modes-on-device-cloud-and-basic)).
 - Browser-only demo with ONNX Runtime Web on WebGPU.
 
 **Non-goals**
@@ -153,31 +153,39 @@ flowchart LR
 | App integration | Expo **development build** (not Expo Go) + `react-native-vision-camera` v4 | A small native frame-processor plugin runs the Core ML model on each frame and returns joints to JavaScript |
 | Camera placement | One camera, on a small tripod or propped up, 2–3 m away; side-on for squats and lunges | One fixed angle keeps the rules simple. An on-screen framing guide helps users place it. |
 | Smoothing | One Euro filter per joint | Removes jitter without adding lag |
-| Android (stretch) | Same model exported to TFLite with the GPU or NNAPI delegate | Same joints, same rules |
+| Android (stretch) | No on-device pose. Every frame goes through cloud mode ([§4.1](#41-pose-modes-on-device-cloud-and-basic), CONN-11) | Same joints, same rules, one model to maintain |
 | Browser demo (fallback) | ONNX Runtime Web on WebGPU | Slower, but runs on a laptop if a phone build breaks |
 | Model updates | The app checks our Hub repo on launch and downloads a newer model if there is one | Closes the retraining loop in [§5](#5-phone-databricks-and-hugging-face-inference-split) |
 | Battery and heat | Run at 15–30 fps and pause inference during rest | Keeps a long workout from draining the phone |
 
-### 4.1 Cloud fallback on Hugging Face (older or unsupported phones)
+### 4.1 Pose modes: on-device, cloud and basic
 
 ```mermaid
 flowchart LR
-    S(["App launch"]) --> T{"2-second on-device<br/>benchmark"}
-    T -- "12+ fps" --> L["On-device mode<br/>(default)"]
-    T -- "too slow or<br/>no model support" --> Q{"User agrees to send<br/>frames to the cloud?"}
+    S(["App launch"]) --> P{"Platform"}
+    P -- "iPhone" --> T{"2-second on-device<br/>benchmark"}
+    P -- "Android" --> Q{"User agrees to send<br/>frames to the cloud?"}
+    T -- "12+ fps and<br/>model loads" --> L["On-device mode<br/>Core ML (default)"]
+    T -- "too slow or<br/>no model support" --> Q
     Q -- "yes" --> C["Cloud mode<br/>frames to HF endpoint"]
-    Q -- "no" --> B["Basic mode<br/>Apple Vision / ML Kit pose,<br/>rep counting only"]
+    Q -- "no" --> U["Live Set unavailable<br/>manual set logging only"]
+    M(["Settings, iPhone only"]) -. "user picks" .-> B["Basic mode<br/>Apple Vision body pose"]
     C -- "17 joints back" --> R["Same rep rules<br/>on the phone"]
     L --> R
     B --> R
 ```
 
-- **When:** on first launch the app runs YOLOv8n-pose for two seconds. If it can't hold about 12 fps, or the model won't load, the app offers cloud mode.
+- **iPhone:** on first launch the app runs YOLOv8n-pose for two seconds. If it holds about 12 fps and the model loads, it uses on-device mode (`coreml`), the default. Otherwise it offers cloud mode.
+- **Android:** always cloud mode. Android runs no pose model on the phone.
+- **Consent:** cloud mode needs explicit one-time consent. If the user declines, Live Set is unavailable on that phone; manual set logging still works.
+- **Manual choices:** on iPhone the user can switch from on-device to cloud in settings (still needs consent), or pick basic mode.
 - **How:** the phone sends downscaled JPEG frames (about 320 px, 10 fps) over a WebSocket to a **Hugging Face Inference Endpoint** on a small GPU, running YOLOv8n-pose (or the larger `yolov8m-pose`) with a custom handler. The endpoint returns only the 17 joints per frame, and the phone runs the same rep rules and silent cues as on-device mode.
-- **Speed:** a round trip of roughly 150–300 ms on good signal (estimate; measure it). That's fine here because nothing is spoken mid-rep, so a small delay on the rep counter isn't noticeable. On weak gym signal, the app drops to fewer frames per second, then to basic mode.
-- **Privacy:** this is the only mode where video leaves the phone, so it needs explicit opt-in. Frames are processed in memory on the endpoint and never stored.
+- **Speed:** a round trip of roughly 150–300 ms on good signal (estimate; measure it). That's fine here because nothing is spoken mid-rep, so a small delay on the rep counter isn't noticeable. On weak gym signal, the app drops to fewer frames per second.
+- **Lost connection:** if the endpoint is unreachable mid-workout, tracking pauses with a quiet "reconnecting" state, and the user can enter reps for that set by hand. If the phone also passed the on-device benchmark (the user chose cloud manually), the app falls back to on-device `coreml` instead of pausing.
+- **Privacy:** this is the only mode where video leaves the phone, so it needs the explicit consent above. Frames are processed in memory on the endpoint and never stored.
 - **Cost:** endpoints are billed while running, from the team's HF credits. Set scale-to-zero so it only costs money while someone is mid-workout. A Gradio Space is not a good fit here, because it queues requests instead of streaming.
-- **Basic mode:** without opt-in, Apple Vision body pose (iPhone) or ML Kit pose (Android) runs on almost any phone. It's less accurate but enough for rep counting and the main form rules.
+- **Basic mode (iPhone, manual only):** Apple Vision body pose (`VNDetectHumanBodyPoseRequest`, source `vision`) runs fully on-device. The user picks it in settings, e.g. "Basic, on-device"; it is never chosen automatically. It maps Vision's 19 points to the same 17 COCO joints (neck and root dropped). It's less accurate but enough for rep counting and the main form rules.
+- **Code:** the selection logic is a pure function, `selectPoseMode` in `apps/mobile/src/pose/mode.ts`, returning `'coreml' | 'vision' | 'cloud' | 'paused' | 'unavailable'`. AI-04 wires the real benchmark into it. The Apple Vision detector is `apps/mobile/src/pose/basic.ts` plus the native `HybridBasicPoseDetector` in `modules/spotter-pose`; the joint mapping is `VisionPoseMapper.swift` in PoseCore.
 
 ---
 
@@ -214,7 +222,7 @@ flowchart LR
 
 | Job | Runs on | Model | Fallback if it's slow or down |
 |---|---|---|---|
-| Joint detection | Phone neural processor | YOLOv8n-pose (ours, optionally fine-tuned) | Lower input size or frame rate |
+| Joint detection | Phone neural processor (iPhone); HF Inference Endpoint in cloud mode (Android, slow iPhones) | YOLOv8n-pose (ours, optionally fine-tuned) | Lower input size or frame rate; cloud mode with consent |
 | Rep counting, live form tint | Phone | Rule engine (JSON specs) | n/a, always local |
 | Per-rep quality score, set medal | Databricks Model Serving (CPU) | Small GRU or gradient-boosted model on rep features, registered in Unity Catalog via MLflow | The phone's rule-based score decides the medal |
 | Deep re-check of a flagged set (optional) | HF Inference Endpoint or Gradio Space (GPU) | Larger pose model run on the set's joints and rep features | Skip; use the phone result |
@@ -656,7 +664,7 @@ spotter/
 ├── ml/
 │   ├── labelling/             # record + label clips, extract landmarks
 │   ├── form_classifier/       # train, export ONNX, push to Hub
-│   ├── pose_export/           # YOLOv8n-pose to Core ML / TFLite / ONNX, push to Hub
+│   ├── pose_export/           # YOLOv8n-pose to Core ML / ONNX, push to Hub
 │   └── space/                 # Gradio Space
 ├── databricks/
 │   ├── pipelines/             # Lakeflow Declarative Pipeline (bronze/silver/gold)
@@ -747,12 +755,12 @@ About 4 minutes, adjusted per judging room. Lead with that room's challenge.
 
 | Risk | Likelihood | Fallback |
 |---|---|---|
-| YOLOv8n-pose too slow on older phones | Medium | Lower input to 256 px or the frame rate; fall back to Apple Vision body pose on iPhone |
+| YOLOv8n-pose too slow on older phones | Medium | Lower input to 256 px or the frame rate; then cloud mode (with consent). Apple Vision body pose is available manually on iPhone |
 | Phone heats up or drains battery | Medium | Run at 15 fps and pause inference during rest |
 | Frame-processor plugin is hard to build in Expo | Medium | Start it first; fall back to the browser demo with ONNX Runtime Web |
 | Databricks serving unavailable or slow on Free Edition | Medium | The phone's rule score sets the medal; Databricks scores in a job afterwards |
 | Databricks quota or cold warehouse during the demo | Medium | The app reads synced Neon tables only. Pre-run jobs before judging. |
-| HF custom model hosting costs | Medium | Use a Gradio Space API instead of a paid endpoint; cloud mode is optional |
+| HF custom model hosting costs | Medium | Scale the endpoint to zero between workouts. Cloud mode is required on Android, so keep a Gradio Space API as a slower backup |
 | LLM rest note uses a banned phrase or a commanding tone | Medium | Banned-phrase check, then fall back to the rule's fixed `rest_note` |
 | Not enough labelled form data | High | Rules carry the demo. Present the model as a prototype trained on our own clips plus a public landmark set. |
 | AGPL-3.0 on YOLOv8 | Known | Keep the repo public; note MediaPipe or MoveNet as the commercial path |

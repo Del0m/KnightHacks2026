@@ -50,6 +50,36 @@ describe('PoseDebugScreen', () => {
     expect(renderer.root.findByType('PoseSkeleton').props.mirrored).toBe(false);
   });
 
+  it('shows the skeleton on startup when the resolution is unknown at configure time', () => {
+    frameOutput.currentResolution = undefined as never;
+    act(() => { renderer = create(React.createElement(PoseDebugScreen)); });
+    act(() => renderer.root.findAllByType(View)[0].props.onLayout({
+      nativeEvent: { layout: { width: 390, height: 844 } },
+    }));
+    act(() => renderer.root.findByType('Camera').props.onConfigured());
+    expect(renderer.root.findAllByType('PoseSkeleton')).toHaveLength(0);
+
+    // Frames are flowing by the first pose, so the resolution is known.
+    frameOutput.currentResolution = { width: 1920, height: 1080 };
+    const { onPose } = jest.mocked(usePoseOutput).mock.calls.at(-1)![0];
+    act(() => onPose({ latencyMs: 8 }));
+    expect(renderer.root.findByType('PoseSkeleton').props.imageSize).toEqual({ width: 1080, height: 1920 });
+  });
+
+  it('toggles between YOLOv8 and Apple Vision', () => {
+    act(() => { renderer = create(React.createElement(PoseDebugScreen)); });
+    expect(jest.mocked(usePoseOutput).mock.calls.at(-1)![0].engine).toBe('coreml');
+
+    const toggle = () => renderer.root.findByProps({ testID: 'pose-engine-toggle' });
+    expect(JSON.stringify(renderer.toJSON())).toContain('Use Apple Vision');
+    act(() => toggle().props.onPress());
+    expect(jest.mocked(usePoseOutput).mock.calls.at(-1)![0].engine).toBe('vision');
+    expect(JSON.stringify(renderer.toJSON())).toContain('Use Core ML');
+
+    act(() => toggle().props.onPress());
+    expect(jest.mocked(usePoseOutput).mock.calls.at(-1)![0].engine).toBe('coreml');
+  });
+
   it('shows a rejected permission request instead of an unhandled rejection', async () => {
     jest.mocked(useCameraPermission).mockReturnValue({
       hasPermission: false,

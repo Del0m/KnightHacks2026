@@ -131,7 +131,7 @@ That number covers the model alone. PoseBench's latency also includes Vision's r
 - **`PoseCore` as-is:** add it as a local Swift package to the Expo iOS project. It's pure Swift, with no app or UI code.
 - **The `CoreMLPoseEstimator` logic:** the frame-processor plugin receives a `CVPixelBuffer` per frame, which is exactly what `estimate` takes. Copy the class, or move it into `PoseCore` if both need it.
 - **The capture rule:** configure vision-camera for portrait, unmirrored frames (or rotate before inference), and mirror only in the overlay.
-- **The `PoseEstimating` protocol** (in `PoseCore`): the seam where a cloud estimator for non-iPhone users (CONN-11) plugs in.
+- **The `PoseEstimating` protocol** (in `PoseCore`): the seam where a cloud estimator for Android and slow iPhones (CONN-11) plugs in.
 
 ## Running in the Expo app
 
@@ -156,3 +156,13 @@ EXIF `.right` corrects counter-clockwise-rotated pixels; `.left` corrects clockw
 **Throttle and drops:** `usePoseOutput` keeps the last processed frame time in a `createSynchronizable` value shared with the worklet. With the default `maxFps = 15`, frames arriving less than `1000 / 15` ms later are disposed immediately. A 0.001 ms tolerance prevents floating-point rounding from skipping a frame exactly on the boundary. A restarted camera timestamp resets the throttle. Frames are never queued. The hook sets Vision Camera's `dropFramesWhileBusy` to `true`, so it also drops incoming frames while the processor is busy. The fps readout counts successful detections delivered to JS in the last second, including frames with no person. The dropped readout counts camera-pipeline drops, not throttle skips.
 
 **Mirroring:** the camera uses `mirrorMode="off"`, keeping inference input unmirrored and left/right anatomical. For the front camera, the preview alone is flipped with `scaleX: -1`, and the skeleton receives `mirrored = true` to flip its drawn x coordinates. The returned joints are unchanged. See [pose-result-contract.md](pose-result-contract.md) for coordinates and COCO joint order.
+
+## Basic mode (Apple Vision)
+
+Basic mode is a manual, iPhone-only option that uses Apple Vision body pose instead of YOLOv8n-pose (Architecture §4.1).
+
+- **Same frame path.** It uses the same Vision Camera frame output, throttle and `ImageOrientation` calibration as the Core ML detector.
+- **Different request.** `VNDetectHumanBodyPoseRequest` replaces `VNCoreMLRequest`. There is no square model input, so there is no letterbox to undo.
+- **Same result.** `VisionPoseMapper` converts Vision's points to a `PoseResult` with `source = "vision"`. The joint mapping, y flip and score rule are in [pose-result-contract.md](pose-result-contract.md#apple-vision-mapping).
+- **JS entry.** `useBasicPoseOutput` in `src/pose/basic.ts`, or `usePoseOutput({ engine: 'vision' })`. Both call `createBasicPoseDetector()` from `spotter-pose`, backed by the native `HybridBasicPoseDetector`. Both detectors share `PoseFrameReader` for orientation and timestamps.
+- **Debug screen.** A Core ML / Vision toggle switches detectors on the same camera feed.

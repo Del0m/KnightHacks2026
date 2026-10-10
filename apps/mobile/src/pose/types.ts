@@ -23,8 +23,13 @@ export interface Joint {
   c: number;
 }
 
+/** `coreml` is YOLOv8 on the phone, `vision` is Apple Vision body pose (manual basic mode on iPhone). */
+export type PoseSource = 'coreml' | 'vision' | 'cloud';
+
+const POSE_SOURCES: readonly string[] = ['coreml', 'vision', 'cloud'] satisfies PoseSource[];
+
 export interface PoseResult {
-  source: 'coreml' | 'cloud';
+  source: PoseSource;
   model: string;
   /** Frame time, Unix milliseconds. */
   timestamp_ms: number;
@@ -52,7 +57,8 @@ export function isPoseResult(v: unknown): v is PoseResult {
   if (typeof v !== 'object' || v === null) return false;
   const r = v as Record<string, unknown>;
   return (
-    (r.source === 'coreml' || r.source === 'cloud') &&
+    typeof r.source === 'string' &&
+    POSE_SOURCES.includes(r.source) &&
     typeof r.model === 'string' &&
     isNumber(r.timestamp_ms) &&
     isNumber(r.score) &&

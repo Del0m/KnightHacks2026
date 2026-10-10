@@ -12,4 +12,10 @@ export function createPoseDetector(size: number): PoseDetector {
   return factory.createPoseDetector(size)
 }
 
+/** Creates the Apple Vision body-pose detector (basic mode, iPhone only). */
+export function createBasicPoseDetector(): PoseDetector {
+  factory ??= NitroModules.createHybridObject<PoseDetectorFactory>('PoseDetectorFactory')
+  return factory.createBasicPoseDetector()
+}
+
 export type { PoseDetector, PoseDetection, PoseResult, Joint } from './specs/PoseDetector.nitro'

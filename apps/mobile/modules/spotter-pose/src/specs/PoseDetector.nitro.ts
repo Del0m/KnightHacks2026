@@ -4,7 +4,7 @@ import type { CameraFrameOutput, Frame } from 'react-native-vision-camera'
 export interface Joint { x: number; y: number; c: number }
 
 export interface PoseResult {
-  source: string        // "coreml"
+  source: string        // "coreml" or "vision"
   model: string         // "yolov8n-pose-320"
   timestamp_ms: number  // Unix ms
   score: number         // person confidence 0–1
@@ -24,4 +24,5 @@ export interface PoseDetector extends HybridObject<{ ios: 'swift' }> {
 
 export interface PoseDetectorFactory extends HybridObject<{ ios: 'swift' }> {
   createPoseDetector(size: number): PoseDetector  // 320 or 256; anything else throws
+  createBasicPoseDetector(): PoseDetector         // Apple Vision body pose; no bundled model
 }

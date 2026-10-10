@@ -15,6 +15,7 @@ namespace margelo::nitro::spotterpose {
     // load custom methods/properties
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridMethod("createPoseDetector", &HybridPoseDetectorFactorySpec::createPoseDetector);
+      prototype.registerHybridMethod("createBasicPoseDetector", &HybridPoseDetectorFactorySpec::createBasicPoseDetector);
     });
   }
 

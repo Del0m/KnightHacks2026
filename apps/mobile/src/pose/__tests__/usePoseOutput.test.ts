@@ -7,7 +7,7 @@ import { usePoseOutput, type PoseOutput } from '../usePoseOutput';
 
 const { act, create } = require('react-test-renderer');
 
-jest.mock('spotter-pose', () => ({ createPoseDetector: jest.fn() }));
+jest.mock('spotter-pose', () => ({ createPoseDetector: jest.fn(), createBasicPoseDetector: jest.fn() }));
 jest.mock('react-native-vision-camera', () => ({ useFrameOutput: jest.fn() }));
 jest.mock('react-native-worklets', () => ({
   createSynchronizable: jest.fn(),
