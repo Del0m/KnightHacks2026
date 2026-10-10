@@ -9,7 +9,7 @@ jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('@/components/AppPage', () => ({
   AppPage: ({ children }: { children: React.ReactNode }) => children,
   Action: ({ children }: { children: string }) => require('react').createElement(require('react-native').Text, null, children),
-  ui: {},
+  ui: {}, pageStyles: () => ({}),
 }));
 let renderer: ReturnType<typeof create>;
 afterEach(() => act(() => renderer.unmount()));

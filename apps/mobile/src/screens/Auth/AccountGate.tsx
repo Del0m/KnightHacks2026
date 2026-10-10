@@ -2,11 +2,12 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { AppPage, Action, ui } from '@/components/AppPage';
-import { colors } from '@/theme/tokens';
+import { AppPage, Action, pageStyles } from '@/components/AppPage';
+import { pageColors } from '@/theme/tokens';
 import { useAuth } from './session';
 
 export function AccountGate({ title, children }: { title: string; children: ReactNode }) {
+  const colors = pageColors(title), ui = pageStyles(title);
   const { user, loading } = useAuth();
   if (user) return children;
   return <AppPage title={title}><View style={ui.empty}>

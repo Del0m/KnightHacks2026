@@ -5,7 +5,8 @@ Based on the owner's profile doodle (IMG_6527 2.HEIC).
 - Circular photo/initials on the left, name and bio on the right; editing opens inline name/bio fields. Bio is optional and limited to 160 characters. Tap the photo to use the system library picker; photo removal is available while editing.
 - Existing streak counter sits underneath; a gray divider separates identity from the content tabs.
 - Calendar opens first. Current month defaults automatically; previous/next controls allow browsing. Workout days come from saved session dates, counted once per day. Today is outlined, and completed days are filled.
-- Videos and PBs have independent tabs and empty states. Video creation/library data and personal-best records have not been connected, so no example achievements or media are fabricated.
+- Calendar, Videos and PBs use calendar, video and trophy icons with accessible names. Videos and PBs have independent tabs and empty states. Video creation/library data and personal-best records have not been connected, so no example achievements or media are fabricated.
+- Each page now carries its tab palette through the background gradient, brand accent, text, borders, buttons, selected controls, and locked account prompt. Shared buttons receive the page palette from AppPage, so profile editing actions also use rose. Streak text follows the page; flame severity colors are preserved.
 - Bottom navigation progresses blue → periwinkle → purple → mauve → rose, keeping Train's existing blue. Profile sub-tabs use blue, purple, rose. Sliding selection indicators animate with color interpolation and honor reduced motion.
 - Existing auth gate remains: Me, Feed and Buddies require a confirmed session; Train, Plan and workouts stay public.
 

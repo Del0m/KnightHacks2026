@@ -2,7 +2,7 @@ import { useEffect, useState, type ComponentProps } from 'react';
 import { Tabs } from 'expo-router';
 import { Animated, Easing, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors as c, typography as t, tabAccents } from '@/theme/tokens';
+import { colors as c, typography as t, tabAccents, pageColors } from '@/theme/tokens';
 import { NavIcon } from '@/components/NavIcon';
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -32,7 +32,7 @@ function GlassTabBar({ state, descriptors, navigation }: BarProps) {
 }
 export default function TabLayout() {
   const reduced = useReducedMotion();
-  return <Tabs screenOptions={{ headerShown: false, animation: reduced === false ? 'fade' : 'none', sceneStyle: { backgroundColor: c.background } }} tabBar={props => <GlassTabBar {...props} />}>
+  return <Tabs screenOptions={({ route }) => ({ headerShown: false, animation: reduced === false ? 'fade' : 'none', sceneStyle: { backgroundColor: pageColors(route.name).background } })} tabBar={props => <GlassTabBar {...props} />}>
     <Tabs.Screen name="index" options={{ title: 'Train' }} /><Tabs.Screen name="plan" options={{ title: 'Plan' }} /><Tabs.Screen name="feed" options={{ title: 'Feed' }} /><Tabs.Screen name="buddies" options={{ title: 'Buddies' }} /><Tabs.Screen name="me" options={{ title: 'Me' }} />
   </Tabs>;
 }
