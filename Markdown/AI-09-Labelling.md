@@ -22,7 +22,7 @@ pnpm exec expo run:ios --device --configuration Release
 
 Keep bundle identifier `com.knighthacks.spotter` and the existing signing team to update the installed app. A development client can load Metro changes with `pnpm start --lan`. A standalone Release app needs its updated bundled code. Expo Go cannot load the custom pose plugin.
 
-The October 10 build was installed as a standalone Release on the owner's iPhone 17 Pro Max running iOS 26.6.2 (23G90), from implementation commit `1921fe4`. After reconnecting and unlocking the phone, CoreDevice successfully launched Spotter with the labelling URL, and the owner confirmed the Joint labelling screen is visible. Capture behaviour still requires the owner pilot. To open the route from this Mac while the phone is connected and unlocked:
+The October 10 build was installed as a standalone Release on the owner's iPhone 17 Pro Max running iOS 26.6.2 (23G90), from implementation commit `1921fe4`. After reconnecting and unlocking the phone, CoreDevice successfully launched Spotter with the labelling URL, and the owner confirmed the Joint labelling screen is visible. Confirmed capture and review results appear under Device acceptance below. To open the route from this Mac while the phone is connected and unlocked:
 
 ```sh
 xcrun devicectl device process launch --device Armin --payload-url 'spotter://labelling' com.knighthacks.spotter
@@ -42,6 +42,8 @@ The recorder preserves original joint values and no-person markers. Drafts use v
 ## Share and validate on the Mac
 
 Share one dataset bundle from the phone and separately share the private consent evidence JSON. Store both locally outside tracked source. The bundle carries source clips, accepted training rows, checksums, provenance and coverage summaries. The summaries do not replace private consent evidence. Cancelling the share sheet preserves the draft/export; an opened share sheet is not evidence of successful transfer.
+
+Each phone export contains all saved clips. During continued collection, validate the newest full export and unpack it into a new folder. Do not merge successive full exports from the same phone: overlapping clip/rep IDs are deliberately rejected. Merge is for disjoint source collections. The phone's per-exercise accepted coverage indicates what remains to collect; review and save each interval before it can count.
 
 Use **Node 25** from the repository root; it executes the pure TypeScript modules through native type stripping. Replace the example paths with the actual saved files:
 
