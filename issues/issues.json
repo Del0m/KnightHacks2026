@@ -1,0 +1,726 @@
+{
+  "labels": [
+    {
+      "name": "area: database",
+      "color": "1d76db",
+      "description": "Neon Postgres schema, migrations, pgvector, seed data"
+    },
+    {
+      "name": "area: backend",
+      "color": "0e8a16",
+      "description": "Express + TypeScript API in apps/api"
+    },
+    {
+      "name": "area: frontend",
+      "color": "fbca04",
+      "description": "React Native + Expo app in apps/mobile"
+    },
+    {
+      "name": "area: ai",
+      "color": "d93f0b",
+      "description": "On-device pose, form engine, models, LLM prompts"
+    },
+    {
+      "name": "area: connections",
+      "color": "5319e7",
+      "description": "Databricks and Hugging Face integrations"
+    },
+    {
+      "name": "area: pitch deck",
+      "color": "c5def5",
+      "description": "Slides, demo script, Devpost"
+    },
+    {
+      "name": "priority: P0",
+      "color": "b60205",
+      "description": "Needed for the core demo"
+    },
+    {
+      "name": "priority: P1",
+      "color": "fbca04",
+      "description": "Important, build after P0"
+    },
+    {
+      "name": "priority: P2",
+      "color": "c2e0c6",
+      "description": "Nice to have / stretch"
+    }
+  ],
+  "issues": [
+    {
+      "key": "DB-01",
+      "title": "[DB-01] Create Neon project with main, dev and demo branches",
+      "labels": [
+        "area: database",
+        "priority: P0"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nSet up the Neon project the whole app uses, with one branch per developer plus a demo branch.\n\n## Acceptance criteria\n- [ ] Neon project created; `main`, `demo` and one `dev-<name>` branch per teammate exist\n- [ ] Connection strings stored in a shared password manager, never committed\n- [ ] `.env.example` in apps/api lists every DB variable\n\n## Depends on\nNothing, can start now\n\n## Where\n`apps/api/.env.example`\n\n## Context\nSee `docs/Architecture.md` \u00a79.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-02",
+      "title": "[DB-02] Set up Drizzle ORM and migration workflow",
+      "labels": [
+        "area: database",
+        "priority: P0"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nAdd Drizzle to the API with the Neon serverless driver and a repeatable migrate command.\n\n## Acceptance criteria\n- [ ] `npm run db:generate` and `npm run db:migrate` work against a dev branch\n- [ ] Uses `@neondatabase/serverless`\n- [ ] README section explains how to run migrations on your own branch\n\n## Depends on\nDB-01\n\n## Where\n`apps/api/drizzle/`\n\n## Context\nSee `docs/Architecture.md` \u00a79.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-03",
+      "title": "[DB-03] Schema: users, profiles and injuries",
+      "labels": [
+        "area: database",
+        "priority: P0"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nTables for user profile (handle, experience level, gym, schedule, goals) and reported injuries.\n\n## Acceptance criteria\n- [ ] `users` keyed by the Neon Auth user id\n- [ ] `injuries` with body_part, severity, since, notes; private by default\n- [ ] Migration applies cleanly on a fresh branch\n\n## Depends on\nDB-02\n\n## Where\n`apps/api/drizzle/schema/users.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.2 Planning.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-04",
+      "title": "[DB-04] Schema: sessions, sets, reps, form flags",
+      "labels": [
+        "area: database",
+        "priority: P0"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nWorkout tables that store aggregates only (no per-frame joints).\n\n## Acceptance criteria\n- [ ] `sessions` (started_at, device, inference_mode, medal, form_score)\n- [ ] `sets` (exercise_id, reps, weight_kg, medal), `reps` (tempo_ms, range_deg, quality), `form_flags` (rule_id, severity)\n- [ ] Foreign keys cascade on delete\n\n## Depends on\nDB-03\n\n## Where\n`apps/api/drizzle/schema/workouts.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.2 Workouts.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-05",
+      "title": "[DB-05] Schema: exercises and workout plans",
+      "labels": [
+        "area: database",
+        "priority: P0"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nExercise library with form specs, plus weekly plans and plan items.\n\n## Acceptance criteria\n- [ ] `exercises` (id, name, muscles, level, form_spec jsonb)\n- [ ] `plans` (week_of, ai_sources jsonb) and `plan_items` (sets, reps, swap_note)\n- [ ] Migration applies cleanly\n\n## Depends on\nDB-03\n\n## Where\n`apps/api/drizzle/schema/plans.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.2 Planning.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-06",
+      "title": "[DB-06] Schema: social graph (posts, comments, kudos, follows)",
+      "labels": [
+        "area: database",
+        "priority: P0"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nTables behind the Strava-style feed.\n\n## Acceptance criteria\n- [ ] `posts.kind` enum: session, pr, medal, goal, advice\n- [ ] `comments.ai_suggested` boolean; `kudos` and `follows` with composite primary keys\n- [ ] Index supports keyset pagination of the feed by created_at\n\n## Depends on\nDB-03\n\n## Where\n`apps/api/drizzle/schema/social.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.2 Social, \u00a712.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-07",
+      "title": "[DB-07] Schema: progress (PRs, goals, medals, risk insights)",
+      "labels": [
+        "area: database",
+        "priority: P1"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nTables for personal records, goals, medals and Databricks-synced risk insights.\n\n## Acceptance criteria\n- [ ] `personal_records`, `goals`, `medals` (tier, session_id), `risk_insights` (body_part, score, explanation, as_of)\n- [ ] `risk_insights` upsert key is (user_id, body_part, as_of)\n\n## Depends on\nDB-04\n\n## Where\n`apps/api/drizzle/schema/progress.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.2 Progress.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-08",
+      "title": "[DB-08] Enable pgvector and create doc_chunk table",
+      "labels": [
+        "area: database",
+        "priority: P0"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nVector store for the RAG planner.\n\n## Acceptance criteria\n- [ ] `CREATE EXTENSION vector` in a migration\n- [ ] `doc_chunks` (source, content, metadata jsonb, embedding vector(384)) with an HNSW index\n- [ ] A sample nearest-neighbour query returns results\n\n## Depends on\nDB-02\n\n## Where\n`apps/api/drizzle/schema/rag.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a710.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-09",
+      "title": "[DB-09] Profile embeddings and buddy_match table",
+      "labels": [
+        "area: database",
+        "priority: P1"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nStore a 384-d embedding per profile and buddy match results.\n\n## Acceptance criteria\n- [ ] `profiles.embedding vector(384)` with HNSW index\n- [ ] `buddy_matches` (a_id, b_id, score, status, reasons jsonb)\n\n## Depends on\nDB-03, DB-08\n\n## Where\n`apps/api/drizzle/schema/social.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a712.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-10",
+      "title": "[DB-10] Seed script for the demo branch",
+      "labels": [
+        "area: database",
+        "priority: P1"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nRealistic demo data so every screen looks alive during judging.\n\n## Acceptance criteria\n- [ ] ~30 users at 2 gyms, 6 weeks of sessions, medals, PRs, posts, comments, buddy matches\n- [ ] `npm run db:seed:demo` resets and reseeds the `demo` branch\n- [ ] No real people's data\n\n## Depends on\nDB-04, DB-06, DB-07\n\n## Where\n`apps/api/scripts/seed-demo.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "DB-11",
+      "title": "[DB-11] Row-level security for read-only progress views",
+      "labels": [
+        "area: database",
+        "priority: P2"
+      ],
+      "body": "**Area:** database \u00b7 **Priority:** P2 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nOptional: let the app read its own progress through Neon's Data API safely.\n\n## Acceptance criteria\n- [ ] RLS policies restrict rows to the JWT's user id\n- [ ] Confirm whether the Data API is on the free plan before building on it\n\n## Depends on\nDB-07\n\n## Where\n`apps/api/drizzle/rls.sql`\n\n## Context\nSee `docs/Architecture.md` \u00a79.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-01",
+      "title": "[BE-01] Scaffold Express + TypeScript API",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nBase API service with health check, error handling, request logging and env validation.\n\n## Acceptance criteria\n- [ ] `GET /health` returns 200\n- [ ] Zod-validated env on boot\n- [ ] ESLint + Prettier + `npm run dev`\n\n## Depends on\nNothing, can start now\n\n## Where\n`apps/api/`\n\n## Context\nSee `docs/Architecture.md` \u00a79.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-02",
+      "title": "[BE-02] Neon Auth JWT middleware",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nVerify Neon Auth tokens on every protected route and attach the user.\n\n## Acceptance criteria\n- [ ] Invalid or missing token returns 401\n- [ ] `req.user.id` available in handlers\n- [ ] Unit test with a mocked token\n\n## Depends on\nBE-01, DB-03\n\n## Where\n`apps/api/src/middleware/auth.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-03",
+      "title": "[BE-03] Profile and injury endpoints",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nCRUD for the user's profile and injuries.\n\n## Acceptance criteria\n- [ ] `GET/PUT /me/profile`, `GET/POST/DELETE /me/injuries`\n- [ ] Validation with Zod\n\n## Depends on\nBE-02\n\n## Where\n`apps/api/src/routes/me.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.3.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-04",
+      "title": "[BE-04] Session lifecycle endpoints",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nCreate a session, append sets with rep data, and finish the session.\n\n## Acceptance criteria\n- [ ] `POST /sessions`, `POST /sessions/:id/sets`, `POST /sessions/:id/finish`\n- [ ] Sets payload includes per-rep aggregates and form flags\n- [ ] Finish triggers medal + PR computation (BE-05) and queues the Databricks export (CONN-03)\n\n## Depends on\nBE-02, DB-04\n\n## Where\n`apps/api/src/routes/sessions.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.3.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-05",
+      "title": "[BE-05] Medal and PR computation",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nCompute the workout medal against the user's own 4-week average, and detect PRs.\n\n## Acceptance criteria\n- [ ] Form score = clean reps / total reps\n- [ ] Bronze: below 4-week average; Silver: at or above average; Gold: every rep clean\n- [ ] First workout compares against a 70% baseline\n- [ ] Unit tests cover all three tiers and the first-workout case\n\n## Depends on\nBE-04, DB-07\n\n## Where\n`apps/api/src/services/medals.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a78.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-06",
+      "title": "[BE-06] Exercise library and spec endpoints",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nServe the exercise list and per-exercise JSON form specs to the app.\n\n## Acceptance criteria\n- [ ] `GET /exercises`, `GET /exercises/:id/spec`\n- [ ] Specs loaded from `specs/exercises/*.json` into the DB\n\n## Depends on\nDB-05, AI-05\n\n## Where\n`apps/api/src/routes/exercises.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.3.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-07",
+      "title": "[BE-07] Rest-note endpoint",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nReturn the one-line rest note for the last set (scores from Databricks, text from HF).\n\n## Acceptance criteria\n- [ ] `GET /sets/:id/rest-note` responds within ~1.5 s\n- [ ] Falls back to the rule's fixed `rest_note` if Databricks or HF is slow\n- [ ] Output passes the banned-phrase check (AI-11)\n\n## Depends on\nCONN-04, CONN-07, AI-11\n\n## Where\n`apps/api/src/routes/sets.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a77.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-08",
+      "title": "[BE-08] Plan generation endpoints",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nExpose the RAG planner to the app.\n\n## Acceptance criteria\n- [ ] `POST /plans/generate`, `GET /plans/current`\n- [ ] Stores plan with its source chunks\n\n## Depends on\nAI-12, DB-05\n\n## Where\n`apps/api/src/routes/plans.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a710.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-09",
+      "title": "[BE-09] Feed endpoint with keyset pagination",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nPosts from followed users plus same-gym beginners, newest first.\n\n## Acceptance criteria\n- [ ] `GET /feed?cursor=` returns 20 posts and a next cursor\n- [ ] Includes kudos and comment counts\n\n## Depends on\nDB-06\n\n## Where\n`apps/api/src/routes/feed.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a712.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-10",
+      "title": "[BE-10] Posts, comments, kudos and follows",
+      "labels": [
+        "area: backend",
+        "priority: P0"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nWrite side of the social layer.\n\n## Acceptance criteria\n- [ ] `POST /posts`, `POST /posts/:id/comments`, `POST /posts/:id/kudos`, `POST/DELETE /follows/:userId`\n- [ ] Every post and comment passes moderation (CONN-09) before saving\n- [ ] Auto-post on medal or PR only when the user opted in\n\n## Depends on\nDB-06, CONN-09\n\n## Where\n`apps/api/src/routes/social.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a712.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-11",
+      "title": "[BE-11] Advice questions with AI first answer",
+      "labels": [
+        "area: backend",
+        "priority: P1"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nAdvice posts get an AI-suggested first comment.\n\n## Acceptance criteria\n- [ ] Similar answered questions found via pgvector\n- [ ] AI answer labelled `ai_suggested`\n- [ ] Questions mentioning acute pain get a fixed 'see a professional' reply instead\n\n## Depends on\nBE-10, CONN-08, AI-13\n\n## Where\n`apps/api/src/services/advice.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a710.2.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-12",
+      "title": "[BE-12] Buddy matching endpoints",
+      "labels": [
+        "area: backend",
+        "priority: P1"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nSuggest gym buddies and handle requests.\n\n## Acceptance criteria\n- [ ] `GET /buddies/suggestions` returns top 10 with 'why you match'\n- [ ] Score = 0.4 goals + 0.3 schedule + 0.2 level + 0.1 streak\n- [ ] `POST /buddies/:id/request`, accept/decline\n\n## Depends on\nDB-09, CONN-08\n\n## Where\n`apps/api/src/services/matching.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a712.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-13",
+      "title": "[BE-13] Progress and insights endpoints",
+      "labels": [
+        "area: backend",
+        "priority: P1"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nRead progress charts and risk insights from Neon.\n\n## Acceptance criteria\n- [ ] `GET /me/progress` (daily volume, form score trend, medals)\n- [ ] `GET /me/insights` (risk flags with explanations)\n\n## Depends on\nDB-07, CONN-05\n\n## Where\n`apps/api/src/routes/progress.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.3.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "BE-14",
+      "title": "[BE-14] Deploy the API",
+      "labels": [
+        "area: backend",
+        "priority: P1"
+      ],
+      "body": "**Area:** backend \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Back-end dev\n\n## Goal\nHost the API for the demo.\n\n## Acceptance criteria\n- [ ] Deployed on Render, Railway or Fly.io with env vars set\n- [ ] Points at the Neon `demo` branch for judging\n- [ ] Health check monitored\n\n## Depends on\nBE-01\n\n## Where\n`apps/api/`\n\n## Context\nSee `docs/Architecture.md` \u00a714.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-01",
+      "title": "[FE-01] Scaffold Expo app with dev build and navigation",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nReact Native + Expo app with an Expo development build (needed for the camera plugin).\n\n## Acceptance criteria\n- [ ] Expo dev build runs on at least one teammate's iPhone\n- [ ] Tab navigation: Train, Plan, Feed, Buddies, Me\n- [ ] Shared theme tokens (colors, type)\n\n## Depends on\nNothing, can start now\n\n## Where\n`apps/mobile/`\n\n## Context\nSee `docs/Architecture.md` \u00a73.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-02",
+      "title": "[FE-02] Sign up and login with Neon Auth",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nAuth screens and token storage.\n\n## Acceptance criteria\n- [ ] Email sign-up and login\n- [ ] Token stored securely and sent on API calls\n\n## Depends on\nFE-01, BE-02\n\n## Where\n`apps/mobile/src/screens/Auth/`\n\n## Context\nSee `docs/Architecture.md` \u00a79.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-03",
+      "title": "[FE-03] Onboarding: goals, level, schedule, injuries",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nCollect what the planner and buddy matcher need.\n\n## Acceptance criteria\n- [ ] 4 short steps, skippable injuries step\n- [ ] Injury step shows the 'not medical advice' disclaimer\n- [ ] Saves via BE-03\n\n## Depends on\nFE-02, BE-03\n\n## Where\n`apps/mobile/src/screens/Onboarding/`\n\n## Context\nSee `docs/Architecture.md` \u00a71.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-04",
+      "title": "[FE-04] Camera framing guide",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nHelp the user place the phone so the whole body is visible.\n\n## Acceptance criteria\n- [ ] Outline overlay turns green when all 17 joints are visible\n- [ ] Side-on hint for squats and lunges\n\n## Depends on\nAI-01\n\n## Where\n`apps/mobile/src/screens/LiveSet/FramingGuide.tsx`\n\n## Context\nSee `docs/Architecture.md` \u00a74.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-05",
+      "title": "[FE-05] Live set screen: skeleton overlay and rep counter",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nThe core screen: silent, glanceable feedback while lifting.\n\n## Acceptance criteria\n- [ ] Skeleton drawn over the camera preview at 15+ fps\n- [ ] Large rep counter\n- [ ] No sound and no pop-ups during the set\n\n## Depends on\nAI-02, AI-06\n\n## Where\n`apps/mobile/src/screens/LiveSet/`\n\n## Context\nSee `docs/Architecture.md` \u00a77.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-06",
+      "title": "[FE-06] Amber joint tint for form drift",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nShow form issues silently by tinting the affected joints.\n\n## Acceptance criteria\n- [ ] Joints flagged by the form engine tint amber for that rep, then clear\n- [ ] Colour-blind safe (also thickens the joint marker)\n\n## Depends on\nFE-05, AI-07\n\n## Where\n`apps/mobile/src/screens/LiveSet/Skeleton.tsx`\n\n## Context\nSee `docs/Architecture.md` \u00a77.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-07",
+      "title": "[FE-07] Rest timer with rest-note card",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nDuring rest, show a timer and the one short note.\n\n## Acceptance criteria\n- [ ] Card shows the note from BE-07, good news first\n- [ ] Shows set medal\n- [ ] Never more than one suggestion\n\n## Depends on\nFE-05, BE-07\n\n## Where\n`apps/mobile/src/screens/LiveSet/RestCard.tsx`\n\n## Context\nSee `docs/Architecture.md` \u00a77.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-08",
+      "title": "[FE-08] Workout summary and medal screen",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nAfter the workout: medal, form score vs your average, PRs, opt-in share.\n\n## Acceptance criteria\n- [ ] Bronze, silver or gold with a one-line explanation\n- [ ] 'Share to feed' toggle, off by default\n\n## Depends on\nBE-05\n\n## Where\n`apps/mobile/src/screens/Summary/`\n\n## Context\nSee `docs/Architecture.md` \u00a78.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-09",
+      "title": "[FE-09] Weekly plan screen",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nShow the generated plan with 'why this exercise' sources and injury swaps.\n\n## Acceptance criteria\n- [ ] Generate button calls BE-08\n- [ ] Each item expands to show its source\n- [ ] Swapped items show the swap note\n\n## Depends on\nBE-08\n\n## Where\n`apps/mobile/src/screens/Plan/`\n\n## Context\nSee `docs/Architecture.md` \u00a710.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-10",
+      "title": "[FE-10] Feed screen",
+      "labels": [
+        "area: frontend",
+        "priority: P0"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nStrava-style feed with session, PR, medal, goal and advice cards.\n\n## Acceptance criteria\n- [ ] Infinite scroll via cursor\n- [ ] Kudos and comment counts\n- [ ] Gold workouts get a distinct card\n\n## Depends on\nBE-09\n\n## Where\n`apps/mobile/src/screens/Feed/`\n\n## Context\nSee `docs/Architecture.md` \u00a712.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-11",
+      "title": "[FE-11] Post detail, comments and kudos",
+      "labels": [
+        "area: frontend",
+        "priority: P1"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nOpen a post, read and add comments, give kudos.\n\n## Acceptance criteria\n- [ ] AI-suggested answers clearly labelled\n- [ ] Report and block actions\n\n## Depends on\nFE-10, BE-10\n\n## Where\n`apps/mobile/src/screens/Feed/PostDetail.tsx`\n\n## Context\nSee `docs/Architecture.md` \u00a712.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-12",
+      "title": "[FE-12] Ask for advice flow",
+      "labels": [
+        "area: frontend",
+        "priority: P1"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nCompose an advice question and see the AI first answer arrive.\n\n## Acceptance criteria\n- [ ] Compose screen with tips on what to include\n- [ ] Shows the 'see a professional' reply for pain questions\n\n## Depends on\nBE-11\n\n## Where\n`apps/mobile/src/screens/Feed/AskAdvice.tsx`\n\n## Context\nSee `docs/Architecture.md` \u00a710.2.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-13",
+      "title": "[FE-13] Gym buddies screen",
+      "labels": [
+        "area: frontend",
+        "priority: P1"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nBrowse buddy suggestions and send requests.\n\n## Acceptance criteria\n- [ ] Cards show 'why you match'\n- [ ] Request, accept, decline\n- [ ] Only gym-level location is ever shown\n\n## Depends on\nBE-12\n\n## Where\n`apps/mobile/src/screens/Buddies/`\n\n## Context\nSee `docs/Architecture.md` \u00a712.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-14",
+      "title": "[FE-14] Progress and insights screen",
+      "labels": [
+        "area: frontend",
+        "priority: P1"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nCharts for form score, volume and medals, plus Databricks risk insights.\n\n## Acceptance criteria\n- [ ] Form score vs 4-week average line\n- [ ] Medal calendar\n- [ ] Risk insights worded as trends, not diagnoses\n\n## Depends on\nBE-13\n\n## Where\n`apps/mobile/src/screens/Me/Progress.tsx`\n\n## Context\nSee `docs/Architecture.md` \u00a711.3.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "FE-15",
+      "title": "[FE-15] Cloud-mode consent and settings",
+      "labels": [
+        "area: frontend",
+        "priority: P1"
+      ],
+      "body": "**Area:** frontend \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Front-end dev\n\n## Goal\nAsk permission before sending frames to Hugging Face on slow phones.\n\n## Acceptance criteria\n- [ ] Shown only when the on-device benchmark fails (AI-04)\n- [ ] Clear yes / no; 'no' selects basic mode\n- [ ] Settings page lets the user change it later; sound off by default\n\n## Depends on\nAI-04, CONN-11\n\n## Where\n`apps/mobile/src/screens/Me/Settings.tsx`\n\n## Context\nSee `docs/Architecture.md` \u00a74.1, \u00a713.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-01",
+      "title": "[AI-01] Export YOLOv8n-pose to Core ML and benchmark on iPhone",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nGet the pose model running on the Neural Engine and measure fps.\n\n## Acceptance criteria\n- [ ] `yolo export model=yolov8n-pose.pt format=coreml` at 320 and 256 px\n- [ ] fps and latency recorded on each teammate's phone in a table in the PR\n- [ ] Export script committed\n\n## Depends on\nNothing, can start now\n\n## Where\n`ml/pose_export/`\n\n## Context\nSee `docs/Architecture.md` \u00a74.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-02",
+      "title": "[AI-02] Vision Camera frame-processor plugin for pose",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nNative plugin that runs the Core ML model on each camera frame and returns 17 joints to JS.\n\n## Acceptance criteria\n- [ ] Works in the Expo dev build\n- [ ] Returns joints + confidence per frame\n- [ ] 15+ fps on a recent iPhone\n\n## Depends on\nAI-01, FE-01\n\n## Where\n`apps/mobile/src/pose/`\n\n## Context\nSee `docs/Architecture.md` \u00a74.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-03",
+      "title": "[AI-03] Basic-mode fallback with Apple Vision / ML Kit",
+      "labels": [
+        "area: ai",
+        "priority: P1"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nPose on phones where YOLOv8 is too slow and the user declines cloud mode.\n\n## Acceptance criteria\n- [ ] Apple Vision body pose mapped to the same 17 joints\n- [ ] Android ML Kit equivalent (P2 if time is short)\n\n## Depends on\nAI-02\n\n## Where\n`apps/mobile/src/pose/basic.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a74.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-04",
+      "title": "[AI-04] On-device benchmark and mode selection",
+      "labels": [
+        "area: ai",
+        "priority: P1"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\n2-second benchmark on first launch to choose on-device, cloud or basic mode.\n\n## Acceptance criteria\n- [ ] Picks on-device at 12+ fps\n- [ ] Otherwise prompts for cloud mode (FE-15)\n- [ ] Result cached; re-run from settings\n\n## Depends on\nAI-02\n\n## Where\n`apps/mobile/src/pose/benchmark.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a74.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-05",
+      "title": "[AI-05] Exercise JSON specs for the 5 MVP exercises",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nDeclarative specs for squat, push-up, bicep curl, shoulder press and lunge.\n\n## Acceptance criteria\n- [ ] Angles, phases, rules and `rest_note` per rule\n- [ ] Injury overrides for knee, shoulder, lower back\n- [ ] No commanding phrasing in any rest_note\n\n## Depends on\nNothing, can start now\n\n## Where\n`specs/exercises/`\n\n## Context\nSee `docs/Architecture.md` \u00a76.2.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-06",
+      "title": "[AI-06] Form engine: smoothing, angles and rep state machine",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nTypeScript engine that turns joints into reps.\n\n## Acceptance criteria\n- [ ] One Euro filter per joint\n- [ ] Joint angle helpers\n- [ ] State machine with hysteresis; no double counts on a recorded test clip\n- [ ] Unit tests on recorded joint sequences\n\n## Depends on\nAI-05\n\n## Where\n`apps/mobile/src/engine/`\n\n## Context\nSee `docs/Architecture.md` \u00a76.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-07",
+      "title": "[AI-07] Form rules evaluation and silent flags",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nEvaluate each rule at its phase and emit flags without interrupting the user.\n\n## Acceptance criteria\n- [ ] Flags include rule_id, severity, rep index\n- [ ] Flags held until the set ends\n- [ ] Injury overrides applied per user\n\n## Depends on\nAI-06\n\n## Where\n`apps/mobile/src/engine/rules.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a76, \u00a77.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-08",
+      "title": "[AI-08] Set record payload",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nPackage a finished set for the API and Databricks.\n\n## Acceptance criteria\n- [ ] Per-rep aggregates for Neon\n- [ ] Compressed per-frame joints for Databricks\n- [ ] Schema shared with CONN-02\n\n## Depends on\nAI-07\n\n## Where\n`apps/mobile/src/engine/setRecord.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a79.3, \u00a711.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-09",
+      "title": "[AI-09] Record and label form clips",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nBuild our own labelled dataset: clean and off-form reps for each exercise.\n\n## Acceptance criteria\n- [ ] Simple labelling tool (clip, rep boundaries, label)\n- [ ] At least 40 reps per MVP exercise\n- [ ] Only joints kept; consent from everyone filmed\n\n## Depends on\nAI-02\n\n## Where\n`ml/labelling/`\n\n## Context\nSee `docs/Architecture.md` \u00a76.3.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-10",
+      "title": "[AI-10] Train the form-quality model",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nSmall GRU or gradient-boosted model scoring each rep 0\u20131 with a label.\n\n## Acceptance criteria\n- [ ] Trained on AI-09 data plus a public landmark set\n- [ ] Held-out accuracy reported\n- [ ] Logged to MLflow (CONN-04)\n\n## Depends on\nAI-09\n\n## Where\n`ml/form_classifier/`\n\n## Context\nSee `docs/Architecture.md` \u00a76.3.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-11",
+      "title": "[AI-11] Rest-note prompt and banned-phrase guard",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nPrompt gpt-oss to write one kind, specific note from set scores.\n\n## Acceptance criteria\n- [ ] Good news first, one suggestion max, describes movement not person, no commands\n- [ ] Guard rejects banned phrases and falls back to the rule's rest_note\n- [ ] 20 sample sets reviewed by the team\n\n## Depends on\nCONN-07\n\n## Where\n`apps/api/src/services/restNote.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a77.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-12",
+      "title": "[AI-12] RAG planner: retrieval, generation and safety rules",
+      "labels": [
+        "area: ai",
+        "priority: P0"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nGenerate a weekly plan grounded in the exercise library.\n\n## Acceptance criteria\n- [ ] Retrieves with injury filters\n- [ ] gpt-oss JSON-schema output\n- [ ] Code safety check: drop contraindicated, cap +10% volume, physio notes\n- [ ] Each item stores its source chunks\n\n## Depends on\nCONN-08, DB-08\n\n## Where\n`apps/api/src/services/planner.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a710.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-13",
+      "title": "[AI-13] Advice answer prompt",
+      "labels": [
+        "area: ai",
+        "priority: P1"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nShort, sourced AI answers for community advice questions.\n\n## Acceptance criteria\n- [ ] Cites similar answers or library sources\n- [ ] Never diagnoses; pain triggers the fixed reply\n\n## Depends on\nCONN-07\n\n## Where\n`apps/api/src/services/advice.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a710.2.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-14",
+      "title": "[AI-14] Injury-risk model",
+      "labels": [
+        "area: ai",
+        "priority: P1"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nXGBoost trend model on rep features with heuristic labels.\n\n## Acceptance criteria\n- [ ] Features: flag rate trend, range on injured side, asymmetry, volume ratio, tempo\n- [ ] Feature importance shown in the dashboard\n- [ ] Labelled as a trend score, not a diagnosis\n\n## Depends on\nCONN-03\n\n## Where\n`databricks/notebooks/risk_model.py`\n\n## Context\nSee `docs/Architecture.md` \u00a711.2.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "AI-15",
+      "title": "[AI-15] Optional YOLOv8n-pose fine-tune on gym footage",
+      "labels": [
+        "area: ai",
+        "priority: P2"
+      ],
+      "body": "**Area:** ai \u00b7 **Priority:** P2 \u00b7 **Suggested owner:** AI engineer A\n\n## Goal\nFine-tune the pose model if base accuracy is weak in gym lighting.\n\n## Acceptance criteria\n- [ ] Before/after keypoint accuracy on our clips\n- [ ] New weights exported to Core ML and pushed to the Hub\n\n## Depends on\nAI-01, AI-09\n\n## Where\n`ml/pose_export/`\n\n## Context\nSee `docs/Architecture.md` \u00a75.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-01",
+      "title": "[CONN-01] Databricks workspace, catalog and Volume",
+      "labels": [
+        "area: connections",
+        "priority: P0"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nSet up Unity Catalog objects for Spotter in Databricks Free Edition.\n\n## Acceptance criteria\n- [ ] Catalog `spotter`, schemas `raw`, `ml`, `gold`\n- [ ] Volume `/Volumes/spotter/raw/sessions/`\n- [ ] Service principal and scoped token for the API\n\n## Depends on\nNothing, can start now\n\n## Where\n`databricks/`\n\n## Context\nSee `docs/Architecture.md` \u00a711.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-02",
+      "title": "[CONN-02] Upload finished sessions to the Databricks Volume",
+      "labels": [
+        "area: connections",
+        "priority: P0"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nAPI uploads each finished session via the Files API.\n\n## Acceptance criteria\n- [ ] JSON metadata + gzip'd joint arrays per session\n- [ ] Retries on failure; marks `export_status` in Neon\n- [ ] No video, pseudonymous user id only\n\n## Depends on\nCONN-01, BE-04, AI-08\n\n## Where\n`apps/api/src/integrations/databricks/upload.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a711.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-03",
+      "title": "[CONN-03] Lakeflow pipeline: bronze, silver, gold",
+      "labels": [
+        "area: connections",
+        "priority: P0"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nDeclarative pipeline from raw sessions to gold tables.\n\n## Acceptance criteria\n- [ ] Auto Loader into `bronze_sessions`\n- [ ] `silver_reps`, `silver_frames` with expectations\n- [ ] Gold: progress daily, form summary, workout medals, training features, risk scores\n\n## Depends on\nCONN-01\n\n## Where\n`databricks/pipelines/`\n\n## Context\nSee `docs/Architecture.md` \u00a711.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-04",
+      "title": "[CONN-04] MLflow tracking and registry for the form model",
+      "labels": [
+        "area: connections",
+        "priority: P0"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nTrack training runs and register the form-quality model in Unity Catalog.\n\n## Acceptance criteria\n- [ ] Runs logged with params and metrics\n- [ ] Model registered as `spotter.ml.form_quality`\n\n## Depends on\nAI-10, CONN-01\n\n## Where\n`databricks/notebooks/form_model.py`\n\n## Context\nSee `docs/Architecture.md` \u00a75.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-05",
+      "title": "[CONN-05] Model Serving endpoint for set scoring",
+      "labels": [
+        "area: connections",
+        "priority: P0"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nCPU endpoint that scores a set's reps and returns the medal in ~1 s.\n\n## Acceptance criteria\n- [ ] Endpoint live on Free Edition (or documented job fallback)\n- [ ] API client with timeout and fallback to the phone's rule score\n\n## Depends on\nCONN-04\n\n## Where\n`apps/api/src/integrations/databricks/score.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a75.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-06",
+      "title": "[CONN-06] Sync gold tables into Neon",
+      "labels": [
+        "area: connections",
+        "priority: P1"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nNode cron that reads gold tables and upserts progress and risk insights into Neon.\n\n## Acceptance criteria\n- [ ] Runs every 15 minutes with `@databricks/sql`\n- [ ] Idempotent upserts\n- [ ] App never queries Databricks directly\n\n## Depends on\nCONN-03, DB-07\n\n## Where\n`apps/api/src/jobs/syncInsights.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a711.3.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-07",
+      "title": "[CONN-07] Hugging Face Inference Providers client",
+      "labels": [
+        "area: connections",
+        "priority: P0"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nShared client for gpt-oss with JSON-schema output.\n\n## Acceptance criteria\n- [ ] `@huggingface/inference` with token from env\n- [ ] Tested model + provider pair for structured output\n- [ ] Timeouts and retries\n\n## Depends on\nNothing, can start now\n\n## Where\n`apps/api/src/integrations/huggingface/llm.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a710.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-08",
+      "title": "[CONN-08] Embeddings client and RAG ingest",
+      "labels": [
+        "area: connections",
+        "priority: P0"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nEmbed the exercise library and injury notes into Neon pgvector.\n\n## Acceptance criteria\n- [ ] `BAAI/bge-small-en-v1.5` via Inference Providers\n- [ ] Ingest free-exercise-db + team-written injury notes\n- [ ] Re-runnable `npm run rag:ingest`\n\n## Depends on\nCONN-07, DB-08\n\n## Where\n`rag/`\n\n## Context\nSee `docs/Architecture.md` \u00a710.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-09",
+      "title": "[CONN-09] Llama Guard moderation",
+      "labels": [
+        "area: connections",
+        "priority: P1"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nModerate posts, comments and advice before they're saved.\n\n## Acceptance criteria\n- [ ] `meta-llama/Llama-Guard-4-12B` via Inference Providers\n- [ ] Blocked content returns a friendly message\n\n## Depends on\nCONN-07\n\n## Where\n`apps/api/src/integrations/huggingface/moderation.ts`\n\n## Context\nSee `docs/Architecture.md` \u00a712.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-10",
+      "title": "[CONN-10] Publish models to the Hugging Face Hub and app update check",
+      "labels": [
+        "area: connections",
+        "priority: P1"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nPush the pose and form models to our Hub repo; the app downloads newer versions.\n\n## Acceptance criteria\n- [ ] Databricks job pushes Core ML + ONNX exports with a model card\n- [ ] App checks the Hub on launch and downloads if newer\n\n## Depends on\nCONN-04, AI-01\n\n## Where\n`ml/pose_export/push_to_hub.py`\n\n## Context\nSee `docs/Architecture.md` \u00a75.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-11",
+      "title": "[CONN-11] HF Inference Endpoint for cloud mode",
+      "labels": [
+        "area: connections",
+        "priority: P1"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nGPU endpoint that receives frames and returns 17 joints for unsupported phones.\n\n## Acceptance criteria\n- [ ] Custom handler running YOLOv8n-pose\n- [ ] WebSocket or streaming HTTP; frames never stored\n- [ ] Scale-to-zero enabled; cost noted in the PR\n\n## Depends on\nAI-01\n\n## Where\n`ml/cloud_endpoint/`\n\n## Context\nSee `docs/Architecture.md` \u00a74.1.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "CONN-12",
+      "title": "[CONN-12] Publish our dataset and Gradio Space",
+      "labels": [
+        "area: connections",
+        "priority: P1"
+      ],
+      "body": "**Area:** connections \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** AI engineer B\n\n## Goal\nShare the labelled form dataset and a demo Space on the Hub.\n\n## Acceptance criteria\n- [ ] Dataset card with collection method and license\n- [ ] Space: upload a clip, see per-rep scores\n\n## Depends on\nAI-09, AI-10\n\n## Where\n`ml/space/`\n\n## Context\nSee `docs/Architecture.md` \u00a76.3.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "PITCH-01",
+      "title": "[PITCH-01] Pitch deck outline and story",
+      "labels": [
+        "area: pitch deck",
+        "priority: P0"
+      ],
+      "body": "**Area:** pitch deck \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Whole team\n\n## Goal\nAgree the story: quiet coach for beginners and people returning from injury.\n\n## Acceptance criteria\n- [ ] 8\u201310 slide outline agreed by the team\n- [ ] One-sentence pitch and the problem stat sources\n\n## Depends on\nNothing, can start now\n\n## Where\n`docs/pitch/`\n\n## Context\nSee `docs/Architecture.md` \u00a72.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "PITCH-02",
+      "title": "[PITCH-02] Architecture slide",
+      "labels": [
+        "area: pitch deck",
+        "priority: P0"
+      ],
+      "body": "**Area:** pitch deck \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Whole team\n\n## Goal\nOne clear slide adapted from the overview diagrams.\n\n## Acceptance criteria\n- [ ] Phone, Databricks, Hugging Face, Neon with labelled arrows\n- [ ] Readable from the back of a room\n\n## Depends on\nPITCH-01\n\n## Where\n`docs/pitch/`\n\n## Context\nSee `docs/Architecture.md` \u00a73, \u00a75.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "PITCH-03",
+      "title": "[PITCH-03] Per-challenge slides (HF, Databricks, Neon, Best AI)",
+      "labels": [
+        "area: pitch deck",
+        "priority: P0"
+      ],
+      "body": "**Area:** pitch deck \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Whole team\n\n## Goal\nOne slide per sponsor showing exactly what we built on their platform.\n\n## Acceptance criteria\n- [ ] Each slide names the specific features used\n- [ ] Screenshots from the real build\n\n## Depends on\nPITCH-01\n\n## Where\n`docs/pitch/`\n\n## Context\nSee `docs/Architecture.md` \u00a72.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "PITCH-04",
+      "title": "[PITCH-04] Demo script and rehearsal",
+      "labels": [
+        "area: pitch deck",
+        "priority: P0"
+      ],
+      "body": "**Area:** pitch deck \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Whole team\n\n## Goal\nFour-minute live demo with a backup plan.\n\n## Acceptance criteria\n- [ ] Script based on Architecture.md \u00a717\n- [ ] Two full rehearsals with timing\n- [ ] Airplane-mode moment rehearsed\n\n## Depends on\nFE-05, FE-07, FE-08\n\n## Where\n`docs/pitch/demo-script.md`\n\n## Context\nSee `docs/Architecture.md` \u00a717.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "PITCH-05",
+      "title": "[PITCH-05] Backup demo video",
+      "labels": [
+        "area: pitch deck",
+        "priority: P0"
+      ],
+      "body": "**Area:** pitch deck \u00b7 **Priority:** P0 \u00b7 **Suggested owner:** Whole team\n\n## Goal\nRecorded walkthrough in case live demo fails.\n\n## Acceptance criteria\n- [ ] Under 2 minutes\n- [ ] Shows live set, rest note, medal, plan, feed\n\n## Depends on\nPITCH-04\n\n## Where\n`docs/pitch/`\n\n## Context\nSee `docs/Architecture.md` \u00a717.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "PITCH-06",
+      "title": "[PITCH-06] Screenshots and visuals",
+      "labels": [
+        "area: pitch deck",
+        "priority: P1"
+      ],
+      "body": "**Area:** pitch deck \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Whole team\n\n## Goal\nPolished app screenshots and diagrams for slides and Devpost.\n\n## Acceptance criteria\n- [ ] Live set, rest card, medal, plan, feed, buddies\n- [ ] Dark and light versions where it matters\n\n## Depends on\nFE-07, FE-08, FE-10\n\n## Where\n`docs/pitch/assets/`\n\n## Context\nSee `docs/Architecture.md` \u2014.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "PITCH-07",
+      "title": "[PITCH-07] Devpost write-up",
+      "labels": [
+        "area: pitch deck",
+        "priority: P1"
+      ],
+      "body": "**Area:** pitch deck \u00b7 **Priority:** P1 \u00b7 **Suggested owner:** Whole team\n\n## Goal\nSubmission text, tracks, and media.\n\n## Acceptance criteria\n- [ ] What it does, how we built it, challenges, what's next\n- [ ] All targeted challenges selected\n- [ ] Links to repo, Space and dataset\n\n## Depends on\nPITCH-03\n\n## Where\n`docs/pitch/devpost.md`\n\n## Context\nSee `docs/Architecture.md` \u00a72.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    },
+    {
+      "key": "PITCH-08",
+      "title": "[PITCH-08] Judge Q&A prep",
+      "labels": [
+        "area: pitch deck",
+        "priority: P2"
+      ],
+      "body": "**Area:** pitch deck \u00b7 **Priority:** P2 \u00b7 **Suggested owner:** Whole team\n\n## Goal\nAnswers to likely judge questions.\n\n## Acceptance criteria\n- [ ] Privacy, medical claims, accuracy, cost, AGPL license, business model\n- [ ] Each teammate owns their area's answers\n\n## Depends on\nPITCH-03\n\n## Where\n`docs/pitch/qa.md`\n\n## Context\nSee `docs/Architecture.md` \u00a718.\n\n## Notes for Claude\nStay inside this issue's area folder unless the issue says otherwise. If a dependency isn't done yet, stub its interface and note it in the PR."
+    }
+  ]
+}
