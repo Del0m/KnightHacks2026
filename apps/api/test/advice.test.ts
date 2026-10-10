@@ -1,6 +1,6 @@
 // AI-13: the AI-suggested first answer to an advice question (Architecture §10.2).
 // Behaviour: docs/superpowers/specs/2026-10-10-advice-answer-design.md
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -12,8 +12,11 @@ import {
   MAX_CITED_SOURCES,
   MAX_PROMPT_SOURCES,
   PAIN_REPLY,
+  REPUTABLE_SOURCE_HOSTS,
   acuteSignals,
   answerProblems,
+  isReputableUrl,
+  splitSentences,
   type AdviceSource,
 } from "../src/services/advice.js";
 
@@ -36,7 +39,7 @@ const source = (id: string, extra: Partial<AdviceSource> = {}): AdviceSource => 
   kind: "injury_note",
   title: `Title ${id}`,
   content: `Passage ${id}.`,
-  url: `https://example.org/${id}`,
+  url: `https://www.nhs.uk/${id}`,
   ...extra,
 });
 
@@ -45,22 +48,50 @@ const GOOD_ANSWER =
   "Light cycling or an easy walk can help it settle.";
 
 interface Call {
+  schemaName: string;
   system: string;
   user: string;
   timeoutMs?: number;
 }
 
-/** A stand-in for the CONN-07 client: replies with `reply` (or throws it), recording each call. */
-function fakeLlm(reply: unknown | Error | (() => Promise<never>)) {
+/** Replies to one call: may return a value or a promise, or throw. */
+type Responder = (call: Call) => unknown;
+
+const respond = (r: unknown): Responder =>
+  typeof r === "function"
+    ? (r as Responder)
+    : () => {
+        if (r instanceof Error) throw r;
+        return r;
+      };
+
+/** The claim check's verdict when every sentence it was sent is supported. */
+const allSupported: Responder = (call) => ({
+  supported: (JSON.parse(call.user) as { sentences: string[] }).sentences.map(() => true),
+});
+
+/**
+ * A stand-in for the CONN-07 client, recording each call. The answer call ("advice_answer") gets
+ * `reply`; the claim check ("advice_verify") gets `verify`, by default "every sentence supported".
+ * A value is returned, an Error is thrown, and a function decides per call.
+ */
+function fakeLlm(reply: unknown, verify: unknown = allSupported) {
   const calls: Call[] = [];
   return {
     calls,
+    answerCalls: () => calls.filter((c) => c.schemaName === "advice_answer"),
+    verifyCalls: () => calls.filter((c) => c.schemaName === "advice_verify"),
     llm: {
       async generateJson<T>(input: Call) {
-        calls.push({ system: input.system, user: input.user, timeoutMs: input.timeoutMs });
-        if (typeof reply === "function") return (reply as () => Promise<never>)();
-        if (reply instanceof Error) throw reply;
-        return { data: reply as T, model: "m", provider: "p", attempts: 1, latency_ms: 1, failures: [] };
+        const call: Call = {
+          schemaName: input.schemaName,
+          system: input.system,
+          user: input.user,
+          timeoutMs: input.timeoutMs,
+        };
+        calls.push(call);
+        const data = await respond(call.schemaName === "advice_verify" ? verify : reply)(call);
+        return { data: data as T, model: "m", provider: "p", attempts: 1, latency_ms: 1, failures: [] };
       },
     },
   };
@@ -227,7 +258,7 @@ describe("AdviceWriter", () => {
     const { llm, calls } = fakeLlm(answered(["c", "a"]));
     const result = await new AdviceWriter(llm).answer({ question: "Sore legs after squats?", sources }, 2000);
     expect(result).toEqual({ kind: "ai", text: GOOD_ANSWER, sources: [sources[0], sources[2]] });
-    expect(calls).toHaveLength(1);
+    expect(calls.filter((c) => c.schemaName === "advice_answer")).toHaveLength(1);
   });
 
   it(`returns no answer when the model cites more than ${MAX_CITED_SOURCES} sources`, async () => {
@@ -408,9 +439,147 @@ describe("sample questions", () => {
         expect(result).toEqual({ kind: "none", reason: "not_answerable" });
         expect(calls).toHaveLength(1);
       } else {
+        expect(calls.filter((c) => c.schemaName === "advice_answer")).toHaveLength(1);
         expect(result).toMatchObject({ kind: "ai", sources: [byId.get(sample.source_ids[0]!)] });
-        expect(calls).toHaveLength(1);
       }
     });
   }
+});
+
+describe("reputable sources", () => {
+  const reputable = [
+    "https://www.nhs.uk/conditions/knee-pain/",
+    "https://medlineplus.gov/sprainsandstrains.html",
+    "https://my.clevelandclinic.org/health/articles/knee",
+    "https://orthoinfo.aaos.org/en/recovery/knee-exercises/",
+    "https://github.com/yuhonas/free-exercise-db",
+    "https://raw.githubusercontent.com/yuhonas/free-exercise-db/0123abc/dist/exercises.json",
+  ];
+  for (const url of reputable) {
+    it(`accepts ${url}`, () => {
+      expect(isReputableUrl(url)).toBe(true);
+    });
+  }
+
+  const notReputable = [
+    "https://www.campbellclinic.com/active-knee-injury/",
+    "https://www.nhs.uk.evil.example/knee",
+    "http://www.nhs.uk/conditions/knee-pain/",
+    "https://github.com/someone-else/free-exercise-db",
+    "not a url",
+    "",
+  ];
+  for (const url of notReputable) {
+    it(`rejects ${url || "an empty url"}`, () => {
+      expect(isReputableUrl(url)).toBe(false);
+    });
+  }
+
+  it("lists public health bodies among the allowed hosts", () => {
+    for (const host of ["nhs.uk", "nih.gov", "cdc.gov"]) expect(REPUTABLE_SOURCE_HOSTS).toContain(host);
+  });
+
+  it("keeps library sources from unlisted sites out of the prompt, and community answers in", async () => {
+    const blog = source("blog", { url: "https://www.campbellclinic.com/active-knee-injury/" });
+    const nhs = source("nhs");
+    const member = source("member", { kind: "community_answer", url: null, post_id: "p1" });
+    const { llm, calls } = fakeLlm(answered(["nhs"]));
+    const result = await new AdviceWriter(llm).answer(
+      { question: "Sore legs?", sources: [blog, nhs, member] },
+      2000,
+    );
+    const user = JSON.parse(calls[0]!.user) as { sources: { id: string }[] };
+    expect(user.sources.map((s) => s.id)).toEqual(["nhs", "member"]);
+    expect(result).toEqual({ kind: "ai", text: GOOD_ANSWER, sources: [nhs] });
+  });
+
+  it("returns no answer, without a model call, when no source is from an allowed site", async () => {
+    const { llm, calls } = fakeLlm(answered(["blog"]));
+    const blog = source("blog", { url: "https://www.campbellclinic.com/active-knee-injury/" });
+    const noUrl = source("no-url", { url: null });
+    expect(
+      await new AdviceWriter(llm).answer({ question: "Sore legs?", sources: [blog, noUrl] }, 2000),
+    ).toEqual({
+      kind: "none",
+      reason: "no_sources",
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("cites only allowed sites in the sample fixture", () => {
+    for (const s of samples.sources) {
+      if (s.kind !== "community_answer") expect(isReputableUrl(s.url ?? ""), s.id).toBe(true);
+    }
+  });
+
+  it("cites only allowed sites in the injury notes (rag/notes)", () => {
+    const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../rag/notes");
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md"))) {
+      const raw = readFileSync(path.join(dir, file), "utf8");
+      const line = raw.split("\n").find((l) => l.startsWith("sources:"));
+      const urls = JSON.parse(line?.slice("sources:".length) ?? "[]") as string[];
+      expect(urls.length, file).toBeGreaterThan(0);
+      for (const url of urls) expect(isReputableUrl(url), `${file}: ${url}`).toBe(true);
+    }
+  });
+});
+
+describe("claim check", () => {
+  const sources = [source("a"), source("b"), source("c")];
+  const input = { question: "Sore legs after squats?", sources };
+
+  it("splits an answer into sentences", () => {
+    expect(splitSentences(GOOD_ANSWER)).toEqual([
+      "Muscle soreness a day or two after a new squat routine is common and usually fades within a few days.",
+      "Light cycling or an easy walk can help it settle.",
+    ]);
+  });
+
+  it("checks each sentence against only the sources the answer cites", async () => {
+    const { llm, verifyCalls } = fakeLlm(answered(["c", "a"]));
+    const result = await new AdviceWriter(llm).answer(input, 2000);
+    expect(result.kind).toBe("ai");
+    expect(verifyCalls()).toHaveLength(1);
+    const user = JSON.parse(verifyCalls()[0]!.user) as {
+      sentences: string[];
+      sources: { id: string; content: string }[];
+    };
+    expect(user.sentences).toEqual(splitSentences(GOOD_ANSWER));
+    expect(user.sources.map((s) => s.id)).toEqual(["a", "c"]);
+    expect(user.sources[0]!.content).toContain("Passage a");
+  });
+
+  it("returns no answer when any sentence isn't supported by its sources", async () => {
+    const { llm } = fakeLlm(answered(["a"]), { supported: [true, false] });
+    expect(await new AdviceWriter(llm).answer(input, 2000)).toEqual({
+      kind: "none",
+      reason: "unsupported_claim",
+    });
+  });
+
+  it("returns no answer when the check fails or replies in the wrong shape", async () => {
+    for (const verify of [new LlmError("down", ["x"]), { supported: [true] }, { verdict: "ok" }]) {
+      const { llm } = fakeLlm(answered(["a"]), verify);
+      expect(await new AdviceWriter(llm).answer(input, 2000)).toEqual({
+        kind: "none",
+        reason: "verify_failed",
+      });
+    }
+  });
+
+  it("fits both model calls inside one time budget", async () => {
+    const { llm } = fakeLlm(answered(["a"]), () => new Promise<never>(() => {}));
+    const started = Date.now();
+    expect(await new AdviceWriter(llm).answer(input, 100)).toEqual({ kind: "none", reason: "verify_failed" });
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it("doesn't run the check on an answer the guard already rejected", async () => {
+    const { llm, verifyCalls } = fakeLlm(answered(["zzz"]));
+    expect(await new AdviceWriter(llm).answer(input, 2000)).toEqual({
+      kind: "none",
+      reason: "guard_rejected",
+    });
+    expect(verifyCalls()).toHaveLength(0);
+  });
 });

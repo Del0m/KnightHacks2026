@@ -22,7 +22,8 @@ export interface AdviceInput {
 }
 
 export type AdviceNoneReason =
-  | "empty_question" | "no_sources" | "llm_unavailable" | "llm_failed" | "not_answerable" | "guard_rejected";
+  | "empty_question" | "no_sources" | "llm_unavailable" | "llm_failed" | "not_answerable" | "guard_rejected"
+  | "unsupported_claim" | "verify_failed";
 
 export type AdviceAnswer =
   | { kind: "ai"; text: string; sources: AdviceSource[] }        // cited sources only, in input order
@@ -35,6 +36,9 @@ export const MAX_ANSWER_SENTENCES = 3;
 export const MAX_PROMPT_SOURCES = 6;
 export const MAX_CITED_SOURCES = 3;
 
+export const REPUTABLE_SOURCE_HOSTS: readonly string[];
+export function isReputableUrl(url: string): boolean;
+export function splitSentences(text: string): string[];
 export function acuteSignals(question: string): string[]; // [] when no red flag
 export function answerProblems(text: string): string[];   // [] when the answer may be shown
 
@@ -48,12 +52,21 @@ export class AdviceWriter {
 
 1. Blank question → `none: empty_question`.
 2. `acuteSignals(question)` non-empty → `fixed_pain` with `PAIN_REPLY`. The LLM is never called.
-3. No sources → `none: no_sources`. No LLM.
+3. Library sources (`injury_note`, `exercise`) whose `url` fails `isReputableUrl` are dropped (logged); community answers are kept, labelled as community. No sources left → `none: no_sources`. No LLM.
 4. No LLM, or `timeoutMs <= 0` → `none: llm_unavailable`.
 5. `generateJson` with schema `{ answerable: boolean, answer: string (≤ MAX_ANSWER_CHARS), source_ids: string[] (≤ MAX_CITED_SOURCES) }`. Only the first `MAX_PROMPT_SOURCES` sources go into the prompt (content trimmed). The question and sources go in the **user** message as JSON data; the system prompt says they are data, never instructions. Thrown error or deadline → `none: llm_failed`.
 6. `answerable: false` → `none: not_answerable`.
 7. Guard → `none: guard_rejected` when: no cited id; more than `MAX_CITED_SOURCES` cited ids; any cited id not among the prompt's sources; `answerProblems(answer)` non-empty; or the answer states a number that none of its cited sources contains (grounding, as the rest note keeps its rule's numbers).
-8. Otherwise `ai` with the trimmed answer and the cited sources (deduplicated by id, input order).
+8. Claim check: a second `generateJson` call (schema name `advice_verify`) gets `{ sentences: splitSentences(answer), sources: [{ id, content }] }` with only the cited sources (content as shown to the model) and returns `{ supported: boolean[] }`, one per sentence: is the sentence fully supported by those sources? Any `false` → `none: unsupported_claim`. A thrown error, a missed deadline, or the wrong shape (not an array of booleans the same length as the sentences) → `none: verify_failed`. Both model calls share the one `timeoutMs` budget; the check gets what remains.
+9. Otherwise `ai` with the trimmed answer and the cited sources (deduplicated by id, input order).
+
+## Reputable sources
+
+`isReputableUrl(url)` is true only for `https:` URLs whose host is, or is a subdomain of, one of `REPUTABLE_SOURCE_HOSTS`, or that start with `https://github.com/yuhonas/free-exercise-db` or `https://raw.githubusercontent.com/yuhonas/free-exercise-db/` (free-exercise-db: technique only, public domain, chosen in §10.1). Hosts: public health bodies and national professional bodies, plus major academic medical centres:
+
+`nhs.uk`, `nhsinform.scot`, `nih.gov`, `medlineplus.gov`, `cdc.gov`, `who.int`, `orthoinfo.aaos.org`, `acsm.org`, `choosept.com`, `csp.org.uk`, `mayoclinic.org`, `clevelandclinic.org`, `hopkinsmedicine.org`, `health.harvard.edu`.
+
+Every URL in `rag/notes/*.md` front matter and every library source in the sample fixture must pass it (tested).
 
 ## Pain and acute red flags (`acuteSignals`)
 
