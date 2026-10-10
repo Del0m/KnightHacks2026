@@ -29,6 +29,8 @@ export interface JointFrame {
 }
 
 export interface FinishedRep {
+  start_ms: number; // rep boundaries on the set's frame clock (JointFrame.t_ms)
+  end_ms: number;
   tempo_ms: number;
   range_deg: number;
   quality: number;
@@ -53,6 +55,8 @@ export interface FinishedSession {
   inference_mode: "on_device" | "cloud";
   medal: string | null;
   form_score: number | null;
+  experience_level: string | null; // from the profile (DB-03)
+  injury_groups: string[]; // coarse body parts, e.g. ["knee"]; never notes or dates
   sets: FinishedSet[];
 }
 
@@ -167,6 +171,8 @@ export function buildMetadata(session: FinishedSession, config: UploadConfig, jo
     inference_mode: session.inference_mode,
     medal: session.medal,
     form_score: session.form_score,
+    experience_level: session.experience_level,
+    injury_groups: session.injury_groups.map(String),
     joints_path: jointsPath,
     exported_at: new Date().toISOString(),
     sets: session.sets.map((set, setIndex) => ({
@@ -177,6 +183,8 @@ export function buildMetadata(session: FinishedSession, config: UploadConfig, jo
       frame_count: set.frames.length,
       reps: set.reps.map((rep, repIndex) => ({
         rep_index: repIndex,
+        start_ms: rep.start_ms,
+        end_ms: rep.end_ms,
         tempo_ms: rep.tempo_ms,
         range_deg: rep.range_deg,
         quality: rep.quality,
