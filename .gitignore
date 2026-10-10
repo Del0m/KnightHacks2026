@@ -1,0 +1,9 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Frontend dependencies and local files
+node_modules/
+.pnpm-store/
+.DS_Store
