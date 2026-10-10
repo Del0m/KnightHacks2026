@@ -231,6 +231,38 @@ describe("CONN-14 range of motion sync", () => {
     const updated = await t.db.select().from(schema.romTrend).where(eq(schema.romTrend.userId, "rom-user"));
     expect(updated).toHaveLength(3);
     expect(updated.find((r) => r.week === "2026-09-21" && r.side === "left")!.changeDeg).toBeCloseTo(19.1, 3);
+
+    // gold_rom_trend can't be read (e.g. not deployed yet): rom_trend is left as it was and
+    // progress still syncs.
+    const failed = [{ table: "gold_rom_trend", error: "[TABLE_OR_VIEW_NOT_FOUND]" }];
+    const progressRow = {
+      user_id: pseudo,
+      date: "2026-10-09",
+      exercise_id: "lunge",
+      sets: 2,
+      reps: 16,
+      clean_reps: 16,
+      clean_share: 1,
+      volume_kg: null,
+      avg_range_deg: 88,
+      avg_quality: null,
+      est_1rm_kg: null,
+      is_pr: false,
+    };
+    const partial = await runInsightSync({
+      db: client,
+      config,
+      read: async () => ({ progress: [progressRow], risk: [], rom: null, failed }),
+    });
+    expect(partial).toMatchObject({ progress: 1, rom: 0, failed });
+    const kept = await t.db.select().from(schema.romTrend).where(eq(schema.romTrend.userId, "rom-user"));
+    expect(kept).toHaveLength(3);
+    expect(kept.find((r) => r.week === "2026-09-21" && r.side === "left")!.changeDeg).toBeCloseTo(19.1, 3);
+    const progress = await t.db
+      .select()
+      .from(schema.progressDaily)
+      .where(eq(schema.progressDaily.userId, "rom-user"));
+    expect(progress).toEqual([expect.objectContaining({ exerciseId: "lunge", reps: 16 })]);
   });
 });
 
