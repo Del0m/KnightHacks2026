@@ -1,0 +1,98 @@
+{
+  "$schema": "./schema.json",
+  "spec_version": 1,
+  "id": "squat",
+  "name": "Squat",
+  "recommended_view": "side",
+  "angles": {
+    "knee": { "type": "joint_angle", "joints": ["hip", "knee", "ankle"], "side": "most_visible" },
+    "trunk": { "type": "segment_tilt", "from": "mid_hip", "to": "mid_shoulder" },
+    "knee_width_ratio": {
+      "type": "width_ratio",
+      "numerator": ["left_knee", "right_knee"],
+      "denominator": ["left_ankle", "right_ankle"]
+    }
+  },
+  "primary_angle": { "name": "knee", "direction": "decreasing" },
+  "phases": {
+    "start_exit": 160,
+    "count_min": 135,
+    "target": 95,
+    "start_enter": 165,
+    "reverse_deg": 5,
+    "min_state_ms": 150,
+    "set_end_still_ms": 8000
+  },
+  "rules": [
+    {
+      "id": "depth",
+      "phase": "peak",
+      "view": "any",
+      "check": { "metric": "knee", "reduce": "min", "op": "<=", "value": "target" },
+      "severity": "form",
+      "priority": 1,
+      "label": "partial_range",
+      "joints": ["left_hip", "right_hip", "left_knee", "right_knee"],
+      "rest_note": "Next set, try lowering until your hips are level with your knees."
+    },
+    {
+      "id": "knee_tracking",
+      "phase": "rep",
+      "view": "front",
+      "check": { "metric": "knee_width_ratio", "reduce": "min", "op": ">=", "value": 0.9 },
+      "severity": "form",
+      "priority": 2,
+      "label": "knees_in",
+      "joints": ["left_knee", "right_knee"],
+      "rest_note": "Your knees drifted inward on {n} reps. Pointing them over your toes keeps them comfortable."
+    },
+    {
+      "id": "trunk_lean",
+      "phase": "peak",
+      "view": "side",
+      "check": { "metric": "trunk", "reduce": "max", "op": "<=", "value": 45 },
+      "severity": "form",
+      "priority": 3,
+      "label": "forward_lean",
+      "joints": ["left_shoulder", "right_shoulder", "left_hip", "right_hip"],
+      "rest_note": "Keeping your chest a little taller makes this easier on your back."
+    },
+    {
+      "id": "tempo",
+      "phase": "outbound",
+      "view": "any",
+      "check": { "metric": "duration_ms", "op": ">=", "value": 800 },
+      "severity": "form",
+      "priority": 4,
+      "label": "fast_lowering",
+      "joints": ["left_hip", "right_hip", "left_knee", "right_knee"],
+      "rest_note": "Your reps took about {t} s on the way down. Around 2 s gives you more control."
+    }
+  ],
+  "injury_overrides": {
+    "knee": {
+      "phases": { "target": 110 },
+      "rules": {
+        "tempo": {
+          "value": 1500,
+          "rest_note": "Your reps took about {t} s on the way down. A slower 2 to 3 s is gentler on a recovering knee."
+        }
+      },
+      "extra_note": "The depth here is set shorter to suit a recovering knee. Any pain is worth raising with your physio or a doctor."
+    },
+    "shoulder": {
+      "extra_note": "Squats put little load on the shoulders. A comfortable hand position matters more than a particular grip."
+    },
+    "lower_back": {
+      "phases": { "target": 105 },
+      "rules": {
+        "trunk_lean": {
+          "value": 35,
+          "severity": "safety",
+          "rest_note": "Your chest tipped forward on {n} reps. A taller chest keeps the load off your lower back."
+        }
+      },
+      "extra_note": "The depth and lean limits here are set to go easy on a recovering lower back. Any pain is worth raising with your physio or a doctor."
+    }
+  }
+}
