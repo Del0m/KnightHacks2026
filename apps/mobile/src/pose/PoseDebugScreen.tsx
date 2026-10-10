@@ -1,13 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Linking, Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { PoseSkeleton } from './PoseSkeleton';
 import type { PoseDetection } from './types';
-import { usePoseOutput } from './usePoseOutput';
+import { isBasicModeSupported } from './basic';
+import { usePoseOutput, type PoseEngine } from './usePoseOutput';
 
 type Size = { width: number; height: number };
 
-/** Debug screen: full-screen camera, live skeleton, and fps / latency / score / model / drop readout. */
+/** The portrait app shows frames upright, so the short side is the width. */
+const uprightSize = (r: Size | undefined): Size | null =>
+  r ? { width: Math.min(r.width, r.height), height: Math.max(r.width, r.height) } : null;
+
+/**
+ * Debug screen: full-screen camera, live skeleton, and fps / latency / score / model / drop readout.
+ * On iPhone, a toggle switches between YOLOv8 (Core ML) and Apple Vision (basic mode) to compare them.
+ */
 export function PoseDebugScreen() {
   const { hasPermission, canRequestPermission, requestPermission } = useCameraPermission();
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -42,14 +50,21 @@ export function PoseDebugScreen() {
 
 function PoseCamera() {
   const [position, setPosition] = useState<'front' | 'back'>('front');
+  const [engine, setEngine] = useState<PoseEngine>('coreml');
   const device = useCameraDevice(position);
   const [detection, setDetection] = useState<PoseDetection | null>(null);
   const [viewSize, setViewSize] = useState<Size | null>(null);
   const [imageSize, setImageSize] = useState<Size | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
-  const onPose = useCallback((d: PoseDetection) => setDetection(d), []);
-  const { frameOutput, fps, error, model, dropped } = usePoseOutput({ size: 320, maxFps: 15, onPose });
+  // On a cold start `onConfigured` can fire before the resolution is known, so the first pose fills it in.
+  const frameOutputRef = useRef<{ currentResolution?: Size } | null>(null);
+  const onPose = useCallback((d: PoseDetection) => {
+    setDetection(d);
+    setImageSize((s) => s ?? uprightSize(frameOutputRef.current?.currentResolution));
+  }, []);
+  const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size: 320, maxFps: 15, onPose });
+  frameOutputRef.current = frameOutput;
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -63,12 +78,13 @@ function PoseCamera() {
     setPosition((p) => (p === 'front' ? 'back' : 'front'));
   }, []);
 
+  const toggleEngine = useCallback(() => {
+    setDetection(null);
+    setEngine((e) => (e === 'coreml' ? 'vision' : 'coreml'));
+  }, []);
+
   const onConfigured = useCallback(() => {
-    const resolution = frameOutput.currentResolution;
-    setImageSize(resolution ? {
-        width: Math.min(resolution.width, resolution.height),
-        height: Math.max(resolution.width, resolution.height),
-      } : null);
+    setImageSize(uprightSize(frameOutput.currentResolution));
     setCameraError(null);
   }, [frameOutput]);
 
@@ -121,6 +137,12 @@ function PoseCamera() {
       <Pressable style={[styles.button, styles.flip]} onPress={flip}>
         <Text style={styles.buttonText}>{position === 'front' ? 'Use back camera' : 'Use front camera'}</Text>
       </Pressable>
+
+      {isBasicModeSupported(Platform.OS) ? (
+        <Pressable testID="pose-engine-toggle" style={[styles.button, styles.engine]} onPress={toggleEngine}>
+          <Text style={styles.buttonText}>{engine === 'coreml' ? 'Use Apple Vision' : 'Use Core ML'}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -152,5 +174,6 @@ const styles = StyleSheet.create({
   bannerText: { color: '#fff', fontSize: 13 },
   button: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 24, backgroundColor: '#fff' },
   flip: { position: 'absolute', bottom: 48, alignSelf: 'center' },
+  engine: { position: 'absolute', bottom: 108, alignSelf: 'center' },
   buttonText: { color: '#000', fontSize: 16, fontWeight: '600' },
 });
