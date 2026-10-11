@@ -143,6 +143,7 @@ export function sessionsRouter(db: Db, deps: FinishDeps): Router {
       reps: input.reps.map((r) => ({
         rangeDeg: r.range_deg,
         tempoMs: r.tempo_ms,
+        loweringMs: r.lowering_ms,
         quality: r.quality,
         startMs: r.start_ms,
         endMs: r.end_ms,
