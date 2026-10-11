@@ -25,8 +25,6 @@ export function AppPage({ children, title = 'Train', intro, compact = false, hea
   return <PageColors.Provider value={colors}><LinearGradient colors={['#FFFFFF', colors.background, colors.primarySoft]} style={{ flex: 1 }}>
     {Platform.OS === 'web' && <Head><title>{title} · SteadyForum</title></Head>}
     <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}><PageScrollLock.Provider value={lockScroll}><PageScroll.Provider value={scrollBy}><ScrollContainer style={{ flex: 1 }} {...(scrollable ? { ref: scroll as never, scrollEnabled: !scrollLocked,
-      onTouchEnd: (event: import('react-native').GestureResponderEvent) => { if (!event.nativeEvent.touches.length) { locks.current.clear(); setScrollLocked(false); } },
-      onTouchCancel: () => { locks.current.clear(); setScrollLocked(false); },
       contentContainerStyle: ui.scroll, scrollEventThrottle: 16,
       onScroll: (event: import('react-native').NativeSyntheticEvent<import('react-native').NativeScrollEvent>) => { position.current.y = event.nativeEvent.contentOffset.y; },
       onContentSizeChange: (_width: number, height: number) => { position.current.content = height; },

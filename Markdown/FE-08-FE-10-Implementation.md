@@ -18,6 +18,8 @@ Kudos uses the existing POST/DELETE endpoints, prevents duplicate taps, and only
 
 ## Deployment and checks
 
+The Workout/Practice selector captures touches at the start and owns its page scroll lock through responder release, termination, or unmount. Vertical drags remain reserved to the selector; horizontal drags update the bubble and tint. Tap selection and accessible tab buttons remain available. AppPage no longer clears other controls' locks on bubbling touch cancellation. Regression tests cover ownership, tap selection, vertical holding, release, cancellation, and cleanup. Physical iPhone confirmation is still required after this follow-up.
+
 Deploy the two new API routes alongside the frontend. No dependencies, database migrations, credentials, or native signing changes are needed. Physical signed-in phone verification against the updated API remains a manual check: finish a camera session, verify award/PRs, choose sharing, confirm one gold/session card, paginate/refresh, and toggle kudos. This implementation does not post any real workout during automated checks.
 
 Verified October 10, 2026: 64 mobile suites / 627 tests and 21 API files / 147 tests passed. Mobile/API typechecks passed. Mobile lint has zero errors and eight existing warnings; changed API files pass lint and formatting. Web export succeeds. Regression coverage includes finish-result recovery, share ownership/retries, unmeasured manual summaries, cursor deduplication/retries, account changes, and kudos during refresh. The supplied private environment values were scanned against changed/new source files without printing values.
