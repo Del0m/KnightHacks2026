@@ -13,12 +13,9 @@ import type {
   DatabricksUploader,
   ExportStatus,
   ExportStatusStore,
-  FinishedSession,
-  JointFrame,
 } from "../integrations/databricks/upload.js";
-
-// The session as the uploader takes it (CONN-02).
-export type ExportSession = FinishedSession;
+import type { ExportSession, JointFrame } from "../../../../specs/set-record/types.js";
+export type { ExportSession } from "../../../../specs/set-record/types.js";
 
 export interface ExportQueue {
   enqueue(session: ExportSession): void;
@@ -123,7 +120,7 @@ export function drizzleExportStatusStore(db: Db): ExportStatusStore {
 // ---- Joints waiting for their session to finish ----
 
 export interface BufferedSetJoints {
-  fps: number;
+  fps: number | null;
   frames: JointFrame[];
 }
 

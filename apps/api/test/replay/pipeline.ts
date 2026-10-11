@@ -2,7 +2,7 @@
 // deterministic summary for the golden files:
 //   1. engine (AI-06)       mobile form engine, imported straight from apps/mobile
 //   2. rules (AI-07)        mobile form rules on the engine's events, flags per rep
-//   3. set record (AI-08)   not on main yet, see toSetPayload
+//   3. set record (AI-08)   the phone's set recorder, fed the same poses and events
 //   4. API                  the real Express app on PGlite with the real migrations
 // Databricks (scoring, file upload) and Hugging Face (rest notes) run their real clients with
 // fetch faked, so the requests they would send are what gets checked.
@@ -14,12 +14,15 @@ import { gunzipSync } from "node:zlib";
 import { InferenceClient } from "@huggingface/inference";
 import { eq, inArray } from "drizzle-orm";
 import { pino } from "pino";
-import { runClip, type ClipRun } from "../../../mobile/src/engine/__fixtures__/run.js";
+import { runClip } from "../../../mobile/src/engine/__fixtures__/run.js";
+import { createFormEngine } from "../../../mobile/src/engine/engine.js";
 import { isAbsentFrame, type Clip } from "../../../mobile/src/engine/recording.js";
 import { createSetRules } from "../../../mobile/src/engine/rules.js";
+import { createSetRecorder } from "../../../mobile/src/engine/setRecord.js";
 import { getSpec } from "../../../mobile/src/engine/specs.js";
-import type { RepRecord } from "../../../mobile/src/engine/types.js";
+import type { EngineEvent } from "../../../mobile/src/engine/types.js";
 import type { PoseResult } from "../../../mobile/src/pose/types.js";
+import type { InferenceMode, JointFrame, SetRecord } from "../../../../specs/set-record/types.js";
 import { schema } from "../../src/db.js";
 import { DatabricksScorer } from "../../src/integrations/databricks/score.js";
 import { DatabricksUploader, type UploadConfig } from "../../src/integrations/databricks/upload.js";
@@ -44,79 +47,39 @@ export function loadClips(dir = CLIPS_DIR): Clip[] {
 
 // ---- Stage 2 + 3: rules and set record ----
 
-type Flag = { rule_id: string; severity: string };
-type SetRep = {
-  tempo_ms: number;
-  range_deg: number;
-  quality: number | null;
-  start_ms: number;
-  end_ms: number;
-  flags: Flag[];
-};
-type SetFrame = { t_ms: number; kp: number[] };
-export type SetPayload = {
-  exercise_id: string;
-  weight_kg: number | null;
-  fps: number;
-  frames: SetFrame[];
-  reps: SetRep[];
-};
-
 const r1 = (v: number) => Math.round(v * 10) / 10;
 
-/** Primary-angle travel across the rep window: the range of motion the rep covered. */
-function rangeDeg(rep: RepRecord, primary: string): number {
-  const angles = rep.windows.rep.flatMap((f) => (f.metrics[primary] == null ? [] : [f.metrics[primary]!]));
-  return angles.length ? r1(Math.max(...angles) - Math.min(...angles)) : 0;
-}
-
-/** AI-07's flags for each closed rep, keyed by 0-based rep index, from the engine's events. */
-export function ruleFlags(clip: Clip, run: ClipRun): Map<number, Flag[]> {
-  const rules = createSetRules(getSpec(clip.exercise)!);
-  const flags = new Map<number, Flag[]>();
-  for (const e of run.events) {
-    const out = rules.handle(e);
-    if (out?.type === "rep_evaluated") {
-      flags.set(
-        out.result.rep_index,
-        out.result.flags.map((f) => ({ rule_id: f.rule_id, severity: f.severity })),
-      );
+/**
+ * Engine output + AI-07 rules -> AI-08's set record, the payload POST /sessions/:id/sets takes.
+ * Wired the way the phone wires it: every pose goes to the engine and the recorder, and every
+ * engine event to the rules and the recorder.
+ */
+export function toSetPayload(clip: Clip): SetRecord {
+  const spec = getSpec(clip.exercise)!;
+  const engine = createFormEngine(spec, { imageAspect: clip.image.width / clip.image.height });
+  const rules = createSetRules(spec);
+  const recorder = createSetRecorder(spec, { setIndex: 0 });
+  const dispatch = (events: EngineEvent[]) => {
+    for (const event of events) {
+      recorder.event(event);
+      rules.handle(event);
+    }
+  };
+  for (const frame of clip.frames) {
+    if (isAbsentFrame(frame)) dispatch(engine.pushAbsent(frame.timestamp_ms).events);
+    else {
+      recorder.pose(frame);
+      dispatch(engine.push(frame).events);
     }
   }
-  return flags;
+  if (!rules.summary()) dispatch(engine.endSet(clip.frames.at(-1)!.timestamp_ms).events);
+  return recorder.finish(rules.summary()!);
 }
 
-/**
- * Engine output + AI-07 rules -> the set payload POST /sessions/:id/sets takes.
- *
- * PLACEHOLDER for AI-08 (setRecord.ts, on origin/ai-08-set-record): quality is null and the
- * payload is built here. When AI-08 lands, build it with AI-08's set record instead and
- * regenerate the golden files.
- */
-export function toSetPayload(clip: Clip, run: ClipRun): SetPayload {
-  const spec = getSpec(clip.exercise)!;
-  const flags = ruleFlags(clip, run);
-  const poses = clip.frames.filter((f): f is PoseResult => !isAbsentFrame(f));
-  const t0 = clip.frames[0]?.timestamp_ms ?? 0;
-  const frames = poses.map((p) => ({
-    t_ms: Math.round(p.timestamp_ms - t0),
-    kp: p.joints.flatMap((j) => [j.x, j.y, j.c]),
-  }));
-  const span = frames.length > 1 ? (frames.at(-1)!.t_ms - frames[0]!.t_ms) / 1000 : 0;
-  return {
-    exercise_id: clip.exercise,
-    weight_kg: null,
-    fps: span > 0 ? r1((frames.length - 1) / span) : 15,
-    frames,
-    reps: run.reps.map((rep) => ({
-      tempo_ms: Math.round(rep.durations.rep),
-      range_deg: rangeDeg(rep, spec.primary_angle.name),
-      quality: null,
-      start_ms: Math.round(rep.startedAt - t0),
-      end_ms: Math.round(rep.closedAt - t0),
-      flags: flags.get(rep.index - 1) ?? [],
-    })),
-  };
+/** The clip's pose source, as the session's inference mode. */
+function inferenceMode(clip: Clip): InferenceMode {
+  const pose = clip.frames.find((f): f is PoseResult => !isAbsentFrame(f));
+  return pose?.source ?? "coreml";
 }
 
 // ---- Stage 4: API with faked network ----
@@ -280,14 +243,14 @@ const sha256 = (b: Buffer | string) => createHash("sha256").update(b).digest("he
 /** Runs one clip end to end and returns everything the golden file pins. */
 export async function replayClip(api: ReplayApi, clip: Clip) {
   const run = runClip(clip);
-  const payload = toSetPayload(clip, run);
+  const payload = toSetPayload(clip);
 
   const user = `replay-${clip.name}`;
   const client = await api.as(user);
   const session = await client.post("/sessions", {
     started_at: STARTED_AT,
     device: "replay",
-    inference_mode: "on_device",
+    inference_mode: inferenceMode(clip),
   });
   if (session.status !== 201)
     throw new Error(`POST /sessions ${session.status}: ${JSON.stringify(session.body)}`);
@@ -295,7 +258,7 @@ export async function replayClip(api: ReplayApi, clip: Clip) {
 
   const llmBefore = api.net.llmCalls.length;
   const uploadsBefore = api.net.uploads.length;
-  const set = await client.post(`/sessions/${sessionId}/sets`, { ...payload, set_index: 0 });
+  const set = await client.post(`/sessions/${sessionId}/sets`, payload);
   if (set.status !== 201) throw new Error(`POST /sets ${set.status}: ${JSON.stringify(set.body)}`);
   const finish = await client.post(`/sessions/${sessionId}/finish`, { finished_at: FINISHED_AT });
   if (finish.status !== 200) throw new Error(`POST /finish ${finish.status}: ${JSON.stringify(finish.body)}`);
@@ -320,7 +283,8 @@ export async function replayClip(api: ReplayApi, clip: Clip) {
         .trim()
         .split("\n")
         .map(
-          (l) => JSON.parse(l) as { set_index: number; exercise_id: string; fps: number; frames: SetFrame[] },
+          (l) =>
+            JSON.parse(l) as { set_index: number; exercise_id: string; fps: number; frames: JointFrame[] },
         );
       return {
         path: u.path,

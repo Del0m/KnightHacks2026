@@ -1,15 +1,11 @@
+import type { SessionStart, SetRecord } from '../../../../specs/set-record/types';
+
 export type ApiRequest = (path: string, options?: RequestInit) => Promise<Response>;
 export type UploadCheckpoint = { sessionId?: string; finished?: boolean };
-export type WorkoutSet = {
-  exercise_id: string;
-  weight_kg?: number | null;
-  reps: { tempo_ms: number; range_deg: number; quality: number | null; flags: { rule_id: string; severity: string }[]; start_ms?: number; end_ms?: number }[];
-  fps?: number;
-  frames?: { t_ms: number; kp: number[] }[];
-};
+export type WorkoutSet = SetRecord;
 
 /** Stable set_index makes an interrupted save safe to resume on the same session. */
-export async function uploadWorkout(request: ApiRequest, checkpoint: UploadCheckpoint, startedAt: string, sets: WorkoutSet[]) {
+export async function uploadWorkout(request: ApiRequest, checkpoint: UploadCheckpoint, sessionStart: SessionStart, sets: WorkoutSet[]) {
   async function post(path: string, body: object) {
     const response = await request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!response.ok) throw new Error('Could not save your workout. Keep this screen open and try again.');
@@ -17,12 +13,12 @@ export async function uploadWorkout(request: ApiRequest, checkpoint: UploadCheck
   }
   if (checkpoint.finished) return;
   if (!checkpoint.sessionId) {
-    const session = await post('/sessions', { started_at: startedAt, device: 'phone', inference_mode: 'on_device' });
+    const session = await post('/sessions', sessionStart);
     checkpoint.sessionId = session.id;
   }
-  for (let i = 0; i < sets.length; i++) {
+  for (const set of sets) {
     const response = await request(`/sessions/${checkpoint.sessionId}/sets`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sets[i], set_index: i }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(set),
     });
     // This checkpoint owns the session and each index. 409 means this set already
     // committed, or the session finished before its response reached the phone.

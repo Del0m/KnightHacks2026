@@ -179,7 +179,7 @@ async function trained(
   const when = new Date(at);
   const [session] = await db
     .insert(schema.sessions)
-    .values({ userId, startedAt: when, finishedAt: when })
+    .values({ userId, inferenceMode: "coreml", startedAt: when, finishedAt: when })
     .returning();
   await db.insert(schema.sets).values(
     Array.from({ length: sets }, (_, i) => ({

@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabricksScorer } from "../src/integrations/databricks/score.js";
 import { RestNoteWriter } from "../src/services/restNote.js";
-import { createTestDb, setup } from "./helpers.js";
+import { createTestDb, setup, setRecord } from "./helpers.js";
 
 const FIXTURES = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -71,14 +71,18 @@ describe.each(fixtures.map((f) => [f.name, f] as const))("medal parity: %s", (_n
       vi.setSystemTime(new Date(NOW.getTime() - session.days_ago * 86_400_000));
       const api = await t.as(fixture.user); // signed at the session's time
 
-      const { id } = (await api.post("/sessions")).body;
+      const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
       const setMedals: string[] = [];
-      for (const set of session.sets) {
+      for (const [set_index, set] of session.sets.entries()) {
         modelReps = set.reps.map((r) => r.model);
-        const res = await api.post(`/sessions/${id}/sets`, {
-          exercise_id: set.exercise_id,
-          reps: set.reps.map(({ tempo_ms, range_deg, flags }) => ({ tempo_ms, range_deg, flags })),
-        });
+        const res = await api.post(
+          `/sessions/${id}/sets`,
+          setRecord({
+            set_index,
+            exercise_id: set.exercise_id,
+            reps: set.reps.map(({ tempo_ms, range_deg, flags }) => ({ tempo_ms, range_deg, flags })),
+          }),
+        );
         expect(res.status).toBe(201);
         expect(res.body.score.source).toBe("databricks"); // the model answered, and still didn't decide
         setMedals.push(res.body.score.medal);

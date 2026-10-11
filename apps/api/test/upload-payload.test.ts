@@ -14,11 +14,12 @@ const session = (extra: Partial<FinishedSession>): FinishedSession => ({
   started_at: "2026-10-10T10:00:00Z",
   finished_at: "2026-10-10T10:30:00Z",
   device: "iPhone",
-  inference_mode: "on_device",
+  inference_mode: "coreml",
   medal: null,
   form_score: null,
   experience_level: null,
   injury_groups: [],
+  rehab_start_on: null,
   sets: [],
   ...extra,
 });
