@@ -18,6 +18,14 @@ Kudos uses the existing POST/DELETE endpoints, prevents duplicate taps, and only
 
 ## Deployment and checks
 
+### Intermittent blank tab on iPhone
+
+The owner's screenshots show Feed selected with the whole page missing, including the brand and heading; the working state shows the expected empty feed. Installed Expo Router 57.0.25 still derives native screen activity state from native-driven animated progress in `BottomTabView.js`. This matches [Expo #49681](https://github.com/expo/expo/issues/49681), which describes blank tabs with animated transitions and automatic detachment.
+
+The tab navigator now sets `detachInactiveScreens={false}`. Sliding transitions, the custom glass tab bar and lazy initial loading remain. Visited tab views stay attached, using more memory; this avoids the affected native detach path without patching dependencies. Feed still cancels requests on blur. Revisit this setting after an SDK-compatible Expo Router release contains the upstream fix. Physical confirmation should switch Feed ↔ Train and Feed ↔ Me repeatedly, including rapid switches and both tapping and dragging the bottom bar.
+
+Follow-up checks: mobile typecheck passed, lint passed with eight existing warnings and zero errors, and the three Feed/tab suites passed all 10 tests. Those tests cover API/feed behavior and swipe selection; they do not reproduce native detachment. The owner's iPhone check remains required.
+
 The Workout/Practice selector captures touches at the start and owns its page scroll lock through responder release, termination, or unmount. Vertical drags remain reserved to the selector; horizontal drags update the bubble and tint. Tap selection and accessible tab buttons remain available. AppPage no longer clears other controls' locks on bubbling touch cancellation. Regression tests cover ownership, tap selection, vertical holding, release, cancellation, and cleanup. Physical iPhone confirmation is still required after this follow-up.
 
 Deploy the two new API routes alongside the frontend. No dependencies, database migrations, credentials, or native signing changes are needed. Physical signed-in phone verification against the updated API remains a manual check: finish a camera session, verify award/PRs, choose sharing, confirm one gold/session card, paginate/refresh, and toggle kudos. This implementation does not post any real workout during automated checks.
