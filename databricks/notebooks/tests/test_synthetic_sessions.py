@@ -175,5 +175,42 @@ class ClearSynthetic(unittest.TestCase):
             self.assertEqual(list(Path(volume, "joints").rglob("*.gz")), [])
 
 
+class ReplaceSynthetic(unittest.TestCase):
+    def test_lazy_failure_preserves_existing_files(self):
+        def broken():
+            yield "2026-09-01", "new", {"device": "synthetic"}, ["{}"]
+            raise ValueError("invalid generation input")
+
+        with tempfile.TemporaryDirectory() as volume:
+            ns["write_sessions"]([("2026-09-01", "old", {"device": "synthetic", "joints_path": "joints/2026-09-01/old.ndjson.gz"}, ["old"])], volume)
+            before = {str(p.relative_to(volume)): p.read_bytes() for p in Path(volume).rglob("*") if p.is_file()}
+            for sessions in (broken(), iter(())):
+                with self.assertRaises(ValueError):
+                    ns["replace_sessions"](sessions, volume)
+                self.assertEqual(before, {str(p.relative_to(volume)): p.read_bytes() for p in Path(volume).rglob("*") if p.is_file()})
+            self.assertEqual(ns["replace_sessions"]([("2026-09-02", "new", {"device": "synthetic"}, ["new"])], volume), 1)
+            self.assertFalse(Path(volume, "meta/2026-09-01/old.json").exists())
+            self.assertFalse(Path(volume, "joints/2026-09-01/old.ndjson.gz").exists())
+            self.assertTrue(Path(volume, "meta/2026-09-02/new.json").exists())
+
+
+    def test_notebook_input_failures_preserve_existing_files(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        for failure in ("manifest", "secret"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as volume:
+                ns["write_sessions"]([("2026-09-01", "old", {"device": "synthetic"}, ["old"])], volume)
+                before = {str(p.relative_to(volume)): p.read_bytes() for p in Path(volume).rglob("*") if p.is_file()}
+                values = {"seed_user_ids_path": "" if failure == "manifest" else str(ROOT / "data/demo-user-ids.json"),
+                          "presenter_user_id": "", "users": "1", "weeks": "1", "recovery": "",
+                          "volume": volume, "replace": "true", "injured_share": "0.3", "decline_share": "0.5"}
+                widgets = SimpleNamespace(text=Mock(), dropdown=Mock(), get=values.__getitem__)
+                dbutils = SimpleNamespace(widgets=widgets, secrets=SimpleNamespace(get=Mock(side_effect=RuntimeError("secret unavailable"))))
+                with self.assertRaises((IsADirectoryError, RuntimeError)):
+                    exec(compile(source, "synthetic-notebook", "exec"), {"dbutils": dbutils})
+                self.assertEqual(before, {str(p.relative_to(volume)): p.read_bytes() for p in Path(volume).rglob("*") if p.is_file()})
+
+
 if __name__ == "__main__":
     unittest.main()

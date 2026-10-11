@@ -125,3 +125,24 @@ def test_dropped_injury_tag_keeps_the_injured_side(tmp_path, run_pipeline):
         assert row.range_7d == pytest.approx(100.0, abs=0.5), on
         assert row.range_28d == pytest.approx(100.0, abs=0.5), on
         assert "range_shrinking" not in row.top_features, on
+
+
+def test_future_tags_do_not_rewrite_history_and_side_changes_use_whole_window(tmp_path, run_pipeline):
+    write_lifter(tmp_path, "late-tag", [], lambda d: (100.0, 60.0))
+    before = {r.date: r.asDict() for r in run_pipeline(tmp_path)["gold_injury_risk_scores"].collect()}
+    for day, tag in ((21, "knee:left"), (27, "knee:right")):
+        on = (START + timedelta(days=day)).isoformat()
+        path = tmp_path / "meta" / on / f"late-tag-{on}.json"
+        meta = json.loads(path.read_text())
+        meta["injury_groups"] = [tag]
+        path.write_text(json.dumps(meta))
+    after = {r.date: r for r in run_pipeline(tmp_path)["gold_injury_risk_scores"].collect()}
+    for day in SESSION_DAYS:
+        on = START + timedelta(days=day)
+        row = after[on]
+        if day < 21:
+            assert row.asDict() == before[on]
+        expected = 100.0 if 21 <= day < 27 else 60.0
+        assert row.range_7d == pytest.approx(expected, abs=0.5)
+        assert row.range_28d == pytest.approx(expected, abs=0.5)
+        assert row.range_side == ("min" if day < 21 else "injured")

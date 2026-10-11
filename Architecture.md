@@ -663,7 +663,7 @@ This is a **training-load and form-trend score, not a diagnosis.** Example featu
 - Acute-to-chronic volume ratio above 1.5.
 - Tempo speeding up under fatigue.
 
-**Range side:** range uses the injured side when `silver_reps` knows it, and the smaller of left and right otherwise. The side is resolved once per lifter and body part, from the latest session that names it, so the 7- and 28-day windows never mix sides. `range_side` records which was used. The heuristic and the model share this one definition.
+**Range side:** range uses the injured side when `silver_reps` knows it, and the smaller of left and right otherwise. For each prediction date, the side is resolved from the latest tagged day on or before that date, then applied consistently across both the 7- and 28-day windows. Future tags cannot change historical features. `range_side` records which was used. The heuristic and the model share this one definition.
 
 **Heuristic score and weak label (pipeline, `gold_injury_risk_scores`):** a weighted sum of the five families above (`flag_rate_rising` 0.30; `range_shrinking`, `asymmetry` and `acute_chronic_load` 0.20 each; `tempo_speeding_up` 0.10), with `weak_label = score >= 0.5`. At hackathon scale there are no real injury labels, so **the labels are heuristic.** Tell judges so.
 

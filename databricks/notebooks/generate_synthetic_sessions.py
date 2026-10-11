@@ -19,7 +19,7 @@
 # MAGIC   lowering gets faster and more reps are flagged, so the heuristic risk score (gold) crosses 0.5
 # MAGIC   for most of them. The rest stay steady with a small deficit; healthy lifters get no tags or flags.
 # MAGIC - Session ids are deterministic, so re-running overwrites instead of duplicating. With
-# MAGIC   `replace` = true (default) it first deletes earlier synthetic sessions (meta files whose
+# MAGIC   `replace` = true (default) it stages the replacement files before deleting earlier synthetic sessions (meta files whose
 # MAGIC   device is "synthetic", and their joints), so sessions a changed generator no longer makes
 # MAGIC   don't linger. Bronze is append-only, so after that run the pipeline with a **full refresh**.
 # MAGIC
@@ -280,6 +280,22 @@ def write_sessions(sessions, volume: str) -> int:
     return n
 
 
+def replace_sessions(sessions, volume: str) -> int:
+    """Fully generate and serialize replacements before deleting any existing data."""
+    import shutil
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="spotter-synthetic-") as staging:
+        written = write_sessions(sessions, staging)
+        if not written:
+            raise ValueError("Replacement generated no sessions; existing data was preserved")
+        clear_synthetic(volume)
+        # Publish joints before metadata, as with normal uploads.
+        for folder in ("joints", "meta"):
+            shutil.copytree(Path(staging, folder), Path(volume, folder), dirs_exist_ok=True)
+        return written
+
+
 # COMMAND ----------
 
 # MAGIC %md ## Run
@@ -304,9 +320,8 @@ recovery = {
 presenter = dbutils.widgets.get("presenter_user_id")
 if presenter and "demo-user-01" in recovery:
     recovery[presenter] = recovery.pop("demo-user-01")
-if dbutils.widgets.get("replace") == "true":
-    print(f"deleted {clear_synthetic(dbutils.widgets.get('volume'))} earlier synthetic sessions")
-written = write_sessions(
+writer = replace_sessions if dbutils.widgets.get("replace") == "true" else write_sessions
+written = writer(
     generate(
         user_ids=load_seed_user_ids(dbutils.widgets.get("seed_user_ids_path"), int(dbutils.widgets.get("users")), dbutils.widgets.get("presenter_user_id")),
         weeks=int(dbutils.widgets.get("weeks")),
