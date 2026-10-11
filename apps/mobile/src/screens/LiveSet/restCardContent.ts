@@ -8,6 +8,7 @@ export interface PhoneResult {
   medal: Medal;
   cleanReps: number;
   totalReps: number;
+  note?: string;
 }
 
 /** The part of the API's set response the card uses. */
@@ -35,7 +36,7 @@ export function phoneNote({ cleanReps, totalReps }: PhoneResult): string {
  */
 export function restCardContent(phone: PhoneResult, server: ServerRestResult | null, arrivedDuringRest: boolean): RestCardContent {
   if (server && arrivedDuringRest) return { medal: server.score.medal, note: server.rest_note.text, fromServer: true };
-  return { medal: phone.medal, note: phoneNote(phone), fromServer: false };
+  return { medal: phone.medal, note: phone.note ?? phoneNote(phone), fromServer: false };
 }
 
 export const MEDAL_LABEL: Record<Medal, string> = { gold: 'Gold', silver: 'Silver', bronze: 'Bronze' };

@@ -1,0 +1,36 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Native renderer test. */
+import React from 'react';
+import { router } from 'expo-router';
+import TrainScreen from '../index';
+const { act, create } = require('react-test-renderer');
+jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: null }) }));
+jest.mock('expo-router', () => ({ router: { push: jest.fn() }, useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]), useNavigation: () => ({ addListener: () => () => {} }) }));
+jest.mock('@/state/Training', () => ({ useTraining: () => ({ workouts: [] }) }));
+jest.mock('@/hooks/useReducedMotion', () => ({ useReducedMotion: () => false }));
+jest.mock('@/components/AppPage', () => ({ ui: {}, AppPage: (props: object) => require('react').createElement('Page', props), Action: 'Action' }));
+jest.mock('@/components/PolishedPressable', () => ({ PolishedPressable: 'Button' }));
+jest.mock('@/components/BodyPreview', () => ({ BodyPreview: 'Body' }));
+jest.mock('@/components/GlassSurface', () => ({ GlassSurface: 'Glass' }));
+jest.mock('@/components/ExerciseMenu', () => ({ ExerciseMenu: (props: { open: boolean; onPractice: () => void }) => props.open ? require('react').createElement('Practice', props) : null }));
+jest.mock('@/components/ExerciseTabs', () => ({ ExerciseTabs: 'ExerciseTabs' }));
+jest.mock('@/components/RotationSlider', () => ({ RotationSlider: 'Rotation' }));
+jest.mock('@/components/Streak', () => ({ Streak: 'Streak' }));
+test('switching exercise tabs keeps selection, playback and rotation; practice starts the selected exercise', () => {
+  let screen: ReturnType<typeof create>;
+  act(() => { screen = create(<TrainScreen />); });
+  expect(screen.root.findAllByProps({ testID: 'practice-exercise-push_up' })).toHaveLength(0);
+  const tabs = () => screen.root.findByType('ExerciseTabs');
+  act(() => screen.root.findByProps({ testID: 'exercise-squat' }).props.onPress());
+  act(() => screen.root.findByType('Rotation').props.onChange(45));
+  act(() => tabs().props.onChange('practice'));
+  expect(screen.root.findByType('Body').props).toMatchObject({ selected: 'squat', playing: true, rotation: 45 });
+  expect(screen.root.findByProps({ testID: 'practice-exercise-squat' }).props.accessibilityState).toMatchObject({ selected: true, expanded: true });
+  act(() => screen.root.findByProps({ testID: 'practice-exercise-push_up' }).props.onPress());
+  act(() => screen.root.findByType('Practice').props.onPractice());
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/practice', params: { exercise: 'push_up' } });
+  act(() => tabs().props.onChange('workout'));
+  expect(screen.root.findByType('Body').props.selected).toBe('push_up');
+  act(() => tabs().props.onChange('practice'));
+  expect(screen.root.findByProps({ testID: 'practice-exercise-push_up' }).props.accessibilityState).toMatchObject({ selected: true, expanded: true });
+  act(() => screen.unmount());
+});

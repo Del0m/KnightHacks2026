@@ -307,6 +307,50 @@ export async function finishSession(
   return result;
 }
 
+/** Read the committed award after a lost finish response; never award or export twice. */
+export async function sessionSummary(db: Db, userId: string, sessionId: string): Promise<FinishResult> {
+  const session = await ownSession(db, userId, sessionId);
+  if (!session.finishedAt) throw conflict("This session is not finished");
+  const [award] = await db
+    .select()
+    .from(medals)
+    .where(and(eq(medals.sessionId, sessionId), eq(medals.userId, userId)))
+    .limit(1);
+  if (!award) throw notFound("Session summary");
+  const [counts] = await db
+    .select({
+      total: sql<number>`count(${reps.id})::int`,
+      clean: sql<number>`count(${reps.id}) filter (where ${reps.clean})::int`,
+    })
+    .from(reps)
+    .innerJoin(sets, eq(reps.setId, sets.id))
+    .where(eq(sets.sessionId, sessionId));
+  const prs = await db
+    .select({
+      exerciseId: personalRecords.exerciseId,
+      metric: personalRecords.metric,
+      value: personalRecords.value,
+      previousValue: personalRecords.previousValue,
+    })
+    .from(personalRecords)
+    .where(and(eq(personalRecords.sessionId, sessionId), eq(personalRecords.userId, userId)));
+  const shared = await db
+    .select({ id: posts.id, kind: posts.kind })
+    .from(posts)
+    .where(and(eq(posts.sessionId, sessionId), eq(posts.authorId, userId)));
+  return {
+    sessionId,
+    finishedAt: session.finishedAt,
+    medal: award.tier,
+    formScore: award.formScore,
+    baselineShare: award.baselineShare,
+    totalReps: counts?.total ?? 0,
+    cleanReps: counts?.clean ?? 0,
+    personalRecords: prs,
+    posts: shared,
+  };
+}
+
 export async function buildExportSession(
   db: Db,
   userId: string,

@@ -7,8 +7,10 @@ import { setup } from "./helpers.js";
 
 const moderator: Moderator = {
   async check(text) {
-    if (/hopeless/i.test(text)) return { allowed: false, message: "Call or text 988.", support: true, categories: ["S11"] };
-    if (/forbidden/i.test(text)) return { allowed: false, message: "Please keep it kind.", categories: ["S15"] };
+    if (/hopeless/i.test(text))
+      return { allowed: false, message: "Call or text 988.", support: true, categories: ["S11"] };
+    if (/forbidden/i.test(text))
+      return { allowed: false, message: "Please keep it kind.", categories: ["S15"] };
     return { allowed: true };
   },
 };
@@ -148,7 +150,12 @@ describe("blocked content", () => {
     expect(logged).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ kind: "post", postId: null, body: "forbidden post", categories: ["S15"] }),
-        expect.objectContaining({ kind: "comment", postId: post.id, body: "forbidden comment", categories: ["S15"] }),
+        expect.objectContaining({
+          kind: "comment",
+          postId: post.id,
+          body: "forbidden comment",
+          categories: ["S15"],
+        }),
       ]),
     );
     expect(logged).toHaveLength(2);
@@ -158,7 +165,11 @@ describe("blocked content", () => {
     const api = await t.as("m-support");
     const res = await api.post("/posts", { kind: "goal", body: "I feel hopeless" });
     expect(res.status).toBe(422);
-    expect(res.body).toMatchObject({ error: "moderation_blocked", message: "Call or text 988.", details: { support: true } });
+    expect(res.body).toMatchObject({
+      error: "moderation_blocked",
+      message: "Call or text 988.",
+      details: { support: true },
+    });
 
     const blocked = await api.post("/posts", { kind: "goal", body: "forbidden" });
     expect(blocked.body.details).toBeUndefined();
@@ -169,4 +180,23 @@ describe("blocked content", () => {
       .where(eq(schema.moderationBlocks.authorId, "m-support"));
     expect(logged.map((r) => r.categories)).toEqual([["S15"]]);
   });
+});
+
+it("shares a completed session only once across retries and enforces ownership", async () => {
+  const api = await t.as("share-retry");
+  const session = await api.post("/sessions", { inference_mode: "vision" });
+  const path = `/sessions/${session.body.id}/share`;
+  const body = { body: "Workout complete.", data: { tier: "bronze" } };
+  expect((await api.put(path, body)).status).toBe(409);
+  await api.post(`/sessions/${session.body.id}/finish`);
+  const first = await api.put(path, body);
+  const again = await api.put(path, body);
+  expect(first.status).toBe(200);
+  expect(again.body.id).toBe(first.body.id);
+  expect(
+    (await api.get("/feed")).body.posts.filter(
+      (p: { session_id: string }) => p.session_id === session.body.id,
+    ),
+  ).toHaveLength(1);
+  expect((await (await t.as("share-stranger")).put(path, body)).status).toBe(404);
 });

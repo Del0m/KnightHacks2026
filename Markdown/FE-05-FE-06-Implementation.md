@@ -1,0 +1,19 @@
+# Mobile workout implementation
+
+Owner approved continuing through the entire implementation on October 10, 2026.
+
+Scope: native offline glass 3D figure with multitouch, camera workouts (FE-05 / INT-02), amber form feedback (FE-06), good-rep totals and one rest note (FE-07), tab swiping, native glass surfaces, and completed-day workout details.
+
+Reuse the existing renderer, pose mode, form engine, rules, skeleton and server set/rest APIs. Camera setup passes exercise and camera/manual selection. A set ends through Done or the engine's inactivity detection after the first counted rep. Pause inference during rest/background. Count clean reps from rule flags; show an immediate phone result and accept server advice only during its matching rest. Store measured timing/range with null model quality; never invent model scores. Preserve results locally if networking fails and retry stable set indices. Keep camera frames on device.
+
+Native model work uses an offline WebView and the same materials/glow/animations. Reserve two-finger pan/pinch and opposing-finger twist rotation for the model. Single-finger tab swipes must preserve vertical scrolling and model controls. Pause animation offscreen. Glass respects Reduce Transparency and Reduce Motion. Completed dates open all workouts that day, with available per-set details; old aggregate history stays readable. Native persistence is account-scoped.
+
+Verification: fixture-driven rep packaging; rest transitions and feedback; upload retries; history/persistence; swipe classification; model loading/message lifecycle; mobile tests/typecheck/lint; web export; Expo-generated native rebuild/install. Physical rep accuracy and gesture feel require iPhone feedback. No pushes or PR updates are requested for this work. Keep secrets and generated signing data out of tracked files.
+
+The supplied HTTPS Express API passed liveness, database readiness and protected-account checks. Its address is configured only in the ignored local environment file; the development server was restarted and the phone app relaunched. Account-authenticated upload still needs a real signed-in workout check.
+
+The iPhone owner confirmed live rep counting works and the replacement native refraction pass removed the black patch. Native refraction now samples a single-pass RGBA8 scene target (body excluded) with foreground depth rejection, preserving glass, glow and canvas antialiasing. The figure has clearer transmission with a subtle view-dependent rainbow edge tint. Native two-finger gestures lock to rotation, pan or pinch; one-finger drags scroll the parent page through a bounded local bridge without moving the model.
+
+Back to Train is available during camera/manual sets and rest. It saves completed sets and queues account uploads; no empty workout is created when leaving before the first set. Train checks exercises after their full prescribed set count is saved that day, including across partial sessions. Glass controls use dark text over light tinted surfaces. Small top-right tab title labels are removed; header actions remain. Review also caught and fixed manual curl/press preview aliases, with regression coverage.
+
+Verification on October 10: 56 mobile suites / 601 tests passed; type checking passed. API checks previously passed 19 files / 121 tests. Native offline bundle rebuilt; replacement refraction and rainbow shader render without errors in the standalone check. iPhone app reloaded; owner confirmed camera counting and removal of black tiles. Owner also confirmed one-finger page scrolling and approved the rainbow edge appearance. Glass body density increased slightly afterward; strain now tints transmitted glass red so additive emission cannot wash out against white. Secret scan across 52 changed/untracked paths found zero credential matches; API/mobile env and generated iOS signing files remain ignored.

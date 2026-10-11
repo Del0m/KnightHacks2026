@@ -2,7 +2,7 @@
 
 ## User brief
 
-Follow the supplied hand-drawn layout: Spotter title, streak with growing flame, grey 3D humanoid, today's exercise list, Begin Workout button, and a raised bottom navigation bar. Keep white and light blue with firm Barlow typography. Replace the promotional photo hero on Train.
+Follow the supplied hand-drawn layout: SteadyForum title, streak with growing flame, grey 3D humanoid, today's exercise list, Begin Workout button, and a raised bottom navigation bar. Keep white and light blue with firm Barlow typography. Replace the promotional photo hero on Train.
 
 ## Streak
 

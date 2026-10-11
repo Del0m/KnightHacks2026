@@ -14,7 +14,7 @@ import { CLIP_DEFS, generateAll, generateClip, serializeClip, sortFlags } from '
 import { applyInjuries } from '../overrides';
 import { isAbsentFrame, type Clip } from '../recording';
 import { STILL_BAND_DEG } from '../repCounter';
-import { getSpec } from '../specs';
+import { EXERCISE_SPECS, getSpec } from '../specs';
 import type { ExerciseSpec, JointAngleSpec, PrimaryGate, SegmentTiltSpec } from '../types';
 
 const fileFor = (name: string) => path.join(FIXTURES_DIR, `${name}.json`);
@@ -303,3 +303,5 @@ describe('the press rest clips need the primary gate', () => {
     expect(runClip(clip, {}, ungated).counted.length).toBeGreaterThan(clip.expected!.reps);
   });
 });
+
+test.each(EXERCISE_SPECS.map(s => [s.id, s.phases] as const))('live %s ends after four seconds of stillness', (_id, phases) => { expect(phases.set_end_still_ms).toBe(4000); });

@@ -1,0 +1,62 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Existing renderer convention. */
+import React from 'react';
+import { Switch, Text } from 'react-native';
+import { WorkoutSummary } from '../index';
+import { useAuth } from '@/screens/Auth/session';
+const { act, create } = require('react-test-renderer');
+jest.mock('expo-router', () => ({ router: { replace: jest.fn(), push: jest.fn() } }));
+jest.mock('@/screens/Auth/session', () => ({ useAuth: jest.fn() }));
+jest.mock('@/components/AppPage', () => ({ AppPage: ({ children }: React.PropsWithChildren) => children, Action: 'Action', ui: {} }));
+jest.mock('@/components/GlassSurface', () => ({ GlassSurface: () => null }));
+jest.mock('@/services/workoutQueue', () => { const result = { session_id: 'server', medal: 'gold', form_score: 1, baseline_share: .7, total_reps: 4, clean_reps: 4, personal_records: [{ exercise_id: 'squat', metric: 'max_reps', value: 4, previous_value: 3 }] }; return { readWorkoutResult: () => result, subscribeWorkoutResults: () => () => {}, workoutShared: () => false, markWorkoutShared: jest.fn(), syncWorkouts: jest.fn() }; });
+it('shows authoritative medal, score and PRs; sharing stays off until explicitly selected', async () => {
+ const apiFetch = jest.fn().mockResolvedValue({ ok: true });
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<WorkoutSummary workoutId="local" records={[]} history={[]} syncStatus="Saved" />); });
+ expect(screen.root.findByType(Switch).props.value).toBe(false);
+ expect(apiFetch).not.toHaveBeenCalled();
+ const text = screen.root.findAllByType(Text).map((n: { props: { children: unknown } }) => JSON.stringify(n.props.children)).join(' ');
+ expect(text).toContain('Gold'); expect(text).toContain('Personal records');
+ act(() => screen.root.findByType(Switch).props.onValueChange(true));
+ await act(async () => { screen.root.findAllByType('Action').find((n: { props: { children: string } }) => n.props.children === 'Share workout').props.onPress(); });
+ expect(apiFetch.mock.calls[0][0]).toBe('/sessions/server/share');
+ expect(apiFetch.mock.calls[0][1].method).toBe('PUT');
+ act(() => screen.unmount());
+});
+it('guests get an unmeasured summary and cannot publish', async () => {
+ const apiFetch = jest.fn(); jest.mocked(useAuth).mockReturnValue({ user: null, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<WorkoutSummary workoutId="local" records={[]} history={[]} syncStatus="Saved locally" />); });
+ expect(screen.root.findByType(Switch).props.disabled).toBe(true);
+ expect(apiFetch).not.toHaveBeenCalled();
+ act(() => screen.unmount());
+});
+it('keeps share failures visible and prevents duplicate taps during an in-flight post', async () => {
+ let resolve!: (value: unknown) => void;
+ const apiFetch = jest.fn().mockReturnValue(new Promise(r => { resolve = r; }));
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<WorkoutSummary workoutId="local" records={[]} history={[]} syncStatus="Saved" />); });
+ act(() => screen.root.findByType(Switch).props.onValueChange(true));
+ const button = screen.root.findAllByType('Action').find((n: { props: { children: string } }) => n.props.children === 'Share workout');
+ act(() => { button.props.onPress(); button.props.onPress(); });
+ expect(apiFetch).toHaveBeenCalledTimes(1);
+ await act(async () => { resolve({ ok: false }); });
+ expect(screen.root.findAllByType(Text).some((n: { props: { children: unknown } }) => n.props.children === 'Could not share your workout. Try again.')).toBe(true);
+ expect(screen.root.findByType(Switch).props.value).toBe(true);
+ act(() => screen.unmount());
+});
+it('keeps manual form unmeasured after syncing and shares no fabricated score', async () => {
+ const apiFetch = jest.fn().mockResolvedValue({ ok: true });
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ const records = [{ exercise_id: 'squat', reps: [{ tempo_ms: 0, range_deg: 0, quality: null, flags: [{ rule_id: 'manual_unscored', severity: 'info' }] }] }];
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<WorkoutSummary workoutId="manual" records={records} history={[]} syncStatus="Saved" />); });
+ const text = screen.root.findAllByType(Text).map((n: { props: { children: unknown } }) => JSON.stringify(n.props.children)).join(' ');
+ expect(text).toContain('No measured form score'); expect(text).not.toContain('% form');
+ act(() => screen.root.findByType(Switch).props.onValueChange(true));
+ await act(async () => { screen.root.findAllByType('Action').find((n: { props: { children: string } }) => n.props.children === 'Share workout').props.onPress(); });
+ expect(JSON.parse(apiFetch.mock.calls[0][1].body).data.form_score).toBeNull();
+ act(() => screen.unmount());
+});
