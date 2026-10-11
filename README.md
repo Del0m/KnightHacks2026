@@ -72,6 +72,78 @@ Rules decide whether a rep counts as clean and determine the medal. A model asse
 
 The diagrams describe the system architecture. The app supports camera tracking and manual logging; some screens still use sample data or await backend integration.
 
+## RAG pipeline
+
+Retrieval-augmented generation (RAG) gives the planner and advice writer source material before they ask a model to draft anything. The ingestion script splits the exercise library and reviewed injury notes into passages, embeds them with `BAAI/bge-small-en-v1.5`, and stores the text, metadata, and 384-dimensional vectors in Neon's `doc_chunks` table. It re-embeds passages when their content changes.
+
+```mermaid
+flowchart TD
+    subgraph Ingestion["Build the source library"]
+        Library["Exercise library<br/>free-exercise-db"] --> Chunks["Split into passages<br/>Keep source metadata"]
+        Notes["Reviewed injury notes<br/>rag/notes"] --> Chunks
+        Chunks --> Embed["Hugging Face embeddings<br/>bge-small-en-v1.5"]
+        Embed --> Store[("Neon pgvector<br/>doc_chunks")]
+    end
+
+    subgraph Retrieval["Use the sources in a request"]
+        Request["Planning goals<br/>or an advice question"] --> Query["Embed the search query<br/>with the same model"]
+        Query --> Search["Retrieve relevant passages"]
+        Store --> Search
+        Search --> Planner["Planner<br/>Filter exercise candidates"]
+        Profile["Level, injuries, preferences<br/>and workout history"] --> Planner
+        Planner --> PlanDraft["gpt-oss plan draft<br/>or rule-based fallback"]
+        PlanDraft --> PlanCheck["Code checks exercise choices<br/>and training volume"]
+        PlanCheck --> Plan["Saved plan<br/>with source references"]
+
+        Search --> Advice["Advice writer<br/>Check question and sources"]
+        Community["Answers to similar questions<br/>Visible to the asker"] --> Advice
+        Advice --> AnswerDraft["gpt-oss answer draft"]
+        AnswerDraft --> AnswerCheck["Answer guard<br/>and source claim check"]
+        AnswerCheck --> Reply["AI-suggested comment<br/>with citations and disclaimer"]
+    end
+```
+
+The planner filters exercise candidates for the user's injuries and checks the draft in code. Advice retrieval can also use members' answers to similar questions, while excluding earlier AI answers and blocked users. Questions mentioning pain or acute warning signs get a fixed reply before the advice model runs. If an answer fails its checks, the thread stays open for community answers without an AI reply.
+
+See [`rag/ingest.ts`](rag/ingest.ts), the [planner](apps/api/src/services/planner.ts), and the [advice retrieval service](apps/api/src/services/adviceThread.ts) for the implementation.
+
+## Hugging Face integration
+
+Hugging Face has three roles in the project: inference providers run language and embedding models, a custom endpoint runs cloud pose detection, and the Hub distributes model files. The phone calls the API for hosted inference; the API keeps the inference token on the server.
+
+```mermaid
+flowchart TD
+    App["Phone app"] -->|Authenticated requests| API["SteadyForum API"]
+    Ingest["RAG ingestion script"] --> Embeddings
+
+    subgraph Providers["Hugging Face Inference Providers"]
+        LLM["gpt-oss<br/>Plan drafts, advice, rest notes<br/>and claim checks"]
+        Guard["Llama Guard<br/>Content moderation"]
+        Embeddings["bge-small-en-v1.5<br/>Passage and query embeddings"]
+    end
+    API --> LLM
+    API --> Guard
+    API --> Embeddings
+    LLM --> Checked["API validation and fallbacks"]
+    Guard --> Checked
+    Checked -->|Response| App
+    Embeddings --> Vectors[("Neon pgvector")]
+
+    App -->|Camera frames with consent| Relay["API WebSocket relay"]
+    Relay --> Endpoint["Hugging Face Inference Endpoint<br/>Custom YOLOv8n-pose handler"]
+    Endpoint -->|Joint positions| Relay
+    Relay -->|Pose result| App
+
+    Export["Model export and publishing<br/>Core ML, ONNX, form model"] --> Hub["Hugging Face Hub<br/>Model files + manifest"]
+    Hub -->|Check manifest and download| Updates["iPhone model updater<br/>Verify files before installing"]
+```
+
+The language client tries its configured model/provider chain within a deadline. Rest notes fall back to fixed text, and the planner can produce a rule-based plan when inference fails. Moderation combines Llama Guard with a separate threats and harassment check using the language model.
+
+Model publishing uploads exported artifacts and a manifest to the Hub. The iPhone updater downloads changed files and verifies them before installation. The native detector currently loads bundled models, so downloading an update does not yet switch the running pose model.
+
+See the [language client](apps/api/src/integrations/huggingface/llm.ts), [cloud endpoint guide](ml/cloud_endpoint/README.md), and [model publishing guide](ml/pose_export/README.md#publish-to-the-hugging-face-hub-conn-10) for setup details.
+
 ## Camera data and privacy
 
 On-device mode runs YOLOv8n-pose through Core ML on an iPhone. Apple Vision body pose is also available as a manual choice. In these modes, camera frames stay on the phone; workout uploads contain joint positions and rep data.
