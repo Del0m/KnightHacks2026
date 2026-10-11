@@ -62,7 +62,6 @@ PR #131 had already merged a first cloud client on `main`. This PR replaces its 
     - Resets the form engine, rules and clock on any interruption or source switch.
     - Gains a **Use cloud** / **Use automatic** toggle. A phone that passes the benchmark otherwise never runs cloud, and the settings toggle is FE-15.
 - **Engine:** the clip recorder and `useFormEngine` time no-person frames by their capture time.
-- **Cloudflare Workers Builds (`wrangler.jsonc`, `.node-version`):** the `knighthacks2026` project was connected in the dashboard with nothing in the repo to deploy, so every build failed. It now builds the Expo web export (`apps/mobile`, Node 22) and serves it as static assets, falling back to the client router for unknown paths. The web build only reaches the API once the `EXPO_PUBLIC_*` variables are set in the Cloudflare build settings. This isn't part of #108; it's here so this PR's checks pass.
 - **`app.json`:** the camera permission text no longer says "Video never leaves your phone".
 - **Docs:**
   - Root `Architecture.md` §4.1: "Lost connection" now describes the explicit tap, not an automatic switch; also consent per account and code pointers.
