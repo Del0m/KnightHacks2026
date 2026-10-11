@@ -291,7 +291,7 @@ describe("route -> database -> export -> gzip", () => {
     ]);
   });
 
-  it("preserves actual stored rep positions and normalizes only known legacy severities", async () => {
+  it("preserves actual stored rep positions and exports any legacy severity as form", async () => {
     const api = await testApp.as("legacy-contract-user");
     const started = await api.post("/sessions", { inference_mode: "coreml" });
     const [set] = await testApp.db
@@ -333,8 +333,7 @@ describe("route -> database -> export -> gzip", () => {
       .update(schema.formFlags)
       .set({ severity: "unknown" })
       .where(eq(schema.formFlags.repId, rep!.id));
-    await expect(buildExportSession(testApp.db, "legacy-contract-user", started.body.id)).rejects.toThrow(
-      "Unsupported stored flag severity",
-    );
+    const unknown = await buildExportSession(testApp.db, "legacy-contract-user", started.body.id);
+    expect(unknown.sets[0]!.reps[0]!.flags.map((f) => f.severity)).toEqual(["form", "form", "form"]);
   });
 });

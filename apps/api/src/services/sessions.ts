@@ -398,10 +398,10 @@ export async function buildExportSession(
   };
 }
 
+// Migration 0010 rewrites legacy severities to form; this covers rows written by an older API
+// after that, so one odd value never blocks finishing a session.
 function exportSeverity(severity: string): Severity {
-  if (severity === "form" || severity === "safety") return severity;
-  if (severity === "info" || severity === "warn") return "form";
-  throw new Error(`Unsupported stored flag severity: ${severity}`);
+  return severity === "safety" ? "safety" : "form";
 }
 
 // Feed copy follows §7: describe what happened, good news first, never "bad" or "wrong".

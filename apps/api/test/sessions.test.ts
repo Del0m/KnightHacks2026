@@ -87,6 +87,28 @@ describe("session lifecycle", () => {
     expect(exported.medal).toBe("silver");
   });
 
+  it("finishes and exports a legacy flag severity as form", async () => {
+    // Before AI-08 the API stored any severity string; those rows must not block finishing.
+    const { api, id } = await startSession("legacy-severity");
+    const set = await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({ exercise_id: "squat", reps: [rep(["knee_tracking"])] }),
+    );
+    expect(set.status).toBe(201);
+    const [repRow] = await t.db.select().from(schema.reps).where(eq(schema.reps.setId, set.body.id));
+    await t.db
+      .update(schema.formFlags)
+      .set({ severity: "high" })
+      .where(eq(schema.formFlags.repId, repRow!.id));
+
+    const finish = await api.post(`/sessions/${id}/finish`);
+    expect(finish.status).toBe(200);
+    const exported = t.queue.sessions.find((s) => s.id === id)!;
+    expect(exported.sets[0]!.reps[0]!.flags).toEqual([
+      { rule_id: "knee_tracking", severity: "form", rep_index: 0 },
+    ]);
+  });
+
   it("compares later workouts with the lifter's own 4-week average", async () => {
     const user = "lifter-3";
     const day = (d: number) => new Date(Date.UTC(2026, 9, d, 18)).toISOString();

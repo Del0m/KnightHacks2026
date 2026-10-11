@@ -41,6 +41,9 @@ describe("migrations", () => {
           VALUES ('00000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-000000000004', 0, 2000, 90, NULL, false);
         INSERT INTO form_flags (rep_id, rule_id)
           VALUES ('00000000-0000-4000-8000-000000000005', 'legacy_rule');
+        INSERT INTO form_flags (rep_id, rule_id, severity)
+          VALUES ('00000000-0000-4000-8000-000000000005', 'legacy_high', 'high'),
+                 ('00000000-0000-4000-8000-000000000005', 'legacy_safety', 'safety');
       `);
         for (const migration of migrations.slice(appliedCount)) {
           await client.exec(`BEGIN;\n${migration.sql.join("\n")}\nCOMMIT;`);
@@ -62,8 +65,12 @@ describe("migrations", () => {
         expect(
           (await client.query("SELECT tempo_ms, quality, lowering_ms, rising_ms FROM reps")).rows,
         ).toEqual([{ tempo_ms: 2000, quality: null, lowering_ms: null, rising_ms: null }]);
-        expect((await client.query("SELECT rule_id, severity FROM form_flags")).rows).toEqual([
-          { rule_id: "legacy_rule", severity: "info" },
+        expect(
+          (await client.query("SELECT rule_id, severity FROM form_flags ORDER BY rule_id")).rows,
+        ).toEqual([
+          { rule_id: "legacy_high", severity: "form" },
+          { rule_id: "legacy_rule", severity: "form" },
+          { rule_id: "legacy_safety", severity: "safety" },
         ]);
         expect(
           (
