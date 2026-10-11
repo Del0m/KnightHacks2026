@@ -3,7 +3,7 @@ const post = { id: 'one', kind: 'session', body: 'Workout done.', created_at: '2
 it('uses the opaque backend cursor and preserves snake-case counts', async () => {
  const request = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ posts: [post], next_cursor: 'next/+=' }) });
  expect(await fetchFeed(request, 'cursor/+=' )).toEqual({ posts: [post], next_cursor: 'next/+=' });
- expect(request.mock.calls[0][0]).toBe('/feed?cursor=cursor%2F%2B%3D');
+ expect(request.mock.calls[0][0]).toBe('/feed?scope=public&cursor=cursor%2F%2B%3D');
  expect(isGoldWorkout(post)).toBe(true);
  expect(isGoldWorkout({ ...post, kind: 'goal' })).toBe(false);
 });
@@ -17,4 +17,12 @@ it('supports giving and removing kudos, and surfaces a failed request', async ()
 it('rejects malformed feed pages instead of rendering invalid counts', async () => {
  const request = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ posts: [{ ...post, kudos_count: -1 }], next_cursor: null }) });
  await expect(fetchFeed(request)).rejects.toThrow();
+});
+
+it('requests public posts without requiring follows and explains network failures', async () => {
+ const request = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ posts: [post], next_cursor: null }) });
+ await fetchFeed(request);
+ expect(request.mock.calls[0][0]).toBe('/feed?scope=public');
+ request.mockRejectedValue(new TypeError('Network request failed'));
+ await expect(fetchFeed(request)).rejects.toThrow('Could not reach the workout server');
 });

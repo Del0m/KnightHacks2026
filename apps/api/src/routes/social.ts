@@ -60,7 +60,7 @@ async function visiblePost(db: Db, me: string, postId: string) {
     .select({ id: posts.id })
     .from(posts)
     .leftJoin(profiles, eq(profiles.userId, posts.authorId))
-    .where(and(eq(posts.id, postId), visiblePostsFilter(me)));
+    .where(and(eq(posts.id, postId), visiblePostsFilter(me, true)));
   if (!row) throw notFound("Post");
   return row;
 }

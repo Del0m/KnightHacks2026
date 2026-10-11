@@ -30,7 +30,9 @@ export function decodeCursor(raw: string): Cursor {
   return { ts, id };
 }
 
-export function visiblePostsFilter(me: string) {
+export function visiblePostsFilter(me: string, publicFeed = false) {
+  // Public discovery reads shared posts only, never raw workout sessions.
+  if (publicFeed) return notBlocked(me, posts.authorId);
   const myGym = sql`(select ${profiles.gymPlaceId} from ${profiles} where ${profiles.userId} = ${me})`;
   return and(
     or(
@@ -47,7 +49,13 @@ export function feedRouter(db: Db): Router {
 
   router.get("/feed", async (req, res) => {
     const me = userId(req);
-    const { cursor } = parse(z.object({ cursor: z.string().max(200).optional() }), req.query);
+    const { cursor, scope } = parse(
+      z.object({
+        cursor: z.string().max(200).optional(),
+        scope: z.enum(["following", "public"]).default("following"),
+      }),
+      req.query,
+    );
     const after = cursor ? decodeCursor(cursor) : null;
 
     const rows = await db
@@ -74,7 +82,7 @@ export function feedRouter(db: Db): Router {
       .leftJoin(profiles, eq(profiles.userId, posts.authorId))
       .where(
         and(
-          visiblePostsFilter(me),
+          visiblePostsFilter(me, scope === "public"),
           after
             ? sql`(${posts.createdAt}, ${posts.id}) < (${after.ts}::timestamptz, ${after.id}::uuid)`
             : undefined,

@@ -26,7 +26,7 @@ it('loads cursor pages once, deduplicates overlapping posts, and refreshes from 
  await act(async () => { screen = create(<FeedScreen />); });
  await act(async () => { const list = screen.root.findByType(FlatList); list.props.onEndReached(); list.props.onEndReached(); });
  expect(apiFetch).toHaveBeenCalledTimes(2);
- expect(apiFetch.mock.calls[1][0]).toBe('/feed?cursor=next');
+ expect(apiFetch.mock.calls[1][0]).toBe('/feed?scope=public&cursor=next');
  expect(screen.root.findByType(FlatList).props.data.map((p: { id: string }) => p.id)).toEqual(['a', 'b']);
  await act(async () => { screen.root.findByType(FlatList).props.onRefresh(); });
  expect(screen.root.findByType(FlatList).props.data.map((p: { id: string }) => p.id)).toEqual(['c']);

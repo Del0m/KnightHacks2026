@@ -40,8 +40,8 @@ describe("posts, comments, kudos, follows", () => {
     const fan = await t.as("s-fan");
     const post = (await author.post("/posts", { kind: "session", body: "Leg day" })).body;
 
-    // Not visible until fan follows author.
-    expect((await fan.post(`/posts/${post.id}/kudos`)).status).toBe(404);
+    // Shared posts are public; follows still curate the default feed.
+    expect((await fan.get(`/posts/${post.id}/comments`)).status).toBe(200);
     expect((await fan.post("/follows/s-author2")).status).toBe(204);
     expect((await fan.post("/follows/s-author2")).status).toBe(204); // idempotent
 
@@ -199,4 +199,63 @@ it("shares a completed session only once across retries and enforces ownership",
     ),
   ).toHaveLength(1);
   expect((await (await t.as("share-stranger")).put(path, body)).status).toBe(404);
+});
+
+it("public feed includes historical shared workouts from unfollowed users, never unshared sessions or blocked authors", async () => {
+  const author = await t.as("public-workout-author");
+  const reader = await t.as("public-workout-reader");
+  await author.put("/me/profile", {
+    display_name: "Alex",
+    experience_level: "advanced",
+    gym_place_id: "another-gym",
+  });
+  await reader.get("/me/profile");
+  const session = await author.post("/sessions", { inference_mode: "vision" });
+  await author.post(`/sessions/${session.body.id}/finish`);
+  const shared = await author.put(`/sessions/${session.body.id}/share`, {
+    body: "A stronger leg day.",
+    data: { tier: "gold", exercises: [{ name: "Squat", sets: 3, reps: 30 }] },
+  });
+  expect(shared.status).toBe(200);
+  await t.db
+    .update(schema.posts)
+    .set({ createdAt: new Date("2026-09-01T12:00:00Z") })
+    .where(eq(schema.posts.id, shared.body.id));
+  const unshared = await author.post("/sessions", { inference_mode: "vision" });
+  await author.post(`/sessions/${unshared.body.id}/finish`);
+  async function publicPosts() {
+    const rows: { id: string; author: { id: string } }[] = [];
+    let cursor: string | null = null;
+    do {
+      const page = await reader.get(
+        `/feed?scope=public${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      );
+      expect(page.status).toBe(200);
+      rows.push(...page.body.posts);
+      cursor = page.body.next_cursor;
+    } while (cursor);
+    return rows;
+  }
+  const workouts = (await publicPosts()).filter((p) => p.author.id === "public-workout-author");
+  expect(workouts).toHaveLength(1);
+  expect(workouts[0]).toMatchObject({
+    id: shared.body.id,
+    author: { display_name: "Alex" },
+    data: { tier: "gold" },
+    created_at: "2026-09-01T12:00:00.000Z",
+  });
+  expect((await reader.post(`/posts/${shared.body.id}/kudos`)).status).toBe(204);
+  expect((await reader.post(`/posts/${shared.body.id}/comments`, { body: "Nice progress!" })).status).toBe(
+    201,
+  );
+  await t.db
+    .insert(schema.blocks)
+    .values({ blockerId: "public-workout-author", blockedId: "public-workout-reader" });
+  expect((await publicPosts()).some((p) => p.id === shared.body.id)).toBe(false);
+  expect((await reader.post(`/posts/${shared.body.id}/kudos`)).status).toBe(404);
+  await t.db.delete(schema.blocks).where(eq(schema.blocks.blockerId, "public-workout-author"));
+  await t.db
+    .insert(schema.blocks)
+    .values({ blockerId: "public-workout-reader", blockedId: "public-workout-author" });
+  expect((await publicPosts()).some((p) => p.id === shared.body.id)).toBe(false);
 });
