@@ -71,13 +71,17 @@ export type AdviceNoneReason =
   | "verify_failed";
 
 export type AdviceAnswer =
-  | { kind: "ai"; text: string; sources: AdviceSource[] }
+  | { kind: "ai"; text: string; sources: AdviceSource[] } // text ends with ADVICE_DISCLAIMER
   | { kind: "fixed_pain"; text: string; signals: string[] }
   | { kind: "none"; reason: AdviceNoneReason };
 
 export const PAIN_REPLY =
   "Pain like this is worth having a doctor or physiotherapist look at before training on it. " +
   "Spotter can't assess injuries, so there's no AI suggestion for this question.";
+// Ends every AI answer, so it is shown wherever the answer is (Architecture §13). Fixed text, added
+// after the guard and the claim check, which judge only the model's own words.
+export const ADVICE_DISCLAIMER =
+  "This is general information, not medical advice. Always consult a doctor before acting on it.";
 export const MAX_ANSWER_CHARS = 450;
 export const MAX_ANSWER_SENTENCES = 3;
 export const MAX_PROMPT_SOURCES = 6;
@@ -593,7 +597,7 @@ export class AdviceWriter {
     );
     if (verdict !== "supported") return { kind: "none", reason: verdict };
 
-    return { kind: "ai", text, sources: citedSources };
+    return { kind: "ai", text: `${text} ${ADVICE_DISCLAIMER}`, sources: citedSources };
   }
 
   /** Step 8: is every sentence of the answer supported by the sources it cites? */
