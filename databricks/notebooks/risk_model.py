@@ -366,9 +366,12 @@ if status:
 # MAGIC
 # MAGIC Skipped (with an `insufficient_labels` tag) when either split lacks a class, so no model is
 # MAGIC logged that can't be trained or measured. The model is logged as a run artifact; Unity Catalog
-# MAGIC registration is attempted afterwards and a failure only tags the run `uc_registration=skipped`.
+# MAGIC registration is opt-in (`register_uc`); a failure only tags the run `uc_registration=skipped`.
 
 # COMMAND ----------
+
+dbutils.widgets.dropdown("register_uc", "false", ["false", "true"], "also register in Unity Catalog")
+REGISTER_UC = dbutils.widgets.get("register_uc") == "true"
 
 info, metrics, uc_version = None, None, None
 with mlflow.start_run(run_name="injury_risk_xgboost") as run:
@@ -417,15 +420,23 @@ with mlflow.start_run(run_name="injury_risk_xgboost") as run:
         )
         mlflow.set_tag("status", "trained")
 
-        # Best effort: Free Edition denies the artifact upload to the catalog's default storage.
-        try:
-            uc_version = mlflow.register_model(f"runs:/{run.info.run_id}/{MODEL_ARTIFACT_PATH}", MODEL_NAME).version
-            mlflow.set_tag("uc_registration", f"version {uc_version}")
-        except Exception as exc:
-            reason = registration_skip_reason(exc)
-            mlflow.set_tag("uc_registration", "skipped")
-            mlflow.set_tag("uc_registration_reason", reason)
-            print(f"Unity Catalog registration skipped ({reason}); the model stays a run artifact.")
+        # Opt-in: Free Edition denies the artifact upload to the catalog's default storage, and each
+        # failed attempt leaves a PENDING_REGISTRATION version behind, which we delete.
+        if REGISTER_UC:
+            try:
+                uc_version = mlflow.register_model(f"runs:/{run.info.run_id}/{MODEL_ARTIFACT_PATH}", MODEL_NAME).version
+                mlflow.set_tag("uc_registration", f"version {uc_version}")
+            except Exception as exc:
+                reason = registration_skip_reason(exc)
+                mlflow.set_tag("uc_registration", "skipped")
+                mlflow.set_tag("uc_registration_reason", reason)
+                print(f"Unity Catalog registration skipped ({reason}); the model stays a run artifact.")
+                client = MlflowClient()
+                for v in client.search_model_versions(f"name='{MODEL_NAME}'"):
+                    if v.run_id == run.info.run_id:
+                        client.delete_model_version(MODEL_NAME, v.version)
+        else:
+            mlflow.set_tag("uc_registration", "off")
 
 if info:
     print(f"Run {run.info.run_id}: model {metrics['model']}, heuristic {metrics['heuristic']}")
