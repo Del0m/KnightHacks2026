@@ -44,6 +44,9 @@ MODEL_TABLE_COMMENT = ("Training-load and form-trend score from a model trained 
                        "Not a diagnosis.")
 IMPORTANCE_TABLE_COMMENT = ("Gain importance of the injury-risk model's features and feature families. "
                             "The model is trained on heuristic labels. Not a diagnosis.")
+METRICS_TABLE = "spotter.gold.gold_risk_model_metrics"
+METRICS_TABLE_COMMENT = ("Held-out metrics of the champion injury-risk model and of the heuristic score used as "
+                         "next week's predictor. Labels are heuristic. Not a diagnosis.")
 ALIAS = "champion"
 CHAMPION_TAG = "champion"  # run tag: "true" on the champion run only
 MODEL_ARTIFACT_PATH = "model"
@@ -291,6 +294,15 @@ def score_rows(model: xgboost.XGBClassifier, df: pd.DataFrame, model_version, sc
     return out[OUTPUT_COLUMNS]
 
 
+def metrics_rows(logged: dict, model_version: str, trained_at) -> list[dict]:
+    """The champion run's logged test metrics as one row for the model and one for the heuristic."""
+    shared = {"model_version": model_version, "trained_at": trained_at,
+              "test_positives": int(logged.get("test_positives", 0)),
+              "test_rows": int(logged.get("test_trainable", 0))}
+    return [{"predictor": name, **{m: logged.get(f"{prefix}_{m}") for m in ("roc_auc", "pr_auc", "brier")}, **shared}
+            for name, prefix in (("model", "test"), ("heuristic", "heuristic"))]
+
+
 def comment_sql(table: str, comment: str) -> str:
     """COMMENT ON TABLE with the comment as a safely escaped string literal."""
     literal = comment.replace("\\", "\\\\").replace("'", "\\'")
@@ -515,6 +527,16 @@ IMPORTANCE_SCHEMA = T.StructType([
     T.StructField("rank", T.IntegerType()),
     T.StructField("trained_at", T.TimestampType()),
 ])
+METRICS_SCHEMA = T.StructType([
+    T.StructField("predictor", T.StringType()),
+    T.StructField("roc_auc", T.DoubleType()),
+    T.StructField("pr_auc", T.DoubleType()),
+    T.StructField("brier", T.DoubleType()),
+    T.StructField("model_version", T.StringType()),
+    T.StructField("trained_at", T.TimestampType()),
+    T.StructField("test_positives", T.IntegerType()),
+    T.StructField("test_rows", T.IntegerType()),
+])
 
 
 def overwrite(rows, schema, table, comment):
@@ -550,6 +572,9 @@ else:
 
     overwrite(score_records, SCORES_SCHEMA, MODEL_SCORES_TABLE, MODEL_TABLE_COMMENT)
     overwrite(importance_rows, IMPORTANCE_SCHEMA, IMPORTANCE_TABLE, IMPORTANCE_TABLE_COMMENT)
+    metric_rows = [tuple(r[f.name] for f in METRICS_SCHEMA.fields)
+                   for r in metrics_rows(champion.data.metrics, champion_run_id, trained_at)]
+    overwrite(metric_rows, METRICS_SCHEMA, METRICS_TABLE, METRICS_TABLE_COMMENT)
     display(spark.read.table(MODEL_SCORES_TABLE).orderBy("score", ascending=False).limit(20))
 
 # COMMAND ----------
