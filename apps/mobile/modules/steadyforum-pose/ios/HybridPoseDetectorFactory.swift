@@ -4,7 +4,7 @@ import NitroModules
 import PoseCore
 import QuartzCore
 
-/// Entry point registered with Nitro: creates the detectors and runs the on-device benchmark (AI-04).
+/// Entry point registered with Nitro: creates the detectors and the cloud frame encoder, and runs the on-device benchmark (AI-04).
 class HybridPoseDetectorFactory: HybridPoseDetectorFactorySpec {
   private static let sizes = [320, 256]
   /// Serial, so two benchmarks never compete for the Neural Engine.
@@ -17,6 +17,10 @@ class HybridPoseDetectorFactory: HybridPoseDetectorFactorySpec {
 
   func createBasicPoseDetector() throws -> any HybridPoseDetectorSpec {
     HybridBasicPoseDetector()
+  }
+
+  func createCloudFrameEncoder() throws -> any HybridCloudFrameEncoderSpec {
+    HybridCloudFrameEncoder()
   }
 
   func poseModelId() throws -> String {

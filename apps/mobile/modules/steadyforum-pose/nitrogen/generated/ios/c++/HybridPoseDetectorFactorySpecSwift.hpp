@@ -14,12 +14,15 @@ namespace SteadyForumPose { class HybridPoseDetectorFactorySpec_cxx; }
 
 // Forward declaration of `HybridPoseDetectorSpec` to properly resolve imports.
 namespace margelo::nitro::steadyforumpose { class HybridPoseDetectorSpec; }
+// Forward declaration of `HybridCloudFrameEncoderSpec` to properly resolve imports.
+namespace margelo::nitro::steadyforumpose { class HybridCloudFrameEncoderSpec; }
 // Forward declaration of `PoseBenchmark` to properly resolve imports.
 namespace margelo::nitro::steadyforumpose { struct PoseBenchmark; }
 
 #include <memory>
 #include "HybridPoseDetectorSpec.hpp"
 #include <string>
+#include "HybridCloudFrameEncoderSpec.hpp"
 #include "PoseBenchmark.hpp"
 #include <NitroModules/Promise.hpp>
 
@@ -91,6 +94,14 @@ namespace margelo::nitro::steadyforumpose {
     }
     inline std::string poseModelId() override {
       auto __result = _swiftPart.poseModelId();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<HybridCloudFrameEncoderSpec> createCloudFrameEncoder() override {
+      auto __result = _swiftPart.createCloudFrameEncoder();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

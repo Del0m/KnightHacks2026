@@ -3,24 +3,36 @@ import { ActivityIndicator, AppState, Linking, Platform, StyleSheet, Text, View 
 import { useFocusEffect } from 'expo-router';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { GlassChoice } from '@/components/GlassChoice';
+import { MIN_ON_DEVICE_FPS } from '@/pose/mode';
 import { usePoseOutput, type PoseEngine } from '@/pose/usePoseOutput';
 import { startPoseBenchmark, usePoseMode } from '@/pose/usePoseMode';
+import { useCloudConfig } from '@/pose/useCloudConfig';
 import type { PoseResult } from '@/pose/types';
+import { useAuth } from '@/screens/Auth/session';
 import { colors as c, typography as t } from '@/theme/tokens';
 import { assessFraming, FRAME_STALE_MS, updateStability, type Size } from './framing';
 import { cameraSpec } from './exercises';
 import { FramingGuide } from './FramingGuide';
 import { useTorchPulse } from './useTorchPulse';
 
-export default function CameraCheck({ exercise, onContinue }: { exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
+type Continue = (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void;
+/** Cloud for this camera-check session: the signed-in account and its token source. */
+type Cloud = { userId: string; getToken: () => Promise<string | null> };
+/** After this long failing, continuing without the camera becomes the main choice. */
+const RECOVERY_PRIMARY_MS = 15_000;
+const SOURCE: Record<PoseEngine, string> = { cloud: 'Cloud tracking', coreml: 'On-device tracking', vision: 'Basic tracking (Apple Vision)' };
+
+export default function CameraCheck({ exercise, onContinue }: { exercise: string; onContinue: Continue }) {
   if (Platform.OS !== 'ios') return <View style={s.group}><Text style={s.heading}>Live framing is available on iPhone.</Text><Text style={s.text}>Use the placement guide above, or continue with manual tracking on this device.</Text><GlassChoice label="Continue without camera" onPress={() => onContinue('manual')} compact /></View>;
   return <IPhoneCheck exercise={exercise} onContinue={onContinue} />;
 }
-function IPhoneCheck({ exercise, onContinue }: { exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
+function IPhoneCheck({ exercise, onContinue }: { exercise: string; onContinue: Continue }) {
   const permission = useCameraPermission();
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [focused, setFocused] = useState(true);
+  // Core ML instead of failing cloud, for this camera-check session only; the saved preference is unchanged.
+  const [local, setLocal] = useState(false);
   useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
   useEffect(() => { const subscription = AppState.addEventListener('change', state => setForeground(state === 'active')); return () => subscription.remove(); }, []);
   if (!permission.hasPermission) return <View style={s.group}>
@@ -31,24 +43,42 @@ function IPhoneCheck({ exercise, onContinue }: { exercise: string; onContinue: (
   </View>;
   // Unmounting the live check clears all detection/stability state when backgrounded or unfocused.
   if (!foreground || !focused) return <Text style={s.text}>Camera paused. Return to SteadyForum to check your framing.</Text>;
-  return <ModeCheck exercise={exercise} onContinue={onContinue} />;
+  return <ModeCheck exercise={exercise} local={local} onUseLocal={() => setLocal(true)} onContinue={onContinue} />;
 }
-function ModeCheck({ exercise, onContinue }: { exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
-  const mode = usePoseMode();
+function ModeCheck({ exercise, local, onUseLocal, onContinue }: { exercise: string; local: boolean; onUseLocal: () => void; onContinue: Continue }) {
+  const auth = useAuth();
+  const userId = auth.user?.id ?? null;
+  const mode = usePoseMode(userId);
   useEffect(() => { void startPoseBenchmark(); }, []);
   if (mode.benchmarking || mode.mode === 'pending') return <View style={s.group}><ActivityIndicator accessibilityLabel="Preparing the camera" color={c.primary} /><Text style={s.text}>Getting the camera ready…</Text><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} /></View>;
-  if (mode.mode !== 'coreml' && mode.mode !== 'vision') return <View style={s.group}>
+  const cloudMode = mode.mode === 'cloud' || mode.mode === 'paused';
+  if (mode.mode === 'unavailable' && mode.needsCloudConsent && userId) return <View style={s.group}>
+    <Text style={s.heading}>Turn on cloud tracking?</Text><Text style={s.text}>This iPhone is too slow to track reps on its own. Cloud tracking sends camera frames to the SteadyForum API for pose detection. Frames are processed in memory and never stored.</Text>
+    <GlassChoice label="Allow cloud tracking" primary selected onPress={() => mode.setCloudConsent(true)} /><GlassChoice compact label="Use basic tracking" onPress={() => mode.setPreference('vision')} /><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />
+  </View>;
+  if (!cloudMode && mode.mode !== 'coreml' && mode.mode !== 'vision') return <View style={s.group}>
     <Text style={s.heading}>Try basic on-device tracking.</Text><Text style={s.text}>The main tracker isn’t available on this phone right now. Basic tracking uses Apple Vision on your iPhone.</Text>
     <GlassChoice label="Use basic tracking" primary selected onPress={() => mode.setPreference('vision')} /><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />
   </View>;
-  return <LiveCheck key={`${mode.mode}:${mode.size}`} engine={mode.mode} size={mode.size} exercise={exercise} onContinue={onContinue} />;
+  // Cloud and paused both run the cloud transport, so it can recover; Core ML replaces it only on a tap,
+  // and only on a phone whose benchmark passed. Apple Vision is never offered as this fallback.
+  const capable = (mode.benchmark?.fps ?? 0) >= MIN_ON_DEVICE_FPS;
+  const engine: PoseEngine = cloudMode ? local ? 'coreml' : 'cloud' : mode.mode as PoseEngine;
+  const cloud = cloudMode && !local && userId && mode.cloudConsent ? { userId, getToken: auth.getApiToken } : null;
+  // Keyed by engine, not mode: a cloud <-> paused flip keeps the camera and its transport.
+  return <LiveCheck key={`${engine}:${mode.size}`} engine={engine} size={mode.size} cloud={cloud} onUseLocal={cloudMode && capable ? onUseLocal : undefined} exercise={exercise} onContinue={onContinue} />;
 }
-function LiveCheck({ engine, size, exercise, onContinue }: { engine: PoseEngine; size: 320 | 256; exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
+type LiveProps = { engine: PoseEngine; size: 320 | 256; cloud: Cloud | null; onUseLocal?: () => void; exercise: string; onContinue: Continue };
+function LiveCheck(props: LiveProps) {
   const [position, setPosition] = useState<'front' | 'back'>('front');
-  return <CameraPreview key={position} position={position} engine={engine} size={size} exercise={exercise} onFlip={() => setPosition(p => p === 'front' ? 'back' : 'front')} onContinue={onContinue} />;
+  return <CameraPreview key={position} {...props} position={position} onFlip={() => setPosition(p => p === 'front' ? 'back' : 'front')} />;
 }
-function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }: { position: 'front' | 'back'; engine: PoseEngine; size: 320 | 256; exercise: string; onFlip: () => void; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
+const noToken = async () => null;
+function CameraPreview({ position, engine, size, cloud, onUseLocal, exercise, onFlip, onContinue }: LiveProps & { position: 'front' | 'back'; onFlip: () => void }) {
   const device = useCameraDevice(position);
+  // Set on the first cloud failure; cleared by a fresh tracked result or a retry.
+  const [failingSince, setFailingSince] = useState<number | null>(null), [attempt, setAttempt] = useState(0);
+  const cloudConfig = useCloudConfig({ enabled: engine === 'cloud' && cloud != null, userId: cloud?.userId, getToken: cloud?.getToken ?? noToken, attempt, onFailure: () => setFailingSince(since => since ?? Date.now()) });
   const [result, setResult] = useState<PoseResult | undefined>();
   const [view, setView] = useState<Size | null>(null), [image, setImage] = useState<Size | null>(null);
   const [cameraError, setCameraError] = useState(false), [now, setNow] = useState(Date.now);
@@ -64,16 +94,23 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
     // app.json locks the app to portrait; native results are upright and unmirrored.
     if (r) setImage({ width: Math.min(r.width, r.height), height: Math.max(r.width, r.height) });
   }
-  const output = usePoseOutput({ engine, size, maxFps: 15, onPose: detection => {
-    const time = Date.now(); setNow(time); setResult(detection.result); resolution();
+  const output = usePoseOutput({ engine, size, maxFps: 15, cloud: cloudConfig, onPose: detection => {
+    // A frame captured more than FRAME_STALE_MS ago counts as no pose, so it can't hold Ready.
+    const time = Date.now(), captured = detection.timestampMs ?? detection.result?.timestamp_ms;
+    const pose = captured == null || time - captured <= FRAME_STALE_MS ? detection.result : undefined;
+    setNow(time); setResult(pose); resolution(); setFailingSince(null);
     if (time - lastDetection.current > FRAME_STALE_MS) stableSince.current = null;
     lastDetection.current = time;
     if (image && view) {
-      const next = updateStability(stableSince.current, assessFraming(detection.result, image, view, mirrored, time).kind === 'ready', time);
+      const next = updateStability(stableSince.current, assessFraming(pose, image, view, mirrored, time).kind === 'ready', time);
       stableSince.current = next.since; setReady(next.ready);
     }
   } });
   useLayoutEffect(() => { outputRef.current = output.frameOutput; }, [output.frameOutput]);
+  // Leaving cloud tracking clears the pose and readiness; the effect below then restarts the hold.
+  const tracking = engine !== 'cloud' || output.cloudStatus === 'tracking';
+  const [wasTracking, setWasTracking] = useState(tracking);
+  if (wasTracking !== tracking) { setWasTracking(tracking); if (!tracking) { setResult(undefined); setReady(false); } }
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(timer);
@@ -88,9 +125,18 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
     confirmed.current = true;
     signal(() => onContinue('camera', position));
   }, [valid, signal, onContinue, position]);
+  const recovering = engine === 'cloud' && failingSince != null;
+  const giveUp = recovering && now - failingSince >= RECOVERY_PRIMARY_MS;
+  const waiting = engine === 'cloud' && output.cloudStatus !== 'tracking' ? output.cloudStatus === 'connecting' ? 'Connecting…' : 'Reconnecting…' : null;
   if (!device) return <View style={s.group}><Text style={s.heading}>This camera isn’t available.</Text><GlassChoice compact label="Switch camera" onPress={onFlip} /><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} /></View>;
   return <View style={s.group}>
-    <View style={s.status} accessibilityLiveRegion="polite"><Text style={[s.heading, valid && { color: '#14744C' }]}>{cameraError || output.error ? 'Camera check interrupted' : valid ? '✓ Ready' : framing?.kind === 'ready' ? 'Hold your position…' : framing?.title ?? 'Looking for you'}</Text><Text style={s.text}>{cameraError || output.error ? 'Try switching cameras, or continue with manual tracking.' : framing?.hint ?? 'Return to your exercise spot with your whole body visible.'}</Text></View>
+    <View style={s.status} accessibilityLiveRegion="polite"><Text style={[s.heading, valid && { color: '#14744C' }]}>{cameraError || output.error ? 'Camera check interrupted' : waiting ?? (valid ? '✓ Ready' : framing?.kind === 'ready' ? 'Hold your position…' : framing?.title ?? 'Looking for you')}</Text><Text style={s.text}>{cameraError || output.error ? 'Try switching cameras, or continue with manual tracking.' : waiting ? 'Waiting for cloud tracking. Your camera stays on.' : framing?.hint ?? 'Return to your exercise spot with your whole body visible.'}</Text><Text style={s.caption}>{SOURCE[engine]}</Text></View>
+    {recovering && <View style={s.group}>
+      <Text style={s.text}>Cloud tracking isn’t responding.{onUseLocal ? ' You can track on this iPhone instead.' : ''}</Text>
+      {onUseLocal && <GlassChoice label="Use local tracking" primary={!giveUp} selected={!giveUp} compact={giveUp} onPress={onUseLocal} />}
+      <GlassChoice compact label="Retry cloud" onPress={() => { setFailingSince(null); setAttempt(a => a + 1); }} />
+      <GlassChoice label="Continue without camera" primary={giveUp} selected={giveUp} compact={!giveUp} onPress={() => onContinue('manual')} />
+    </View>}
     <View testID="framing-preview" style={s.preview} onLayout={event => { setView(event.nativeEvent.layout); stableSince.current = null; setReady(false); }}>
       <Camera style={[StyleSheet.absoluteFill, mirrored && { transform: [{ scaleX: -1 }] }]} device={device} outputs={[output.frameOutput]} isActive torchMode={torchMode} mirrorMode="off" orientationSource="interface" resizeMode="cover" onConfigured={() => { resolution(); setCameraError(false); stableSince.current = null; setReady(false); setResult(undefined); }} onError={() => { setCameraError(true); stableSince.current = null; setReady(false); }} />
       <FramingGuide ready={Boolean(valid)} />
@@ -99,7 +145,7 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
     <Text style={s.caption}>Keep your full rep inside the frame. The eight-foot guide is approximate.</Text>
     <GlassChoice compact label={position === 'front' ? 'Use back camera' : 'Use front camera'} onPress={onFlip} />
     <Text style={s.caption}>Hold your position for one second. Your workout starts automatically.{position === 'back' && device.hasTorch ? ' The light flashes when you’re ready.' : ''}</Text>
-    <GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />
+    {!recovering && <GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />}
     <Text style={s.caption}>Your workout uses the camera to count reps.</Text>
   </View>;
 }

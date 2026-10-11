@@ -8,10 +8,14 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `CloudFrame` to properly resolve imports.
+namespace margelo::nitro::steadyforumpose { struct CloudFrame; }
 // Forward declaration of `HybridCameraFrameOutputSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridCameraFrameOutputSpec; }
 // Forward declaration of `HybridCameraOutputSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridCameraOutputSpec; }
+// Forward declaration of `HybridCloudFrameEncoderSpec` to properly resolve imports.
+namespace margelo::nitro::steadyforumpose { class HybridCloudFrameEncoderSpec; }
 // Forward declaration of `HybridFrameSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridFrameSpec; }
 // Forward declaration of `HybridPoseDetectorFactorySpec` to properly resolve imports.
@@ -28,12 +32,15 @@ namespace margelo::nitro::steadyforumpose { struct PoseDetection; }
 namespace margelo::nitro::steadyforumpose { struct PoseResult; }
 
 // Include C++ defined types
+#include "CloudFrame.hpp"
+#include "HybridCloudFrameEncoderSpec.hpp"
 #include "HybridPoseDetectorFactorySpec.hpp"
 #include "HybridPoseDetectorSpec.hpp"
 #include "Joint.hpp"
 #include "PoseBenchmark.hpp"
 #include "PoseDetection.hpp"
 #include "PoseResult.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <VisionCamera/HybridCameraFrameOutputSpec.hpp>
@@ -59,6 +66,8 @@ namespace margelo::nitro::steadyforumpose { struct PoseResult; }
 namespace VisionCamera { class HybridCameraFrameOutputSpec_cxx; }
 // Forward declaration of `HybridCameraOutputSpec_cxx` to properly resolve imports.
 namespace VisionCamera { class HybridCameraOutputSpec_cxx; }
+// Forward declaration of `HybridCloudFrameEncoderSpec_cxx` to properly resolve imports.
+namespace SteadyForumPose { class HybridCloudFrameEncoderSpec_cxx; }
 // Forward declaration of `HybridFrameSpec_cxx` to properly resolve imports.
 namespace VisionCamera { class HybridFrameSpec_cxx; }
 // Forward declaration of `HybridPoseDetectorFactorySpec_cxx` to properly resolve imports.

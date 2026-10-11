@@ -9,5 +9,5 @@ Pod::Spec.new do |s|
   s.swift_version = '5.10'
   s.source        = { :path => '.' }
   s.source_files  = 'Sources/PoseCore/**/*.swift'
-  s.frameworks    = ['CoreML', 'CoreVideo', 'QuartzCore', 'ImageIO', 'Vision']
+  s.frameworks    = ['CoreImage', 'CoreML', 'CoreVideo', 'QuartzCore', 'ImageIO', 'UniformTypeIdentifiers', 'Vision']
 end

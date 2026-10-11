@@ -43,6 +43,8 @@ export interface PoseResult {
 export interface PoseDetection {
   result?: PoseResult;
   latencyMs: number;
+  /** Capture time, Unix ms; kept for no-person frames too. */
+  timestampMs?: number;
 }
 
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);

@@ -89,6 +89,41 @@ it('keeps token acquisition valid across a harmless focus refresh', async () => 
     expect(send).toHaveBeenCalledTimes(1);
   } finally { globalThis.fetch = original; }
 });
+describe('getApiToken (cloud pose socket)', () => {
+  function pendingToken() {
+    let resolve!: (value: never) => void;
+    jest.mocked(client.token).mockImplementationOnce(() => new Promise(r => { resolve = r; }) as never);
+    return (token: string) => resolve({ data: { token }, error: null } as never);
+  }
+  it('returns a fresh token for the signed-in account', async () => {
+    await mount(); const finish = pendingToken();
+    let request!: Promise<string | null>;
+    await act(async () => { request = auth.getApiToken(); await auth.refresh(); });
+    let token: string | null = null;
+    await act(async () => { finish('jwt-first'); token = await request; });
+    expect(token).toBe('jwt-first');
+  });
+  it('drops a token that arrives after logout', async () => {
+    await mount(); const finish = pendingToken();
+    let request!: Promise<string | null>;
+    await act(async () => { request = auth.getApiToken(); });
+    await act(async () => { await auth.logout(); });
+    let token: string | null = 'unset';
+    await act(async () => { finish('jwt-first'); token = await request; });
+    expect(token).toBeNull();
+  });
+  it('drops a token that arrives after the account changed', async () => {
+    await mount(); const finish = pendingToken();
+    let request!: Promise<string | null>;
+    await act(async () => { request = auth.getApiToken(); });
+    jest.mocked(client.getSession).mockResolvedValueOnce({ data: { user: { id: 'second', email: 'second@example.com', name: 'Second' }, session: {} }, error: null } as never);
+    await act(async () => { await auth.refresh(); });
+    expect(auth.user?.id).toBe('second');
+    let token: string | null = 'unset';
+    await act(async () => { finish('jwt-first'); token = await request; });
+    expect(token).toBeNull();
+  });
+});
 it('preserves a previously confirmed account during a transient focus refresh failure', async () => {
  await mount();
  jest.mocked(client.getSession).mockRejectedValueOnce(new TypeError('Network request failed'));

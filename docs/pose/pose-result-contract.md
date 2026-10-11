@@ -104,4 +104,13 @@ The output above is unchanged. How frames get to the cloud endpoint and back:
 
 Full protocol: the header of `apps/api/src/routes/poseStream.ts`. Deploy and cost: `ml/cloud_endpoint/README.md`.
 
-**Phone side (AI-17):** `apps/mobile/src/pose/cloud.ts` is the client: frame encoding, one frame in flight, a 2 s hold after a warming reply (the relay drops frames sent sooner, unanswered), an 8 s give-up on a frame with no reply, and reconnect with backoff and a fresh token. `cloudFrame.ts` encodes the JPEG inside the frame worklet with VisionCamera's `HybridFrameConverter` and nitro-image, so nothing runs on the JS thread. The conversion already applies the frame's orientation and mirroring (baked into the bitmap on Android, an orientation tag on iOS), so the client never rotates or mirrors again; it always redraws through `resize`, which is what turns the iOS tag into upright pixels. `usePoseOutput({ engine: 'cloud', cloud })` returns the same `PoseDetection`s as the on-device engines, and `usePoseMode(cloudCheck)` probes the relay so mode selection can pick `cloud` or `paused`.
+**Phone side (AI-17, iOS):**
+
+- **Encoding:** the native `CloudFrameEncoder` in `modules/steadyforum-pose` runs on the frame thread. It reuses `PoseFrameReader`, so orientation and capture time match the on-device detectors exactly. PoseCore's `CloudFrameEncoder` bakes rotation and mirroring into the pixels (no EXIF tag), scales the longest side to at most 320 px without upscaling, and writes JPEG at quality 70. Frames stay in memory and are never logged.
+- **Client:** `apps/mobile/src/pose/cloud.ts` (`CloudPoseClient`).
+  - **Flow:** at most 10 fps are encoded. One frame awaits a reply and one pending frame is replaced by newer ones. At most 2 encoded frames are queued between the frame thread and JS.
+  - **Replies:** a reply is accepted only on the current socket generation, for the in-flight timestamp, once, and no more than 1 s after capture. `result: null` becomes no person, and accepted detections carry `timestampMs` (capture time).
+  - **Timeouts:** 5 s to get `ready`, and 5 s for each reply. Reconnect backoff runs from 0.5 s to 15 s, with a fresh token each time, and resets only after a fresh pose reply.
+  - **Warming:** while warming, pending frames are dropped and the client probes once per 2 s after the latest warming reply.
+  - **Status:** `connecting`, `tracking`, `reconnecting` or `stopped`.
+- **Hook:** `usePoseOutput({ engine: 'cloud', cloud })` runs the transport only while `cloud` is non-null. The screens build it with `useCloudConfig`, which returns null unless the screen is focused, the app is in the foreground, the user is signed in, has consented for this account, the mode is `cloud`/`paused`, and no local override applies.

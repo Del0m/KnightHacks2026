@@ -6,20 +6,29 @@
 //                  JPEG ~320 px on the long side, upright and unmirrored
 //   API -> phone   JSON: ready | pose | status "warming" | error
 //
-// One frame is in flight at a time; a newer frame replaces one still waiting, as on the relay.
+// One frame is in flight at a time plus one pending frame; the newest pending frame wins, as on the
+// relay. A reply counts only for the in-flight frame on the current socket, and only while fresh.
 // The socket authenticates with the Neon Auth token (never the Hugging Face token, which stays on
 // the server). Frames live only in memory: nothing here stores or logs them.
 import type { PoseDetection, PoseResult } from './types';
 
 const HEADER_BYTES = 8;
-const BACKOFF_MS = [1000, 2000, 4000, 8000, 15000];
-/** The relay silently drops frames for this long after a warming reply (WARMING_BACKOFF_MS). */
-const WARMING_HOLD_MS = 2000;
-/** A frame with no reply by then is given up on, so a lost reply can't stall the stream. */
-const IN_FLIGHT_TIMEOUT_MS = 8000;
+/** Delay before each reconnect; the last one repeats. */
+const BACKOFF_MS = [500, 1000, 2000, 4000, 8000, 15000];
+/** The relay drops frames for this long after a warming reply (WARMING_BACKOFF_MS); probe no faster. */
+const WARMING_PROBE_MS = 2000;
+/** No `ready` by then is a connect failure. */
+const CONNECT_TIMEOUT_MS = 5000;
+/** No reply to a transmitted frame by then is a timeout, so a lost reply can't stall the stream. */
+const RESULT_TIMEOUT_MS = 5000;
+/** A reply for a frame captured longer ago than this is stale. */
+const MAX_AGE_MS = 1000;
 
-/** `live` once the relay said ready; `reconnecting` while warming up or after a drop. */
-export type CloudState = 'connecting' | 'live' | 'reconnecting' | 'closed';
+/** `tracking` once the relay said ready; `reconnecting` while warming up or after a failure. */
+export type CloudStatus = 'connecting' | 'tracking' | 'reconnecting' | 'stopped';
+export type CloudFailure = 'warming' | 'connect' | 'inference' | 'timeout' | 'stale';
+/** Frames dropped since the last reply: replaced here while pending, and skipped by the relay. */
+export interface CloudDrops { replaced: number; relay: number }
 
 export type ServerMessage =
   | { type: 'ready' }
@@ -108,168 +117,202 @@ export const nativeSocket: CreateSocket = (url, token) => {
 export interface CloudPoseOptions {
   url: string;
   getToken: () => Promise<string | null>;
-  onPose: (d: PoseDetection, dropped: number) => void;
-  onState?: (state: CloudState, error: string | null) => void;
+  onPose: (d: PoseDetection, drops: CloudDrops) => void;
+  onStatus?: (status: CloudStatus) => void;
+  /** True once the relay is ready; false after a failure or a drop. */
+  onAvailability?: (available: boolean) => void;
+  onFailure?: (kind: CloudFailure) => void;
   createSocket?: CreateSocket;
-  /** Reconnect delays; the last one repeats. */
-  backoffMs?: number[];
-  setTimer?: (fn: () => void, ms: number) => unknown;
-  clearTimer?: (id: unknown) => void;
-  now?: () => number;
 }
+
+type Frame = { ts: number; jpeg: ArrayBuffer };
 
 /**
  * The phone side of the relay. `send` a frame whenever the camera has one; it goes out at once
  * if nothing is in flight, else it waits (replacing any older waiting frame) until the reply.
+ * Each connection attempt is a generation: callbacks from an older one do nothing.
  */
 export class CloudPoseClient {
+  private gen = 0;
   private socket: SocketLike | null = null;
   private ready = false; // the relay said ready on this socket
-  private inFlight = false;
-  private waiting: ArrayBuffer | null = null;
-  private holdUntil = 0; // after a warming reply, frames sent before this are dropped by the relay
+  private available = false;
+  private warming = false;
+  private inFlight: number | null = null; // timestamp of the frame awaiting its reply
+  private answered: number | null = null;
+  private pending: Frame | null = null;
+  private lastSentAt = 0;
   private attempt = 0;
-  private timer: unknown = null; // reconnect
-  private holdTimer: unknown = null; // flush when the warming hold ends
-  private watchdog: unknown = null; // in-flight frame with no reply
+  private replaced = 0;
+  private relay = 0;
+  private timers = new Set<ReturnType<typeof setTimeout>>();
+  private resultTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
-  private state: CloudState = 'connecting';
-
-  private now() { return (this.opts.now ?? Date.now)(); }
-  private schedule(fn: () => void, ms: number) { return (this.opts.setTimer ?? setTimeout)(fn, ms); }
-  private cancel(id: unknown) { if (id != null) (this.opts.clearTimer ?? clearTimeout)(id as ReturnType<typeof setTimeout>); }
+  private status: CloudStatus | null = null;
 
   constructor(private readonly opts: CloudPoseOptions) {}
 
   start(): void {
-    this.closed = false;
+    if (this.closed) return;
+    this.setStatus('connecting');
     void this.connect();
   }
 
-  /** Queues one encoded frame (from `encodeFrame`); sent now if nothing is in flight. */
-  send(frame: ArrayBuffer): void {
+  /** Queues one JPEG captured at `timestampMs`; sent now if nothing is in flight. */
+  send(timestampMs: number, jpeg: ArrayBuffer): void {
     if (this.closed) return;
-    this.waiting = frame; // newest wins; an older waiting frame is dropped
+    const frame = { ts: timestampMs, jpeg };
+    if (this.warming) {
+      // The relay is starting up: one probe every 2 s, everything in between is discarded.
+      if (this.ready && this.inFlight == null && Date.now() - this.lastSentAt >= WARMING_PROBE_MS) this.transmit(frame);
+      return;
+    }
+    if (this.pending) this.replaced += 1;
+    this.pending = frame;
     this.flush();
   }
 
+  /** Final: stops the socket, timers and any token request; later callbacks do nothing. */
   close(): void {
+    if (this.closed) return;
     this.closed = true;
-    this.waiting = null;
-    for (const id of [this.timer, this.holdTimer, this.watchdog]) this.cancel(id);
-    this.timer = this.holdTimer = this.watchdog = null;
-    const s = this.socket;
-    this.socket = null;
-    if (s) { s.onclose = null; s.close(); }
-    this.setState('closed', null);
+    this.drop();
+    this.setStatus('stopped');
   }
 
-  private setState(state: CloudState, error: string | null) {
-    this.state = state;
-    this.opts.onState?.(state, error);
+  private setStatus(status: CloudStatus) {
+    if (this.status === status) return;
+    this.status = status;
+    this.opts.onStatus?.(status);
+  }
+
+  private setAvailable(available: boolean) {
+    if (this.available === available) return;
+    this.available = available;
+    this.opts.onAvailability?.(available);
+  }
+
+  /** A timer that only fires for the generation that set it. */
+  private after(ms: number, fn: () => void) {
+    const gen = this.gen;
+    const id = setTimeout(() => {
+      this.timers.delete(id);
+      if (!this.closed && gen === this.gen) fn();
+    }, ms);
+    this.timers.add(id);
+    return id;
   }
 
   private async connect(): Promise<void> {
-    if (this.closed) return;
+    const gen = ++this.gen;
     let token: string | null;
     try { token = await this.opts.getToken(); } catch { token = null; }
-    if (this.closed) return;
-    if (!token) { this.retry('Please log in to use cloud mode.'); return; }
+    if (this.closed || gen !== this.gen) return;
+    if (!token) { this.fail('connect'); return; }
 
-    const socket = (this.opts.createSocket ?? nativeSocket)(this.opts.url, token);
+    let socket: SocketLike;
+    try { socket = (this.opts.createSocket ?? nativeSocket)(this.opts.url, token); } catch { this.fail('connect'); return; }
     socket.binaryType = 'arraybuffer';
     this.socket = socket;
-    this.ready = false;
-    this.settle();
-    socket.onmessage = (e) => this.onMessage(parseServerMessage(e.data));
-    socket.onerror = () => {}; // onclose follows and reconnects
-    socket.onclose = () => {
-      if (this.socket !== socket) return;
-      this.socket = null;
-      this.retry(this.state === 'live' ? 'Connection to the pose service dropped.' : 'Could not reach the pose service.');
-    };
+    const live = () => !this.closed && gen === this.gen && this.socket === socket;
+    socket.onmessage = (e) => { if (live()) this.onMessage(parseServerMessage(e.data)); };
+    // Error and close usually both fire; the first ends this generation, so the second does nothing.
+    socket.onerror = socket.onclose = () => { if (live()) this.fail(this.ready ? null : 'connect'); };
+    this.after(CONNECT_TIMEOUT_MS, () => { if (!this.ready) this.fail('connect'); });
   }
 
   private onMessage(m: ServerMessage | null) {
     if (!m) return;
     if (m.type === 'ready') {
-      this.attempt = 0;
+      if (this.ready) return;
       this.ready = true;
-      this.setState('live', null);
+      this.setStatus('tracking');
+      this.setAvailable(true);
       this.flush();
     } else if (m.type === 'status') {
-      // The endpoint is scaling up from zero. Show "reconnecting", and hold the next frame until
-      // the relay's back-off ends, since it drops (and never answers) frames sent before then.
+      // The endpoint is scaling up from zero: this answers the in-flight frame, and the relay
+      // drops (never answers) whatever arrives in the next 2 s.
       this.settle();
-      this.holdUntil = this.now() + WARMING_HOLD_MS;
-      this.setState('reconnecting', null);
-      this.cancel(this.holdTimer);
-      this.holdTimer = this.schedule(() => { this.holdTimer = null; this.flush(); }, WARMING_HOLD_MS);
-    } else if (m.type === 'pose') {
-      if (this.state !== 'live') this.setState('live', null);
-      this.settle();
-      const result = m.result ? { ...m.result, source: 'cloud' as const } : undefined;
-      this.opts.onPose({ result, latencyMs: m.latency_ms }, m.dropped);
-      this.flush();
+      this.warming = true;
+      this.pending = null;
+      this.lastSentAt = Date.now(); // the relay's hold starts at its reply, not at our send
+      this.failure('warming');
+    } else if (m.type === 'error') {
+      this.fail('inference');
     } else {
-      // A relay error ends this socket; reconnect from scratch.
-      const s = this.socket;
-      this.socket = null;
-      if (s) { s.onclose = null; s.close(); }
-      this.retry(m.message);
+      if (this.inFlight == null || m.timestamp_ms !== this.inFlight || m.timestamp_ms === this.answered) return;
+      this.settle();
+      this.answered = m.timestamp_ms;
+      this.relay += m.dropped;
+      if (Date.now() - m.timestamp_ms > MAX_AGE_MS) {
+        this.failure('stale');
+      } else {
+        this.attempt = 0;
+        this.warming = false;
+        this.setStatus('tracking');
+        this.setAvailable(true);
+        const drops = { replaced: this.replaced, relay: this.relay };
+        this.replaced = this.relay = 0;
+        const result = m.result ? { ...m.result, source: 'cloud' as const } : undefined;
+        this.opts.onPose({ result, latencyMs: m.latency_ms, timestampMs: m.timestamp_ms }, drops);
+      }
+      this.flush();
     }
   }
 
-  /** The in-flight frame got its reply (or is given up on). */
+  /** The in-flight frame got its reply. */
   private settle() {
-    this.inFlight = false;
-    this.cancel(this.watchdog);
-    this.watchdog = null;
+    this.inFlight = null;
+    if (this.resultTimer != null) { clearTimeout(this.resultTimer); this.timers.delete(this.resultTimer); }
+    this.resultTimer = null;
   }
 
   private flush() {
-    const next = this.waiting;
-    if (!next || this.inFlight || !this.ready || this.socket?.readyState !== OPEN || this.now() < this.holdUntil) return;
-    this.waiting = null;
-    this.inFlight = true;
-    this.socket.send(next);
-    this.watchdog = this.schedule(() => { this.watchdog = null; this.inFlight = false; this.flush(); }, IN_FLIGHT_TIMEOUT_MS);
+    const next = this.pending;
+    if (!next || this.warming || this.inFlight != null || !this.ready) return;
+    this.pending = null;
+    this.transmit(next);
   }
 
-  private retry(error: string) {
-    if (this.closed) return;
+  private transmit(frame: Frame) {
+    if (this.socket?.readyState !== OPEN) return;
+    this.inFlight = frame.ts;
+    this.lastSentAt = Date.now();
+    this.socket.send(encodeFrame(frame.ts, frame.jpeg));
+    this.resultTimer = this.after(RESULT_TIMEOUT_MS, () => this.fail('timeout'));
+  }
+
+  /** A failure that keeps the socket: not tracking until a fresh reply. */
+  private failure(kind: CloudFailure) {
+    this.setStatus('reconnecting');
+    this.setAvailable(false);
+    this.opts.onFailure?.(kind);
+  }
+
+  /** Ends this generation: socket, timers and frames. */
+  private drop() {
+    this.gen += 1;
+    for (const id of this.timers) clearTimeout(id);
+    this.timers.clear();
+    this.resultTimer = null;
+    this.inFlight = null;
+    this.pending = null;
     this.ready = false;
-    this.settle();
-    this.setState('reconnecting', error);
-    const delays = this.opts.backoffMs ?? BACKOFF_MS;
-    const delay = delays[Math.min(this.attempt, delays.length - 1)]!;
-    this.attempt += 1;
-    this.timer = this.schedule(() => { this.timer = null; void this.connect(); }, delay);
+    this.warming = false;
+    const s = this.socket;
+    this.socket = null;
+    s?.close();
   }
-}
 
-/**
- * Whether the relay accepts this user right now: opens a socket and waits for `ready` (or a
- * warming status, which also means it's there). Resolves false on close, error or timeout.
- */
-export function probeCloud(url: string, token: string, timeoutMs = 5000, createSocket: CreateSocket = nativeSocket): Promise<boolean> {
-  return new Promise((resolve) => {
-    let socket: SocketLike | null = null;
-    const finish = (ok: boolean) => {
-      clearTimeout(timer);
-      const s = socket;
-      socket = null;
-      if (s) { s.onclose = null; s.onmessage = null; s.close(); }
-      resolve(ok);
-    };
-    const timer = setTimeout(() => finish(false), timeoutMs);
-    try { socket = createSocket(url, token); } catch { finish(false); return; }
-    socket.onmessage = (e) => {
-      const m = parseServerMessage(e.data);
-      if (m?.type === 'ready' || m?.type === 'status') finish(true);
-      else if (m?.type === 'error') finish(false);
-    };
-    socket.onerror = () => {};
-    socket.onclose = () => finish(false);
-  });
+  /** Closes the socket and reconnects after the backoff. `null`: a drop after ready, not a failure. */
+  private fail(kind: CloudFailure | null) {
+    if (this.closed) return;
+    this.drop();
+    this.setStatus('reconnecting');
+    this.setAvailable(false);
+    if (kind) this.opts.onFailure?.(kind);
+    const delay = BACKOFF_MS[Math.min(this.attempt, BACKOFF_MS.length - 1)]!;
+    this.attempt += 1;
+    this.after(delay, () => void this.connect());
+  }
 }

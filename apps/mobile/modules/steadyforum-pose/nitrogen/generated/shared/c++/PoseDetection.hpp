@@ -43,10 +43,11 @@ namespace margelo::nitro::steadyforumpose {
   public:
     std::optional<PoseResult> result     SWIFT_PRIVATE;
     double latencyMs     SWIFT_PRIVATE;
+    std::optional<double> timestampMs     SWIFT_PRIVATE;
 
   public:
     PoseDetection() = default;
-    explicit PoseDetection(std::optional<PoseResult> result, double latencyMs): result(result), latencyMs(latencyMs) {}
+    explicit PoseDetection(std::optional<PoseResult> result, double latencyMs, std::optional<double> timestampMs): result(result), latencyMs(latencyMs), timestampMs(timestampMs) {}
 
   public:
     friend bool operator==(const PoseDetection& lhs, const PoseDetection& rhs) = default;
@@ -63,13 +64,15 @@ namespace margelo::nitro {
       jsi::Object obj = arg.asObject(runtime);
       return margelo::nitro::steadyforumpose::PoseDetection(
         JSIConverter<std::optional<margelo::nitro::steadyforumpose::PoseResult>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "result"))),
-        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "latencyMs")))
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "latencyMs"))),
+        JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timestampMs")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::steadyforumpose::PoseDetection& arg) {
       jsi::Object obj(runtime);
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "result"), JSIConverter<std::optional<margelo::nitro::steadyforumpose::PoseResult>>::toJSI(runtime, arg.result));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "latencyMs"), JSIConverter<double>::toJSI(runtime, arg.latencyMs));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "timestampMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.timestampMs));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -82,6 +85,7 @@ namespace margelo::nitro {
       }
       if (!JSIConverter<std::optional<margelo::nitro::steadyforumpose::PoseResult>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "result")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "latencyMs")))) return false;
+      if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timestampMs")))) return false;
       return true;
     }
   };

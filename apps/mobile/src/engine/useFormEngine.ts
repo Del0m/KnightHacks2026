@@ -93,7 +93,8 @@ export function useFormEngine(
     (d: PoseDetection) => {
       if (!engine) return;
       if (d.result) clock.observe(d.result.timestamp_ms);
-      publish(d.result ? engine.push(d.result) : engine.pushAbsent(clock.now()));
+      // A no-person cloud frame still has its capture time; on-device ones fall back to the pose clock.
+      publish(d.result ? engine.push(d.result) : engine.pushAbsent(d.timestampMs ?? clock.now()));
     },
     [engine, clock, publish],
   );

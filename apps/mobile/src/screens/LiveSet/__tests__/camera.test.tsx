@@ -8,6 +8,8 @@ import type { PoseResult } from '@/pose/types';
 const { act, create } = require('react-test-renderer');
 jest.mock('@/components/GlassChoice', () => ({ GlassChoice: (props: unknown) => require('react').createElement('Choice', props) }));
 jest.mock('@/pose/usePoseOutput', () => ({ usePoseOutput: jest.fn() }));
+jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: { id: 'user-1' }, getApiToken: async () => null }) }));
+jest.mock('@/screens/Auth/client', () => ({ apiUrl: 'https://api.test' }));
 jest.mock('@/pose/usePoseMode', () => ({ usePoseMode: () => ({ mode: 'coreml', size: 320 }), startPoseBenchmark: jest.fn() }));
 jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void) => require('react').useEffect(callback, []) }));
 jest.mock('react-native-vision-camera', () => ({ Camera: (props: unknown) => require('react').createElement('Camera', props), useCameraDevice: () => ({ id: 'front' }), useCameraPermission: jest.fn() }));

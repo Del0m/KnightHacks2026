@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { Linking, Platform, Pressable, Share, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { AppState, Linking, Platform, Pressable, Share, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { PoseSkeleton } from './PoseSkeleton';
 import type { PoseDetection } from './types';
 import { isBasicModeSupported } from './basic';
-import { usePoseOutput, type PoseEngine } from './usePoseOutput';
+import { usePoseOutput, type CloudConfig, type PoseEngine } from './usePoseOutput';
 import { usePoseMode, type PoseModeState } from './usePoseMode';
+import { useCloudConfig } from './useCloudConfig';
 import { EXERCISE_SPECS } from '../engine/specs';
 import { useFormEngine } from '../engine/useFormEngine';
 import { useFormRules } from '../engine/useFormRules';
@@ -13,6 +15,7 @@ import { restNote } from '../engine/rules';
 import type { ExerciseSpec, RepResult } from '../engine/types';
 import { createPoseClock } from '../engine/poseClock';
 import { createClipRecorder } from '../engine/recording';
+import { useAuth } from '../screens/Auth/session';
 
 type Size = { width: number; height: number };
 
@@ -76,8 +79,24 @@ export function PoseDebugScreen() {
 }
 
 function PoseCamera() {
-  const poseMode = usePoseMode();
+  const auth = useAuth();
+  const userId = auth.user?.id ?? null;
+  const poseMode = usePoseMode(userId);
   const [position, setPosition] = useState<'front' | 'back'>('front');
+  // Cloud frames go out only while this screen is in the foreground and focused (AI-17).
+  const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => setForeground(state === 'active'));
+    return () => subscription.remove();
+  }, []);
+  const { mode, cloudConsent } = poseMode;
+  const cloud = useCloudConfig({
+    enabled: (mode === 'cloud' || mode === 'paused') && cloudConsent && foreground && focused,
+    userId,
+    getToken: auth.getApiToken,
+  });
   // The camera's detector would compete with the benchmark for the Neural Engine, so it is unmounted.
   if (poseMode.benchmarking) {
     return (
@@ -86,16 +105,18 @@ function PoseCamera() {
       </View>
     );
   }
-  return <LiveCamera poseMode={poseMode} position={position} setPosition={setPosition} />;
+  return <LiveCamera poseMode={poseMode} cloud={cloud} position={position} setPosition={setPosition} />;
 }
 
-function LiveCamera({ poseMode, position, setPosition }: {
+function LiveCamera({ poseMode, cloud, position, setPosition }: {
   poseMode: PoseModeState;
+  cloud: CloudConfig | null;
   position: 'front' | 'back';
   setPosition: Dispatch<SetStateAction<'front' | 'back'>>;
 }) {
   const { mode, benchmark, size, preference, setPreference, cloudConsent, setCloudConsent, needsCloudConsent } = poseMode;
-  const engine: PoseEngine = mode === 'vision' ? 'vision' : 'coreml';
+  // No implicit Core ML: without a source (pending, unavailable) the cloud engine runs with no config, so nothing does.
+  const engine: PoseEngine = mode === 'coreml' || mode === 'vision' ? mode : 'cloud';
   const device = useCameraDevice(position);
   const [detection, setDetection] = useState<PoseDetection | null>(null);
   const [viewSize, setViewSize] = useState<Size | null>(null);
@@ -116,8 +137,10 @@ function LiveCamera({ poseMode, position, setPosition }: {
     resetRules();
   }, [resetEngine, resetRules]);
   const recorder = useRef<ReturnType<typeof createClipRecorder> | null>(null);
-  const clock = useRef(createPoseClock()).current;
+  const clock = useRef(createPoseClock());
   const [recording, setRecording] = useState(false);
+  // Capture to result, ms: what the owner's on-device demo measures.
+  const [age, setAge] = useState<number | null>(null);
 
   // On a cold start `onConfigured` can fire before the resolution is known, so the first pose fills it in.
   const frameOutputRef = useRef<{ currentResolution?: Size } | null>(null);
@@ -125,11 +148,27 @@ function LiveCamera({ poseMode, position, setPosition }: {
     setDetection(d);
     setImageSize((s) => s ?? uprightSize(frameOutputRef.current?.currentResolution));
     formOnPose(d);
-    if (d.result) clock.observe(d.result.timestamp_ms);
-    recorder.current?.add(d, clock.now());
-  }, [formOnPose, clock]);
-  const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size, maxFps: 15, onPose });
+    // Capture time; a no-person cloud frame has one too.
+    const captured = d.timestampMs ?? d.result?.timestamp_ms;
+    setAge(captured != null ? Date.now() - captured : null);
+    if (captured != null) clock.current.observe(captured);
+    recorder.current?.add(d, clock.current.now());
+  }, [formOnPose]);
+  const { frameOutput, fps, error, model, dropped, cloudStatus } = usePoseOutput({ engine, size, maxFps: 15, onPose, cloud });
   useLayoutEffect(() => { frameOutputRef.current = frameOutput; }, [frameOutput]);
+
+  // An interruption or a source switch starts over: no overlay, rep state or clock spans the gap.
+  const live = engine !== 'cloud' || cloudStatus === 'tracking';
+  const [source, setSource] = useState({ engine, live });
+  if (source.engine !== engine || source.live !== live) {
+    setSource({ engine, live });
+    setDetection(null);
+    setAge(null);
+  }
+  useEffect(() => {
+    resetForm();
+    clock.current = createPoseClock();
+  }, [engine, live, resetForm]);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -146,6 +185,12 @@ function LiveCamera({ poseMode, position, setPosition }: {
   const toggleEngine = useCallback(() => {
     setDetection(null);
     setPreference(preference === 'vision' ? 'auto' : 'vision');
+  }, [preference, setPreference]);
+
+  // A phone that passes the benchmark only runs cloud when the user picks it.
+  const toggleCloud = useCallback(() => {
+    setDetection(null);
+    setPreference(preference === 'cloud' ? 'auto' : 'cloud');
   }, [preference, setPreference]);
 
   const nextExercise = useCallback(() => {
@@ -219,6 +264,9 @@ function LiveCamera({ poseMode, position, setPosition }: {
           <Text style={styles.readoutText}>
             {model ?? 'no model'} · dropped {dropped}
           </Text>
+          <Text style={styles.readoutText} testID="pose-source-readout">
+            source {engine} · {cloudStatus ?? 'on device'} · capture→result {age ?? '–'} ms
+          </Text>
           <Text style={styles.readoutText}>
             mode {mode} · consent {cloudConsent ? 'yes' : needsCloudConsent ? 'needed' : 'no'}
           </Text>
@@ -271,6 +319,10 @@ function LiveCamera({ poseMode, position, setPosition }: {
         onPress={() => { poseMode.rerunBenchmark(); }}
       >
         <Text style={styles.buttonText}>Re-run benchmark</Text>
+      </Pressable>
+
+      <Pressable testID="pose-cloud-toggle" style={[styles.button, styles.cloud]} onPress={toggleCloud}>
+        <Text style={styles.buttonText}>{preference === 'cloud' ? 'Use automatic' : 'Use cloud'}</Text>
       </Pressable>
 
       <Pressable
@@ -328,7 +380,8 @@ const styles = StyleSheet.create({
   flip: { position: 'absolute', bottom: 48, alignSelf: 'center' },
   engine: { position: 'absolute', bottom: 108, alignSelf: 'center' },
   rerun: { position: 'absolute', bottom: 168, alignSelf: 'center' },
-  consent: { position: 'absolute', bottom: 228, alignSelf: 'center' },
+  consent: { position: 'absolute', bottom: 228, right: 16 },
+  cloud: { position: 'absolute', bottom: 228, left: 16 },
   exercise: { position: 'absolute', bottom: 288, alignSelf: 'center' },
   record: { position: 'absolute', bottom: 348, alignSelf: 'center' },
   newSet: { position: 'absolute', bottom: 408, alignSelf: 'center' },

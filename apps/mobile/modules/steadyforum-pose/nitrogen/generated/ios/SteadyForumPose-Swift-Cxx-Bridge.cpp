@@ -8,6 +8,7 @@
 #include "SteadyForumPose-Swift-Cxx-Bridge.hpp"
 
 // Include C++ implementation defined types
+#include "HybridCloudFrameEncoderSpecSwift.hpp"
 #include "HybridPoseDetectorFactorySpecSwift.hpp"
 #include "HybridPoseDetectorSpecSwift.hpp"
 #include "SteadyForumPose-Swift-Cxx-Umbrella.hpp"
@@ -59,6 +60,22 @@ namespace margelo::nitro::steadyforumpose::bridge::swift {
     }
     #endif
     SteadyForumPose::HybridPoseDetectorSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridCloudFrameEncoderSpec>
+  std::shared_ptr<HybridCloudFrameEncoderSpec> create_std__shared_ptr_HybridCloudFrameEncoderSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    SteadyForumPose::HybridCloudFrameEncoderSpec_cxx swiftPart = SteadyForumPose::HybridCloudFrameEncoderSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::steadyforumpose::HybridCloudFrameEncoderSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridCloudFrameEncoderSpec_(std__shared_ptr_HybridCloudFrameEncoderSpec_ cppType) {
+    std::shared_ptr<margelo::nitro::steadyforumpose::HybridCloudFrameEncoderSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::steadyforumpose::HybridCloudFrameEncoderSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridCloudFrameEncoderSpec\" is not implemented in Swift!");
+    }
+    #endif
+    SteadyForumPose::HybridCloudFrameEncoderSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
   

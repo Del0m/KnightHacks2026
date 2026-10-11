@@ -16,6 +16,7 @@ public protocol HybridPoseDetectorFactorySpec_protocol: HybridObject {
   func createPoseDetector(size: Double) throws -> (any HybridPoseDetectorSpec)
   func createBasicPoseDetector() throws -> (any HybridPoseDetectorSpec)
   func poseModelId() throws -> String
+  func createCloudFrameEncoder() throws -> (any HybridCloudFrameEncoderSpec)
   func benchmarkPoseModel(size: Double, warmUpMs: Double, measureMs: Double) throws -> Promise<PoseBenchmark>
 }
 

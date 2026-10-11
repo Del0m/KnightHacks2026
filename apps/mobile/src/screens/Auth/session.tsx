@@ -107,8 +107,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message || 'Could not send verification email.');
   }
   async function getApiToken() {
-    if (!authClient || !state.user || activeUser.current !== state.user.id) return null;
+    // A token for an account that logged out or changed while it was fetched is never handed out.
+    const requestGeneration = generation.current, requestUser = activeUser.current;
+    if (!authClient || !state.user || requestUser !== state.user.id) return null;
     const { data, error } = await authClient.token();
+    if (requestGeneration !== generation.current || requestUser !== activeUser.current) return null;
     return error || !data?.token ? null : data.token;
   }
   async function apiFetch(path: string, options?: RequestInit) {

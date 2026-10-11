@@ -1,10 +1,12 @@
 // Persisted pose mode inputs (AI-04): the cached benchmark, the user's preference and cloud consent.
-// MMKV reads are synchronous, so the mode is known on the first render after launch.
+// MMKV reads are synchronous, so the mode is known on the first render after launch. Consent is per
+// account (`cloudConsent:<userId>`, AI-17); the old device-wide `cloudConsent` key is never read.
 import { createMMKV, type MMKV } from 'react-native-mmkv';
 import type { BenchmarkResult } from './benchmark';
 import type { PosePreference } from './mode';
 
-const KEYS = { benchmark: 'benchmark', preference: 'preference', cloudConsent: 'cloudConsent' } as const;
+const KEYS = { benchmark: 'benchmark', preference: 'preference' } as const;
+const consentKey = (userId: string) => `cloudConsent:${userId}`;
 const PREFERENCES: readonly PosePreference[] = ['auto', 'cloud', 'vision'];
 
 let storage: MMKV | undefined;
@@ -36,13 +38,13 @@ export function savePreference(preference: PosePreference): void {
   store().set(KEYS.preference, preference);
 }
 
-/** Defaults to false. */
-export function loadCloudConsent(): boolean {
-  return store().getBoolean(KEYS.cloudConsent) ?? false;
+/** This account agreed to send frames to the cloud endpoint. False without an account. */
+export function loadCloudConsent(userId: string | null | undefined): boolean {
+  return userId ? store().getBoolean(consentKey(userId)) ?? false : false;
 }
 
-export function saveCloudConsent(consent: boolean): void {
-  store().set(KEYS.cloudConsent, consent);
+export function saveCloudConsent(userId: string, consent: boolean): void {
+  store().set(consentKey(userId), consent);
 }
 
 /** Test-only: wipes the store. */

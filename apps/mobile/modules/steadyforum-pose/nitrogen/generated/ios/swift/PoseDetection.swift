@@ -18,14 +18,20 @@ public extension PoseDetection {
   /**
    * Create a new instance of `PoseDetection`.
    */
-  init(result: PoseResult?, latencyMs: Double) {
+  init(result: PoseResult?, latencyMs: Double, timestampMs: Double?) {
     self.init({ () -> bridge.std__optional_PoseResult_ in
       if let __unwrappedValue = result {
         return bridge.create_std__optional_PoseResult_(__unwrappedValue)
       } else {
         return .init()
       }
-    }(), latencyMs)
+    }(), latencyMs, { () -> bridge.std__optional_double_ in
+      if let __unwrappedValue = timestampMs {
+        return bridge.create_std__optional_double_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }())
   }
 
   @inline(__always)
@@ -36,5 +42,17 @@ public extension PoseDetection {
   @inline(__always)
   var latencyMs: Double {
     return self.__latencyMs
+  }
+  
+  @inline(__always)
+  var timestampMs: Double? {
+    return { () -> Double? in
+      if bridge.has_value_std__optional_double_(self.__timestampMs) {
+        let __unwrapped = bridge.get_std__optional_double_(self.__timestampMs)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
   }
 }
