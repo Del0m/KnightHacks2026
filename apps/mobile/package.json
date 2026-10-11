@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@better-auth/expo": "^1.7.7",
+    "@react-native-community/slider": "5.2.0",
     "better-auth": "^1.7.7",
     "expo": "~57.0.27",
     "expo-build-properties": "~57.0.22",
@@ -33,6 +34,7 @@
     "react-native-vision-camera": "^5.2.3",
     "react-native-vision-camera-worklets": "^5.2.3",
     "react-native-web": "~0.21.0",
+    "react-native-webview": "13.16.1",
     "react-native-worklets": "0.10.1",
     "spotter-pose": "file:./modules/spotter-pose"
   },

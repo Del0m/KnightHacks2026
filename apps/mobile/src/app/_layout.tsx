@@ -4,6 +4,7 @@ import { DefaultTheme, Stack, ThemeProvider, router, usePathname } from 'expo-ro
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { checkForModelUpdates } from '@/models/modelUpdates';
+import { WorkoutSync } from '@/services/WorkoutSync';
 import { TrainingProvider } from '@/state/Training';
 import { useTheme } from '@/theme/tokens';
 import { AuthProvider, useAuth } from '@/screens/Auth/session';
@@ -42,9 +43,9 @@ function AuthenticatedApp() {
       card: theme.colors.surface, text: theme.colors.text, border: theme.colors.border,
     } }}>
       <StatusBar style="dark" />
-      <OnboardingEntry />
+      <OnboardingEntry /><WorkoutSync />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
-        <Stack.Screen name="(tabs)" /><Stack.Screen name="workout" />
+        <Stack.Screen name="(tabs)" /><Stack.Screen name="workout" /><Stack.Screen name="practice" />
         <Stack.Screen name="onboarding" /><Stack.Screen name="camera-setup" />
         <Stack.Protected guard={!auth.user}>
           <Stack.Screen name="login" /><Stack.Screen name="signup" />

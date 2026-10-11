@@ -23,7 +23,7 @@ The throttle regression test processes 150 of 300 nominal 30 fps frames over 10 
 Native build command, from `apps/mobile`:
 
 ```bash
-xcodebuild -workspace ios/Spotter.xcworkspace -scheme Spotter \
+xcodebuild -workspace ios/SteadyForum.xcworkspace -scheme SteadyForum \
   -configuration Release -destination 'generic/platform=iOS' \
   -derivedDataPath /private/tmp/spotter-pose-final-build \
   build CODE_SIGNING_ALLOWED=NO

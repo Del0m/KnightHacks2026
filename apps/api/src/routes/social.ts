@@ -10,7 +10,7 @@ import { Router, type Request } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
-import { badRequest, HttpError, notFound, parse, send, userId } from "../http.js";
+import { badRequest, conflict, HttpError, notFound, parse, send, userId } from "../http.js";
 import { BLOCKED_MESSAGE, type Moderator } from "../services/moderation.js";
 import { visiblePostsFilter } from "./feed.js";
 
@@ -67,6 +67,36 @@ async function visiblePost(db: Db, me: string, postId: string) {
 
 export function socialRouter(db: Db, moderator: Moderator): Router {
   const router = Router();
+
+  // The session row lock serializes retries; sharing this workout creates one session post.
+  router.put("/sessions/:id/share", async (req, res) => {
+    const me = userId(req),
+      sessionId = parse(z.string().uuid(), req.params.id);
+    const input = parse(postInput.pick({ body: true, data: true }), req.body);
+    await moderate(db, moderator, req, input.body, { kind: "post" });
+    const post = await db.transaction(async (tx) => {
+      const [session] = await tx
+        .select()
+        .from(sessions)
+        .where(and(eq(sessions.id, sessionId), eq(sessions.userId, me)))
+        .for("update")
+        .limit(1);
+      if (!session) throw notFound("Session");
+      if (!session.finishedAt) throw conflict("This session is not finished");
+      const [existing] = await tx
+        .select()
+        .from(posts)
+        .where(and(eq(posts.authorId, me), eq(posts.sessionId, sessionId), eq(posts.kind, "session")))
+        .limit(1);
+      if (existing) return existing;
+      const [created] = await tx
+        .insert(posts)
+        .values({ authorId: me, kind: "session", sessionId, body: input.body, data: input.data ?? null })
+        .returning();
+      return created;
+    });
+    send(res, post);
+  });
 
   router.post("/posts", async (req, res) => {
     const me = userId(req);
