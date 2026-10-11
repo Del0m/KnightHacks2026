@@ -262,32 +262,34 @@ describe('CloudPoseClient', () => {
     expect(socket().sent).toHaveLength(2);
   });
 
-  it('while warming: reconnecting, pending frames discarded, at most one probe per 2 s', async () => {
+  it('while warming: reconnecting, pending frames discarded, at most one probe per 2 s after each warming reply', async () => {
     start();
     await connected();
     const a = send(1); // in flight
     await advance(10);
     send(2); // pending
+    const w = Date.now();
     socket().reply({ type: 'status', status: 'warming' });
     expect(statuses.at(-1)).toBe('reconnecting');
     expect(failures).toEqual(['warming']);
     expect(available).toEqual([true, false]);
     expect(socket().sent).toHaveLength(1); // pending frame discarded, not sent
 
-    jest.setSystemTime(a + 1999);
+    jest.setSystemTime(w + 1999);
     send(3);
     expect(socket().sent).toHaveLength(1);
-    jest.setSystemTime(a + 2000);
+    jest.setSystemTime(w + 2000);
     const probe = send(4);
     expect(socket().stamps()).toEqual([a, probe]);
-    jest.setSystemTime(a + 2100);
+    jest.setSystemTime(w + 2100);
     send(5); // probe in flight: discarded
+    const w2 = Date.now();
     socket().reply({ type: 'status', status: 'warming' });
     expect(failures).toEqual(['warming', 'warming']);
-    jest.setSystemTime(probe + 1999);
+    jest.setSystemTime(w2 + 1999);
     send(6);
     expect(socket().sent).toHaveLength(2);
-    jest.setSystemTime(probe + 2000);
+    jest.setSystemTime(w2 + 2000);
     const probe2 = send(7);
     expect(socket().stamps()).toEqual([a, probe, probe2]);
     socket().reply(pose(probe2));

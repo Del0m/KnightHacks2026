@@ -235,6 +235,7 @@ export class CloudPoseClient {
       this.settle();
       this.warming = true;
       this.pending = null;
+      this.lastSentAt = Date.now(); // the relay's hold starts at its reply, not at our send
       this.failure('warming');
     } else if (m.type === 'error') {
       this.fail('inference');

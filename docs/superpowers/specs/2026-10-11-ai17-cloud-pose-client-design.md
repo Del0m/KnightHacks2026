@@ -113,7 +113,8 @@ export interface CloudDrops { replaced: number; relay: number } // client-side r
   - Nothing is sent before `ready`, or while another frame is in flight.
 - While warming:
   - Pending frames are discarded rather than held.
-  - At most one probe frame goes out every 2 s, measured from the last transmission.
+  - At most one probe frame goes out every 2 s, measured from the latest warming reply (when the
+    relay's hold starts).
   - Frames arriving in between are discarded without counting as replaced.
 - Accepting a reply. A `pose` reply is accepted only when all of these hold:
   - it arrives on the current socket generation;
