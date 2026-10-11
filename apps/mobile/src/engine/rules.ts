@@ -20,6 +20,8 @@ import type {
   View,
 } from './types';
 import { detectView } from './view';
+import { gatePasses } from './gate';
+import { assertEvaluationSpec, ruleThreshold } from './validation';
 
 /** A frame within this many degrees of the rep's extreme counts as at the extreme. */
 export const NEAR_EXTREME_DEG = 1;
@@ -38,7 +40,7 @@ export function phaseDuration(spec: ExerciseSpec, rep: RepRecord, phase: RulePha
   const name = spec.primary_angle.name;
   const near = rep.windows.rep.filter((f) => {
     const p = f.metrics[name];
-    return f.t <= rep.countedAt && p != null && Math.abs(p - rep.extreme) <= NEAR_EXTREME_DEG;
+    return f.t <= rep.countedAt && gatePasses(spec.primary_angle.gate, f.metrics) && p != null && Math.abs(p - rep.extreme) <= NEAR_EXTREME_DEG;
   });
   if (near.length === 0) return rep.durations[phase];
   const firstNear = near[0].t;
@@ -85,7 +87,15 @@ function reduce(values: number[], how: string): number {
 /** The reduced metric over the rule's window, or null when too few frames have it. */
 function windowValue(spec: ExerciseSpec, rule: Rule, rep: RepRecord): number | null {
   const { metric } = rule.check;
-  const frames = rep.windows[rule.phase];
+  // The dwell can delay `peak` until after the turn. Primary-angle depth/lockout checks need
+  // the accepted extreme of the movement, including outbound frames but excluding the settle tail.
+  const primaryExtreme =
+    rule.phase === 'peak' &&
+    metric === spec.primary_angle.name &&
+    rule.check.reduce === (spec.primary_angle.direction === 'decreasing' ? 'min' : 'max');
+  const frames = primaryExtreme
+    ? rep.windows.rep.filter((f) => f.t <= rep.countedAt && gatePasses(spec.primary_angle.gate, f.metrics))
+    : rep.windows[rule.phase];
   let valid = frames.filter((f) => f.metrics[metric] != null);
   if (valid.length === 0 || valid.length < MIN_COVERAGE * frames.length) return null;
   // A `mid_` point is the mean of both sides or just the one present, so the two read differently.
@@ -117,8 +127,7 @@ function holds(value: number, op: Rule['check']['op'], threshold: number): boole
 
 /** One rule on one rep. `spec` is the effective spec, so threshold names read its phases. */
 export function evaluateRule(spec: ExerciseSpec, rule: Rule, rep: RepRecord, view: DetectedView): RuleOutcome {
-  const { value: v } = rule.check;
-  const threshold = typeof v === 'number' ? v : spec.phases[v];
+  const threshold = ruleThreshold(spec, rule);
   const base = { rule_id: rule.id, threshold };
   if (rule.view !== 'any' && rule.view !== view) return { ...base, status: 'skipped_view', value: null };
   const value =
@@ -161,6 +170,7 @@ export interface SetRules {
 
 /** Evaluates each closed rep and holds the results until the set ends; then ignores events until `reset`. */
 export function createSetRules(spec: ExerciseSpec | EffectiveSpec, opts: { view?: View } = {}): SetRules {
+  assertEvaluationSpec(spec);
   let reps: RepResult[] = [];
   let summary: SetFlags | null = null;
   return {
@@ -204,7 +214,10 @@ export function summarizeSet(
     };
   });
   const top = rules.filter((a) => a.n > 0).reduce<RuleAggregate | null>(
-    (best, a) => (best === null || a.priority < best.priority ? a : best),
+    (best, a) => (
+      best === null || (a.severity === 'safety' && best.severity !== 'safety') ||
+      (a.severity === best.severity && a.priority < best.priority) ? a : best
+    ),
     null,
   );
   return {

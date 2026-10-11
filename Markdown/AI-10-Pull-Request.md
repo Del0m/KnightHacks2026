@@ -6,7 +6,7 @@ It uses the AI-09 cumulative export (`labelling-export-all-bundle_a620b7b2-….j
 - **A check of the phone's form rules against the human labels** (`apps/mobile/scripts/check-rule-labels.ts`). The labels mostly disagree with the rule flags.
 - **One spec change from the owner's review:** the push-up `tempo` threshold drops from 800 ms to 250 ms, so a push-up of about one second (the owner's normal pace) is no longer flagged as fast lowering.
 
-Stacked on #124 (`codex/ai09-labelling`), which provides the export schema and `preprocess.ts`. Retarget to `main` once #124 merges.
+Targets `main` and includes the AI-09 capture, consent, labelling and export tooling from the closed, unmerged #124. These files provide the export schema and `preprocess.ts` required by AI-10, so this PR no longer depends on #124 being merged separately. AI-09 dataset collection targets remain incomplete. Current `main` is integrated; the push-up fixtures preserve its range/timing corrections with AI-10’s tempo threshold.
 
 ## The data
 

@@ -21,7 +21,8 @@ import {
   type PrResult,
 } from "./medals.js";
 
-const { sessions, sets, reps, formFlags, medals, personalRecords, profiles, injuries, posts } = schema;
+const { sessions, sets, reps, formFlags, medals, personalRecords, profiles, injuries, posts, rehabPlans } =
+  schema;
 
 export interface NewSet {
   setIndex: number;
@@ -306,6 +307,50 @@ export async function finishSession(
   return result;
 }
 
+/** Read the committed award after a lost finish response; never award or export twice. */
+export async function sessionSummary(db: Db, userId: string, sessionId: string): Promise<FinishResult> {
+  const session = await ownSession(db, userId, sessionId);
+  if (!session.finishedAt) throw conflict("This session is not finished");
+  const [award] = await db
+    .select()
+    .from(medals)
+    .where(and(eq(medals.sessionId, sessionId), eq(medals.userId, userId)))
+    .limit(1);
+  if (!award) throw notFound("Session summary");
+  const [counts] = await db
+    .select({
+      total: sql<number>`count(${reps.id})::int`,
+      clean: sql<number>`count(${reps.id}) filter (where ${reps.clean})::int`,
+    })
+    .from(reps)
+    .innerJoin(sets, eq(reps.setId, sets.id))
+    .where(eq(sets.sessionId, sessionId));
+  const prs = await db
+    .select({
+      exerciseId: personalRecords.exerciseId,
+      metric: personalRecords.metric,
+      value: personalRecords.value,
+      previousValue: personalRecords.previousValue,
+    })
+    .from(personalRecords)
+    .where(and(eq(personalRecords.sessionId, sessionId), eq(personalRecords.userId, userId)));
+  const shared = await db
+    .select({ id: posts.id, kind: posts.kind })
+    .from(posts)
+    .where(and(eq(posts.sessionId, sessionId), eq(posts.authorId, userId)));
+  return {
+    sessionId,
+    finishedAt: session.finishedAt,
+    medal: award.tier,
+    formScore: award.formScore,
+    baselineShare: award.baselineShare,
+    totalReps: counts?.total ?? 0,
+    cleanReps: counts?.clean ?? 0,
+    personalRecords: prs,
+    posts: shared,
+  };
+}
+
 export async function buildExportSession(
   db: Db,
   userId: string,
@@ -341,10 +386,14 @@ export async function buildExportSession(
     .select({ level: profiles.experienceLevel })
     .from(profiles)
     .where(eq(profiles.userId, userId));
-  const injuryParts = await db
-    .selectDistinct({ part: injuries.bodyPart })
+  const injuryRows = await db
+    .selectDistinct({ part: injuries.bodyPart, side: injuries.side })
     .from(injuries)
     .where(eq(injuries.userId, userId));
+  const [activePlan] = await db
+    .select({ startOn: rehabPlans.startOn })
+    .from(rehabPlans)
+    .where(and(eq(rehabPlans.userId, userId), eq(rehabPlans.status, "active")));
 
   return {
     id: session.id,
@@ -356,10 +405,15 @@ export async function buildExportSession(
     medal: session.medal,
     form_score: session.formScore,
     experience_level: profile?.level ?? null,
-    // DB-12 adds injuries.side and rehab_plans: pass the side to injuryGroup() and set
-    // rehab_start_on from the active plan, so range of motion (CONN-14) compares the right sides.
-    injury_groups: injuryParts.map((p) => injuryGroup(p.part)),
-    rehab_start_on: null,
+    // The injured side and the rehab plan's start let range of motion (CONN-14) compare the
+    // right sides from the right baseline. Coarse tags only, never notes or dates (§13).
+    injury_groups: [...new Set(injuryRows.map((i) => injuryGroup(i.part, i.side)))],
+    // Only once the plan has started by this session's date, so ROM never gets a baseline from
+    // the future. The session's UTC date is close enough here: it only picks the baseline window.
+    rehab_start_on:
+      activePlan && activePlan.startOn <= (session.finishedAt ?? new Date()).toISOString().slice(0, 10)
+        ? activePlan.startOn
+        : null,
     sets: setRows.map((s) => ({
       set_index: s.position,
       exercise_id: s.exerciseId,
@@ -388,10 +442,10 @@ export async function buildExportSession(
   };
 }
 
+// Migration 0010 rewrites legacy severities to form; this covers rows written by an older API
+// after that, so one odd value never blocks finishing a session.
 function exportSeverity(severity: string): Severity {
-  if (severity === "form" || severity === "safety") return severity;
-  if (severity === "info" || severity === "warn") return "form";
-  throw new Error(`Unsupported stored flag severity: ${severity}`);
+  return severity === "safety" ? "safety" : "form";
 }
 
 // Feed copy follows §7: describe what happened, good news first, never "bad" or "wrong".

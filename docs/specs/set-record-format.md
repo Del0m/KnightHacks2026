@@ -65,13 +65,13 @@ Not phone fields: `clean`, `clean_share`, `medal` and `score_source`. The server
 | `start_ms` | int ≥ 0 or null | `startedAt` (left the start position) on the set clock |
 | `end_ms` | int ≥ 0 or null | `countedAt` (crossed back, counted) on the set clock |
 | `tempo_ms` | int 0–120,000 | Start-to-count duration; equals `end_ms − start_ms` after rounding the clock positions |
-| `range_deg` | number 0–180 | Movement range: max − min of the primary angle over the rep's frames (`windows.rep`), to 0.1°. Bigger is a fuller rep for every exercise. |
+| `range_deg` | number 0–180 | Movement range: max − min of the primary angle over the rep's frames (`windows.rep`) that pass the primary gate, up to the count, to 0.1°. The settle tail after the count and gate-failing frames (a rest position, arms hanging down) are left out, as in AI-07's depth, lockout and tempo checks. Bigger is a fuller rep for every exercise. |
 | `quality` | number 0–1 or null | The form-quality model's score, advisory only (INT-06). Always null from the phone. |
-| `lowering_ms` | int ≥ 0 or null | From `start_ms` to the frame with the smallest primary angle, whatever the direction (silver's `bottom_ms`). |
-| `rising_ms` | int ≥ 0 or null | `tempo_ms − lowering_ms` |
+| `lowering_ms` | int ≥ 0 or null | Start → turn: from `start_ms` to the first gated frame at the rep's direction-aware extreme (minimum for decreasing exercises, maximum for increasing), the same split as AI-07's `phaseDuration(spec, rep, 'outbound')`. It is the lowering only for eccentric-first exercises (squat, push-up); for the press and curl it is the lift. |
+| `rising_ms` | int ≥ 0 or null | Turn → count: `tempo_ms − lowering_ms`, including any pause at the extreme. |
 | `flags` | `Flag[]`, at most 20 | AI-07's flags for this rep |
 
-Null `start_ms` / `end_ms` come from legacy or seeded rows. The phone fills them even when joints were dropped at the cap. `lowering_ms` / `rising_ms` can also be null when no primary-angle sample exists between start and count. Missing boundaries prevent the pipeline from matching a rep to frames.
+Null `start_ms` / `end_ms` come from legacy or seeded rows. The phone fills them even when joints were dropped at the cap. The phone always fills `lowering_ms` / `rising_ms`; when no gated frame reaches the extreme it uses the engine's own phase durations, as AI-07 does. Missing boundaries prevent the pipeline from matching a rep to frames.
 
 For fractional capture timestamps, clock positions are rounded first and durations are their differences. `tempo_ms` can differ by 1 ms from independently rounding `durations.rep`; this preserves both `end_ms − start_ms = tempo_ms` and `lowering_ms + rising_ms = tempo_ms`. The builder rejects an engine duration inconsistent with its unrounded start/count timestamps.
 

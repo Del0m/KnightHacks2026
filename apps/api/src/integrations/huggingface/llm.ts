@@ -7,10 +7,9 @@
 // (retrying rate limits, provider errors, timeouts and replies that don't match the schema),
 // all inside one overall deadline. Throws LlmError when nothing works, so callers can fall back
 // to their template text.
-//
-// Stub until BE-01: env is read directly; move to the Zod env.
 
 import { InferenceClient } from "@huggingface/inference";
+import type { Env } from "../../env.js";
 
 // Tested 2026-10-10 with a strict rest-note schema, best first:
 //   120b@cerebras ~0.6 s warm (6 s cold), 120b@together 1-2.5 s, 20b@groq ~0.7 s.
@@ -66,7 +65,10 @@ export interface LlmConfig {
   defaultTimeoutMs: number;
 }
 
-export function llmConfigFromEnv(env = process.env): LlmConfig {
+type LlmEnv = Pick<Env, "HF_TOKEN" | "HF_LLM_CHAIN" | "HF_LLM_ATTEMPTS" | "HF_LLM_TIMEOUT_MS">;
+
+/** From the validated env (src/env.ts); scripts can pass process.env. */
+export function llmConfigFromEnv(env: LlmEnv = process.env): LlmConfig {
   if (!env.HF_TOKEN) throw new Error("Missing env for Hugging Face: HF_TOKEN");
   const chain = (env.HF_LLM_CHAIN || DEFAULT_CHAIN).split(",").map((pair) => {
     const i = pair.lastIndexOf(":");

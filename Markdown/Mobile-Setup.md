@@ -1,4 +1,4 @@
-# Spotter mobile · FE-01
+# SteadyForum mobile · FE-01
 
 The app lives in `apps/mobile/`. The scaffold follows `Architecture.md` §§3, 7, 12–16: quiet coaching, personal progress, opt-in sharing, and a community for beginners.
 
@@ -41,7 +41,7 @@ pnpm build:ios:development
 pnpm start
 ```
 
-`eas init` links the app to the team's project and adds its project ID to `app.json`. Include the registered phone when prompted during the build. Install from the resulting EAS link on that phone, enable Developer Mode if prompted, then open Spotter and connect to Metro on the same network. If LAN access is blocked, use `pnpm start --tunnel`.
+`eas init` links the app to the team's project and adds its project ID to `app.json`. Include the registered phone when prompted during the build. Install from the resulting EAS link on that phone, enable Developer Mode if prompted, then open SteadyForum and connect to Metro on the same network. If LAN access is blocked, use `pnpm start --tunnel`.
 
 Alternatively, with the matching Xcode installed and signing configured:
 

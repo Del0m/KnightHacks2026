@@ -3,7 +3,8 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { JOINT_NAMES } from '../../pose/types';
 import { getSpec } from '../specs';
 import type { EngineEvent, ExerciseSpec, RepRecord, SetFlags, View } from '../types';
-import { useFormRules, type FormRulesState } from '../useFormRules';
+import { MIN_TINT_MS, useFormRules, type FormRulesState } from '../useFormRules';
+import { applyInjuries } from '../overrides';
 
 const squat = getSpec('squat')!;
 
@@ -31,12 +32,12 @@ function squatRep(index: number, knee: number, trunk: number): RepRecord {
 
 const closed = (rep: RepRecord): EngineEvent => ({ type: 'rep_closed', t: rep.closedAt, rep });
 
-function mount(spec: ExerciseSpec | null, opts: { view?: View; onSetFlags?: (s: SetFlags) => void } = {}) {
+function mount(spec: ExerciseSpec | null, opts: { view?: View; onSetFlags?: (s: SetFlags) => void; inlineInjuries?: boolean } = {}) {
   const latest: { current: FormRulesState | null } = { current: null };
   let renders = 0;
   function Probe({ s, v }: { s: ExerciseSpec | null; v?: View }) {
     renders++;
-    latest.current = useFormRules(s, { view: v, onSetFlags: opts.onSetFlags });
+    latest.current = useFormRules(s && opts.inlineInjuries ? applyInjuries(s, ['lower_back']) : s, { view: v, onSetFlags: opts.onSetFlags });
     return null;
   }
   let renderer: ReactTestRenderer;
@@ -47,6 +48,61 @@ function mount(spec: ExerciseSpec | null, opts: { view?: View; onSetFlags?: (s: 
 }
 
 describe('useFormRules', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => { jest.clearAllTimers(); jest.useRealTimers(); });
+
+  it('keeps held reps across inline injury applications and equivalent spec objects', () => {
+    const { latest, send, rerender, renderer } = mount(squat, { inlineInjuries: true });
+    send(closed(squatRep(1, 90, 10)));
+    rerender({ ...squat, phases: { ...squat.phases } });
+    send(closed(squatRep(2, 110, 10)));
+    send({ type: 'set_ended', t: 9000, reason: 'manual' });
+    expect(latest.current!.summary).toMatchObject({ total_reps: 2, clean_reps: 1 });
+    rerender({ ...squat, phases: { ...squat.phases, count_min: 130 } });
+    expect(latest.current!.summary).toBeNull();
+    act(() => renderer.unmount());
+  });
+
+  it('shows a batched tint for at least 300 ms and cancels stale clears', () => {
+    const { latest, renderer, send } = mount(squat);
+    act(() => {
+      latest.current!.onEvent(closed(squatRep(1, 110, 60)));
+      latest.current!.onEvent({ type: 'rep_started', t: 1500 });
+    });
+    expect(latest.current!.tintJoints.length).toBeGreaterThan(0);
+    act(() => jest.advanceTimersByTime(MIN_TINT_MS - 1));
+    expect(latest.current!.tintJoints.length).toBeGreaterThan(0);
+    act(() => jest.advanceTimersByTime(1));
+    expect(latest.current!.tintJoints).toEqual([]);
+    send(closed(squatRep(2, 110, 60)));
+    send({ type: 'rep_started', t: 2500 });
+    act(() => jest.advanceTimersByTime(100));
+    send(closed(squatRep(3, 110, 60)));
+    act(() => jest.advanceTimersByTime(200));
+    expect(latest.current!.tintJoints.length).toBeGreaterThan(0);
+    send({ type: 'set_ended', t: 9000, reason: 'manual' });
+    expect(latest.current!.tintJoints).toEqual([]);
+    act(() => renderer.unmount());
+    expect(jest.getTimerCount()).toBe(0);
+  });
+  it('exposes invalid-spec errors and resumes only when given valid limits', () => {
+    const bad = { ...squat, phases: { ...squat.phases, target: 150 } };
+    const got: SetFlags[] = [];
+    const { latest, send, rerender, renderer } = mount(bad, { onSetFlags: (s) => got.push(s) });
+    expect(latest.current!.error?.message).toMatch(/Invalid exercise spec/);
+    send(closed(squatRep(1, 90, 60)));
+    send({ type: 'set_ended', t: 9000, reason: 'manual' });
+    expect(latest.current).toMatchObject({ tintJoints: [], lastRep: null, summary: null });
+    expect(got).toEqual([]);
+    rerender(squat);
+    expect(latest.current!.error).toBeNull();
+    send(closed(squatRep(1, 90, 60)));
+    expect(latest.current!.lastRep!.flags).toHaveLength(1);
+    rerender(bad);
+    expect(latest.current!.error).not.toBeNull();
+    expect(latest.current).toMatchObject({ tintJoints: [], lastRep: null, summary: null });
+    act(() => renderer.unmount());
+  });
   it('tints a flagged rep until the next rep starts', () => {
     const { latest, send, renders, renderer } = mount(squat);
     send({ type: 'rep_started', t: 0 });
@@ -54,6 +110,7 @@ describe('useFormRules', () => {
     expect(latest.current!.tintJoints).toEqual(['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip']);
     expect(latest.current!.lastRep).toMatchObject({ rep_index: 0, view: 'side', flags: [{ rule_id: 'trunk_lean' }] });
     send({ type: 'rep_started', t: 2000 });
+    act(() => jest.advanceTimersByTime(MIN_TINT_MS));
     expect(latest.current!.tintJoints).toEqual([]);
     expect(latest.current!.lastRep?.rep_index).toBe(0);
 

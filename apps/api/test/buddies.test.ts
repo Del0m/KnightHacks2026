@@ -49,7 +49,10 @@ describe("scorePair", () => {
       distanceKm: null,
       goalSimilarity: 0.9,
     };
-    expect(scorePair(me, them).parts.goals).toBe(0.9);
+    // Stretched from bge-small's 0.75..0.95 band: 0.9 -> 0.75.
+    expect(scorePair(me, them).parts.goals).toBeCloseTo(0.75);
+    expect(scorePair(me, { ...them, goalSimilarity: 0.78 }).parts.goals).toBeCloseTo(0.15);
+    expect(scorePair(me, { ...them, goalSimilarity: 0.78 }).reasons).not.toContain("Similar goals");
   });
 
   it("explains the match in plain words", () => {

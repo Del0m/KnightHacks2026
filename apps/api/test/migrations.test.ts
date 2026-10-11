@@ -18,15 +18,17 @@ afterAll(() => close());
 const unit = (i: number) => Array.from({ length: 384 }, (_, j) => (j === i ? 1 : 0));
 
 describe("migrations", () => {
-  it("upgrades 0006 data in place, including on_device defaults and legacy aggregates", async () => {
-    const client = new PGlite({ extensions: { vector } });
-    try {
-      const migrations = readMigrationFiles({ migrationsFolder });
-      expect(migrations).toHaveLength(8);
-      for (const migration of migrations.slice(0, -1)) {
-        await client.exec(`BEGIN;\n${migration.sql.join("\n")}\nCOMMIT;`);
-      }
-      await client.exec(`
+  it.each([7, 8, 9, 10])(
+    "upgrades data after %i migrations, including on_device defaults and legacy aggregates",
+    async (appliedCount) => {
+      const client = new PGlite({ extensions: { vector } });
+      try {
+        const migrations = readMigrationFiles({ migrationsFolder });
+        expect(migrations).toHaveLength(11);
+        for (const migration of migrations.slice(0, appliedCount)) {
+          await client.exec(`BEGIN;\n${migration.sql.join("\n")}\nCOMMIT;`);
+        }
+        await client.exec(`
         INSERT INTO users (id, handle) VALUES ('migration-user', 'migration_user');
         INSERT INTO sessions (id, user_id, inference_mode, export_attempts, export_status)
           VALUES ('00000000-0000-4000-8000-000000000001', 'migration-user', 'on_device', 12, 'failed'),
@@ -39,47 +41,63 @@ describe("migrations", () => {
           VALUES ('00000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-000000000004', 0, 2000, 90, NULL, false);
         INSERT INTO form_flags (rep_id, rule_id)
           VALUES ('00000000-0000-4000-8000-000000000005', 'legacy_rule');
+        INSERT INTO form_flags (rep_id, rule_id, severity)
+          VALUES ('00000000-0000-4000-8000-000000000005', 'legacy_high', 'high'),
+                 ('00000000-0000-4000-8000-000000000005', 'legacy_safety', 'safety');
       `);
-      await client.exec(`BEGIN;\n${migrations.at(-1)!.sql.join("\n")}\nCOMMIT;`);
-      expect(
-        (
-          await client.query(
-            "SELECT inference_mode, export_attempts, export_status FROM sessions ORDER BY id",
-          )
-        ).rows,
-      ).toEqual([
-        { inference_mode: "coreml", export_attempts: 12, export_status: "failed" },
-        { inference_mode: "cloud", export_attempts: 2, export_status: "exported" },
-        { inference_mode: "coreml", export_attempts: 0, export_status: "pending" },
-      ]);
-      expect(
-        (await client.query("SELECT position, weight_kg, end_reason, partial_reps FROM sets")).rows,
-      ).toEqual([{ position: 9, weight_kg: 40, end_reason: null, partial_reps: null }]);
-      expect((await client.query("SELECT tempo_ms, quality, lowering_ms, rising_ms FROM reps")).rows).toEqual(
-        [{ tempo_ms: 2000, quality: null, lowering_ms: null, rising_ms: null }],
-      );
-      expect((await client.query("SELECT rule_id, severity FROM form_flags")).rows).toEqual([
-        { rule_id: "legacy_rule", severity: "info" },
-      ]);
-      expect(
-        (
-          await client.query(
-            "SELECT column_default FROM information_schema.columns WHERE table_name = 'sessions' AND column_name = 'inference_mode'",
-          )
-        ).rows,
-      ).toEqual([{ column_default: null }]);
-      await expect(client.exec("INSERT INTO sessions (user_id) VALUES ('migration-user')")).rejects.toThrow();
-      await expect(
-        client.exec("INSERT INTO sessions (user_id, inference_mode) VALUES ('migration-user', 'on_device')"),
-      ).rejects.toThrow();
-      await client.exec("INSERT INTO sessions (user_id, inference_mode) VALUES ('migration-user', 'vision')");
-      expect((await client.query("SELECT enum_range(NULL::inference_mode)::text AS modes")).rows).toEqual([
-        { modes: "{coreml,vision,cloud}" },
-      ]);
-    } finally {
-      await client.close();
-    }
-  });
+        for (const migration of migrations.slice(appliedCount)) {
+          await client.exec(`BEGIN;\n${migration.sql.join("\n")}\nCOMMIT;`);
+        }
+        expect(
+          (
+            await client.query(
+              "SELECT inference_mode, export_attempts, export_status FROM sessions ORDER BY id",
+            )
+          ).rows,
+        ).toEqual([
+          { inference_mode: "coreml", export_attempts: 12, export_status: "failed" },
+          { inference_mode: "cloud", export_attempts: 2, export_status: "exported" },
+          { inference_mode: "coreml", export_attempts: 0, export_status: "pending" },
+        ]);
+        expect(
+          (await client.query("SELECT position, weight_kg, end_reason, partial_reps FROM sets")).rows,
+        ).toEqual([{ position: 9, weight_kg: 40, end_reason: null, partial_reps: null }]);
+        expect(
+          (await client.query("SELECT tempo_ms, quality, lowering_ms, rising_ms FROM reps")).rows,
+        ).toEqual([{ tempo_ms: 2000, quality: null, lowering_ms: null, rising_ms: null }]);
+        expect(
+          (await client.query("SELECT rule_id, severity FROM form_flags ORDER BY rule_id")).rows,
+        ).toEqual([
+          { rule_id: "legacy_high", severity: "form" },
+          { rule_id: "legacy_rule", severity: "form" },
+          { rule_id: "legacy_safety", severity: "safety" },
+        ]);
+        expect(
+          (
+            await client.query(
+              "SELECT column_default FROM information_schema.columns WHERE table_name = 'sessions' AND column_name = 'inference_mode'",
+            )
+          ).rows,
+        ).toEqual([{ column_default: null }]);
+        await expect(
+          client.exec("INSERT INTO sessions (user_id) VALUES ('migration-user')"),
+        ).rejects.toThrow();
+        await expect(
+          client.exec(
+            "INSERT INTO sessions (user_id, inference_mode) VALUES ('migration-user', 'on_device')",
+          ),
+        ).rejects.toThrow();
+        await client.exec(
+          "INSERT INTO sessions (user_id, inference_mode) VALUES ('migration-user', 'vision')",
+        );
+        expect((await client.query("SELECT enum_range(NULL::inference_mode)::text AS modes")).rows).toEqual([
+          { modes: "{coreml,vision,cloud}" },
+        ]);
+      } finally {
+        await client.close();
+      }
+    },
+  );
 
   it("create every table on a fresh branch", async () => {
     const res = await db.execute<{ table_name: string }>(
@@ -110,6 +128,9 @@ describe("migrations", () => {
         "risk_insights",
         "doc_chunks",
         "progress_daily",
+        "rehab_plans",
+        "rehab_limits",
+        "rom_trend",
       ]),
     );
   });

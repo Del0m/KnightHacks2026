@@ -6,8 +6,9 @@ import { JOINT_NAMES, type PoseResult } from '../../pose/types';
 import { loadFixtures } from '../__fixtures__/load';
 import { runClip } from '../__fixtures__/run';
 import { createFormEngine } from '../engine';
-import { compactPose, isAbsentFrame } from '../recording';
-import { createSetRules, summarizeSet } from '../rules';
+import { compactPose, isAbsentFrame, type Clip } from '../recording';
+import { createSetRules, phaseDuration, summarizeSet } from '../rules';
+import { form, generateClip, hold, move } from '../__fixtures__/synth';
 import { buildSetRecord, createSetRecorder, LEAD_IN_MS, MAX_SET_FRAMES, type SetRecordInput } from '../setRecord';
 import { getSpec } from '../specs';
 import type { EngineEvent, EngineFrame, RepRecord, RepResult, SetEndReason } from '../types';
@@ -103,7 +104,7 @@ function expectIntegerRelations(record: SetRecord): void {
 }
 
 describe('buildSetRecord', () => {
-  it('packages only contract fields, raw COCO joints, flags, range and start-to-count timing', () => {
+  it('packages only contract fields, raw COCO joints, flags, range and start-to-turn timing', () => {
     const flags = summarizeSet(spec, [resultAt(0, true)], 'manual');
     const input = inputWith({ flags });
     const before = JSON.stringify(input);
@@ -121,7 +122,7 @@ describe('buildSetRecord', () => {
         kp: compactPose(pose).joints.flatMap((joint) => [joint.x, joint.y, joint.c]),
       })),
       reps: [{
-        rep_index: 0, start_ms: 200, end_ms: 1200, tempo_ms: 1000, range_deg: 109.9,
+        rep_index: 0, start_ms: 200, end_ms: 1200, tempo_ms: 1000, range_deg: 95,
         quality: null, lowering_ms: 300, rising_ms: 700,
         flags: [{ rule_id: 'depth', severity: 'safety', rep_index: 0 }],
       }],
@@ -137,7 +138,7 @@ describe('buildSetRecord', () => {
     const startedAt = origin + 100.49;
     const countedAt = origin + 300.51;
     const rep = repWith({
-      startedAt, countedAt, closedAt: countedAt + 300,
+      startedAt, countedAt, closedAt: countedAt + 300, extreme: 80,
       durations: { outbound: 0, peak: 0, return: 0, rep: countedAt - startedAt },
       windows: { outbound: [], peak: [], return: [], rep: [frameAt(startedAt, 160), frameAt(origin + 200.51, 80)] },
     });
@@ -149,25 +150,43 @@ describe('buildSetRecord', () => {
     expectIntegerRelations(record);
   });
 
-  it('uses the minimum for increasing exercises too and includes the settle tail only in range', () => {
-    const rep = repWith({
-      windows: { outbound: [], peak: [], return: [], rep: [
-        frameAt(1200, 50), frameAt(1600, 170), frameAt(2200, 60), frameAt(2350, 20),
-      ] },
-    });
+  it('splits at the direction-aware turn and measures range only on gated frames up to the count', () => {
+    const windows = { outbound: [], peak: [], return: [], rep: [
+      frameAt(1200, 50), frameAt(1600, 170), frameAt(2200, 60), frameAt(2350, 20),
+    ] };
     const increasing = { ...spec, primary_angle: { ...spec.primary_angle, direction: 'increasing' as const } };
-    const record = buildSetRecord(inputWith({ spec: increasing, reps: [rep] }));
-    expect(record.reps[0]).toMatchObject({ lowering_ms: 0, rising_ms: 1000, range_deg: 150 });
+    const pressing = buildSetRecord(inputWith({ spec: increasing, reps: [repWith({ extreme: 170, windows })] }));
+    // The settle tail at 2350 (20°) is after the count, so it stays out of range.
+    expect(pressing.reps[0]).toMatchObject({ lowering_ms: 400, rising_ms: 600, range_deg: 120 });
+    const lowering = buildSetRecord(inputWith({ reps: [repWith({ extreme: 50, windows })] }));
+    expect(lowering.reps[0]).toMatchObject({ lowering_ms: 0, rising_ms: 1000, range_deg: 120 });
   });
 
   it.each([
     ['empty', [], 0],
     ['null metric', [frameAt(1500, null)], 0],
-    ['outside start-to-count', [frameAt(1100, 20), frameAt(2300, 170)], 150],
-  ] as const)('leaves the split null with %s windows', (_label, frames, range) => {
+    ['after the count only', [frameAt(2300, 20)], 0],
+  ] as const)('falls back to the engine phase durations with %s windows', (_label, frames, range) => {
     const rep = repWith({ windows: { outbound: [], peak: [], return: [], rep: [...frames] } });
     expect(buildSetRecord(inputWith({ reps: [rep] })).reps[0]).toMatchObject({
-      lowering_ms: null, rising_ms: null, range_deg: range,
+      lowering_ms: 300, rising_ms: 700, range_deg: range,
+    });
+  });
+
+  it('ignores gate-failing frames for range and the turn', () => {
+    const press = getSpec('shoulder_press')!;
+    const gated = (t: number, elbow: number, arm_raise: number): EngineFrame => ({
+      t, metrics: { elbow, arm_raise }, sides: {}, joints: [],
+    });
+    const rep = repWith({
+      extreme: 140,
+      windows: { outbound: [], peak: [], return: [], rep: [
+        gated(1200, 85, 30), gated(1400, 170, 80), gated(1700, 140, 30), gated(2200, 90, 30),
+      ] },
+    });
+    const flags = summarizeSet(press, [resultAt(0)], 'manual');
+    expect(buildSetRecord(inputWith({ spec: press, reps: [rep], flags })).reps[0]).toMatchObject({
+      lowering_ms: 500, rising_ms: 500, range_deg: 55,
     });
   });
 
@@ -276,7 +295,7 @@ describe('createSetRecorder', () => {
     for (let index = 1; index < MAX_SET_FRAMES + 100; index++) recorder.pose(poseAt(index * 5));
     const startedAt = (MAX_SET_FRAMES + 100) * 5;
     const rep = repWith({
-      startedAt, countedAt: startedAt + 1000, closedAt: startedAt + 1200,
+      startedAt, countedAt: startedAt + 1000, closedAt: startedAt + 1200, extreme: 80,
       windows: { outbound: [], peak: [], return: [], rep: [frameAt(startedAt, 160), frameAt(startedAt + 500, 80)] },
     });
     recorder.event({ type: 'rep_closed', t: rep.closedAt, rep });
@@ -302,7 +321,7 @@ describe('createSetRecorder', () => {
     recorder.event({ type: 'set_ended', t: 2500, reason: 'manual' });
     const record = recorder.finish(flagsFor(1));
     expect(record.frames[0].kp[0]).toBe(0.1235);
-    expect(record.reps[0]).toMatchObject({ start_ms: 200, range_deg: 109.9, lowering_ms: 300 });
+    expect(record.reps[0]).toMatchObject({ start_ms: 200, range_deg: 95, lowering_ms: 300 });
   });
 
   it('requires an end event, supports retry and repeated finish, and resets every clock and buffer', () => {
@@ -386,6 +405,71 @@ describe('malformed pose handling in both entry points', () => {
     recorder.pose(poseAt(1100));
     recorder.event({ type: 'set_ended', t: 1100, reason: 'manual' });
     expect(recorder.finish(flagsFor(0)).frames.map((frame) => frame.t_ms)).toEqual([0, 100]);
+  });
+});
+
+function recordClip(clip: Clip): { record: SetRecord; closed: RepRecord[] } {
+  const exercise = getSpec(clip.exercise)!;
+  const engine = createFormEngine(exercise, { imageAspect: clip.image.width / clip.image.height });
+  const rules = createSetRules(exercise);
+  const recorder = createSetRecorder(exercise, { setIndex: 0 });
+  const closed: RepRecord[] = [];
+  const dispatch = (batch: EngineEvent[]) => {
+    for (const event of batch) {
+      if (event.type === 'rep_closed') closed.push(event.rep);
+      recorder.event(event);
+      rules.handle(event);
+    }
+  };
+  for (const frame of clip.frames) {
+    if (isAbsentFrame(frame)) dispatch(engine.pushAbsent(frame.timestamp_ms).events);
+    else {
+      recorder.pose(frame);
+      dispatch(engine.push(frame).events);
+    }
+  }
+  if (!rules.summary()) dispatch(engine.endSet(clip.frames.at(-1)!.timestamp_ms).events);
+  const record = recorder.finish(rules.summary()!);
+  return { record, closed };
+}
+
+describe('direction-aware tempo split and gated range on replays', () => {
+  const clips = loadFixtures();
+
+  it.each(['shoulder_press_clean', 'bicep_curl_clean'])('%s splits each rep at its turn', (name) => {
+    const clip = clips.find((candidate) => candidate.name === name)!;
+    const exercise = getSpec(clip.exercise)!;
+    const { record, closed } = recordClip(clip);
+    expect(record.reps.length).toBeGreaterThan(0);
+    for (const [i, rep] of record.reps.entries()) {
+      expect(rep.lowering_ms).toBeGreaterThan(0);
+      expect(rep.lowering_ms).toBeLessThan(rep.tempo_ms);
+      expect(Math.abs(rep.lowering_ms! - phaseDuration(exercise, closed[i], 'outbound'))).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('does not credit range with an arms-down angle before a short press', () => {
+    const clip = generateClip({
+      name: 'press_after_arms_down', exercise: 'shoulder_press', description: 'lap, straight arms down, short press',
+      seed: 1, fps: 15, jitterMs: 0, noise: 0, spikes: 0, dips: 0, view: 'front', facing: 1,
+      farConfidence: [0.9, 0.9], source: 'coreml', startAngle: 85, absentWindows: [], offsetY: 0,
+      script: [
+        form({ forearm: 'down' }), hold(500), move(131, 800, 10), hold(200),
+        move(170, 800, 8), hold(200), move(131, 800, 10), hold(200),
+        form({ forearm: 'up' }), move(140, 1000, 140), hold(300), move(85, 800, 85), hold(500),
+      ],
+      expected: { reps: 1, partials: 0, set_end: null },
+    }, { clean: true });
+    const { record, closed } = recordClip(clip);
+    expect(record.reps).toHaveLength(1);
+    const rep = closed[0];
+    const counted = rep.windows.rep.filter((f) => f.t <= rep.countedAt && f.metrics.elbow != null);
+    const armsDown = Math.max(...counted.filter((f) => f.metrics.arm_raise! > 60).map((f) => f.metrics.elbow!));
+    const lowest = Math.min(...counted.map((f) => f.metrics.elbow!));
+    expect(armsDown).toBeGreaterThan(rep.extreme + 10);
+    // The credited range must top out at the press, not at the straight arms hanging down.
+    expect(record.reps[0].range_deg).toBeLessThan(armsDown - lowest);
+    expect(record.reps[0].range_deg).toBeLessThanOrEqual(rep.extreme - lowest + 0.05);
   });
 });
 

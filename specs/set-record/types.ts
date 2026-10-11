@@ -34,13 +34,13 @@ export interface Rep {
   end_ms: number | null;
   /** Rep duration, start to count. */
   tempo_ms: number;
-  /** Movement range: max minus min of the primary angle over the rep. */
+  /** Movement range: max minus min of the primary angle over the rep's gated frames up to the count. */
   range_deg: number;
   /** Form-quality model score, advisory only (INT-06). Null from the phone. */
   quality: number | null;
-  /** Start to the frame with the smallest primary angle. */
+  /** Start to the turn: the first frame at the rep's direction-aware extreme. The lowering only for eccentric-first exercises. */
   lowering_ms: number | null;
-  /** tempo_ms minus lowering_ms. */
+  /** Turn to count: tempo_ms minus lowering_ms. */
   rising_ms: number | null;
   flags: Flag[];
 }

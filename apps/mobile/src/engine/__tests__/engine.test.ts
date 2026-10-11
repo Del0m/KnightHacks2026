@@ -2,6 +2,8 @@ import { loadFixtures } from '../__fixtures__/load';
 import { runClip } from '../__fixtures__/run';
 import { MAX_PRIMARY_DEG_PER_S, createFormEngine, type FormEngine } from '../engine';
 import { getSpec } from '../specs';
+import { evaluateRep, phaseDuration } from '../rules';
+import { form, generateClip, hold, move } from '../__fixtures__/synth';
 import { isAbsentFrame, type Clip } from '../recording';
 import type { ExerciseSpec, PrimaryGate } from '../types';
 import { JOINT_NAMES, type Joint, type PoseResult } from '../../pose/types';
@@ -172,6 +174,7 @@ describe('createFormEngine: counting only real movement', () => {
     return {
       ...press,
       angles: {
+        ...press.angles,
         elbow: { type: 'joint_angle', joints: ['shoulder', 'elbow', 'wrist'], side: 'left' },
         knee: { type: 'joint_angle', joints: ['hip', 'knee', 'ankle'], side: 'left' },
       },
@@ -233,6 +236,16 @@ describe('createFormEngine: counting only real movement', () => {
   describe('primary gate', () => {
     const gate: PrimaryGate = { metric: 'knee', op: '<=', value: 100 };
 
+    it('does not borrow range reached before the gate passed', () => {
+      const frames = [
+        [0, 80, 170], [200, 110, 170], [400, 160, 170],
+        [600, 120, 90], [800, 110, 90], [1000, 90, 170],
+      ];
+      const r = play(createFormEngine(pressSpec(gate), raw), frames.map(([t, elbow, knee]) => pose(t, elbow, { knee })));
+      expect([r.counted, r.partials]).toEqual([0, 1]);
+      expect(r.updates.some((u) => u.state === 'peak')).toBe(false);
+    });
+
     it('counts when the gate passes', () => {
       const r = play(createFormEngine(pressSpec(gate), raw), pressRep().map(([t, v]) => pose(t, v, { knee: 90 })));
       expect([r.counted, r.partials]).toEqual([1, 0]);
@@ -249,6 +262,46 @@ describe('createFormEngine: counting only real movement', () => {
       expect(r.updates.every((u) => u.metrics.knee === null)).toBe(true);
       expect([r.counted, r.partials]).toEqual([0, 1]);
     });
+  });
+
+  it('evaluates squat depth at a turn before the outbound dwell expires', () => {
+    const spec = getSpec('squat')!;
+    const frames = [
+      [0, 170], [200, 155], [267, 120], [334, 90], [401, 115],
+      [468, 140], [535, 155], [602, 170], [802, 170], [1002, 170],
+    ];
+    const r = play(createFormEngine(spec, raw), frames.map(([t, knee]) => pose(t, 80, { knee })));
+    expect(r.reps).toHaveLength(1);
+    const rep = r.reps[0];
+    expect(rep.extreme).toBeLessThan(spec.phases.target);
+    expect(Math.min(...rep.windows.peak.map((f) => f.metrics.knee!))).toBeGreaterThan(spec.phases.target);
+    const result = evaluateRep(spec, rep, { view: 'side' });
+    expect(result.outcomes.find((o) => o.rule_id === 'depth')).toMatchObject({ status: 'pass', value: rep.extreme });
+    expect(result.flags.map((f) => f.rule_id)).not.toContain('depth');
+    expect(result.flags.map((f) => f.rule_id)).toContain('tempo');
+  });
+
+  it('does not borrow an arms-down extreme for a short overhead press or its tempo', () => {
+    const spec = getSpec('shoulder_press')!;
+    const clip = generateClip({
+      name: 'press_after_arms_down', exercise: 'shoulder_press', description: 'lap, straight arms down, short press',
+      seed: 1, fps: 15, jitterMs: 0, noise: 0, spikes: 0, dips: 0, view: 'front', facing: 1,
+      farConfidence: [0.9, 0.9], source: 'coreml', startAngle: 85, absentWindows: [], offsetY: 0,
+      script: [
+        form({ forearm: 'down' }), hold(500), move(131, 800, 10), hold(200),
+        move(170, 800, 8), hold(200), move(131, 800, 10), hold(200),
+        form({ forearm: 'up' }), move(140, 1000, 140), hold(300), move(85, 800, 85), hold(500),
+      ],
+      expected: { reps: 1, partials: 0, set_end: null },
+    }, { clean: true });
+    const run = runClip(clip, raw);
+    expect(run.counted).toEqual([1]);
+    const rep = run.reps[0];
+    expect(Math.max(...rep.windows.rep.filter((f) => f.metrics.arm_raise! > 60).map((f) => f.metrics.elbow!))).toBeGreaterThan(165);
+    expect(rep.extreme).toBeCloseTo(140, 0);
+    expect(evaluateRep(spec, rep, { view: 'front' }).outcomes.find((o) => o.rule_id === 'lockout')).toMatchObject({ status: 'flag', threshold: 150 });
+    expect(phaseDuration(spec, rep, 'return')).toBeGreaterThan(500);
+    expect(phaseDuration(spec, rep, 'return')).toBeLessThan(1000);
   });
 
   describe('primary confidence', () => {

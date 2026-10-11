@@ -67,7 +67,7 @@ export function PoseDebugScreen() {
   }
   return (
     <View style={styles.center}>
-      <Text style={styles.message}>Steady forum needs the camera to see your form.</Text>
+      <Text style={styles.message}>SteadyForum needs the camera to see your form.</Text>
       <Pressable style={styles.button} onPress={() => Linking.openSettings()}>
         <Text style={styles.buttonText}>Open Settings</Text>
       </Pressable>
@@ -235,6 +235,11 @@ function LiveCamera({ poseMode, position, setPosition }: {
               ? `rep ${rules.lastRep.rep_index + 1} (${rules.lastRep.view}): ${describeFlags(spec, rules.lastRep)}`
               : 'no rep yet'}
           </Text>
+          {form.error || rules.error ? (
+            <Text style={styles.readoutText} testID="pose-spec-error">
+              Form tracking unavailable: {(form.error ?? rules.error)?.message}
+            </Text>
+          ) : null}
           {rules.summary ? (
             <Text style={styles.readoutText} testID="pose-set-summary">
               set ({rules.summary.reason}): clean {rules.summary.clean_reps}/{rules.summary.total_reps}

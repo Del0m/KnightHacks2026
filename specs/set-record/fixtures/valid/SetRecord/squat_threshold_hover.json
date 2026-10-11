@@ -1158,10 +1158,10 @@
       "start_ms": 1000,
       "end_ms": 3000,
       "tempo_ms": 2000,
-      "range_deg": 77.8,
+      "range_deg": 75.5,
       "quality": null,
-      "lowering_ms": 934,
-      "rising_ms": 1066,
+      "lowering_ms": 800,
+      "rising_ms": 1200,
       "flags": []
     },
     {
@@ -1169,7 +1169,7 @@
       "start_ms": 6934,
       "end_ms": 8934,
       "tempo_ms": 2000,
-      "range_deg": 80.2,
+      "range_deg": 77.5,
       "quality": null,
       "lowering_ms": 866,
       "rising_ms": 1134,
@@ -1180,10 +1180,10 @@
       "start_ms": 12867,
       "end_ms": 14867,
       "tempo_ms": 2000,
-      "range_deg": 75.5,
+      "range_deg": 72.6,
       "quality": null,
-      "lowering_ms": 933,
-      "rising_ms": 1067,
+      "lowering_ms": 867,
+      "rising_ms": 1133,
       "flags": []
     },
     {
@@ -1191,10 +1191,10 @@
       "start_ms": 16134,
       "end_ms": 18134,
       "tempo_ms": 2000,
-      "range_deg": 78.7,
+      "range_deg": 76.2,
       "quality": null,
-      "lowering_ms": 1000,
-      "rising_ms": 1000,
+      "lowering_ms": 866,
+      "rising_ms": 1134,
       "flags": []
     }
   ]

@@ -45,6 +45,8 @@ export function applyInjuries(spec: ExerciseSpec, injuries: readonly Injury[]): 
 
 ## 2. View detection: `view.ts`
 
+Only torso joints with confidence at least 0.3 are present for view detection; held low-confidence points are excluded.
+
 ```ts
 export const FRONT_MIN_RATIO: number; // 0.4
 export const SIDE_MAX_RATIO: number;  // 0.25
@@ -75,6 +77,7 @@ export function evaluateRep(spec: ExerciseSpec, rep: RepRecord, opts?: { view?: 
 `spec` is the effective spec. Any `Rule` in `spec.rules` is evaluated the same way, including generated ones such as AI-16's `physio_limit`.
 
 **Order for each rule:**
+0. **Runtime check:** reject an unknown metric, phase, comparison, reduction or threshold reference, or a non-finite threshold, with an `Invalid exercise spec` error. This happens even for a view-skipped rule. `createSetRules` and `createFormEngine` also validate phase order and primary/gate settings at construction; malformed effective specs must be handled as configuration failures, not form flags.
 1. **View:** a rule with `view` other than `any` gets `skipped_view` unless the rep's view equals it. An `unknown` view runs only `any` rules.
 2. **Threshold:** a threshold-name `value` resolves against `spec.phases`, which already has the overrides applied. That gives `threshold`.
 3. **Value:**
@@ -83,7 +86,7 @@ export function evaluateRep(spec: ExerciseSpec, rep: RepRecord, opts?: { view?: 
 4. **Status:** `pass` when `value op threshold` holds, otherwise `flag`. No tolerance.
 
 **`duration_ms` (`phaseDuration`).** The engine's `durations.outbound` ends at `count_min`, which is only part of the way down, so AI-07 measures phase time from the frames instead. `rep.durations` is left as it is.
-- Let `p` be `metrics[spec.primary_angle.name]` on each frame of `rep.windows.rep` with `t <= rep.countedAt`.
+- Let `p` be `metrics[spec.primary_angle.name]` on each frame of `rep.windows.rep` with `t <= rep.countedAt` and a passing primary gate (every measured frame for an ungated spec). The counter's `rep.extreme` uses the same gate, so a rest position cannot supply the turn or tempo.
 - **`firstNear`:** the first such frame with `|p − rep.extreme| <= NEAR_EXTREME_DEG`.
 - **`lastNear`:** the last such frame with `|p − rep.extreme| <= NEAR_EXTREME_DEG`.
 
@@ -98,6 +101,7 @@ These add up to the rep. A pause at the bottom isn't counted as lowering. If no 
 
 **Reducing a window** (any metric other than `duration_ms`):
 1. **Window:** `frames = rep.windows[rule.phase]`. Take `valid`, the frames where `metrics[metric]` is not null.
+   - For a `peak` check of the primary angle's movement extreme (`min` for decreasing, `max` for increasing), use the gate-passing frames of `rep.windows.rep` through `countedAt`. The minimum state time can keep the true turn in `outbound`; gate-failing rest positions and the settle tail after the count are excluded. Other metrics and reductions still use their phase window.
 2. **Coverage:** if `valid.length === 0` or `valid.length < MIN_COVERAGE × frames.length`, the outcome is `unmeasured` with `value: null`.
 3. **`mid_` basis:** this applies only when the metric's angle spec uses `mid_` points (`joints`, or `from`/`to`).
    - A frame is two-sided when, for every `mid_<base>` the metric uses, both `left_<base>` and `right_<base>` are non-null in `frame.joints` (index by `JOINT_NAMES`).
@@ -139,7 +143,7 @@ export function summarizeSet(spec: ExerciseSpec | EffectiveSpec, reps: RepResult
   - `n`: reps flagged.
   - `evaluated`: reps that passed or flagged.
   - `mean_value`: mean value over the flagged reps, or null when `n` is 0.
-- **`top`:** the aggregate with `n > 0` and the lowest `priority`, or null.
+- **`top`:** among aggregates with `n > 0`, prefer `safety`, then the lowest `priority` within the severity. Ties keep spec order. Null when no rule flagged.
 - **`extra_notes`:** `spec.extra_notes`, or `[]` for a plain `ExerciseSpec`.
 
 ## 5. Rest-note placeholders
@@ -166,14 +170,16 @@ export function useFormRules(spec: ExerciseSpec | EffectiveSpec | null, opts?: {
   onSetFlags?: (s: SetFlags) => void;
 }): {
   onEvent: (e: EngineEvent) => void; // chain from useFormEngine's onEvent
-  tintJoints: string[];              // last closed rep's flagged joints; [] after rep_started / set_ended / reset
+  tintJoints: string[];              // last closed rep's flagged joints; minimum 300 ms before next-rep clear
   lastRep: RepResult | null;
   summary: SetFlags | null;          // set once set_ended arrives
   reset: () => void;                 // call with the engine's reset for a new set
 };
 ```
 
-- **Lifetime:** one `SetRules` per `spec` and `view`, rebuilt when either changes. `onSetFlags` is read through a ref.
+- **Lifetime:** one `SetRules` per effective spec content and `view`. Both hooks canonicalize the full JSON spec, so equivalent new objects, reordered object keys and inline `applyInjuries` calls preserve a running set. A real content or view change starts fresh evaluation; id and injuries alone are not a sufficient key. `onSetFlags` is read through a ref.
+- **Tint lifetime:** a next `rep_started` clears the last closed rep's tint after at least 300 ms of display, so batched close/start events still show it. A newer closed rep replaces the tint and cancels pending clears. Set end, reset, spec/view change and unmount cancel pending clears; set end/reset clear immediately.
+- **Invalid spec:** returns `error: Error | null` instead of throwing during render. With an error, `onEvent` is inactive, there is no tint, rep or summary, and `onSetFlags` does not fire. A valid replacement clears the error and starts fresh. `useFormEngine` follows the same policy for poses and counts. Neither hook silently removes injury or physio limits by selecting a base spec.
 - **Re-renders:** only when `tintJoints`, `lastRep` or `summary` change.
 
 ## 7. Engine changes (AI-06 follow-ups)
@@ -206,7 +212,7 @@ A screen recording of a seated shoulder press showed three problems:
   - `metric` is an `angles` key. It can't be `duration_ms` or the primary itself.
   - `value` is a number.
 - The engine evaluates the gate every frame from that frame's metrics: it passes if the metric is non-null and `metric op value` holds. With no gate, it always passes.
-- The counter's `outbound → peak` transition needs the gate to pass on that frame, as well as `count_min` and `min_state_ms`. An attempt that never passes the gate returns to `start` as a partial, as before.
+- The counter records range as qualified only when the primary angle passes `count_min` on a frame where the gate also passes. The `outbound → peak` transition needs this qualified range, the gate to pass on the transition frame, and `min_state_ms`. Qualified range is remembered across the dwell and reset for each attempt; an extreme reached while the gate failed cannot qualify a later frame. An attempt without qualified range returns to `start` as a partial.
 - `RepCounter.step(t, value, person = true, gate = true)`.
 - **Shoulder press:**
   - New angle `arm_raise`: `segment_tilt` from `shoulder` to `wrist`, `side: "max"`, so the lower arm decides. 0° is the wrist straight above the shoulder.

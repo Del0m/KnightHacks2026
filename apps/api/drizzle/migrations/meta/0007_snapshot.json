@@ -1,5 +1,5 @@
 {
-  "id": "352f885e-0007-4285-a09a-6549dcd6d050",
+  "id": "6e26155e-406b-4a40-afe3-3b6879a314a1",
   "prevId": "3d5d2bcc-1c29-40bd-a702-f88a179a99a9",
   "version": "7",
   "dialect": "postgresql",
@@ -35,6 +35,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'mild'"
+        },
+        "side": {
+          "name": "side",
+          "type": "injury_side",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'n/a'"
         },
         "since": {
           "name": "since",
@@ -85,8 +93,12 @@
           "name": "injuries_user_id_users_id_fk",
           "tableFrom": "injuries",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -264,8 +276,12 @@
           "name": "profiles_user_id_users_id_fk",
           "tableFrom": "profiles",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -313,12 +329,16 @@
         "users_handle_unique": {
           "name": "users_handle_unique",
           "nullsNotDistinct": false,
-          "columns": ["handle"]
+          "columns": [
+            "handle"
+          ]
         },
         "users_pseudonym_unique": {
           "name": "users_pseudonym_unique",
           "nullsNotDistinct": false,
-          "columns": ["pseudonym"]
+          "columns": [
+            "pseudonym"
+          ]
         }
       },
       "policies": {},
@@ -378,8 +398,12 @@
           "name": "form_flags_rep_id_reps_id_fk",
           "tableFrom": "form_flags",
           "tableTo": "reps",
-          "columnsFrom": ["rep_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "rep_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -425,18 +449,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "lowering_ms": {
-          "name": "lowering_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rising_ms": {
-          "name": "rising_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "tempo_ms": {
           "name": "tempo_ms",
           "type": "integer",
@@ -468,8 +480,12 @@
           "name": "reps_set_id_sets_id_fk",
           "tableFrom": "reps",
           "tableTo": "sets",
-          "columnsFrom": ["set_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "set_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -479,7 +495,10 @@
         "reps_set_position_uq": {
           "name": "reps_set_position_uq",
           "nullsNotDistinct": false,
-          "columns": ["set_id", "position"]
+          "columns": [
+            "set_id",
+            "position"
+          ]
         }
       },
       "policies": {},
@@ -527,7 +546,8 @@
           "type": "inference_mode",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'on_device'"
         },
         "medal": {
           "name": "medal",
@@ -604,8 +624,12 @@
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -654,18 +678,6 @@
         "weight_kg": {
           "name": "weight_kg",
           "type": "real",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "end_reason": {
-          "name": "end_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "partial_reps": {
-          "name": "partial_reps",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -730,8 +742,12 @@
           "name": "sets_session_id_sessions_id_fk",
           "tableFrom": "sets",
           "tableTo": "sessions",
-          "columnsFrom": ["session_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -741,7 +757,10 @@
         "sets_session_position_uq": {
           "name": "sets_session_position_uq",
           "nullsNotDistinct": false,
-          "columns": ["session_id", "position"]
+          "columns": [
+            "session_id",
+            "position"
+          ]
         }
       },
       "policies": {},
@@ -884,8 +903,12 @@
           "name": "plan_items_plan_id_plans_id_fk",
           "tableFrom": "plan_items",
           "tableTo": "plans",
-          "columnsFrom": ["plan_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "plan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -893,8 +916,12 @@
           "name": "plan_items_exercise_id_exercises_id_fk",
           "tableFrom": "plan_items",
           "tableTo": "exercises",
-          "columnsFrom": ["exercise_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "exercise_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -977,8 +1004,12 @@
           "name": "plans_user_id_users_id_fk",
           "tableFrom": "plans",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1035,8 +1066,12 @@
           "name": "blocks_blocker_id_users_id_fk",
           "tableFrom": "blocks",
           "tableTo": "users",
-          "columnsFrom": ["blocker_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "blocker_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1044,8 +1079,12 @@
           "name": "blocks_blocked_id_users_id_fk",
           "tableFrom": "blocks",
           "tableTo": "users",
-          "columnsFrom": ["blocked_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "blocked_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1053,7 +1092,10 @@
       "compositePrimaryKeys": {
         "blocks_blocker_id_blocked_id_pk": {
           "name": "blocks_blocker_id_blocked_id_pk",
-          "columns": ["blocker_id", "blocked_id"]
+          "columns": [
+            "blocker_id",
+            "blocked_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -1163,8 +1205,12 @@
           "name": "buddy_matches_a_id_users_id_fk",
           "tableFrom": "buddy_matches",
           "tableTo": "users",
-          "columnsFrom": ["a_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "a_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1172,8 +1218,12 @@
           "name": "buddy_matches_b_id_users_id_fk",
           "tableFrom": "buddy_matches",
           "tableTo": "users",
-          "columnsFrom": ["b_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "b_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1261,8 +1311,12 @@
           "name": "comments_post_id_posts_id_fk",
           "tableFrom": "comments",
           "tableTo": "posts",
-          "columnsFrom": ["post_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "post_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1270,8 +1324,12 @@
           "name": "comments_author_id_users_id_fk",
           "tableFrom": "comments",
           "tableTo": "users",
-          "columnsFrom": ["author_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1328,8 +1386,12 @@
           "name": "follows_follower_id_users_id_fk",
           "tableFrom": "follows",
           "tableTo": "users",
-          "columnsFrom": ["follower_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "follower_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1337,8 +1399,12 @@
           "name": "follows_followee_id_users_id_fk",
           "tableFrom": "follows",
           "tableTo": "users",
-          "columnsFrom": ["followee_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "followee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1346,7 +1412,10 @@
       "compositePrimaryKeys": {
         "follows_follower_id_followee_id_pk": {
           "name": "follows_follower_id_followee_id_pk",
-          "columns": ["follower_id", "followee_id"]
+          "columns": [
+            "follower_id",
+            "followee_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -1389,8 +1458,12 @@
           "name": "kudos_post_id_posts_id_fk",
           "tableFrom": "kudos",
           "tableTo": "posts",
-          "columnsFrom": ["post_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "post_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1398,8 +1471,12 @@
           "name": "kudos_user_id_users_id_fk",
           "tableFrom": "kudos",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1407,7 +1484,10 @@
       "compositePrimaryKeys": {
         "kudos_post_id_user_id_pk": {
           "name": "kudos_post_id_user_id_pk",
-          "columns": ["post_id", "user_id"]
+          "columns": [
+            "post_id",
+            "user_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -1520,8 +1600,12 @@
           "name": "posts_author_id_users_id_fk",
           "tableFrom": "posts",
           "tableTo": "users",
-          "columnsFrom": ["author_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1529,8 +1613,12 @@
           "name": "posts_session_id_sessions_id_fk",
           "tableFrom": "posts",
           "tableTo": "sessions",
-          "columnsFrom": ["session_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1627,8 +1715,12 @@
           "name": "goals_user_id_users_id_fk",
           "tableFrom": "goals",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1717,8 +1809,12 @@
           "name": "medals_user_id_users_id_fk",
           "tableFrom": "medals",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1726,8 +1822,12 @@
           "name": "medals_session_id_sessions_id_fk",
           "tableFrom": "medals",
           "tableTo": "sessions",
-          "columnsFrom": ["session_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1737,7 +1837,9 @@
         "medals_sessionId_unique": {
           "name": "medals_sessionId_unique",
           "nullsNotDistinct": false,
-          "columns": ["session_id"]
+          "columns": [
+            "session_id"
+          ]
         }
       },
       "policies": {},
@@ -1840,8 +1942,12 @@
           "name": "personal_records_user_id_users_id_fk",
           "tableFrom": "personal_records",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1849,8 +1955,12 @@
           "name": "personal_records_session_id_sessions_id_fk",
           "tableFrom": "personal_records",
           "tableTo": "sessions",
-          "columnsFrom": ["session_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1951,8 +2061,12 @@
           "name": "progress_daily_user_id_users_id_fk",
           "tableFrom": "progress_daily",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1960,7 +2074,11 @@
       "compositePrimaryKeys": {
         "progress_daily_user_id_date_exercise_id_pk": {
           "name": "progress_daily_user_id_date_exercise_id_pk",
-          "columns": ["user_id", "date", "exercise_id"]
+          "columns": [
+            "user_id",
+            "date",
+            "exercise_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -2030,8 +2148,12 @@
           "name": "risk_insights_user_id_users_id_fk",
           "tableFrom": "risk_insights",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2041,7 +2163,11 @@
         "risk_insights_upsert_key": {
           "name": "risk_insights_upsert_key",
           "nullsNotDistinct": false,
-          "columns": ["user_id", "body_part", "as_of"]
+          "columns": [
+            "user_id",
+            "body_part",
+            "as_of"
+          ]
         }
       },
       "policies": {},
@@ -2241,6 +2367,318 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.rehab_limits": {
+      "name": "rehab_limits",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "rehab_plan_id": {
+          "name": "rehab_plan_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exercise_id": {
+          "name": "exercise_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "angle": {
+          "name": "angle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "side": {
+          "name": "side",
+          "type": "limb_side",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'both'"
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "max_range_deg": {
+          "name": "max_range_deg",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sets": {
+          "name": "sets",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reps": {
+          "name": "reps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tempo_min_ms": {
+          "name": "tempo_min_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "rehab_limits_plan_idx": {
+          "name": "rehab_limits_plan_idx",
+          "columns": [
+            {
+              "expression": "rehab_plan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "rehab_limits_rehab_plan_id_rehab_plans_id_fk": {
+          "name": "rehab_limits_rehab_plan_id_rehab_plans_id_fk",
+          "tableFrom": "rehab_limits",
+          "tableTo": "rehab_plans",
+          "columnsFrom": [
+            "rehab_plan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "rehab_limits_exercise_id_exercises_id_fk": {
+          "name": "rehab_limits_exercise_id_exercises_id_fk",
+          "tableFrom": "rehab_limits",
+          "tableTo": "exercises",
+          "columnsFrom": [
+            "exercise_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rehab_limits_plan_exercise_angle_side_uq": {
+          "name": "rehab_limits_plan_exercise_angle_side_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "rehab_plan_id",
+            "exercise_id",
+            "angle",
+            "side"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "rehab_limits_range": {
+          "name": "rehab_limits_range",
+          "value": "\"rehab_limits\".\"max_range_deg\" >= 0 and \"rehab_limits\".\"max_range_deg\" <= 180"
+        },
+        "rehab_limits_volume": {
+          "name": "rehab_limits_volume",
+          "value": "\"rehab_limits\".\"sets\" > 0 and \"rehab_limits\".\"reps\" > 0"
+        },
+        "rehab_limits_tempo": {
+          "name": "rehab_limits_tempo",
+          "value": "\"rehab_limits\".\"tempo_min_ms\" is null or \"rehab_limits\".\"tempo_min_ms\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.rehab_plans": {
+      "name": "rehab_plans",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "injury_id": {
+          "name": "injury_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "from_physio": {
+          "name": "from_physio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start_on": {
+          "name": "start_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "review_on": {
+          "name": "review_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "rehab_plan_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "rehab_plans_user_idx": {
+          "name": "rehab_plans_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "start_on",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "rehab_plans_one_active_uq": {
+          "name": "rehab_plans_one_active_uq",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"rehab_plans\".\"status\" = 'active'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "rehab_plans_user_id_users_id_fk": {
+          "name": "rehab_plans_user_id_users_id_fk",
+          "tableFrom": "rehab_plans",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "rehab_plans_injury_id_injuries_id_fk": {
+          "name": "rehab_plans_injury_id_injuries_id_fk",
+          "tableFrom": "rehab_plans",
+          "tableTo": "injuries",
+          "columnsFrom": [
+            "injury_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "rehab_plans_review_after_start": {
+          "name": "rehab_plans_review_after_start",
+          "value": "\"rehab_plans\".\"review_on\" is null or \"rehab_plans\".\"review_on\" >= \"rehab_plans\".\"start_on\""
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.rom_trend": {
       "name": "rom_trend",
       "schema": "",
@@ -2307,8 +2745,12 @@
           "name": "rom_trend_user_id_users_id_fk",
           "tableFrom": "rom_trend",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2316,7 +2758,12 @@
       "compositePrimaryKeys": {
         "rom_trend_user_id_angle_side_week_pk": {
           "name": "rom_trend_user_id_angle_side_week_pk",
-          "columns": ["user_id", "angle", "side", "week"]
+          "columns": [
+            "user_id",
+            "angle",
+            "side",
+            "week"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -2329,57 +2776,136 @@
     "public.body_part": {
       "name": "body_part",
       "schema": "public",
-      "values": ["knee", "shoulder", "lower_back", "hip", "ankle", "wrist", "elbow", "neck", "other"]
+      "values": [
+        "knee",
+        "shoulder",
+        "lower_back",
+        "hip",
+        "ankle",
+        "wrist",
+        "elbow",
+        "neck",
+        "other"
+      ]
     },
     "public.experience_level": {
       "name": "experience_level",
       "schema": "public",
-      "values": ["beginner", "intermediate", "advanced"]
+      "values": [
+        "beginner",
+        "intermediate",
+        "advanced"
+      ]
     },
     "public.injury_severity": {
       "name": "injury_severity",
       "schema": "public",
-      "values": ["mild", "moderate", "severe"]
+      "values": [
+        "mild",
+        "moderate",
+        "severe"
+      ]
+    },
+    "public.injury_side": {
+      "name": "injury_side",
+      "schema": "public",
+      "values": [
+        "left",
+        "right",
+        "both",
+        "n/a"
+      ]
     },
     "public.export_status": {
       "name": "export_status",
       "schema": "public",
-      "values": ["pending", "uploading", "exported", "failed"]
+      "values": [
+        "pending",
+        "uploading",
+        "exported",
+        "failed"
+      ]
     },
     "public.inference_mode": {
       "name": "inference_mode",
       "schema": "public",
-      "values": ["coreml", "vision", "cloud"]
+      "values": [
+        "on_device",
+        "cloud"
+      ]
     },
     "public.medal_tier": {
       "name": "medal_tier",
       "schema": "public",
-      "values": ["bronze", "silver", "gold"]
+      "values": [
+        "bronze",
+        "silver",
+        "gold"
+      ]
     },
     "public.buddy_status": {
       "name": "buddy_status",
       "schema": "public",
-      "values": ["requested", "accepted", "declined"]
+      "values": [
+        "requested",
+        "accepted",
+        "declined"
+      ]
     },
     "public.post_kind": {
       "name": "post_kind",
       "schema": "public",
-      "values": ["session", "pr", "medal", "goal", "advice"]
+      "values": [
+        "session",
+        "pr",
+        "medal",
+        "goal",
+        "advice"
+      ]
     },
     "public.goal_status": {
       "name": "goal_status",
       "schema": "public",
-      "values": ["active", "achieved", "abandoned"]
+      "values": [
+        "active",
+        "achieved",
+        "abandoned"
+      ]
     },
     "public.pr_metric": {
       "name": "pr_metric",
       "schema": "public",
-      "values": ["max_weight_kg", "max_reps", "est_1rm_kg"]
+      "values": [
+        "max_weight_kg",
+        "max_reps",
+        "est_1rm_kg"
+      ]
     },
     "public.deletion_status": {
       "name": "deletion_status",
       "schema": "public",
-      "values": ["pending", "done"]
+      "values": [
+        "pending",
+        "done"
+      ]
+    },
+    "public.limb_side": {
+      "name": "limb_side",
+      "schema": "public",
+      "values": [
+        "left",
+        "right",
+        "both"
+      ]
+    },
+    "public.rehab_plan_status": {
+      "name": "rehab_plan_status",
+      "schema": "public",
+      "values": [
+        "active",
+        "paused",
+        "done"
+      ]
     }
   },
   "schemas": {},

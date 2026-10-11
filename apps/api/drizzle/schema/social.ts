@@ -1,4 +1,5 @@
 // DB-06: social graph behind the feed (§9.2 Social, §12). DB-09: buddy matches.
+// Moderation log: posts and comments that moderation blocked.
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -19,6 +20,7 @@ import { sessions } from "./workouts.js";
 
 export const postKind = pgEnum("post_kind", ["session", "pr", "medal", "goal", "advice"]);
 export const buddyStatus = pgEnum("buddy_status", ["requested", "accepted", "declined"]);
+export const moderatedKind = pgEnum("moderated_kind", ["post", "comment"]);
 
 export const posts = pgTable(
   "posts",
@@ -54,6 +56,29 @@ export const comments = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("comments_post_created_idx").on(t.postId, t.createdAt)],
+);
+
+// Posts and comments that moderation blocked, so repeat offenders show up (e.g. several S15
+// threats aimed at one person's posts). Self-harm (S11) is never logged: it's someone in
+// distress, not abuse, and the text is health data. Deleted with the author's account.
+export const moderationBlocks = pgTable(
+  "moderation_blocks",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    authorId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: moderatedKind().notNull(),
+    // The post a blocked comment was aimed at; its author is who the comment targeted.
+    postId: uuid().references(() => posts.id, { onDelete: "set null" }),
+    body: text().notNull(),
+    categories: text().array().notNull(), // e.g. ["S15"]
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("moderation_blocks_author_created_idx").on(t.authorId, t.createdAt.desc()),
+    index("moderation_blocks_post_idx").on(t.postId),
+  ],
 );
 
 export const kudos = pgTable(

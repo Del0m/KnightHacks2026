@@ -10,5 +10,5 @@
 - Run lint and typecheck before finishing a mobile change.
 - Generate native projects through Expo config and plugins; do not edit generated native files manually.
 
-- Follow `Frontend-Rules.md` for frontend design; prioritize the white and light-blue Spotter direction.
+- Follow `Frontend-Rules.md` for frontend design; prioritize the white and light-blue SteadyForum direction.
 - Do not create or use fully generative AI art; small logos are the only permitted exception.

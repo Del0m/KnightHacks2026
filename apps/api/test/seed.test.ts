@@ -1,5 +1,5 @@
 // DB-10: the demo seed runs on a fresh branch, resets on re-run, and the API serves it.
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import seedUserIds from "../../../data/demo-user-ids.json";
@@ -71,6 +71,34 @@ describe("seed-demo", () => {
     const progress = await api.get("/me/progress?days=60");
     expect(progress.body.form_trend.length).toBeGreaterThan(5);
     expect((await api.get("/buddies/suggestions")).status).toBe(200);
+  });
+
+  it("gives the presenter the §17 recovery story: a knee plan and range coming back", async () => {
+    expect(summary.rehabPlans).toBeGreaterThan(0);
+    const api = await t.as("presenter-neon-id");
+
+    const limits = (await api.get("/me/limits")).body;
+    expect(limits.body_parts).toEqual(["knee"]);
+    expect(limits.injuries).toEqual([{ body_part: "knee", side: "left" }]);
+    expect(Object.keys(limits.limits)).toEqual(["squat", "lunge"]);
+    expect(limits.rehab_plan.status).toBe("active");
+
+    const today = await api.get("/me/rehab-plans/active/today");
+    expect(today.status).toBe(200);
+    expect(today.body.exercises.map((e: { exercise_id: string }) => e.exercise_id)).toEqual([
+      "squat",
+      "lunge",
+    ]);
+
+    const trend = await t.db
+      .select()
+      .from(schema.romTrend)
+      .where(eq(schema.romTrend.userId, "presenter-neon-id"))
+      .orderBy(schema.romTrend.week);
+    expect(trend).toHaveLength(6);
+    const last = trend.at(-1)!;
+    expect(last.peakRangeDeg! - trend.at(-4)!.peakRangeDeg!).toBe(18); // up 18° in three weeks
+    expect(last.healthySideRangeDeg! - last.peakRangeDeg!).toBeLessThanOrEqual(5); // within 5°
   });
 
   it("resets instead of duplicating when run again", async () => {

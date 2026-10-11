@@ -4,4 +4,5 @@ ALTER TABLE "sessions" ALTER COLUMN "inference_mode" DROP DEFAULT;--> statement-
 ALTER TABLE "reps" ADD COLUMN "lowering_ms" integer;--> statement-breakpoint
 ALTER TABLE "reps" ADD COLUMN "rising_ms" integer;--> statement-breakpoint
 ALTER TABLE "sets" ADD COLUMN "end_reason" text;--> statement-breakpoint
-ALTER TABLE "sets" ADD COLUMN "partial_reps" integer;
+ALTER TABLE "sets" ADD COLUMN "partial_reps" integer;--> statement-breakpoint
+UPDATE "form_flags" SET "severity" = 'form' WHERE "severity" NOT IN ('form', 'safety');

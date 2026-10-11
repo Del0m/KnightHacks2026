@@ -14,7 +14,7 @@ import { CLIP_DEFS, generateAll, generateClip, hold, move, serializeClip, sortFl
 import { applyInjuries } from '../overrides';
 import { isAbsentFrame, type Clip } from '../recording';
 import { STILL_BAND_DEG } from '../repCounter';
-import { getSpec } from '../specs';
+import { EXERCISE_SPECS, getSpec } from '../specs';
 import type { ExerciseSpec, JointAngleSpec, PrimaryGate, SegmentTiltSpec } from '../types';
 
 const fileFor = (name: string) => path.join(FIXTURES_DIR, `${name}.json`);
@@ -328,3 +328,5 @@ describe('push-up tempo', () => {
     expect(tempoFlags(200)).toBe(4);
   });
 });
+
+test.each(EXERCISE_SPECS.map(s => [s.id, s.phases] as const))('live %s ends after four seconds of stillness', (_id, phases) => { expect(phases.set_end_still_ms).toBe(4000); });

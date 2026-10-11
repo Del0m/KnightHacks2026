@@ -14,3 +14,6 @@ node_modules/
 
 # AI-09 private recordings, consent evidence and dataset exports
 ml/labelling/data/
+
+# CONN-12: generated dataset export (ml/space/publish_dataset.py)
+ml/space/dataset/
