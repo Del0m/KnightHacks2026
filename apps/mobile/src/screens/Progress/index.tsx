@@ -76,7 +76,7 @@ export default function ProgressScreen() {
         <PolishedPressable accessibilityRole="button" onPress={() => setEditing(false)}><Text style={styles.link}>Cancel</Text></PolishedPressable>
         {profile.avatar && <PolishedPressable accessibilityRole="button" onPress={() => updateProfile({ avatar: '' })}><Text style={styles.link}>Remove photo</Text></PolishedPressable>}
       </View>}
-      <Streak days={streak(workouts)} />
+      <Streak days={streak(workouts, new Date(), setup.profile?.schedule ?? { kind: 'weekly', days: profile.days })} />
     </View>
     {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
     <View style={styles.tabs} onLayout={event => setTabWidth(event.nativeEvent.layout.width)}>

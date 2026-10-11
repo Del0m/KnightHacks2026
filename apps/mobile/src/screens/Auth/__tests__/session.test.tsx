@@ -124,3 +124,24 @@ describe('getApiToken (cloud pose socket)', () => {
     expect(token).toBeNull();
   });
 });
+it('preserves a previously confirmed account during a transient focus refresh failure', async () => {
+ await mount();
+ jest.mocked(client.getSession).mockRejectedValueOnce(new TypeError('Network request failed'));
+ await act(async () => { await auth.refresh(); });
+ expect(auth.user?.id).toBe('first'); expect(auth.error).toContain('Network'); expect(auth.loading).toBe(false);
+});
+it('clears a previously confirmed account when session refresh returns 401', async () => {
+ await mount();
+ jest.mocked(client.getSession).mockResolvedValueOnce({ data: null, error: { status: 401, message: 'expired' } } as never);
+ await act(async () => { await auth.refresh(); });
+ expect(auth.user).toBeNull();
+});
+it('keeps Neon login separate from a workout API verification failure', async () => {
+ await mount();
+ jest.mocked(client.token).mockResolvedValue({ data: { token: 'jwt' }, error: null } as never);
+ const original = globalThis.fetch; globalThis.fetch = jest.fn(async () => ({ status: 401, ok: false } as Response));
+ try {
+  await act(async () => { await expect(auth.apiFetch('/plans/current')).rejects.toThrow(); });
+  expect(auth.user?.id).toBe('first'); expect(auth.error).toContain('workout server');
+ } finally { globalThis.fetch = original; }
+});

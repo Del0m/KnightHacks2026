@@ -7,7 +7,7 @@ import { GlassSurface } from '@/components/GlassSurface';
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { pageColors } from '@/theme/tokens';
 import { useAuth } from '@/screens/Auth/session';
-import { fetchFeed, postType, toggleKudos, type FeedPost, type FeedType } from './feedApi';
+import { fetchFeed, postType, toggleKudos, type AdviceResult, type AdviceSource, type FeedPost, type FeedType } from './feedApi';
 import { FeedCard, FeedIcon } from './FeedCard';
 import { FeedEditor } from './FeedEditor';
 import { examplePosts } from './examples';
@@ -23,6 +23,7 @@ function FeedSession({ initialExamples = false }: { initialExamples?: boolean })
  const [posts, setPosts] = useState<FeedPost[]>([]), [busy, setBusy] = useState(false), [refreshing, setRefreshing] = useState(false), [error, setError] = useState<string | null>(null), [ready, setReady] = useState(false), [hasMore, setHasMore] = useState(false);
  const cachedPosts = useRef(posts); useLayoutEffect(() => { cachedPosts.current = posts; }, [posts]);
  const [type, setType] = useState<FeedType>('recent'), [filtersOpen, setFiltersOpen] = useState(false), [examples, setExamples] = useState(initialExamples), [preview, setPreview] = useState(examplePosts), [editor, setEditor] = useState<FeedPost | null | undefined>(undefined);
+ const [adviceOpen, setAdviceOpen] = useState(false), [adviceResult, setAdviceResult] = useState<AdviceResult | null>(null);
  const cursor = useRef<string | null>(null), loading = useRef(false), controller = useRef<AbortController | null>(null), failedRefresh = useRef(false), loaded = useRef(false), selection = useRef<string | null>(null);
  const [pendingKudos, setPendingKudos] = useState<string[]>([]), kudosLocks = useRef(new Set<string>());
  const load = useCallback(async (refresh = false, retain = false) => {
@@ -64,7 +65,7 @@ function FeedSession({ initialExamples = false }: { initialExamples?: boolean })
   controller.current = new AbortController(); loading.current = false; setError(null); setPendingKudos([...kudosLocks.current]);
   if (changed) { cursor.current = null; loaded.current = false; setPosts([]); setReady(false); }
   void load(true, !changed);
-  return () => { controller.current?.abort(); };
+  return () => { controller.current?.abort(); setEditor(undefined); setAdviceOpen(false); };
  }, [load, type, examples]));
  async function kudos(post: FeedPost) {
   if (examples) { if (!post.viewer_gave_kudos && Platform.OS !== 'web') void Haptics.selectionAsync().catch(() => {}); setPreview(rows => rows.map(p => p.id === post.id ? { ...p, viewer_gave_kudos: !p.viewer_gave_kudos, kudos_count: p.kudos_count + (p.viewer_gave_kudos ? -1 : 1) } : p)); return; }
@@ -81,6 +82,16 @@ function FeedSession({ initialExamples = false }: { initialExamples?: boolean })
  function retry() { void load(failedRefresh.current || !ready); }
  function toggleFilters() { LayoutAnimation.configureNext({ duration: 220, create: { type: 'easeInEaseOut', property: 'scaleY' }, update: { type: 'easeInEaseOut' }, delete: { type: 'easeInEaseOut', property: 'opacity' } }); setFiltersOpen(v => !v); }
  const visible = examples ? preview.filter(p => type === 'recent' || postType(p) === type) : posts;
+ function adviceCreated(result: AdviceResult) {
+  const post: FeedPost = { ...result.post, kind: 'advice', author: { id: result.post.author_id, handle: null, display_name: auth.user?.name || 'You' }, data: null, kudos_count: 0, comment_count: result.reply ? 1 : 0, viewer_gave_kudos: false };
+  setAdviceOpen(false); setAdviceResult(result); setEditor(post);
+  if (type === 'recent' || type === 'custom') setPosts(rows => [post, ...rows.filter(p => p.id !== post.id)]);
+ }
+ function openComments(post: FeedPost) { setAdviceResult(null); setAdviceOpen(false); setEditor(post); }
+ function openSourceThread(source: AdviceSource) {
+  if (!source.post_id) return;
+  openComments(posts.find(p => p.id === source.post_id) ?? { id: source.post_id, body: source.title, kind: 'advice', created_at: new Date().toISOString(), author: { id: '', handle: null, display_name: 'Community source' }, data: null, kudos_count: 0, comment_count: 0, viewer_gave_kudos: false });
+ }
  function created(body: string, title?: string) {
   if (editor) {
    const id = editor.id;
@@ -93,17 +104,18 @@ function FeedSession({ initialExamples = false }: { initialExamples?: boolean })
  }
  return <AppPage title="Feed" scrollable={false}>
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><Text style={[ui.pageTitle, { marginTop: 8 }]}>Feed</Text><View style={{ flexDirection: 'row', gap: 10 }}>
-   <PolishedPressable accessibilityRole="button" accessibilityLabel="New post" onPress={() => setEditor(null)} style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }}><GlassSurface radius={23} tint="#EDE4FB" colored /><FeedIcon name="plus" /></PolishedPressable>
+   <PolishedPressable accessibilityRole="button" accessibilityLabel="New post" onPress={() => { setAdviceOpen(false); setAdviceResult(null); setEditor(null); }} style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }}><GlassSurface radius={23} tint="#EDE4FB" colored /><FeedIcon name="plus" /></PolishedPressable>
    <PolishedPressable accessibilityRole="button" accessibilityLabel="Filter feed" accessibilityState={{ expanded: filtersOpen }} onPress={() => toggleFilters()} style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }}><GlassSurface radius={23} /><FeedIcon name="filter" /></PolishedPressable>
   </View></View>
+  {!examples && <PolishedPressable accessibilityRole="button" accessibilityLabel="Ask for advice" onPress={() => { setEditor(null); setAdviceOpen(true); setAdviceResult(null); }} style={{ alignSelf: 'flex-start', minHeight: 44, borderRadius: 16, paddingHorizontal: 18, justifyContent: 'center' }}><GlassSurface radius={16} tint="#EDE4FB" colored /><Text style={[ui.label, { color: c.text }]}>Ask for advice</Text></PolishedPressable>}
   {filtersOpen && <View style={{ borderRadius: 20, padding: 12, gap: 4 }}><GlassSurface radius={20} tint="#EDE4FB" colored />{([['recent', 'Recent'], ['custom', 'Custom posts'], ['medal', 'Medals'], ['pr', 'Personal records']] as const).map(([value, label]) => <PolishedPressable key={value} accessibilityRole="button" accessibilityState={{ selected: type === value }} onPress={() => { setType(value); setFiltersOpen(false); }} style={{ minHeight: 44, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 12, backgroundColor: type === value ? 'rgba(255,255,255,.65)' : 'transparent' }}><Text style={[ui.label, { color: c.text }]}>{label}</Text></PolishedPressable>)}
    <PolishedPressable accessibilityRole="button" onPress={() => { setExamples(v => !v); setType('recent'); setFiltersOpen(false); }} style={{ minHeight: 44, borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 12, justifyContent: 'center' }}><Text style={ui.label}>{examples ? 'Return to live feed' : 'Preview 10 examples'}</Text></PolishedPressable>
   </View>}
   {(examples || type !== 'recent') && <Text style={ui.label}>{examples ? 'Example posts · preview only' : ({ custom: 'Custom posts', medal: 'Medals', pr: 'Personal records' } as const)[type as Exclude<FeedType, 'recent'>]}</Text>}
   <FlatList data={visible} keyExtractor={p => p.id} onEndReached={() => { if (!error) void load(); }} onEndReachedThreshold={.5} onRefresh={() => { void load(true); }} refreshing={refreshing} contentContainerStyle={{ paddingTop: 8, paddingBottom: 134, gap: 18 }}
-   renderItem={({ item }) => <FeedCard post={item} pending={pendingKudos.includes(item.id)} onKudos={() => { void kudos(item); }} onComment={() => setEditor(item)} />}
+   renderItem={({ item }) => <FeedCard post={item} pending={pendingKudos.includes(item.id)} onKudos={() => { void kudos(item); }} onComment={() => openComments(item)} />}
    ListEmptyComponent={!busy && ready ? <View style={ui.empty}><Text style={ui.emptyTitle}>No posts yet</Text><Text style={ui.muted}>Shared workouts and updates will appear here.</Text></View> : null}
    ListFooterComponent={<View style={{ gap: 12 }}>{busy && !refreshing && <ActivityIndicator accessibilityLabel="Loading feed" color={c.primary} />}{error && <><Text accessibilityRole="alert" style={ui.muted}>{error}</Text><Action secondary onPress={retry}>Try again</Action></>}{ready && visible.length > 0 && !hasMore && !busy && <Text style={[ui.muted, { textAlign: 'center', padding: 12 }]}>You’re caught up</Text>}</View>} />
-  {editor !== undefined && <FeedEditor key={editor?.id ?? 'new-post'} post={editor} request={auth.apiFetch} examples={examples} onClose={() => setEditor(undefined)} onCreated={created} />}
+  {editor !== undefined && <FeedEditor key={editor?.id ?? (adviceOpen ? 'advice' : 'new-post')} post={editor} request={auth.apiFetch} examples={examples} advice={adviceOpen} onAdviceCreated={adviceCreated} initialComments={adviceResult && adviceResult.post.id === editor?.id && adviceResult.reply ? [adviceResult.reply] : []} notice={adviceResult && adviceResult.post.id === editor?.id && adviceResult.outcome === 'none' ? 'Your question is posted. Community members can answer here.' : undefined} onSourceThread={openSourceThread} onClose={() => setEditor(undefined)} onCreated={created} />}
  </AppPage>;
 }
