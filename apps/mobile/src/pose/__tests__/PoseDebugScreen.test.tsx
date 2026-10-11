@@ -204,3 +204,86 @@ describe('PoseDebugScreen cloud eligibility (AI-17)', () => {
     expect(last().cloud).toBeNull();
   });
 });
+
+describe('PoseDebugScreen cloud readout and form resets (AI-17)', () => {
+  let renderer: ReturnType<typeof create>;
+  let status: string;
+  const clip = require('../../engine/__fixtures__/bicep_curl_clean.json');
+  const last = () => jest.mocked(usePoseOutput).mock.calls.at(-1)![0];
+  const text = () => renderer.root.findAllByType(Text)
+    .map((t: { props: { children: unknown } }) => [t.props.children].flat().join('')).join('\n');
+  const rerender = () => act(() => renderer.update(React.createElement(PoseDebugScreen)));
+  const reps = () => [renderer.root.findByProps({ testID: 'pose-form-readout' }).props.children].flat().join('');
+  function feed(from: number, to: number) {
+    for (let i = from; i < to; i++) act(() => last().onPose({ result: clip.frames[i], latencyMs: 8 }));
+  }
+  function setStatus(next: string) { status = next; rerender(); }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(1_800_000_000_000);
+    jest.clearAllMocks();
+    __clearPoseStoreForTests();
+    saveBenchmark({ modelId: 'model-a', size: 256, fps: 5, meanMs: 200, p95Ms: 250, ranAt: 1, error: null });
+    saveCloudConsent('user-1', true);
+    __resetPoseModeForTests();
+    mockAuth.user = { id: 'user-1' };
+    Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
+    status = 'tracking';
+    jest.mocked(useCameraPermission).mockReturnValue({ hasPermission: true, canRequestPermission: false } as never);
+    jest.mocked(usePoseOutput).mockImplementation(() => ({ frameOutput: { currentResolution: { width: 1920, height: 1080 } }, fps: 9, error: null, model: 'yolov8n-pose-320', dropped: 3, cloudStatus: status }) as never);
+    act(() => { renderer = create(React.createElement(PoseDebugScreen)); });
+    act(() => renderer.root.findAllByType(View)[0].props.onLayout({ nativeEvent: { layout: { width: 390, height: 844 } } }));
+    act(() => renderer.root.findByType('Camera').props.onConfigured());
+  });
+  afterEach(() => { act(() => renderer.unmount()); jest.useRealTimers(); });
+
+  it('shows the source, cloud status, fps, drops and capture-to-result latency', () => {
+    const now = Date.now();
+    act(() => last().onPose({ latencyMs: 40, timestampMs: now - 120, result: { ...clip.frames[0], source: 'cloud', timestamp_ms: now - 120 } }));
+    expect(text()).toContain('source cloud · tracking');
+    expect(text()).toContain('fps 9');
+    expect(text()).toContain('dropped 3');
+    expect(text()).toContain('capture→result 120 ms');
+    setStatus('reconnecting');
+    expect(text()).toContain('source cloud · reconnecting');
+  });
+
+  it('clears the skeleton and result when cloud tracking stops', () => {
+    act(() => last().onPose({ latencyMs: 40, timestampMs: Date.now(), result: { ...clip.frames[0], source: 'cloud', timestamp_ms: Date.now() } }));
+    expect(renderer.root.findByType('PoseSkeleton').props.result).toBeDefined();
+    setStatus('reconnecting');
+    expect(renderer.root.findByType('PoseSkeleton').props.result).toBeUndefined();
+  });
+
+  it("doesn't finish a rep that was half done before a cloud interruption", () => {
+    for (let i = 0; i < 2; i++) act(() => renderer.root.findByProps({ testID: 'pose-exercise-next' }).props.onPress());
+    expect(reps()).toContain('Bicep curl');
+    // Control: the same frames without a gap count one rep.
+    feed(0, 60);
+    expect(reps()).toContain('reps 1');
+    act(() => renderer.root.findByProps({ testID: 'pose-set-reset' }).props.onPress());
+
+    feed(0, 40); // past the peak
+    setStatus('reconnecting');
+    setStatus('tracking');
+    feed(40, 60);
+    expect(reps()).toContain('reps 0');
+  });
+
+  it("doesn't finish a rep across a source switch", () => {
+    act(() => renderer.unmount());
+    saveBenchmark({ modelId: 'model-a', size: 320, fps: 60, meanMs: 9, p95Ms: 10, ranAt: 1, error: null });
+    __resetPoseModeForTests();
+    act(() => { renderer = create(React.createElement(PoseDebugScreen)); });
+    act(() => renderer.root.findAllByType(View)[0].props.onLayout({ nativeEvent: { layout: { width: 390, height: 844 } } }));
+    act(() => renderer.root.findByType('Camera').props.onConfigured());
+    expect(last().engine).toBe('coreml');
+    for (let i = 0; i < 2; i++) act(() => renderer.root.findByProps({ testID: 'pose-exercise-next' }).props.onPress());
+    feed(0, 40);
+    act(() => renderer.root.findByProps({ testID: 'pose-engine-toggle' }).props.onPress());
+    expect(last().engine).toBe('vision');
+    feed(40, 60);
+    expect(reps()).toContain('reps 0');
+  });
+});

@@ -37,3 +37,15 @@ test.each(['front', 'back'] as const)('confirms %s framing once without a button
  expect(screen.root.findAllByType('Choice').some((n: any) => n.props.label === 'Framing checked · continue')).toBe(false);
  act(() => screen.unmount());
 });
+test('a detection captured more than a second ago never enables Ready', () => {
+ const done = jest.fn(); let screen: ReturnType<typeof create>;
+ act(() => { screen = create(<CameraCheck exercise="squat" onContinue={done} />); });
+ act(() => screen.root.findByProps({ testID: 'framing-preview' }).props.onLayout({ nativeEvent: { layout: { width: 360, height: 640 } } }));
+ act(() => screen.root.findByType('Camera').props.onConfigured());
+ // The result carries a fresh time, but the frame it came from was captured 1.5 s ago.
+ const stale = () => act(() => mockOnPose({ latencyMs: 10, timestampMs: Date.now() - 1500, result: { source: 'cloud', model: 'test', timestamp_ms: Date.now(), score: .9, joints: Array.from({ length: 17 }, (_, i) => ({ x: i % 2 ? .4 : .6, y: .2 + i / 30, c: .9 })) } }));
+ for (let i = 0; i < 20; i++) { stale(); act(() => jest.advanceTimersByTime(100)); }
+ expect(done).not.toHaveBeenCalled();
+ expect(screen!.root.findByType('Guide').props.ready).toBe(false);
+ act(() => screen!.unmount());
+});

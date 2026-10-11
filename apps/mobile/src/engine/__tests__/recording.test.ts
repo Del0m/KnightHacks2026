@@ -30,4 +30,10 @@ describe('clip recorder', () => {
     // A recorded clip round-trips through JSON unchanged.
     expect(JSON.parse(JSON.stringify(clip))).toEqual(clip);
   });
+
+  it('stamps a no-person cloud frame with its capture time, not the arrival time', () => {
+    const rec = createClipRecorder({ exercise: 'squat', image: { width: 1080, height: 1920 } });
+    rec.add({ latencyMs: 40, timestampMs: 2000 }, 2400);
+    expect(rec.toClip('c').frames[0]).toEqual({ absent: true, timestamp_ms: 2000 });
+  });
 });

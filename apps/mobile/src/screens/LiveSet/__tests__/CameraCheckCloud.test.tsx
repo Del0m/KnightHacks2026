@@ -406,3 +406,24 @@ describe('camera check: nothing is sent outside an eligible session', () => {
     expect(h.sockets).toHaveLength(0);
   });
 });
+
+describe('camera check: an interruption clears framing', () => {
+  it("restarts the one-second hold after cloud tracking drops, so readiness can't span the gap", async () => {
+    phone({ fps: 5 });
+    await t.mount();
+    t.layout();
+    act(() => t.socket().reply({ type: 'ready' }));
+    for (let i = 0; i < 4; i++) { t.tracked(); await t.advance(200); }
+    expect(t.text()).toContain('Hold your position…');
+
+    act(() => t.socket().onclose?.({})); // dropped after ready: reconnects after 500 ms
+    expect(t.text()).toContain('Reconnecting…');
+    expect(t.text()).not.toContain('Hold your position…');
+    expect(t.root().findByType('Guide').props.ready).toBe(false);
+    await t.advance(500);
+    act(() => t.socket().reply({ type: 'ready' }));
+    t.tracked(); await t.advance(200); t.tracked();
+    expect(h.onContinue).not.toHaveBeenCalled();
+    expect(t.text()).toContain('Hold your position…');
+  });
+});
