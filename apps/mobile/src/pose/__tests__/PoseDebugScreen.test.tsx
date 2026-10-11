@@ -4,7 +4,7 @@ import { useCameraPermission } from 'react-native-vision-camera';
 import { PoseDebugScreen } from '../PoseDebugScreen';
 import { usePoseOutput } from '../usePoseOutput';
 import { benchmarkPoseModel } from 'steadyforum-pose';
-import { __clearPoseStoreForTests } from '../modeStore';
+import { __clearPoseStoreForTests, loadCloudConsent } from '../modeStore';
 import { __resetPoseModeForTests, startPoseBenchmark } from '../usePoseMode';
 
 const { act, create } = require('react-test-renderer');
@@ -14,6 +14,9 @@ jest.mock('steadyforum-pose', () => ({ benchmarkPoseModel: jest.fn(), getPoseMod
 jest.mock('../PoseSkeleton', () => ({
   PoseSkeleton: (props: unknown) => require('react').createElement('PoseSkeleton', props),
 }));
+const mockAuth = { user: { id: 'user-1' } as { id: string } | null, getApiToken: jest.fn(async () => 'jwt') };
+jest.mock('../../screens/Auth/session', () => ({ useAuth: () => mockAuth }));
+jest.mock('../../screens/Auth/client', () => ({ apiUrl: 'https://api.test' }));
 jest.mock('react-native-vision-camera', () => ({
   Camera: (props: unknown) => require('react').createElement('Camera', props),
   useCameraDevice: jest.fn((position) => ({ position })),
@@ -114,6 +117,8 @@ describe('PoseDebugScreen', () => {
     act(() => renderer.root.findByProps({ testID: 'pose-consent-toggle' }).props.onPress());
     expect(text()).toContain('consent yes');
     expect(text()).toContain('Revoke cloud consent');
+    expect(loadCloudConsent('user-1')).toBe(true);
+    expect(loadCloudConsent('user-2')).toBe(false);
   });
 
   it('shows a rejected permission request instead of an unhandled rejection', async () => {

@@ -237,3 +237,45 @@ describe('camera check: cloud failure never starts Core ML on its own', () => {
     expect(t.text()).toContain('Cloud tracking');
   });
 });
+
+describe('camera check: cloud consent belongs to the account', () => {
+  it('explains cloud frames before consent and sends nothing until the user allows it', async () => {
+    phone({ fps: 5, consent: false });
+    await t.mount();
+    expect(t.text()).toContain('sends camera frames to the SteadyForum API for pose detection');
+    expect(t.text()).toContain('processed in memory and never stored');
+    expect(t.labels()).toEqual(expect.arrayContaining(['Allow cloud tracking', 'Continue without camera']));
+    await t.advance(10_000);
+    expect(h.sockets).toHaveLength(0);
+    expect(mockSession.current.getApiToken).not.toHaveBeenCalled();
+
+    await t.press('Allow cloud tracking');
+    expect(modeStore.loadCloudConsent('user-1')).toBe(true);
+    expect(h.sockets).toHaveLength(1);
+    expect(t.socket().token).toBe('jwt-user-1');
+  });
+
+  it("doesn't use another account's consent, or the old device-wide one", async () => {
+    phone({ fps: 5, user: 'user-2', consent: false });
+    modeStore.saveCloudConsent('user-1', true);
+    require('react-native-mmkv').createMMKV({ id: 'pose' }).set('cloudConsent', true);
+    await t.mount();
+    expect(t.labels()).toContain('Allow cloud tracking');
+    expect(h.sockets).toHaveLength(0);
+  });
+
+  it('continues manually from the consent prompt', async () => {
+    phone({ fps: 5, consent: false });
+    await t.mount();
+    await t.press('Continue without camera');
+    expect(h.onContinue).toHaveBeenCalledWith('manual');
+    expect(h.sockets).toHaveLength(0);
+  });
+
+  it('describes cloud frames accurately in the iOS camera permission text', () => {
+    const text: string = require('../../../../app.json').expo.ios.infoPlist.NSCameraUsageDescription;
+    expect(text).not.toMatch(/never leaves/i);
+    expect(text).toMatch(/SteadyForum/);
+    expect(text).toMatch(/never stored/i);
+  });
+});

@@ -107,6 +107,26 @@ describe('usePoseMode', () => {
     hook.unmount();
   });
 
+  it('keeps consent per account; with no account there is none to give', async () => {
+    jest.mocked(benchmarkPoseModel).mockResolvedValueOnce(slow(320)).mockResolvedValueOnce(slow(256));
+    await startPoseBenchmark('ios');
+    const first = renderMode('user-1');
+    act(() => first.get().setCloudConsent(true));
+    expect(first.get()).toMatchObject({ cloudConsent: true, mode: 'paused' });
+    first.unmount();
+
+    const second = renderMode('user-2');
+    expect(second.get()).toMatchObject({ cloudConsent: false, mode: 'unavailable', needsCloudConsent: true });
+    second.unmount();
+
+    const none = renderMode(null);
+    expect(none.get()).toMatchObject({ cloudConsent: false, mode: 'unavailable' });
+    act(() => none.get().setCloudConsent(true));
+    expect(none.get().cloudConsent).toBe(false);
+    expect(loadCloudConsent(null)).toBe(false);
+    none.unmount();
+  });
+
   it('sends Android to cloud without touching native code', async () => {
     const hook = renderMode();
     await act(() => startPoseBenchmark('android'));

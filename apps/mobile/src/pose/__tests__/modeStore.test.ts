@@ -18,16 +18,31 @@ describe('modeStore', () => {
   it('defaults when nothing is saved', () => {
     expect(loadBenchmark()).toBeNull();
     expect(loadPreference()).toBe('auto');
-    expect(loadCloudConsent()).toBe(false);
+    expect(loadCloudConsent('user-1')).toBe(false);
+    expect(loadCloudConsent(null)).toBe(false);
   });
 
   it('round-trips each value', () => {
     saveBenchmark(result);
     savePreference('vision');
-    saveCloudConsent(true);
+    saveCloudConsent('user-1', true);
     expect(loadBenchmark()).toEqual(result);
     expect(loadPreference()).toBe('vision');
-    expect(loadCloudConsent()).toBe(true);
+    expect(loadCloudConsent('user-1')).toBe(true);
+  });
+
+  it('keeps cloud consent per account', () => {
+    saveCloudConsent('user-1', true);
+    expect(loadCloudConsent('user-2')).toBe(false);
+    expect(createMMKV({ id: 'pose' }).getBoolean('cloudConsent:user-1')).toBe(true);
+    saveCloudConsent('user-1', false);
+    expect(loadCloudConsent('user-1')).toBe(false);
+  });
+
+  it('never reads the old device-wide consent as a grant', () => {
+    createMMKV({ id: 'pose' }).set('cloudConsent', true);
+    expect(loadCloudConsent('user-1')).toBe(false);
+    expect(loadCloudConsent(null)).toBe(false);
   });
 
   it('ignores corrupt or unknown values', () => {
