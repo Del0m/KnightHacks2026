@@ -233,6 +233,14 @@ describe('crossClip', () => {
   it('returns nothing with a single clip', () => {
     expect(crossClip([{ clip_id: 'a', value: 1, positive: true }], '>=', 800)).toEqual([]);
   });
+
+  it('does not fit on a clip that has only one label', () => {
+    const out = crossClip([
+      { clip_id: 'a', value: 400, positive: false }, { clip_id: 'a', value: 900, positive: false },
+      { clip_id: 'b', value: 600, positive: true }, { clip_id: 'b', value: 700, positive: false },
+    ], '>=', 800);
+    expect(out.map((o) => [o.train, o.test, o.fitted])).toEqual([['a', 'b', false], ['b', 'a', true]]);
+  });
 });
 
 describe('readBundle', () => {
@@ -266,5 +274,15 @@ describe('renderReport', () => {
     expect(md).toMatch(/trunk_lean.*forward_lean/);
     expect(md).toContain('2/2');
     expect(md).toMatch(/one clip/i);
+  });
+
+  it('lists lowering time and rep time per human label', () => {
+    const data = offForm();
+    const reps = engineReps(data);
+    data.annotations = reps.map((r, i) => annotation(`a${i}`, r.start_frame, r.end_frame, i < 2 ? ['fast_lowering'] : ['clean']));
+    const md = renderReport([checkClip(data)]);
+    expect(md).toMatch(/\| label \| reps \| lowering, ms \| rep, ms \|/);
+    expect(md).toMatch(/\| fast_lowering \| 2 \| \d+–\d+ \| \d+–\d+ \|/);
+    expect(md).toMatch(/\| clean \| 4 \|/);
   });
 });
