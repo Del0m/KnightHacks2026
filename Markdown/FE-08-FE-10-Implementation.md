@@ -90,3 +90,13 @@ Report and block write routes are absent in the current API. The existing Feed r
 The approved merge retains main's moderation status and background rechecks alongside title moderation and rejection of unchecked new comments. Background post checks include the title. Tests retain legacy unchecked-comment recovery without allowing new unchecked comments. The two push-up replay snapshots now match main's reduced lowering threshold; no exercise rule was changed here.
 
 Verification after integration: 77 mobile suites / 804 tests; 29 API files / 544 tests; both TypeScript checks; mobile lint with zero errors and nine warnings; web and iOS exports. The additive moderation-status migration was applied to the local testing database. Main also adds labelling tools and cloud-pose support; its new shared labelling directory requires restarting an already-running Metro server.
+
+## FE-11 review corrections
+
+Comment GET requests now filter obvious abuse only from their response without changing stored comments. Logged moderation and background rechecks remain responsible for removing rejected content. Local patterns no longer reject generic profanity, fitness language involving fat/ugly, or friendly “shut up” banter; these reach contextual moderation. Direct severe insults, slurs and explicit threats retain local protection.
+
+Refocusing Feed retains the mounted list, loaded pages and pagination cursor during its background refresh. Fresh first-page values update existing cards while older loaded pages remain. Selecting a different filter or source resets the query; pull-to-refresh explicitly reloads from the beginning. Account changes still remount account-scoped state and aborted requests cannot update the new screen.
+
+Regression tests reproduced all three original failures before implementation. The corrected social/moderation tests pass (28 tests), as do all four Feed suites (21 tests), both typechecks and lint checks. Mobile lint retains nine warnings and zero errors.
+
+A refocus regression also covers multiple pages of new posts. Background refresh follows fresh cursors until cached posts overlap or the new feed ends before preserving the previous tail cursor, so newly arrived posts cannot fall into a pagination gap.

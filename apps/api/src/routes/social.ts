@@ -5,7 +5,7 @@
 // A blocked post or comment is a 422 moderation_blocked. When it's self-harm, details.support is
 // true: the app should show the message with support resources, not as an error. Other blocks
 // are logged to moderation_blocks.
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { Router, type Request } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
@@ -176,12 +176,9 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
       .leftJoin(profiles, eq(profiles.userId, comments.authorId))
       .where(and(eq(comments.postId, postId), notBlocked(me, comments.authorId)))
       .orderBy(asc(comments.createdAt));
-    const unsafeIds = rows.filter((row) => isAbusiveComment(row.body)).map((row) => row.id);
-    if (unsafeIds.length)
-      await db.delete(comments).where(and(eq(comments.postId, postId), inArray(comments.id, unsafeIds)));
     send(
       res,
-      rows.filter((row) => !unsafeIds.includes(row.id)),
+      rows.filter((row) => !isAbusiveComment(row.body)),
     );
   });
 

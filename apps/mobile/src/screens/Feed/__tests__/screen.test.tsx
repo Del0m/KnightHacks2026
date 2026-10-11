@@ -5,7 +5,9 @@ import FeedScreen, { FeedCard } from '../index';
 import { useAuth } from '@/screens/Auth/session';
 const { act, create } = require('react-test-renderer');
 jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn().mockResolvedValue(undefined) }));
-jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]) }));
+let mockFocused = true;
+beforeEach(() => { mockFocused = true; });
+jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void) => require('react').useEffect(() => mockFocused ? callback() : undefined, [callback, mockFocused]) }));
 jest.mock('@/screens/Auth/session', () => ({ useAuth: jest.fn() }));
 jest.mock('@/components/AppPage', () => ({ AppPage: ({ children }: React.PropsWithChildren) => children, Action: 'Action', pageStyles: () => ({}) }));
 jest.mock('@/components/GlassSurface', () => ({ GlassSurface: () => null }));
@@ -86,5 +88,54 @@ it('previews ten examples without publishing and filters them by type', async ()
  press('Filter feed'); press('Personal records');
  expect(screen.root.findByType(FlatList).props.data).toHaveLength(3);
  expect(screen.root.findByType(FlatList).props.data.every((p: any) => p.kind === 'pr')).toBe(true);
+ act(() => screen.unmount());
+});
+
+it('keeps the mounted paginated list on refocus and refreshes without resetting its cursor', async () => {
+ let resolve!: (value: unknown) => void;
+ const apiFetch = jest.fn()
+  .mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('a')], next_cursor: 'page-two' }) })
+  .mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('b')], next_cursor: 'page-three' }) })
+  .mockReturnValueOnce(new Promise(r => { resolve = r; }))
+  .mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('c')], next_cursor: null }) });
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<FeedScreen />); });
+ await act(async () => { screen.root.findByType(FlatList).props.onEndReached(); });
+ const list = screen.root.findByType(FlatList);
+ mockFocused = false;
+ await act(async () => { screen.update(<FeedScreen />); });
+ mockFocused = true;
+ await act(async () => { screen.update(<FeedScreen />); });
+ expect(screen.root.findByType(FlatList)).toBe(list);
+ expect(list.props.refreshing).toBe(false);
+ expect(list.props.data.map((p: { id: string }) => p.id)).toEqual(['a', 'b']);
+ await act(async () => { resolve({ ok: true, json: async () => ({ posts: [{ ...post('a'), kudos_count: 5 }], next_cursor: 'page-two' }) }); });
+ expect(list.props.data.map((p: { id: string }) => p.id)).toEqual(['a', 'b']);
+ expect(list.props.data[0].kudos_count).toBe(5);
+ await act(async () => { list.props.onEndReached(); });
+ expect(apiFetch.mock.calls[3][0]).toBe('/feed?scope=public&cursor=page-three');
+ act(() => screen.unmount());
+});
+
+it('fills the gap between new pages and cached posts on refocus', async () => {
+ const response = (ids: string[], cursor: string | null) => ({ ok: true, json: async () => ({ posts: ids.map(post), next_cursor: cursor }) });
+ const apiFetch = jest.fn()
+  .mockResolvedValueOnce(response(['old'], 'old-tail'))
+  .mockResolvedValueOnce(response(['newest'], 'new-page'))
+  .mockResolvedValueOnce(response(['newer', 'old'], 'overlap-tail'))
+  .mockResolvedValueOnce(response(['older'], null));
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<FeedScreen />); });
+ mockFocused = false;
+ await act(async () => { screen.update(<FeedScreen />); });
+ mockFocused = true;
+ await act(async () => { screen.update(<FeedScreen />); });
+ expect(apiFetch.mock.calls[2][0]).toBe('/feed?scope=public&cursor=new-page');
+ const list = screen.root.findByType(FlatList);
+ expect(list.props.data.map((p: { id: string }) => p.id)).toEqual(['newest', 'newer', 'old']);
+ await act(async () => { list.props.onEndReached(); });
+ expect(apiFetch.mock.calls[3][0]).toBe('/feed?scope=public&cursor=old-tail');
  act(() => screen.unmount());
 });

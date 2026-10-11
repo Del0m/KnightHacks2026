@@ -300,7 +300,7 @@ it("filters public post types before pagination, including old personal records"
   expect((await reader.get("/feed?scope=public&type=invalid")).status).toBe(400);
 });
 
-it("blocks obvious comment abuse without an AI token and removes legacy abusive comments", async () => {
+it("blocks obvious comment abuse and hides legacy abuse without deleting it", async () => {
   const api = await t.as("comment-safety");
   const post = (await api.post("/posts", { kind: "goal", body: "A good workout" })).body;
   expect((await api.post(`/posts/${post.id}/comments`, { body: "moderation unavailable" })).status).toBe(503);
@@ -316,7 +316,7 @@ it("blocks obvious comment abuse without an AI token and removes legacy abusive 
     .returning();
   const result = await api.get(`/posts/${post.id}/comments`);
   expect(result.body).toHaveLength(1);
-  expect(await t.db.select().from(schema.comments).where(eq(schema.comments.id, legacy.id))).toHaveLength(0);
+  expect(await t.db.select().from(schema.comments).where(eq(schema.comments.id, legacy.id))).toHaveLength(1);
 });
 it("stores and moderates a custom post title", async () => {
   const api = await t.as("post-title");

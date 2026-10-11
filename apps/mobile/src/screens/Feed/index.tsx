@@ -21,28 +21,46 @@ export function FeedExamples() { return <FeedSession initialExamples />; }
 function FeedSession({ initialExamples = false }: { initialExamples?: boolean }) {
  const auth = useAuth(), request = useRef(auth.apiFetch); useLayoutEffect(() => { request.current = auth.apiFetch; }, [auth.apiFetch]);
  const [posts, setPosts] = useState<FeedPost[]>([]), [busy, setBusy] = useState(false), [refreshing, setRefreshing] = useState(false), [error, setError] = useState<string | null>(null), [ready, setReady] = useState(false), [hasMore, setHasMore] = useState(false);
+ const cachedPosts = useRef(posts); useLayoutEffect(() => { cachedPosts.current = posts; }, [posts]);
  const [type, setType] = useState<FeedType>('recent'), [filtersOpen, setFiltersOpen] = useState(false), [examples, setExamples] = useState(initialExamples), [preview, setPreview] = useState(examplePosts), [editor, setEditor] = useState<FeedPost | null | undefined>(undefined);
- const cursor = useRef<string | null>(null), loading = useRef(false), controller = useRef<AbortController | null>(null), failedRefresh = useRef(false);
+ const cursor = useRef<string | null>(null), loading = useRef(false), controller = useRef<AbortController | null>(null), failedRefresh = useRef(false), loaded = useRef(false), selection = useRef<string | null>(null);
  const [pendingKudos, setPendingKudos] = useState<string[]>([]), kudosLocks = useRef(new Set<string>());
- const load = useCallback(async (refresh = false) => {
+ const load = useCallback(async (refresh = false, retain = false) => {
   if (examples) { setReady(true); setHasMore(false); setBusy(false); setRefreshing(false); setError(null); return; }
   if (loading.current || !controller.current || controller.current.signal.aborted || (!refresh && !cursor.current)) return;
-  const signal = controller.current.signal;
-  loading.current = true; failedRefresh.current = refresh; setBusy(true); setRefreshing(refresh); setError(null);
+  const signal = controller.current.signal, keepLoaded = retain && loaded.current;
+  loading.current = true; failedRefresh.current = refresh; setBusy(true); setRefreshing(refresh && !keepLoaded); setError(null);
   try {
-   const page = await fetchFeed(request.current, refresh ? undefined : cursor.current!, signal, type);
+   let page = await fetchFeed(request.current, refresh ? undefined : cursor.current!, signal, type);
+   const cachedIds = new Set(cachedPosts.current.map(p => p.id));
+   const refreshedPosts = [...page.posts];
+   let overlaps = page.posts.some(p => cachedIds.has(p.id));
+   // Catch up through new pages before resuming at the cached tail's cursor.
+   while (keepLoaded && cachedIds.size > 0 && !overlaps && page.next_cursor && !signal.aborted) {
+    page = await fetchFeed(request.current, page.next_cursor, signal, type);
+    refreshedPosts.push(...page.posts);
+    overlaps = page.posts.some(p => cachedIds.has(p.id));
+   }
    if (signal.aborted) return;
-   cursor.current = page.next_cursor; setHasMore(page.next_cursor !== null);
-   setPosts(previous => { const next = refresh ? [] : previous; const ids = new Set(next.map(p => p.id)); return [...next, ...page.posts.filter(p => { if (ids.has(p.id)) return false; ids.add(p.id); return true; })]; });
-   setReady(true);
+   const keepTail = keepLoaded && overlaps;
+   if (!keepTail) { cursor.current = page.next_cursor; setHasMore(page.next_cursor !== null); }
+   setPosts(previous => {
+    const combined = keepTail ? [...refreshedPosts, ...previous] : refresh ? refreshedPosts : [...previous, ...refreshedPosts];
+    const ids = new Set<string>();
+    return combined.filter(p => { if (ids.has(p.id)) return false; ids.add(p.id); return true; });
+   });
+   loaded.current = true; setReady(true);
   } catch (e) { if (!signal.aborted) setError(e instanceof Error ? e.message : 'Could not load the feed.'); }
   finally { if (controller.current?.signal === signal && !signal.aborted) { loading.current = false; setBusy(false); setRefreshing(false); } }
  }, [type, examples]);
  useFocusEffect(useCallback(() => {
-  controller.current = new AbortController(); cursor.current = null; loading.current = false; setPosts([]); setReady(false); setError(null); setPendingKudos([...kudosLocks.current]);
-  void load(true);
+  const nextSelection = `${type}:${examples}`, changed = selection.current !== nextSelection;
+  selection.current = nextSelection;
+  controller.current = new AbortController(); loading.current = false; setError(null); setPendingKudos([...kudosLocks.current]);
+  if (changed) { cursor.current = null; loaded.current = false; setPosts([]); setReady(false); }
+  void load(true, !changed);
   return () => { controller.current?.abort(); };
- }, [load]));
+ }, [load, type, examples]));
  async function kudos(post: FeedPost) {
   if (examples) { if (!post.viewer_gave_kudos && Platform.OS !== 'web') void Haptics.selectionAsync().catch(() => {}); setPreview(rows => rows.map(p => p.id === post.id ? { ...p, viewer_gave_kudos: !p.viewer_gave_kudos, kudos_count: p.kudos_count + (p.viewer_gave_kudos ? -1 : 1) } : p)); return; }
   if (kudosLocks.current.has(post.id) || !controller.current) return;
