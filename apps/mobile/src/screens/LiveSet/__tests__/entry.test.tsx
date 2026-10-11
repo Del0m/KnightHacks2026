@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Renderer matches existing mobile tests. */
 import React from 'react';
+import { Text } from 'react-native';
 import CameraSetupScreen from '../index';
 import WorkoutEntry from '@/app/workout';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -64,4 +65,47 @@ test.each([['curl', 'curl'], ['press', 'press']])('manual %s preview retains exe
   act(() => { screen = create(<WorkoutEntry />); });
   expect(screen.root.findByType('Body').props.selected).toBe(selected);
   act(() => screen.unmount());
+});
+
+const countedSet = { exercise_id: 'bicep_curl', reps: [{ quality: null, flags: [], tempo_ms: 2000, range_deg: 100 }] };
+test.each(['countdown', 'early'])('starts the next camera set after %s rest without a framing tap', end => {
+  jest.useFakeTimers();
+  jest.mocked(useLocalSearchParams).mockReturnValue({ setup: 'done', mode: 'camera', exercise: 'curl' });
+  let screen: ReturnType<typeof create>;
+  act(() => { screen = create(<WorkoutEntry />); });
+  act(() => screen.root.findByType('WorkoutCamera').props.onComplete(countedSet, null));
+  expect(screen.root.findAllByType('WorkoutCamera')).toHaveLength(0);
+  if (end === 'countdown') {
+    act(() => jest.advanceTimersByTime(44750));
+    expect(screen.root.findAllByType('WorkoutCamera')).toHaveLength(0);
+    act(() => jest.advanceTimersByTime(250));
+  } else {
+    act(() => screen.root.findAllByType('Action').find((n: any) => n.props.children === 'Start next set now').props.onPress());
+  }
+  expect(screen.root.findAllByType('WorkoutCamera')).toHaveLength(1);
+  expect(screen.root.findAllByType(Text).some((n: any) => Array.isArray(n.props.children) && n.props.children.join('') === 'Set 2 of 3 · aim for 12 reps')).toBe(true);
+  expect(finish).not.toHaveBeenCalled();
+  act(() => screen.unmount());
+  expect(jest.getTimerCount()).toBe(0);
+  jest.useRealTimers();
+});
+
+test('rest expiry after the final set does not start another camera set', () => {
+  jest.useFakeTimers();
+  jest.mocked(useLocalSearchParams).mockReturnValue({ setup: 'done', mode: 'camera', exercise: 'curl' });
+  let screen: ReturnType<typeof create>;
+  act(() => { screen = create(<WorkoutEntry />); });
+  for (let i = 0; i < 9; i++) {
+    act(() => screen.root.findByType('WorkoutCamera').props.onComplete(countedSet, null));
+    if (i < 8) act(() => screen.root.findAllByType('Action').find((n: any) => n.props.children === 'Start next set now').props.onPress());
+  }
+  act(() => jest.advanceTimersByTime(45000));
+  expect(screen.root.findAllByType('WorkoutCamera')).toHaveLength(0);
+  const finishButton = screen.root.findAllByType('Action').find((n: any) => n.props.children === 'Finish Workout');
+  expect(finishButton).toBeDefined();
+  act(() => finishButton.props.onPress());
+  expect(finish).toHaveBeenCalledTimes(1);
+  expect(screen.root.findAllByType('WorkoutSummary')).toHaveLength(1);
+  act(() => screen.unmount()); expect(jest.getTimerCount()).toBe(0);
+  jest.useRealTimers();
 });

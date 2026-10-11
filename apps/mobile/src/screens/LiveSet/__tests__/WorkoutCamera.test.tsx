@@ -37,7 +37,11 @@ it.each(['manual', 'automatic'])('keeps the rear camera active for the %s comple
   if (end === 'manual') act(() => screen.root.findAllByType('Choice').find((n: any) => n.props.label === 'Done with set').props.onPress());
   else {
     act(() => mockOnPose({ latencyMs: 10 }));
-    act(() => jest.advanceTimersByTime(8000));
+    act(() => jest.advanceTimersByTime(3999));
+    act(() => mockOnPose({ latencyMs: 10 }));
+    expect(complete).not.toHaveBeenCalled();
+    expect(screen.root.findByType('Camera').props.torchMode).toBe('off');
+    act(() => jest.advanceTimersByTime(1));
     act(() => mockOnPose({ latencyMs: 10 }));
   }
   expect(finishing).toHaveBeenCalledTimes(1);

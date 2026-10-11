@@ -13,3 +13,11 @@ Verify one-second/reset framing boundaries, one-shot pulses, front/no-torch beha
 Mobile: 67 suites / 651 tests passed; TypeScript passed; lint passed with eight existing warnings; web export passed. Tests cover lost framing/reset, the one-second boundary, rear/front behavior, automatic and manual set endings, duplicate completion, disabled exits during the pulse, timer cleanup, manual PR filtering, and Feed cards. Focused independent review found and verified fixes for the manual-switch completion race and unmeasured PR highlights. Private env-value scan passed; only env examples and the API env loader are tracked.
 
 Public posting stays opt-in and requires an account/server result; no real public post was created during tests. Physical torch visibility and rear-camera setup timing still require the owner’s iPhone check.
+
+## Four-second set ending and automatic rest — 2026-10-10
+
+All five bundled exercise specs now use 4,000 ms for set-ending stillness (and the existing absent/lost tracking timeout). Continuous movement still resets the stillness hold. A non-final set’s 45-second rest returns automatically to a fresh camera counter; Start next set now skips the remaining rest. Expiry clears the rest timer and server-card request. The final set retains Finish Workout rather than starting an extra set.
+
+Regression checks cover the four-second boundary, all five specs, next-set countdown/early start, timer cleanup, and final-set expiry. Exercise-spec validation and all 62 validator tests passed; mobile typecheck/lint passed (eight existing lint warnings).
+
+Full mobile suite after this change: 67 suites / 659 tests passed.
