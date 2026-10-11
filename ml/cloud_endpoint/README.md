@@ -3,7 +3,7 @@
 Cloud pose mode for phones that can't run YOLOv8n-pose on-device (Android, slow iPhones; Architecture §4.1).
 
 ```
-phone ──WebSocket──▶ Spotter API /pose/stream ──HTTPS, one frame per request──▶ HF Inference Endpoint (handler.py)
+phone ──WebSocket──▶ SteadyForum API /pose/stream ──HTTPS, one frame per request──▶ HF Inference Endpoint (handler.py)
       ◀── pose JSON ──                         ◀── pose result contract ──
 ```
 
@@ -21,10 +21,10 @@ On an Apple-silicon Mac a 320 px frame (~23 KB JPEG) takes about **10 ms** (medi
 
 ## Deploy
 
-1. **Model repo:** create a private model repo, e.g. `bubblesmal/spotter-pose-endpoint`, and upload `handler.py` and `requirements.txt` (optionally `yolov8n-pose.pt`, otherwise the handler downloads it on start):
+1. **Model repo:** create a private model repo, e.g. `bubblesmal/steadyforum-pose-endpoint`, and upload `handler.py` and `requirements.txt` (optionally `yolov8n-pose.pt`, otherwise the handler downloads it on start):
    ```bash
-   hf upload bubblesmal/spotter-pose-endpoint ml/cloud_endpoint/handler.py handler.py --private
-   hf upload bubblesmal/spotter-pose-endpoint ml/cloud_endpoint/requirements.txt requirements.txt
+   hf upload bubblesmal/steadyforum-pose-endpoint ml/cloud_endpoint/handler.py handler.py --private
+   hf upload bubblesmal/steadyforum-pose-endpoint ml/cloud_endpoint/requirements.txt requirements.txt
    ```
 2. **Endpoint:** [Inference Endpoints](https://endpoints.huggingface.co) → New → that repo. The task shows as **Custom** because of `handler.py`.
    - Instance: start with **CPU · intel-spr x4**, move to **GPU · nvidia-t4 x1** if frames take too long (see Cost).

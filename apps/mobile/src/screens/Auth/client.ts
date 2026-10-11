@@ -16,7 +16,7 @@ export const authConfigured = validAuthUrl(authUrl);
 export const authClient = authConfigured ? createAuthClient({
   baseURL: authUrl,
   plugins: [jwtClient(), ...(Platform.OS === 'web' ? [] : [expoClient({
-    scheme: 'spotter', storagePrefix: 'spotter-auth', storage: SecureStore,
+    scheme: 'steadyforum', storagePrefix: 'steadyforum-auth', storage: SecureStore,
     cookiePrefix: ['neonauth', 'neon-auth', 'better-auth'], disableCache: true,
   })])],
   fetchOptions: { credentials: 'include' },

@@ -1,4 +1,4 @@
-# Spotter API
+# SteadyForum API
 
 Express + TypeScript on Neon Postgres (Drizzle ORM, `@neondatabase/serverless`). See `Architecture.md` §9.
 
@@ -28,7 +28,7 @@ npm run dev            # http://localhost:3000/health
 
 Every teammate works on their own branch (`dev-<name>`), so migrations never collide with the demo.
 
-1. In the Neon console, open the `spotter` project, go to **Branches**, and copy the **pooled** connection string of `dev-<name>` into `DATABASE_URL` in `.env`.
+1. In the Neon console, open the `steadyforum` project, go to **Branches**, and copy the **pooled** connection string of `dev-<name>` into `DATABASE_URL` in `.env`.
 2. Change a schema file in `drizzle/schema/`.
 3. `npm run db:generate -- --name short_description` writes `drizzle/migrations/NNNN_short_description.sql`. Read it, then commit it with the schema change.
 4. `npm run db:migrate` applies it to your branch. It's safe to re-run; applied migrations are tracked in `drizzle.__drizzle_migrations`.
@@ -64,7 +64,7 @@ Each one switches on when its env vars are set; without them the API still runs.
 
 | Piece                      | Turns on with                                                                 | What happens                                                                                                                       |
 | -------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| CONN-02 upload             | `DATABRICKS_HOST`, `_CLIENT_ID`, `_CLIENT_SECRET`, `SPOTTER_PSEUDONYM_SECRET` | Finished sessions upload to the Volume; `sessions.export_status` tracks it                                                         |
+| CONN-02 upload             | `DATABRICKS_HOST`, `_CLIENT_ID`, `_CLIENT_SECRET`, `STEADYFORUM_PSEUDONYM_SECRET` | Finished sessions upload to the Volume; `sessions.export_status` tracks it                                                         |
 | CONN-06 insight sync       | The above plus `DATABRICKS_WAREHOUSE_ID`                                      | Every 15 min, gold tables are upserted into `progress_daily` and `risk_insights` (`/me/insights`). Run it on one API instance only |
 | CONN-09 moderation         | `HF_TOKEN`                                                                    | Llama Guard checks posts and comments; blocked content returns 422 with a friendly message                                         |
 | CONN-08 RAG ingest         | `HF_TOKEN` (run `npm run rag:ingest` in `rag/`)                               | Writes `doc_chunks`; needs migration `0001` on the branch first                                                                    |

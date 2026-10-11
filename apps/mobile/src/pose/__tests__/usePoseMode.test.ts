@@ -1,5 +1,5 @@
 import React from 'react';
-import { benchmarkPoseModel, getPoseModelId } from 'spotter-pose';
+import { benchmarkPoseModel, getPoseModelId } from 'steadyforum-pose';
 import type { BenchmarkResult } from '../benchmark';
 import { __clearPoseStoreForTests, loadBenchmark, loadCloudConsent, loadPreference, saveBenchmark } from '../modeStore';
 import {
@@ -12,7 +12,7 @@ import {
 
 const { act, create } = require('react-test-renderer');
 
-jest.mock('spotter-pose', () => ({ benchmarkPoseModel: jest.fn(), getPoseModelId: jest.fn() }));
+jest.mock('steadyforum-pose', () => ({ benchmarkPoseModel: jest.fn(), getPoseModelId: jest.fn() }));
 
 const fast = { size: 320, model: 'yolov8n-pose-320', meanMs: 9, p95Ms: 10, samples: 150 };
 const slow = (size: number) => ({ size, model: `yolov8n-pose-${size}`, meanMs: 150, p95Ms: 200, samples: 8 });

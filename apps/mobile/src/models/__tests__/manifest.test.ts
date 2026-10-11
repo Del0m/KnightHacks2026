@@ -68,8 +68,8 @@ describe('modelsToUpdate', () => {
 
 describe('hubFileUrl', () => {
   it('builds a resolve URL and encodes each segment', () => {
-    expect(hubFileUrl('bubblesmal/spotter-models', 'pose/a b.mlpackage/Manifest.json')).toBe(
-      'https://huggingface.co/bubblesmal/spotter-models/resolve/main/pose/a%20b.mlpackage/Manifest.json',
+    expect(hubFileUrl('bubblesmal/steadyforum-models', 'pose/a b.mlpackage/Manifest.json')).toBe(
+      'https://huggingface.co/bubblesmal/steadyforum-models/resolve/main/pose/a%20b.mlpackage/Manifest.json',
     );
   });
 });

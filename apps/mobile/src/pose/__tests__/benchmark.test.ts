@@ -1,7 +1,7 @@
-import { benchmarkPoseModel, getPoseModelId } from 'spotter-pose';
+import { benchmarkPoseModel, getPoseModelId } from 'steadyforum-pose';
 import { MEASURE_MS, WARM_UP_MS, pickBenchmark, runPoseBenchmark, sustainedFps } from '../benchmark';
 
-jest.mock('spotter-pose', () => ({ benchmarkPoseModel: jest.fn(), getPoseModelId: jest.fn() }));
+jest.mock('steadyforum-pose', () => ({ benchmarkPoseModel: jest.fn(), getPoseModelId: jest.fn() }));
 
 /** A native result with the given p95; mean is a little lower. */
 const run = (size: number, p95Ms: number) => ({ size, model: `yolov8n-pose-${size}`, meanMs: p95Ms * 0.8, p95Ms, samples: 100 });

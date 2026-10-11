@@ -65,7 +65,7 @@ The screen starts with the front camera and the 320 px model. It shows the camer
 
 The hook caps inference at 15 fps. The dropped count tracks camera-pipeline drops since the screen mounted, not frames deliberately skipped by the throttle. Latency covers Vision preprocessing, inference and decode; it does not include the hop to the JS thread or drawing.
 
-This branch uses a standalone debug entry point. FE-01's navigation and theme are now on main; preserve them when integrating this plugin. FE-05 replaces the debug screen with the live-set screen. Both can reuse `src/pose/usePoseOutput.ts` and the native plugin in `modules/spotter-pose/`.
+This branch uses a standalone debug entry point. FE-01's navigation and theme are now on main; preserve them when integrating this plugin. FE-05 replaces the debug screen with the live-set screen. Both can reuse `src/pose/usePoseOutput.ts` and the native plugin in `modules/steadyforum-pose/`.
 
 ## Troubleshooting
 

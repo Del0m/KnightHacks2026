@@ -52,7 +52,7 @@ function select(id){
 }
 buttons.forEach(button=>button.onclick=()=>select(button.dataset.exercise));
 pauseButton.onclick=()=>{const playing=movement.pause();pauseButton.textContent=playing?'Pause movement':'Resume movement';};
-try{const [gltf,dumbbell]=await Promise.all([new GLTFLoader().loadAsync('./rigged-human.glb'),new GLTFLoader().loadAsync('./dumbbell.glb')]);gltf.scene.traverse(o=>{if(o.isMesh){o.material=glass;o.frustumCulled=false;bodyMeshes.push(o);}});scene.add(gltf.scene);movement=createMovement(gltf.scene,dumbbell.scene);buttons.forEach(b=>b.disabled=false);document.body.classList.add('ready');status.textContent='';parent.postMessage({type:'spotter:model-ready'},location.origin);}catch(error){status.textContent='Model could not load. Please reload the preview.';parent.postMessage({type:'spotter:model-error'},location.origin);console.error(error)}
+try{const [gltf,dumbbell]=await Promise.all([new GLTFLoader().loadAsync('./rigged-human.glb'),new GLTFLoader().loadAsync('./dumbbell.glb')]);gltf.scene.traverse(o=>{if(o.isMesh){o.material=glass;o.frustumCulled=false;bodyMeshes.push(o);}});scene.add(gltf.scene);movement=createMovement(gltf.scene,dumbbell.scene);buttons.forEach(b=>b.disabled=false);document.body.classList.add('ready');status.textContent='';parent.postMessage({type:'steadyforum:model-ready'},location.origin);}catch(error){status.textContent='Model could not load. Please reload the preview.';parent.postMessage({type:'steadyforum:model-error'},location.origin);console.error(error)}
 let previous=performance.now();
 const orbit=new THREE.Spherical(),offset=new THREE.Vector3();
 renderer.setAnimationLoop(()=>{
@@ -80,5 +80,5 @@ renderer.setAnimationLoop(()=>{
  renderer.render(scene,camera);
 });
 
-window.addEventListener('message',event=>{if(event.origin!==location.origin||event.source!==parent||!movement)return;const data=event.data;if(data?.type==='spotter:select'&&[null,'curl','squat','press'].includes(data.id))select(data.id);if(data?.type==='spotter:pause'){if(movement.playing!==data.playing)movement.pause();}if(data?.type==='spotter:active'){if(!data.active&&movement.playing)movement.pause();}});
+window.addEventListener('message',event=>{if(event.origin!==location.origin||event.source!==parent||!movement)return;const data=event.data;if(data?.type==='steadyforum:select'&&[null,'curl','squat','press'].includes(data.id))select(data.id);if(data?.type==='steadyforum:pause'){if(movement.playing!==data.playing)movement.pause();}if(data?.type==='steadyforum:active'){if(!data.active&&movement.playing)movement.pause();}});
 </script></body></html>

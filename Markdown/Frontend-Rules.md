@@ -1,6 +1,6 @@
 # Frontend design rules
 
-These rules apply to future frontend design tasks. The current Spotter direction prioritizes white and light blue, inspired by Wii Sports: friendly, open, athletic, and bright.
+These rules apply to future frontend design tasks. The current SteadyForum direction prioritizes white and light blue, inspired by Wii Sports: friendly, open, athletic, and bright.
 
 - **One composition:** The first viewport must read as one composition, not a dashboard unless the surface is a dashboard.
 - **Brand first:** On branded pages, the brand or product name must be a hero-level signal. No headline should overpower the brand.

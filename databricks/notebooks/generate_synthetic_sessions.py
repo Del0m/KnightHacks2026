@@ -8,14 +8,14 @@
 # MAGIC including the joint angles behind `gold_rom_trend`.
 # MAGIC
 # MAGIC - **Users** are the demo seed's lifters (`demo-user-01` … in `apps/api/scripts/seed-demo.ts`),
-# MAGIC   under their real pseudonyms (HMAC with the API's `SPOTTER_PSEUDONYM_SECRET`, stored here as
-# MAGIC   the secret `spotter/pseudonym_secret`), so the insight sync maps them to the seeded accounts.
+# MAGIC   under their real pseudonyms (HMAC with the API's `STEADYFORUM_PSEUDONYM_SECRET`, stored here as
+# MAGIC   the secret `steadyforum/pseudonym_secret`), so the insight sync maps them to the seeded accounts.
 # MAGIC - **Recovery users** follow the §17 story: the injured side sits around 70° for the first two
 # MAGIC   weeks of their rehab plan, then gains about 6° a week for three weeks (+18°), ending within
 # MAGIC   5° of the healthy side.
 # MAGIC - Session ids are deterministic, so re-running overwrites instead of duplicating.
 # MAGIC
-# MAGIC Run it, then run the `spotter_sessions` pipeline and the insight sync.
+# MAGIC Run it, then run the `steadyforum_sessions` pipeline and the insight sync.
 
 # COMMAND ----------
 
@@ -205,7 +205,7 @@ dbutils.widgets.text("users", "30", "demo users (demo-user-01 ...)")
 dbutils.widgets.text("weeks", "6", "weeks of history")
 dbutils.widgets.text("recovery", "demo-user-01:knee:left,demo-user-04:shoulder:right,demo-user-07:knee:right",
                      "recovery users (user:body_part:side, comma-separated)")
-dbutils.widgets.text("volume", "/Volumes/spotter/raw/sessions", "sessions Volume")
+dbutils.widgets.text("volume", "/Volumes/steadyforum/raw/sessions", "sessions Volume")
 
 recovery = {
     u: (part, side)
@@ -218,10 +218,10 @@ written = write_sessions(
     generate(
         user_ids=load_seed_user_ids(dbutils.widgets.get("seed_user_ids_path"), int(dbutils.widgets.get("users")), dbutils.widgets.get("presenter_user_id")),
         weeks=int(dbutils.widgets.get("weeks")),
-        secret=dbutils.secrets.get(scope="spotter", key="pseudonym_secret"),
+        secret=dbutils.secrets.get(scope="steadyforum", key="pseudonym_secret"),
         recovery=recovery,
         now=datetime.now(timezone.utc),
     ),
     dbutils.widgets.get("volume"),
 )
-print(f"wrote {written} sessions; now run the spotter_sessions pipeline")
+print(f"wrote {written} sessions; now run the steadyforum_sessions pipeline")

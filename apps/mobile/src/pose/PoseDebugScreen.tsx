@@ -67,7 +67,7 @@ export function PoseDebugScreen() {
   }
   return (
     <View style={styles.center}>
-      <Text style={styles.message}>Steady forum needs the camera to see your form.</Text>
+      <Text style={styles.message}>SteadyForum needs the camera to see your form.</Text>
       <Pressable style={styles.button} onPress={() => Linking.openSettings()}>
         <Text style={styles.buttonText}>Open Settings</Text>
       </Pressable>

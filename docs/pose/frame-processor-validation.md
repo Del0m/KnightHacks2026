@@ -11,7 +11,7 @@ Checked on 2026-10-10 with Xcode 26.6, Expo 57 and Vision Camera 5.2.3.
 | `npm test -- --runInBand` in `apps/mobile` | 29 tests passed, 6 suites |
 | `npm run typecheck` | Passed |
 | `swift test` in PoseCore | 45 tests passed, including eight landmark cases and native connection-angle cases |
-| `expo prebuild -p ios --no-install`, then `pod install` | Passed; PoseCore, SpotterPose and VisionCamera installed |
+| `expo prebuild -p ios --no-install`, then `pod install` | Passed; PoseCore, SteadyForumPose and VisionCamera installed |
 | `expo export --platform ios` | Passed; iOS Hermes bundle generated |
 | Nitro regeneration into a temporary directory | Matches checked-in generated files |
 | Unsigned Release build for generic iOS | Passed; both compiled models and the JS bundle are present |
@@ -23,9 +23,9 @@ The throttle regression test processes 150 of 300 nominal 30 fps frames over 10 
 Native build command, from `apps/mobile`:
 
 ```bash
-xcodebuild -workspace ios/Spotter.xcworkspace -scheme Spotter \
+xcodebuild -workspace ios/SteadyForum.xcworkspace -scheme SteadyForum \
   -configuration Release -destination 'generic/platform=iOS' \
-  -derivedDataPath /private/tmp/spotter-pose-final-build \
+  -derivedDataPath /private/tmp/steadyforum-pose-final-build \
   build CODE_SIGNING_ALLOWED=NO
 ```
 
@@ -67,6 +67,6 @@ The owner confirmed the requested device checks. The PR can close #42 after its 
 ## Integration notes
 
 - FE-01's navigation/theme scaffold is now on main. This tested branch still has a standalone debug entry point. Preserve main's Expo Router, pnpm setup and app configuration when integrating the plugin. FE-05 can replace the debug screen while keeping `usePoseOutput` and the native plugin. The integrated FE-01 app has not been built or device-tested here.
-- The native package lives in `apps/mobile/modules/spotter-pose/`; app-facing code lives in `apps/mobile/src/pose/`.
+- The native package lives in `apps/mobile/modules/steadyforum-pose/`; app-facing code lives in `apps/mobile/src/pose/`.
 - PoseCore adds a local CocoaPod definition, orientation handling and capture-time conversion. The decoder is shared with PoseBench.
 - Suggested owner edit to `Architecture.md` §4: change Vision Camera v4 to “v5 (Nitro frame-processor plugins)”.

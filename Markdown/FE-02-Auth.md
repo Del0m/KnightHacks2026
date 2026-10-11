@@ -15,7 +15,7 @@ Use the exact Auth URL shown in Neon Console → Auth, including its path. The e
 
 The URLs intentionally remain empty until the backend teammate supplies them. Login and account creation are disabled with a visible setup message. Train, Plan, and workout sessions are available to guests, even while auth is restoring or unconfigured. Me (You), Feed, and Buddies remain visible but show a login/account-creation prompt until a server-confirmed session exists. Their content does not mount for guests, including direct links. Login/signup provide a continue-without-login action; there is no mock authenticated session.
 
-Configure the actual browser origin and native `spotter://` origin with the auth service. Confirm email verification, native cookie support, accepted cookie prefixes, and JWT endpoint/claims with the project's managed Neon Auth configuration. The API needs CORS for its web origin and BE-02 JWT validation. Never use a wildcard CORS origin for credentialed browser auth.
+Configure the actual browser origin and native `steadyforum://` origin with the auth service. Confirm email verification, native cookie support, accepted cookie prefixes, and JWT endpoint/claims with the project's managed Neon Auth configuration. The API needs CORS for its web origin and BE-02 JWT validation. Never use a wildcard CORS origin for credentialed browser auth.
 
 ## Frontend behavior
 

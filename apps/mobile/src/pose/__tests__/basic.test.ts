@@ -2,13 +2,13 @@ import React from 'react';
 import type { Frame } from 'react-native-vision-camera';
 import { useFrameOutput } from 'react-native-vision-camera';
 import { createSynchronizable } from 'react-native-worklets';
-import { createBasicPoseDetector, createPoseDetector } from 'spotter-pose';
+import { createBasicPoseDetector, createPoseDetector } from 'steadyforum-pose';
 import { BASIC_MODEL, isBasicModeSupported, useBasicPoseOutput } from '../basic';
 import { usePoseOutput, type PoseEngine, type PoseOutput } from '../usePoseOutput';
 
 const { act, create } = require('react-test-renderer');
 
-jest.mock('spotter-pose', () => ({ createPoseDetector: jest.fn(), createBasicPoseDetector: jest.fn() }));
+jest.mock('steadyforum-pose', () => ({ createPoseDetector: jest.fn(), createBasicPoseDetector: jest.fn() }));
 jest.mock('react-native-vision-camera', () => ({ useFrameOutput: jest.fn() }));
 jest.mock('react-native-worklets', () => ({
   createSynchronizable: jest.fn(),

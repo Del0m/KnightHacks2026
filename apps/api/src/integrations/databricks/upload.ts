@@ -74,7 +74,7 @@ export function uploadConfigFromEnv(env = process.env): UploadConfig {
     "DATABRICKS_HOST",
     "DATABRICKS_CLIENT_ID",
     "DATABRICKS_CLIENT_SECRET",
-    "SPOTTER_PSEUDONYM_SECRET",
+    "STEADYFORUM_PSEUDONYM_SECRET",
   ] as const;
   const missing = required.filter((k) => !env[k]);
   if (missing.length) throw new Error(`Missing env for Databricks upload: ${missing.join(", ")}`);
@@ -84,8 +84,8 @@ export function uploadConfigFromEnv(env = process.env): UploadConfig {
     clientId: env.DATABRICKS_CLIENT_ID!,
     clientSecret: env.DATABRICKS_CLIENT_SECRET!,
     scopes: env.DATABRICKS_OAUTH_SCOPES || "all-apis",
-    volumePath: (env.DATABRICKS_VOLUME_PATH || "/Volumes/spotter/raw/sessions").replace(/\/+$/, ""),
-    pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET!,
+    volumePath: (env.DATABRICKS_VOLUME_PATH || "/Volumes/steadyforum/raw/sessions").replace(/\/+$/, ""),
+    pseudonymSecret: env.STEADYFORUM_PSEUDONYM_SECRET!,
     maxAttempts: 5,
     baseDelayMs: 500,
   };

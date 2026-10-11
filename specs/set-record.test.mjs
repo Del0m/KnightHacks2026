@@ -15,7 +15,7 @@ import { validateSchema } from './validate.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VALID_DIR = join(HERE, 'set-record', 'fixtures', 'valid');
-const BRONZE_PATH = join(HERE, '..', 'databricks', 'pipelines', 'spotter_sessions', 'bronze.py');
+const BRONZE_PATH = join(HERE, '..', 'databricks', 'pipelines', 'steadyforum_sessions', 'bronze.py');
 
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const schema = readJson(SCHEMA_PATH);

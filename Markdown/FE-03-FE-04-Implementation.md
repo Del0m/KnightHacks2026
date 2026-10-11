@@ -55,7 +55,7 @@ Physical iPhone checks remain: camera placement, side-on joint confidence, backg
 
 ## Final review before PR
 
-The FE-03 issue criteria are implemented: four short steps, skippable injuries with a disclaimer, and BE-03 persistence. FE-04 implements the green outline for all 17 visible confident joints and side-on placement hints for squats and lunges. Later UI requests are included: highlight-only selections, compact settings buttons, the profile glass gear, visible Steady forum branding, and the glass workout figure with first-exercise autoplay.
+The FE-03 issue criteria are implemented: four short steps, skippable injuries with a disclaimer, and BE-03 persistence. FE-04 implements the green outline for all 17 visible confident joints and side-on placement hints for squats and lunges. Later UI requests are included: highlight-only selections, compact settings buttons, the profile glass gear, visible SteadyForum branding, and the glass workout figure with first-exercise autoplay.
 
 Review found and corrected a completed-profile validation gap. Partial API edits now validate the resulting completed profile under the account row lock, and completion accepts only the 12 preset goal IDs. Invalid edits fail before profile or injury writes; unrelated profile edits remain available.
 

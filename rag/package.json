@@ -1,5 +1,5 @@
 {
-  "name": "spotter-rag",
+  "name": "steadyforum-rag",
   "private": true,
   "type": "module",
   "description": "CONN-08: embed free-exercise-db and injury notes into Neon pgvector",

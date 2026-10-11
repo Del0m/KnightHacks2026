@@ -1,9 +1,9 @@
 // CONN-06: every 15 minutes, copy gold tables from Databricks into Neon (Architecture §11.3).
 // The app only ever reads Neon, so it never waits on a cold warehouse or a spent quota.
 //
-//   spotter.gold.gold_user_progress_daily -> progress_daily   key (user_id, date, exercise_id)
-//   spotter.gold.gold_injury_risk_scores  -> risk_insights    key (user_id, body_part, as_of)
-//   spotter.gold.gold_rom_trend           -> rom_trend        key (user_id, angle, side, week)
+//   steadyforum.gold.gold_user_progress_daily -> progress_daily   key (user_id, date, exercise_id)
+//   steadyforum.gold.gold_injury_risk_scores  -> risk_insights    key (user_id, body_part, as_of)
+//   steadyforum.gold.gold_rom_trend           -> rom_trend        key (user_id, angle, side, week)
 //
 // Databricks only knows pseudonymous ids (CONN-02), so we map them back by computing the
 // pseudonym of every Neon user. Rows for unknown pseudonyms (deleted accounts, synthetic demo
@@ -38,7 +38,7 @@ export function syncConfigFromEnv(env = process.env): SyncConfig {
     "DATABRICKS_CLIENT_ID",
     "DATABRICKS_CLIENT_SECRET",
     "DATABRICKS_WAREHOUSE_ID",
-    "SPOTTER_PSEUDONYM_SECRET",
+    "STEADYFORUM_PSEUDONYM_SECRET",
   ] as const;
   const missing = required.filter((k) => !env[k]);
   if (missing.length) throw new Error(`Missing env for insight sync: ${missing.join(", ")}`);
@@ -49,7 +49,7 @@ export function syncConfigFromEnv(env = process.env): SyncConfig {
     clientSecret: env.DATABRICKS_CLIENT_SECRET!,
     scopes: env.DATABRICKS_OAUTH_SCOPES || "all-apis",
     warehouseId: env.DATABRICKS_WAREHOUSE_ID!,
-    pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET!,
+    pseudonymSecret: env.STEADYFORUM_PSEUDONYM_SECRET!,
     lookbackDays: Number(env.SYNC_LOOKBACK_DAYS) || 49,
   };
 }
@@ -131,7 +131,7 @@ export function explainRisk(bodyPart: string, features: string[]): string {
 
 async function getToken(cfg: SyncConfig): Promise<string> {
   // Our own OAuth M2M call so we can request the service principal's scopes; the driver's
-  // built-in OAuth asks for "all-apis", which spotter-api doesn't have.
+  // built-in OAuth asks for "all-apis", which steadyforum-api doesn't have.
   const basic = Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString("base64");
   const res = await fetch(`${cfg.host}/oidc/v1/token`, {
     method: "POST",
@@ -168,17 +168,17 @@ export async function readGold(cfg: SyncConfig, log: LogLike = console): Promise
       SELECT user_id, CAST(session_date AS STRING) AS date, exercise_id,
              sets, reps, clean_reps, clean_share, volume_kg,
              avg_range_deg, avg_quality, est_1rm_kg, is_pr
-      FROM spotter.gold.gold_user_progress_daily
+      FROM steadyforum.gold.gold_user_progress_daily
       WHERE session_date >= date_sub(current_date(), ${days})`);
     const risk = await run<RiskRow>(`
       SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features
-      FROM spotter.gold.gold_injury_risk_scores
+      FROM steadyforum.gold.gold_injury_risk_scores
       WHERE date >= date_sub(current_date(), ${days}) AND score IS NOT NULL`);
     // Range of motion is charted from the start of a rehab plan, so it looks further back.
     const rom = await run<RomRow>(`
       SELECT user_id, angle, side, CAST(week AS STRING) AS week, peak_range_deg,
              baseline_range_deg, healthy_side_range_deg, change_deg
-      FROM spotter.gold.gold_rom_trend
+      FROM steadyforum.gold.gold_rom_trend
       WHERE week >= date_sub(current_date(), ${Math.max(days, ROM_LOOKBACK_DAYS)})`);
     return { progress, risk, rom };
   } finally {

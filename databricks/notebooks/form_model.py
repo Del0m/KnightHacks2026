@@ -2,8 +2,8 @@
 # MAGIC %md
 # MAGIC # CONN-04: form-quality model, MLflow tracking and Unity Catalog registry
 # MAGIC
-# MAGIC Trains on per-rep features from `spotter.raw.silver_reps` (CONN-03), logs the run to MLflow,
-# MAGIC and registers the model as **`spotter.ml.form_quality`**. The best version so far gets the
+# MAGIC Trains on per-rep features from `steadyforum.raw.silver_reps` (CONN-03), logs the run to MLflow,
+# MAGIC and registers the model as **`steadyforum.ml.form_quality`**. The best version so far gets the
 # MAGIC `champion` alias, which Model Serving (CONN-05) should point at.
 # MAGIC
 # MAGIC **Stub until AI-10 lands:** `train_models` is a gradient-boosted baseline on rep features
@@ -30,8 +30,8 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-MODEL_NAME = "spotter.ml.form_quality"
-SOURCE_TABLE = "spotter.raw.silver_reps"
+MODEL_NAME = "steadyforum.ml.form_quality"
+SOURCE_TABLE = "steadyforum.raw.silver_reps"
 ALIAS = "champion"
 SEED = 7
 
@@ -52,7 +52,7 @@ FEATURES = CATEGORICAL_FEATURES + NUMERIC_FEATURES
 
 mlflow.set_registry_uri("databricks-uc")
 user = spark.sql("SELECT current_user()").first()[0]
-mlflow.set_experiment(f"/Users/{user}/spotter_form_quality")
+mlflow.set_experiment(f"/Users/{user}/steadyforum_form_quality")
 
 # COMMAND ----------
 

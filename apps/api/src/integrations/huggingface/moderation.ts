@@ -55,20 +55,20 @@ const SUPPORT_MESSAGE =
   "If you're in the US, you can call or text 988 any time to talk to someone. This post wasn't shared.";
 
 const MESSAGES: Record<string, string> = {
-  S1: "Let's keep Spotter a safe place to train. Posts about hurting people can't be shared.",
+  S1: "Let's keep SteadyForum a safe place to train. Posts about hurting people can't be shared.",
   S2: "We can't share posts about illegal activity, like buying drugs or steroids without a prescription.",
-  S3: "This can't be shared on Spotter.",
-  S4: "This can't be shared on Spotter.",
+  S3: "This can't be shared on SteadyForum.",
+  S4: "This can't be shared on SteadyForum.",
   S5: "Please don't post claims that could damage someone's reputation.",
   S7: "Please keep personal details like addresses, phone numbers or someone's location out of your posts.",
   S8: "Please only share content you have the rights to.",
-  S9: "This can't be shared on Spotter.",
-  S10: "Spotter is for everyone. Please keep posts free of hateful language.",
+  S9: "This can't be shared on SteadyForum.",
+  S10: "SteadyForum is for everyone. Please keep posts free of hateful language.",
   S12: "Please keep posts gym-friendly and free of sexual content.",
-  S13: "Spotter is for training talk, so please keep election content elsewhere.",
-  S14: "This can't be shared on Spotter.",
+  S13: "SteadyForum is for training talk, so please keep election content elsewhere.",
+  S14: "This can't be shared on SteadyForum.",
 };
-const DEFAULT_MESSAGE = "This doesn't fit Spotter's community guidelines. Try rewording it and posting again.";
+const DEFAULT_MESSAGE = "This doesn't fit SteadyForum's community guidelines. Try rewording it and posting again.";
 
 // ---- Config ----
 

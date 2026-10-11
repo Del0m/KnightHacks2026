@@ -1,6 +1,6 @@
 // CONN-05: score a finished set on the Databricks Model Serving endpoint during the rest timer.
 //
-// The endpoint serves spotter.ml.form_quality@champion (CONN-04) and returns, per rep,
+// The endpoint serves steadyforum.ml.form_quality@champion (CONN-04) and returns, per rep,
 // { quality: 0-1, label: "clean" | "partial_range" | ... }. Those are advice (INT-06): a rep is
 // clean when the phone raised no rule flags for it, whatever the source, and the set's medal
 // follows from that (Architecture §8, applied to one set):

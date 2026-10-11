@@ -2,7 +2,7 @@
 // cloud consent, fed through `selectPoseMode`. One module-level store, shared by every caller.
 import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
-import { getPoseModelId } from 'spotter-pose';
+import { getPoseModelId } from 'steadyforum-pose';
 import { runPoseBenchmark, type BenchmarkResult, type BenchmarkSize } from './benchmark';
 import { selectPoseMode, type PoseMode, type PosePreference } from './mode';
 import {

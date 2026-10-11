@@ -96,7 +96,7 @@ The frame must already be upright and unmirrored before inference, as on the pho
 
 The output above is unchanged. How frames get to the cloud endpoint and back:
 
-- **Transport:** a WebSocket from the phone to the Spotter API at `/pose/stream`. The API forwards each frame to the Hugging Face endpoint over HTTPS (`ml/cloud_endpoint/handler.py`) and relays the result. Hugging Face custom handlers are request/response only, so the WebSocket lives in the API.
+- **Transport:** a WebSocket from the phone to the SteadyForum API at `/pose/stream`. The API forwards each frame to the Hugging Face endpoint over HTTPS (`ml/cloud_endpoint/handler.py`) and relays the result. Hugging Face custom handlers are request/response only, so the WebSocket lives in the API.
 - **Frame encoding:** one binary message per frame: an 8-byte big-endian float64 `timestamp_ms`, then a JPEG of about 320 px at about 10 fps. **The phone rotates the frame upright and unmirrored before sending**, so there is no orientation field.
 - **Auth:** the phone sends its Neon Auth token (`Authorization: Bearer`, or `?token=` where headers can't be set). The HF token stays on the API server (§14).
 - **Batching:** one result per frame on the same socket: `{"type":"pose","timestamp_ms":..,"result":<this contract or null>,"latency_ms":..,"endpoint_ms":..,"dropped":n}`.

@@ -76,7 +76,7 @@ const app = createApp({
   moderator,
   verifyToken,
   rest,
-  pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET,
+  pseudonymSecret: env.STEADYFORUM_PSEUDONYM_SECRET,
   corsOrigins: env.CORS_ORIGINS?.split(",").map((s) => s.trim()),
 });
 
@@ -93,7 +93,7 @@ const server = app.listen(env.PORT, () => {
       setScoring: scoringConfigured,
       llmRestNotes: Boolean(env.HF_TOKEN),
     },
-    "spotter api listening",
+    "steadyforum api listening",
   );
 });
 

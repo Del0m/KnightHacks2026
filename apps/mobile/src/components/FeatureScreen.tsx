@@ -59,7 +59,7 @@ export function FeatureScreen(props: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <Head><title>{props.section} · Steady forum</title></Head>
+      <Head><title>{props.section} · SteadyForum</title></Head>
       <ScrollView ref={scroll} contentContainerStyle={styles.scroll}>
         <View style={[styles.hero, { minHeight: Math.max(compact ? 710 : 640, height - 70) }]}>
           <Animated.Image
@@ -86,7 +86,7 @@ export function FeatureScreen(props: Props) {
           ]}>
             <Text accessibilityRole="header" style={[
               styles.brand, { fontSize: compact ? Math.min(56, width * 0.13) : 94, lineHeight: compact ? 66 : 108 },
-            ]}>Steady forum</Text>
+            ]}>SteadyForum</Text>
             <Text accessibilityRole="header" style={[
               styles.title, { fontSize: compact ? 30 : 43, lineHeight: compact ? 36 : 50, maxWidth: compact ? 330 : 470 },
             ]}>{props.title}</Text>

@@ -7,15 +7,15 @@ Use a dev branch for real workouts and the demo branch for synthetic accounts.
 ## Prepare
 
 1. In `apps/api`, configure `DATABASE_URL`, Neon Auth settings, `DATABRICKS_HOST`,
-   `DATABRICKS_CLIENT_ID`, `DATABRICKS_CLIENT_SECRET`, `SPOTTER_PSEUDONYM_SECRET`,
+   `DATABRICKS_CLIENT_ID`, `DATABRICKS_CLIENT_SECRET`, `STEADYFORUM_PSEUDONYM_SECRET`,
    and `DATABRICKS_WAREHOUSE_ID`. Optional `DATABRICKS_VOLUME_PATH` defaults to
-   `/Volumes/spotter/raw/sessions`; OAuth scopes must allow files and SQL.
+   `/Volumes/steadyforum/raw/sessions`; OAuth scopes must allow files and SQL.
 2. Run `npm run db:migrate`. DB-07 already creates `progress_daily` and
    `risk_insights` in migration 0001; 0006 adds export attempt counts and leases.
 3. Run `databricks/setup.sql` as an administrator and configure its service principal
-   and warehouse permissions. Import `databricks/pipelines/spotter_sessions/pipeline.json`,
-   replacing `<repo-path>` in all three library paths. Default schema is `spotter.raw`;
-   gold decorators publish explicitly into `spotter.gold`.
+   and warehouse permissions. Import `databricks/pipelines/steadyforum_sessions/pipeline.json`,
+   replacing `<repo-path>` in all three library paths. Default schema is `steadyforum.raw`;
+   gold decorators publish explicitly into `steadyforum.gold`.
 4. Start the API with `npm run dev`. Set the phone's `EXPO_PUBLIC_API_URL` to that API
    and `EXPO_PUBLIC_NEON_AUTH_URL` to the same branch's auth service. Sign in.
 
@@ -37,7 +37,7 @@ For measured form, submit an AI-08 set record (including rule flags, angles, qua
 and optional joints/rep bounds) to the same sessions endpoints. Pose-engine wiring
 into the manual workout UI remains a separate dependency.
 
-In Databricks, open **Jobs & Pipelines**, select `spotter_sessions`, and choose **Start**
+In Databricks, open **Jobs & Pipelines**, select `steadyforum_sessions`, and choose **Start**
 for a normal update. The pipeline is triggered, not continuous: an operator or a
 Databricks schedule must start it. Do not use a full refresh for routine new sessions.
 Wait for the update to finish successfully.
@@ -87,15 +87,15 @@ synthetic notebook. Default is 30 users. User counts must be 1–30.
 
 1. Migrate the demo branch, then set `DEMO_DATABASE_URL` and run `npm run db:seed:demo`
    in `apps/api`. The seed resets that branch's per-user data. It never falls back to
-   `DATABASE_URL`. Set `SPOTTER_PSEUDONYM_SECRET` to populate stored pseudonyms too.
+   `DATABASE_URL`. Set `STEADYFORUM_PSEUDONYM_SECRET` to populate stored pseudonyms too.
 2. To use your signed-in presenter account, set `DEMO_PRESENTER_USER_ID` to its Neon
    Auth subject. This replaces the first manifest user, rather than adding an account.
 3. Import `databricks/notebooks/generate_synthetic_sessions.py`. Set widget
    `seed_user_ids_path` to the checked-out repo's `data/demo-user-ids.json` path,
    `users` to the same count, `weeks=6`, and `presenter_user_id` to the same presenter
    override (or leave blank in both). Use the same Volume as the pipeline.
-4. Store the API's exact `SPOTTER_PSEUDONYM_SECRET` in Databricks secret
-   `spotter/pseudonym_secret`. Run the notebook, start the pipeline, then run sync with
+4. Store the API's exact `STEADYFORUM_PSEUDONYM_SECRET` in Databricks secret
+   `steadyforum/pseudonym_secret`. Run the notebook, start the pipeline, then run sync with
    `DATABASE_URL` pointing to the demo branch. Notebook sessions are separate synthetic
    sessions from Neon seed history; their IDs are deterministic. Reuse the same configuration
    when rerunning, since changing presenter/secret leaves older Volume files behind.
@@ -122,18 +122,18 @@ FROM sessions WHERE id = '<session-uuid>';
 
 ```sql
 -- Databricks SQL: uploaded session and resulting reps
-SELECT * FROM spotter.raw.bronze_sessions WHERE session_id = '<session-uuid>';
-SELECT * FROM spotter.raw.silver_reps WHERE session_id = '<session-uuid>';
+SELECT * FROM steadyforum.raw.bronze_sessions WHERE session_id = '<session-uuid>';
+SELECT * FROM steadyforum.raw.silver_reps WHERE session_id = '<session-uuid>';
 -- Use the pseudonym from bronze, never the raw Neon ID in Databricks.
-SELECT * FROM spotter.gold.gold_user_progress_daily WHERE user_id = '<pseudonym>';
-SELECT * FROM spotter.gold.gold_injury_risk_scores WHERE user_id = '<pseudonym>';
+SELECT * FROM steadyforum.gold.gold_user_progress_daily WHERE user_id = '<pseudonym>';
+SELECT * FROM steadyforum.gold.gold_injury_risk_scores WHERE user_id = '<pseudonym>';
 ```
 
 - Bronze but no silver: inspect rep range/quality/boundary expectations and empty sets.
   Missing joints do not prevent aggregate reps from processing.
 - Gold but no Neon row: check `[insights]` failures, warehouse access, missing tables,
   lookback dates, unknown-user count, correct Neon branch, and matching HMAC secrets.
-  Confirm the `spotter.gold.gold_rom_trend` table exists too; sync reads all three gold tables.
+  Confirm the `steadyforum.gold.gold_rom_trend` table exists too; sync reads all three gold tables.
 - Neon populated but screen stale: refresh Me; inspect authenticated API responses and
   ensure the phone uses the same API/Auth branch. API responses use snake_case fields.
 

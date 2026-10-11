@@ -43,8 +43,8 @@ You need a Mac with Xcode, [uv](https://docs.astral.sh/uv/), an iPhone 12 or new
 ## Publish to the Hugging Face Hub (CONN-10)
 
 `push_to_hub.py` exports the pose model (Core ML 320/256 + ONNX 320, each verified) and the form
-model `spotter.ml.form_quality@champion` (ONNX, checked against scikit-learn), then uploads them to
-[bubblesmal/spotter-models](https://huggingface.co/bubblesmal/spotter-models) with a model card and
+model `steadyforum.ml.form_quality@champion` (ONNX, checked against scikit-learn), then uploads them to
+[bubblesmal/steadyforum-models](https://huggingface.co/bubblesmal/steadyforum-models) with a model card and
 a `manifest.json`. The app reads that manifest on launch and downloads models that changed
 (`apps/mobile/src/models/`). Unchanged models aren't re-uploaded, so phones don't re-download them.
 
@@ -56,7 +56,7 @@ HF_TOKEN=hf_... uv run --group publish push_to_hub.py --skip-form   # pose only,
 The form model lives in Databricks Unity Catalog, so publish it from the Databricks job
 (`push_to_hub.job.json`): import `push_to_hub.py` and `export.py` into one workspace folder, set
 `<workspace-folder>` in the job file, and store a Hub write token as the secret
-`spotter/hf_write_token`. Run the job after retraining the form model. The job passes `--skip-pose`:
+`steadyforum/hf_write_token`. Run the job after retraining the form model. The job passes `--skip-pose`:
 importing Ultralytics' OpenCV crashes Databricks serverless compute, so publish the pose models from a
 Mac with `--skip-form` (that's also the only place the Core ML models can be run before upload).
 

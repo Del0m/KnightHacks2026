@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Steady forum",
-    "slug": "spotter",
+    "name": "SteadyForum",
+    "slug": "steadyforum",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.knighthacks.spotter",
+      "bundleIdentifier": "com.knighthacks.steadyforum",
       "infoPlist": {
-        "NSCameraUsageDescription": "Steady forum uses the camera to see your form. Video never leaves your phone."
+        "NSCameraUsageDescription": "SteadyForum uses the camera to see your form. Video never leaves your phone."
       }
     },
     "android": {
@@ -50,12 +50,12 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Choose a photo for your Steady forum profile.",
+          "photosPermission": "Choose a photo for your SteadyForum profile.",
           "microphonePermission": false
         }
       ],
       "expo-sharing"
     ],
-    "scheme": "spotter"
+    "scheme": "steadyforum"
   }
 }

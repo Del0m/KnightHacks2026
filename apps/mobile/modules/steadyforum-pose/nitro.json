@@ -1,0 +1,20 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["steadyforumpose"],
+  "ios": {
+    "iosModuleName": "SteadyForumPose"
+  },
+  "android": {
+    "androidNamespace": ["steadyforumpose"],
+    "androidCxxLibName": "SteadyForumPose"
+  },
+  "autolinking": {
+    "PoseDetectorFactory": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridPoseDetectorFactory"
+      }
+    }
+  },
+  "ignorePaths": ["**/node_modules"]
+}

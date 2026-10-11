@@ -5,7 +5,7 @@
 # MAGIC `DELETE /me` in the API deletes the user from Neon and writes their **pseudonym** to
 # MAGIC `deletion_requests`. This notebook, run daily as the job in `delete_user.job.json`:
 # MAGIC
-# MAGIC 1. runs the `spotter_sessions` pipeline so every uploaded file is in bronze
+# MAGIC 1. runs the `steadyforum_sessions` pipeline so every uploaded file is in bronze
 # MAGIC 2. for each pending request, deletes that pseudonym's uploaded files under the sessions Volume
 # MAGIC    (`meta/` and `joints/`), then its rows in the bronze streaming tables
 # MAGIC 3. marks the request done in Neon
@@ -26,13 +26,13 @@
 
 import time
 
-dbutils.widgets.text("pipeline_id", "325c516b-c907-4b0f-9320-4b0c93f3b51e", "spotter_sessions pipeline id")
+dbutils.widgets.text("pipeline_id", "325c516b-c907-4b0f-9320-4b0c93f3b51e", "steadyforum_sessions pipeline id")
 dbutils.widgets.text("dry_run", "false", "dry run (true/false)")
 
 PIPELINE_ID = dbutils.widgets.get("pipeline_id")
 DRY_RUN = dbutils.widgets.get("dry_run").lower() == "true"
-BRONZE_SESSIONS = "spotter.raw.bronze_sessions"
-BRONZE_JOINTS = "spotter.raw.bronze_set_joints"
+BRONZE_SESSIONS = "steadyforum.raw.bronze_sessions"
+BRONZE_JOINTS = "steadyforum.raw.bronze_set_joints"
 
 # COMMAND ----------
 
@@ -132,7 +132,7 @@ def run_pipeline(pipeline_id: str, full_refresh: bool = False, timeout_s: int = 
 def neon():
     import psycopg
 
-    return psycopg.connect(dbutils.secrets.get(scope="spotter", key="neon_database_url"), autocommit=True)
+    return psycopg.connect(dbutils.secrets.get(scope="steadyforum", key="neon_database_url"), autocommit=True)
 
 
 # COMMAND ----------

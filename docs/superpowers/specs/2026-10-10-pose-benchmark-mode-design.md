@@ -26,7 +26,7 @@ The user can re-run the benchmark later from settings. For now the debug screen 
 | Preference | `auto` / `cloud` / `vision` is saved in the same store. |
 | Re-run | `rerunBenchmark()` from the hook, plus a debug-screen button. |
 
-## Native contract (`apps/mobile/modules/spotter-pose`)
+## Native contract (`apps/mobile/modules/steadyforum-pose`)
 
 Additions to `src/specs/PoseDetector.nitro.ts`:
 
@@ -128,7 +128,7 @@ How `runPoseBenchmark` behaves:
 ## Testing
 
 - **`swift test` (PoseCore):** `TimedBenchmark` with a fake clock covers warm-up discard, the measure window, at least one sample, and stats.
-- **Jest** (with `react-native-mmkv` and `spotter-pose` mocked):
+- **Jest** (with `react-native-mmkv` and `steadyforum-pose` mocked):
   - `sustainedFps`
   - size fallback: 320 passes; 320 fails and 256 passes; both fail and the best fps is kept
   - model load failure

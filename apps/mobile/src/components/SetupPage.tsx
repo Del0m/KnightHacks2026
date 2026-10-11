@@ -26,10 +26,10 @@ export function SetupPage({ children, step, total, eyebrow, title, intro, action
     animation.start(); return () => animation.stop();
   }, [step, reduced, entrance]);
   return <LinearGradient colors={['#FFFFFF', '#F4FAFE', '#DFEFF9']} style={s.fill}>
-    <Head><title>{title} · Steady forum</title></Head>
+    <Head><title>{title} · SteadyForum</title></Head>
     <SafeAreaView style={s.fill} edges={['top', 'bottom', 'left', 'right']}>
       <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={s.header}><Text style={s.brand}>Steady forum</Text><GlassChoice label="Back" onPress={onBack} compact /></View>
+        <View style={s.header}><Text style={s.brand}>SteadyForum</Text><GlassChoice label="Back" onPress={onBack} compact /></View>
         <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={s.scroll}>
           <View style={[s.progress, compact && { marginBottom: 12 }]} accessibilityLabel={`Step ${step + 1} of ${total}`}>
             {Array.from({ length: total }, (_, i) => <View key={i} style={[s.progressPart, i <= step && { backgroundColor: c.primary }]} />)}

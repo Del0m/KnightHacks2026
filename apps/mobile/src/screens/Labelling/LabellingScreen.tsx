@@ -188,7 +188,7 @@ export function LabellingScreen() {
 
   return <LinearGradient colors={['#F7FCFF', '#E4F5FE']} style={s.page}><ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
     <Button label="Back" onPress={() => { void finish('background'); router.back(); }} disabled={busy} />
-    <Text style={s.brand}>SPOTTER</Text><Text style={s.heading}>Joint labelling</Text>
+    <Text style={s.brand}>STEADYFORUM</Text><Text style={s.heading}>Joint labelling</Text>
     <Text style={s.text}>Private, on-device capture · self-reviewed demonstration dataset</Text>
     <Text style={s.status} accessibilityLiveRegion="polite">{message}</Text>
     {!selected && <>
