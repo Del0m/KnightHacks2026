@@ -247,6 +247,21 @@ describe('CloudPoseClient', () => {
     expect(sockets).toHaveLength(2);
   });
 
+  it('waits 2 s from the warming reply before probing, matching the relay hold', async () => {
+    start();
+    await connected();
+    send(1);
+    await advance(800); // the endpoint took 800 ms to say it is warming
+    const warmedAt = Date.now();
+    socket().reply({ type: 'status', status: 'warming' });
+    jest.setSystemTime(warmedAt + 1999); // 2.8 s after the send, but the relay still holds
+    send(2);
+    expect(socket().sent).toHaveLength(1);
+    jest.setSystemTime(warmedAt + 2000);
+    send(3);
+    expect(socket().sent).toHaveLength(2);
+  });
+
   it('while warming: reconnecting, pending frames discarded, at most one probe per 2 s', async () => {
     start();
     await connected();
