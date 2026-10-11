@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { Linking, Platform, Pressable, Share, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { AppState, Linking, Platform, Pressable, Share, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { PoseSkeleton } from './PoseSkeleton';
 import type { PoseDetection } from './types';
 import { isBasicModeSupported } from './basic';
-import { usePoseOutput, type PoseEngine } from './usePoseOutput';
+import { usePoseOutput, type CloudConfig, type PoseEngine } from './usePoseOutput';
 import { usePoseMode, type PoseModeState } from './usePoseMode';
+import { useCloudConfig } from './useCloudConfig';
 import { EXERCISE_SPECS } from '../engine/specs';
 import { useFormEngine } from '../engine/useFormEngine';
 import { useFormRules } from '../engine/useFormRules';
@@ -78,8 +80,23 @@ export function PoseDebugScreen() {
 
 function PoseCamera() {
   const auth = useAuth();
-  const poseMode = usePoseMode(auth.user?.id ?? null);
+  const userId = auth.user?.id ?? null;
+  const poseMode = usePoseMode(userId);
   const [position, setPosition] = useState<'front' | 'back'>('front');
+  // Cloud frames go out only while this screen is in the foreground and focused (AI-17).
+  const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => setForeground(state === 'active'));
+    return () => subscription.remove();
+  }, []);
+  const { mode, cloudConsent } = poseMode;
+  const cloud = useCloudConfig({
+    enabled: (mode === 'cloud' || mode === 'paused') && cloudConsent && foreground && focused,
+    userId,
+    getToken: auth.getApiToken,
+  });
   // The camera's detector would compete with the benchmark for the Neural Engine, so it is unmounted.
   if (poseMode.benchmarking) {
     return (
@@ -88,16 +105,18 @@ function PoseCamera() {
       </View>
     );
   }
-  return <LiveCamera poseMode={poseMode} position={position} setPosition={setPosition} />;
+  return <LiveCamera poseMode={poseMode} cloud={cloud} position={position} setPosition={setPosition} />;
 }
 
-function LiveCamera({ poseMode, position, setPosition }: {
+function LiveCamera({ poseMode, cloud, position, setPosition }: {
   poseMode: PoseModeState;
+  cloud: CloudConfig | null;
   position: 'front' | 'back';
   setPosition: Dispatch<SetStateAction<'front' | 'back'>>;
 }) {
   const { mode, benchmark, size, preference, setPreference, cloudConsent, setCloudConsent, needsCloudConsent } = poseMode;
-  const engine: PoseEngine = mode === 'vision' ? 'vision' : 'coreml';
+  // No implicit Core ML: without a source (pending, unavailable) the cloud engine runs with no config, so nothing does.
+  const engine: PoseEngine = mode === 'coreml' || mode === 'vision' ? mode : 'cloud';
   const device = useCameraDevice(position);
   const [detection, setDetection] = useState<PoseDetection | null>(null);
   const [viewSize, setViewSize] = useState<Size | null>(null);
@@ -130,7 +149,7 @@ function LiveCamera({ poseMode, position, setPosition }: {
     if (d.result) clock.observe(d.result.timestamp_ms);
     recorder.current?.add(d, clock.now());
   }, [formOnPose, clock]);
-  const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size, maxFps: 15, onPose });
+  const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size, maxFps: 15, onPose, cloud });
   useLayoutEffect(() => { frameOutputRef.current = frameOutput; }, [frameOutput]);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {

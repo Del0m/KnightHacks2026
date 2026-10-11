@@ -80,6 +80,8 @@ describe('PoseDebugScreen', () => {
   });
 
   it('toggles between YOLOv8 and Apple Vision', () => {
+    saveBenchmark({ modelId: 'model-a', size: 320, fps: 60, meanMs: 9, p95Ms: 10, ranAt: 1, error: null });
+    __resetPoseModeForTests();
     act(() => { renderer = create(React.createElement(PoseDebugScreen)); });
     expect(jest.mocked(usePoseOutput).mock.calls.at(-1)![0].engine).toBe('coreml');
 
