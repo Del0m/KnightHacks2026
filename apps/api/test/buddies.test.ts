@@ -134,6 +134,22 @@ describe("buddy endpoints", () => {
     expect(res.body).toEqual({ suggestions: [], hint: expect.stringContaining("gym") });
   });
 
+  it.each(["incoming", "outgoing"])("hides blocked %s matches and refuses actions in either block direction", async (direction) => {
+    const requester = await t.as(`blocked-${direction}-requester`);
+    const recipient = await t.as(`blocked-${direction}-recipient`);
+    const a = `blocked-${direction}-requester`, b = `blocked-${direction}-recipient`;
+    await requester.put("/me/profile", { gym_place_id: "blocked-gym" });
+    await recipient.put("/me/profile", { gym_place_id: "blocked-gym" });
+    expect((await requester.post(`/buddies/${b}/request`)).status).toBe(201);
+    await t.db.insert(schema.blocks).values({ blockerId: direction === "incoming" ? a : b, blockedId: direction === "incoming" ? b : a });
+    expect((await requester.get("/buddies")).body).toEqual([]);
+    expect((await recipient.get("/buddies")).body).toEqual([]);
+    expect((await recipient.post(`/buddies/${a}/accept`)).status).toBe(404);
+    expect((await recipient.post(`/buddies/${a}/decline`)).status).toBe(404);
+    const [match] = await t.db.select().from(schema.buddyMatches).where(eq(schema.buddyMatches.aId, a));
+    expect(match.status).toBe("requested");
+  });
+
   it("ranks by profile embeddings when they exist", async () => {
     const unit = (i: number) => Array.from({ length: 384 }, (_, j) => (j === i ? 1 : 0));
     for (const id of ["e-me", "e-close", "e-far"])

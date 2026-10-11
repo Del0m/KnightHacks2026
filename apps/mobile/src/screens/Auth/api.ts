@@ -12,7 +12,7 @@ export function createAuthenticatedFetch(baseUrl: string, getToken: () => Promis
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Bearer ${token}`);
     const response = await send(url.toString(), { ...options, headers, redirect: 'error', credentials: 'omit' });
-    if (response.status === 401) { onUnauthorized(); throw new Error('Your session was rejected. Please log in again.'); }
+    if (response.status === 401) { onUnauthorized(); throw new Error('The workout server could not verify your session. Try again.'); }
     return response;
   };
 }

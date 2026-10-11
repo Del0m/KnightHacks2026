@@ -34,7 +34,7 @@ export function FeedCard({ post, pending, onKudos, onComment = () => {} }: { pos
  const name = post.author.display_name || post.author.handle || 'Member';
  const workout = post.kind === 'session' ? readPublicWorkout(post.data) : null;
  const record = type === 'pr', tint = metal?.tint ?? (record ? '#FFFFFF' : '#EDE4FB');
- const label = type === 'medal' ? `${tier ? tier[0].toUpperCase() + tier.slice(1) : ''} workout`.trim() : record ? 'Personal record' : null;
+ const label = type === 'medal' ? `${tier ? tier[0].toUpperCase() + tier.slice(1) : ''} workout`.trim() : record ? 'Personal record' : post.kind === 'advice' ? 'Advice question' : null;
  const body = <View testID={`feed-card-${type}`} style={[styles.card, { borderColor: record ? 'rgba(255,255,255,.95)' : metal?.edge ?? '#DDCEE9', backgroundColor: record ? 'rgba(255,255,255,.16)' : `${tint}55`, boxShadow: record ? '0 12px 28px rgba(86,65,111,.14)' : '0 8px 24px rgba(86,65,111,.07)' }]}>
   <GlassSurface radius={22} tint={tint} colored subtle={record} />
   {!record && <View pointerEvents="none" style={{ position: 'absolute', top: 1, left: 14, right: 14, height: 1, backgroundColor: 'rgba(255,255,255,.85)' }} />}

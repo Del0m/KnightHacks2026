@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Native renderer test. */
 import React from 'react';
+import { dailyWorkout } from '@/data/workout';
 import { router } from 'expo-router';
 import TrainScreen from '../index';
+jest.mock('@/screens/Onboarding/state', () => ({ useOnboarding: () => ({ profile: null }) }));
 const { act, create } = require('react-test-renderer');
 jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: null }) }));
 jest.mock('expo-router', () => ({ router: { push: jest.fn() }, useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]), useNavigation: () => ({ addListener: () => () => {} }) }));
@@ -19,12 +21,13 @@ test('switching exercise tabs keeps selection, playback and rotation; practice s
   let screen: ReturnType<typeof create>;
   act(() => { screen = create(<TrainScreen />); });
   expect(screen.root.findAllByProps({ testID: 'practice-exercise-push_up' })).toHaveLength(0);
+  const selected = dailyWorkout()[0].id;
   const tabs = () => screen.root.findByType('ExerciseTabs');
-  act(() => screen.root.findByProps({ testID: 'exercise-squat' }).props.onPress());
+  act(() => screen.root.findByProps({ testID: `exercise-${selected}` }).props.onPress());
   act(() => screen.root.findByType('Rotation').props.onChange(45));
   act(() => tabs().props.onChange('practice'));
-  expect(screen.root.findByType('Body').props).toMatchObject({ selected: 'squat', playing: true, rotation: 45 });
-  expect(screen.root.findByProps({ testID: 'practice-exercise-squat' }).props.accessibilityState).toMatchObject({ selected: true, expanded: true });
+  expect(screen.root.findByType('Body').props).toMatchObject({ selected, playing: true, rotation: 45 });
+  expect(screen.root.findByProps({ testID: `practice-exercise-${selected}` }).props.accessibilityState).toMatchObject({ selected: true, expanded: true });
   act(() => screen.root.findByProps({ testID: 'practice-exercise-push_up' }).props.onPress());
   act(() => screen.root.findByType('Practice').props.onPractice());
   expect(router.push).toHaveBeenCalledWith({ pathname: '/practice', params: { exercise: 'push_up' } });

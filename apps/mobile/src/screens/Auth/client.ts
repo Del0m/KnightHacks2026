@@ -19,5 +19,5 @@ export const authClient = authConfigured ? createAuthClient({
     scheme: 'steadyforum', storagePrefix: 'steadyforum-auth', storage: SecureStore,
     cookiePrefix: ['neonauth', 'neon-auth', 'better-auth'], disableCache: true,
   })])],
-  fetchOptions: { credentials: 'include' },
+  fetchOptions: { credentials: 'include', ...(Platform.OS !== 'web' ? { headers: { Origin: new URL(authUrl!).origin } } : {}) },
 }) : null;

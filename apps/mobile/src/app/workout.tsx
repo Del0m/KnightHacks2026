@@ -1,11 +1,12 @@
+import { calendarDay, dailyWorkout, exercises } from '@/data/workout';
+import { readPlan, readPrescription, routineForDay, weekStart, modelExercise } from '@/screens/Planner/plan';
 import type { SessionStart } from '../../../../specs/set-record/types';
 import { WorkoutSummary } from '@/screens/Summary';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Text, TextInput, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { AppPage, Action, ui } from '@/components/AppPage';
 import { BodyPreview } from '@/components/BodyPreview';
-import { exercises } from '@/data/workout';
 import { useAuth } from '@/screens/Auth/session';
 import { isPermanentUploadFailure, type UploadCheckpoint, type WorkoutSet } from '@/services/workoutApi';
 import { queueWorkout, syncWorkouts, saveActiveWorkout, readActiveWorkout, clearActiveWorkout, readWorkoutSetResult, type ActiveWorkout } from '@/services/workoutQueue';
@@ -18,33 +19,40 @@ import type { ServerRestResult } from '@/screens/LiveSet/restCardContent';
 export default function WorkoutEntry() {
   const { setup, mode, exercise, cameraPosition } = useLocalSearchParams<{ setup?: string; mode?: string; exercise?: string; cameraPosition?: 'front' | 'back' }>();
   const { user } = useAuth();
-  return readActiveWorkout(user?.id ?? null) || setup === 'done' ? <WorkoutScreen mode={mode} exercise={exercise} cameraPosition={cameraPosition} /> : <Redirect href="/camera-setup" />;
+  const active = readActiveWorkout(user?.id ?? null);
+  const savedPlan = user?.id ? readPlan(user.id, weekStart(calendarDay())) : null;
+  if (!active && savedPlan && !routineForDay(savedPlan.plan, savedPlan.selectedDate).length) return <AppPage title="Workout"><Text style={ui.muted}>This is a rest day.</Text><Action onPress={() => router.replace('/plan')}>View your week</Action></AppPage>;
+  return active || setup === 'done' ? <WorkoutScreen mode={mode} exercise={exercise} cameraPosition={cameraPosition} /> : <Redirect href="/camera-setup" />;
 }
 function WorkoutScreen({ mode, exercise, cameraPosition }: { mode?: string; exercise?: string; cameraPosition?: 'front' | 'back' }) {
   const auth = useAuth(), owner = useRef(auth.user?.id);
   const [restored] = useState(() => readActiveWorkout(auth.user?.id ?? null));
-  const [initialDraft] = useState<ActiveWorkout>(() => restored ?? { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, startedAt: new Date().toISOString(), sets: [], feedbacks: [], checkpoint: {}, exercise: cameraSpec(exercise).id, mode: mode === 'manual' || Platform.OS !== 'ios' ? 'manual' : 'camera', cameraPosition, restUntil: 0 });
+  const [planned] = useState(() => auth.user?.id ? readPlan(auth.user.id, weekStart(calendarDay())) : null);
+  const [initialDraft] = useState<ActiveWorkout>(() => restored ?? { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, startedAt: new Date().toISOString(), sets: [], feedbacks: [], checkpoint: {}, exercise: cameraSpec(exercise).id, mode: mode === 'manual' || Platform.OS !== 'ios' ? 'manual' : 'camera', cameraPosition, restUntil: 0, ...(planned ? { routine: routineForDay(planned.plan, planned.selectedDate), planDate: planned.selectedDate, planId: planned.plan.id } : { routine: dailyWorkout(), planDate: calendarDay() }) });
   const started = useRef(initialDraft.startedAt), checkpoint = useRef<UploadCheckpoint>(initialDraft.checkpoint), recorded = useRef(false);
   const { finish, workouts, removeWorkout } = useTraining();
   const sessionStart = useRef<SessionStart | null>(restored?.sessionStart ?? null);
   const [records, setRecords] = useState<WorkoutSet[]>(restored?.sets ?? []), [feedbacks, setFeedbacks] = useState<(SetFeedback | null)[]>(restored?.feedbacks ?? []);
-  const [manual, setManual] = useState(initialDraft.mode === 'manual'), [reps, setReps] = useState(cameraSpec(restored?.exercise ?? exercise).id === 'bicep_curl' ? '12' : '10');
+  const [manual, setManual] = useState(initialDraft.mode === 'manual'), [reps, setReps] = useState(() => String(initialDraft.routine?.flatMap(item => Array.from({ length: item.sets }, () => item.reps))[initialDraft.sets.length] ?? (cameraSpec(restored?.exercise ?? exercise).id === 'bicep_curl' ? 12 : 10)));
   const [restUntil, setRestUntil] = useState(restored?.restUntil ?? 0), [now, setNow] = useState(Date.now), [done, setDone] = useState(false), [playing, setPlaying] = useState(false), [syncStatus, setSyncStatus] = useState('Saved on this device.'), [workoutId, setWorkoutId] = useState('');
   const draft = useRef(initialDraft), restorationStarted = useRef(false);
   const [completing, setCompleting] = useState(false);
   const completingRef = useRef(false), pendingRest = useRef<Promise<ServerRestResult | null> | null>(null);
   const [restRequest, setRestRequest] = useState<Promise<ServerRestResult | null> | null>(null);
   useEffect(() => {
-    if (restorationStarted.current || !restored || !owner.current || owner.current !== auth.user?.id) return;
+    if (restorationStarted.current || owner.current !== auth.user?.id) return;
     restorationStarted.current = true;
-    saveActiveWorkout(owner.current, draft.current);
-    void syncWorkouts(owner.current, auth.apiFetch).catch(() => {});
+    saveActiveWorkout(owner.current ?? null, draft.current);
+    if (owner.current && restored) void syncWorkouts(owner.current, auth.apiFetch).catch(() => {});
   }, [restored, auth.user?.id, auth.apiFetch]);
   const selected = cameraSpec(restored?.exercise ?? exercise);
   const selectedIndex = exercises.findIndex(e => cameraSpec(e.id).id === selected.id);
-  const ordered = selectedIndex < 0 ? [{ id: selected.id, name: selected.name, sets: 3, reps: 10 }] : [...exercises.slice(selectedIndex), ...exercises.slice(0, selectedIndex)];
-  const plan = ordered.flatMap(item => Array.from({ length: item.sets }, (_, set) => ({ ...item, set: set + 1 })));
-  const current = plan[Math.min(records.length, plan.length - 1)], spec = cameraSpec(current.id), finished = records.length === plan.length;
+  const snapshot = useMemo(() => readPrescription(initialDraft.routine), [initialDraft.routine]);
+  const ordered = useMemo(() => snapshot ?? (selectedIndex < 0 ? [{ id: selected.id, name: selected.name, sets: 3, reps: 10 }] : [...exercises.slice(selectedIndex), ...exercises.slice(0, selectedIndex)]), [snapshot, selectedIndex, selected.id, selected.name]);
+  const plan = useMemo(() => ordered.flatMap(item => Array.from({ length: item.sets }, (_, set) => ({ ...item, set: set + 1 }))), [ordered]);
+  const current = plan[Math.min(records.length, plan.length - 1)];
+  const spec = useMemo(() => modelExercise(current.id) && ('tracked' in current ? current.tracked : true) ? cameraSpec(current.id) : null, [current]);
+  const finished = records.length >= plan.length;
   const resting = restUntil > now;
   useEffect(() => { if (!restUntil) return; const timer = setInterval(() => { const time = Date.now(); setNow(time); if (time >= restUntil) { setRestUntil(0); setRestRequest(null); } }, 250); return () => clearInterval(timer); }, [restUntil]);
   const measuredHistory = workouts.filter(w => now - Date.parse(w.finishedAt) <= 28 * 86400000).flatMap(w => w.details ?? []).filter(s => s.goodReps !== undefined && s.reps > 0);
@@ -57,7 +65,7 @@ function WorkoutScreen({ mode, exercise, cameraPosition }: { mode?: string; exer
     if (inferenceMode) sessionStart.current ??= { started_at: started.current, device: 'phone', inference_mode: inferenceMode };
     const saved = readActiveWorkout(owner.current ?? null);
     checkpoint.current = saved?.id === draft.current.id ? saved.checkpoint : checkpoint.current;
-    const next = { ...draft.current, sets: [...records, record], feedbacks: [...feedbacks, feedback], checkpoint: checkpoint.current, ...(sessionStart.current ? { sessionStart: sessionStart.current } : {}), mode: manual ? 'manual' as const : 'camera' as const, restUntil: Date.now() + 45000 };
+    const next = { ...draft.current, sets: [...records, record], feedbacks: [...feedbacks, feedback], checkpoint: checkpoint.current, ...(sessionStart.current ? { sessionStart: sessionStart.current } : {}), mode: manual || !spec ? 'manual' as const : 'camera' as const, restUntil: Date.now() + 45000 };
     saveActiveWorkout(owner.current ?? null, next); draft.current = next;
     const account = owner.current;
     pendingRest.current = account && auth.user?.id === account && next.sessionStart && next.sets.every(s => 'schema_version' in s)
@@ -73,7 +81,7 @@ function WorkoutScreen({ mode, exercise, cameraPosition }: { mode?: string; exer
     setRecords(next.sets); setFeedbacks(next.feedbacks); setPlaying(false);
     setNow(Date.now()); setRestUntil(next.restUntil); setRestRequest(pendingRest.current);
   }
-  function manualSet() { if (valid) completeSet({ exercise_id: spec.id, reps: Array.from({ length: entered }, () => ({ tempo_ms: 0, range_deg: 0, quality: null, flags: [{ rule_id: 'manual_unscored', severity: 'info' }] })) }, null); }
+  function manualSet() { if (valid) completeSet({ exercise_id: spec?.id ?? current.id, reps: Array.from({ length: entered }, () => ({ tempo_ms: 0, range_deg: 0, quality: null, flags: [{ rule_id: 'manual_unscored', severity: 'info' }] })) }, null); }
   function save() {
     if (recorded.current) return;
     recorded.current = true;
@@ -95,6 +103,6 @@ function WorkoutScreen({ mode, exercise, cameraPosition }: { mode?: string; exer
   if (resting) return <AppPage headerAction={exit} title="Workout" intro={finished ? 'Last set complete' : 'Rest'}>{last ? <RestCard phone={last} server={server} secondsLeft={Math.ceil((restUntil - now) / 1000)} /> : <View style={{ gap: 12 }}><Text style={ui.heading}>{records[records.length - 1].reps.length} reps logged</Text><Text style={ui.pageTitle}>{Math.ceil((restUntil - now) / 1000)}s</Text><Text style={ui.muted}>Manual tracking has no measured form score.</Text></View>}{!finished && <><Text style={ui.muted}>Next: {current.name} · set {current.set} of {current.sets}</Text><Text style={ui.muted}>The next set starts when rest ends.</Text></>}<Action onPress={() => { if (finished) save(); else { setRestUntil(0); setRestRequest(null); } }}>{finished ? 'Finish Workout' : 'Start next set now'}</Action></AppPage>;
   if (finished) return <AppPage headerAction={exit} title="Workout" intro="Session complete">{last && <RestCard phone={last} server={null} />}<Action onPress={save}>Finish Workout</Action></AppPage>;
   return <AppPage headerAction={exit} title="Workout"><Text style={ui.muted}>{records.length} of {plan.length} sets complete</Text><Text style={ui.pageTitle}>{current.name}</Text><Text style={ui.muted}>Set {current.set} of {current.sets} · aim for {current.reps} reps</Text>
-    {manual ? <View style={{ gap: 12 }}><BodyPreview selected={spec.id === 'bicep_curl' ? 'curl' : spec.id === 'shoulder_press' ? 'press' : spec.id === 'squat' ? 'squat' : null} playing={playing} /><Action secondary onPress={() => setPlaying(p => !p)}>{playing ? 'Pause demonstration' : 'Play demonstration'}</Action><Text style={ui.label}>Reps you completed</Text><TextInput accessibilityLabel="Reps you completed" keyboardType="number-pad" value={reps} onChangeText={setReps} style={ui.input} maxLength={3} /><Action disabled={!valid} onPress={manualSet}>Log set</Action>{Platform.OS === 'ios' && <Action secondary onPress={() => setManual(false)}>Use camera tracking</Action>}</View> : <WorkoutCamera key={records.length} spec={spec} setIndex={records.length} initialPosition={restored?.cameraPosition ?? cameraPosition} baseline={baseline} onFinishing={() => { completingRef.current = true; setCompleting(true); }} onRecorded={persistSet} onComplete={completeSet} onManual={() => setManual(true)} />}
+    {manual || !spec ? <View style={{ gap: 12 }}><BodyPreview selected={spec ? modelExercise(spec.id) : null} playing={playing} /><Action secondary onPress={() => setPlaying(p => !p)}>{playing ? 'Pause demonstration' : 'Play demonstration'}</Action><Text style={ui.label}>Reps you completed</Text><TextInput accessibilityLabel="Reps you completed" keyboardType="number-pad" value={reps} onChangeText={setReps} style={ui.input} maxLength={3} /><Action disabled={!valid} onPress={manualSet}>Log set</Action>{Platform.OS === 'ios' && spec && <Action secondary onPress={() => setManual(false)}>Use camera tracking</Action>}</View> : <WorkoutCamera key={records.length} spec={spec} setIndex={records.length} initialPosition={restored?.cameraPosition ?? cameraPosition} baseline={baseline} onFinishing={() => { completingRef.current = true; setCompleting(true); }} onRecorded={persistSet} onComplete={completeSet} onManual={() => setManual(true)} />}
   </AppPage>;
 }

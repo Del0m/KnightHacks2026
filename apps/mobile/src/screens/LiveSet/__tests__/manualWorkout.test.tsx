@@ -1,6 +1,6 @@
 import React from 'react';
 import WorkoutEntry from '@/app/workout';
-import { exercises } from '@/data/workout';
+import { dailyWorkout } from '@/data/workout';
 import { readActiveWorkout } from '@/services/workoutQueue';
 import { uploadWorkout } from '@/services/workoutApi';
 
@@ -25,6 +25,7 @@ test('manual sets save locally once and can be undone without uploading pose dat
   const press = (label: string) => act(() => screen.root.findAllByType('Action')
     .find((node: { props: { children: string } }) => node.props.children === label).props.onPress());
   try {
+    const exercises = dailyWorkout();
     const totalSets = exercises.reduce((total, exercise) => total + exercise.sets, 0);
     for (let index = 0; index < totalSets; index++) {
       press('Log set');

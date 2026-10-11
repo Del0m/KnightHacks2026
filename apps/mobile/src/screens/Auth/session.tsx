@@ -30,9 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } });
+      if (error?.status === 401) { apply({ user: null, loading: false, error: 'Your authentication session expired. Please log in again.' }); return; }
       if (error) throw new Error('Could not restore your session. Check your connection and try again.');
       apply({ user: data?.user ?? null, loading: false, error: null });
-    } catch (error) { apply({ user: null, loading: false, error: message(error) }); }
+    } catch (error) { apply({ user: activeUser.current === state.user?.id ? state.user : null, loading: false, error: message(error) }); }
   }
   const refreshOnFocus = useEffectEvent(() => { void refresh(); });
   useEffect(() => {
@@ -87,7 +88,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     function invalidate() {
       if (requestGeneration !== generation.current) return;
       ++generation.current;
-      commit({ user: null, loading: false, error: 'Your session expired. Please log in again.' });
+      commit({ user: null, loading: false, error: 'Your authentication session expired. Please log in again.' });
+    }
+    function rejectApiSession() {
+      if (requestGeneration !== generation.current) return;
+      setState(current => ({ ...current, error: 'The workout server could not verify your session. Try again.' }));
     }
     const response = await createAuthenticatedFetch(apiUrl, async () => {
       if (!authClient || !state.user || activeUser.current !== state.user.id) return null;
@@ -95,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error?.status === 401) invalidate();
       if (error || !data?.token) throw new Error('Could not get your session token. Please log in again.');
       return requestGeneration === generation.current ? data.token : null;
-    }, invalidate)(path, options);
+    }, rejectApiSession)(path, options);
     if (requestGeneration !== generation.current) throw new Error('Your account changed. Please try again.');
     return response;
   }

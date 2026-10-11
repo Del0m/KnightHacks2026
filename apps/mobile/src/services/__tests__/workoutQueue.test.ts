@@ -5,6 +5,11 @@ const mockData = new Map<string, string>();
 jest.mock('react-native-mmkv', () => ({ createMMKV: () => ({ getString: (k: string) => mockData.get(k), set: (k: string, v: string) => mockData.set(k, v) }) }));
 const response = (status: number, body: object = { session_id: 'existing', medal: 'bronze', form_score: 0, baseline_share: .7, total_reps: 0, clean_reps: 0, personal_records: [] }) => ({ ok: status < 400, status, json: async () => body }) as Response;
 beforeEach(() => mockData.clear());
+it('rejects a corrupt planned prescription instead of restoring a different routine', () => {
+ const active = { id: 'planned', startedAt: '2026-10-10T12:00:00Z', sets: [measured], feedbacks: [null], checkpoint: {}, exercise: 'squat', mode: 'manual' as const, restUntil: 0, routine: [{ id: 'squat', name: 'Squat', sets: 0, reps: 8, tracked: true }] };
+ saveActiveWorkout('a', active);
+ expect(readActiveWorkout('a')).toBeNull();
+});
 it('retains failed saves and retries their original session without crossing accounts', async () => {
   queueWorkout('a', { id: 'local', startedAt: '2026-10-10T12:00:00Z', sets: [measured], sessionStart, checkpoint: {} });
   const request = jest.fn().mockResolvedValueOnce(response(201, { id: 'existing' })).mockRejectedValueOnce(new Error('offline'));

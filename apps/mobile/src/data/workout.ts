@@ -1,3 +1,4 @@
+import type { Schedule } from '../screens/Onboarding/model';
 export type ExerciseId = 'curl' | 'squat' | 'press' | 'push_up' | 'lunge';
 export const exercises = [
   { id: 'curl' as const, name: 'Bicep curl', muscles: 'Biceps', sets: 3, reps: 12, equipment: 'Dumbbells' },
@@ -16,12 +17,41 @@ export const initialProfile: Profile = { name: '', bio: '', avatar: '', days: [1
 export function calendarDay(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
-export function streak(workouts: Workout[], now = new Date()) {
-  const days = new Set(workouts.map(w => w.day));
+/** Local calendar days keep the routine stable offline and across daylight-saving changes. */
+export function dailyWorkout(date = calendarDay()) {
+  const [year, month, day] = date.split('-').map(Number);
+  const ordinal = Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+  const offset = ordinal % practiceExercises.length;
+  const rotated = [...practiceExercises.slice(offset), ...practiceExercises.slice(0, offset)];
+  const selected = rotated.slice(0, 3);
+  // Keep both upper- and lower-body work when the rotation reaches two leg exercises.
+  if (!selected.some(e => e.id === 'press' || e.id === 'push_up')) selected[2] = rotated.find(e => e.id === 'press' || e.id === 'push_up')!;
+  return selected.map((exercise, index) => ({
+    ...exercise,
+    sets: 2 + ((Math.floor(ordinal / 5) >> index) & 1),
+    reps: 8 + 2 * ((ordinal + index) % 3),
+    tracked: true,
+  }));
+}
+/** One schedule predicate shared by streaks and upcoming workout dates. */
+export function isWorkoutDay(day: string, schedule: Schedule = { kind: 'weekly', days: initialProfile.days }) {
+  if (schedule.kind === 'weekly') return schedule.days.includes(new Date(`${day}T12:00:00`).getDay());
+  const elapsed = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${schedule.start_date}T00:00:00Z`)) / 86400000);
+  return schedule.every_days > 0 && elapsed >= 0 && elapsed % schedule.every_days === 0;
+}
+export function streak(workouts: Workout[], now = new Date(), schedule?: Schedule) {
+  const today = calendarDay(now);
+  const days = new Set(workouts.map(w => w.day).filter(day => day <= today));
+  if (!days.size) return 0;
+  const earliest = [...days].sort()[0];
   const cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (!days.has(calendarDay(cursor))) cursor.setDate(cursor.getDate() - 1);
   let count = 0;
-  while (days.has(calendarDay(cursor))) { count++; cursor.setDate(cursor.getDate() - 1); }
+  while (calendarDay(cursor) >= earliest) {
+    const day = calendarDay(cursor);
+    if (days.has(day)) count++;
+    else if (day !== today && isWorkoutDay(day, schedule)) break;
+    cursor.setDate(cursor.getDate() - 1);
+  }
   return count;
 }
 export function streakTier(days: number) { return days < 1 ? 0 : days < 7 ? 1 : days < 30 ? 2 : days < 100 ? 3 : 4; }
