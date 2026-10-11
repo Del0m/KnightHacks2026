@@ -13,6 +13,16 @@ python3 -m form_classifier.train --bundle /path/to/labelling-export-all-bundle_<
 
 Keep the bundle and the report outside the repo. Participant data and consent evidence must never be committed. The tests use synthetic bundles only.
 
+## Checking the rules against the labels
+
+The rule check reuses the phone's engine, so it lives in `apps/mobile`:
+
+```sh
+cd apps/mobile
+npx jest src/engine/__tests__/labelCheck.test.ts
+npx --yes tsx@4.19.2 scripts/check-rule-labels.ts /path/to/labelling-export-all-bundle_<id>.json /path/to/rule-report.md
+```
+
 ## What the loader checks
 
 - Checksums for `training_jsonl` and `clips_jsonl` match the manifest.
