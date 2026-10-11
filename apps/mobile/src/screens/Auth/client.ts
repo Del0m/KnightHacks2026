@@ -19,5 +19,5 @@ export const authClient = authConfigured ? createAuthClient({
     scheme: 'spotter', storagePrefix: 'spotter-auth', storage: SecureStore,
     cookiePrefix: ['neonauth', 'neon-auth', 'better-auth'], disableCache: true,
   })])],
-  fetchOptions: { credentials: 'include' },
+  fetchOptions: { credentials: 'include', ...(Platform.OS !== 'web' ? { headers: { Origin: new URL(authUrl!).origin } } : {}) },
 }) : null;
