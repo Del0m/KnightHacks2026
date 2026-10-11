@@ -91,7 +91,9 @@ const eight = (flagged: Record<number, string[]>, tempo = 2000) =>
   Array.from({ length: 8 }, (_, i) => rep(flagged[i] ?? [], { tempo_ms: tempo }));
 
 describe("rest-time loop", () => {
-  it("passes phase timings through the route and leaves unavailable model features null", async () => {
+  // The model was trained on silver's frame-derived split (features.ts), so the phone's
+  // turn-based lowering_ms / rising_ms are stored but never sent for scoring.
+  it("takes model timing features from the set's joints, not the phone's split", async () => {
     Object.assign(net, { databricks: "ok", labels: "clean", llm: "ok" });
     const { res } = await postSet([
       rep([], { quality: null, lowering_ms: 800, rising_ms: 1200 }),
@@ -104,8 +106,8 @@ describe("rest-time loop", () => {
         weight_kg: 50,
         range_deg: 95,
         tempo_ms: 2000,
-        lowering_ms: 800,
-        rising_ms: 1200,
+        lowering_ms: null,
+        rising_ms: null,
         asymmetry: null,
         max_trunk_angle: null,
         min_knee_ankle_ratio: null,
@@ -126,7 +128,7 @@ describe("rest-time loop", () => {
 
   it("returns a Databricks score and an LLM note in one response, good news first", async () => {
     Object.assign(net, { databricks: "ok", labels: "clean", llm: "ok" });
-    net.suggestion = "Knees tracking over the toes tends to feel steadier through the whole rep.";
+    net.suggestion = "Knees drifted inward on 2 reps. Tracking over the toes tends to feel steadier.";
     const { res, ms } = await postSet(eight({ 2: ["knee_tracking"], 5: ["knee_tracking", "tempo"] }));
     expect(res.status).toBe(201);
     expect(res.body.set_id).toBe(res.body.id);
@@ -159,7 +161,7 @@ describe("rest-time loop", () => {
 
   it("Databricks timeout: the phone score, inside the budget", async () => {
     Object.assign(net, { databricks: "hang", llm: "ok" });
-    net.suggestion = "Knees tracking over the toes tends to feel steadier through the whole rep.";
+    net.suggestion = "Knees drifted inward on 1 rep. Tracking over the toes tends to feel steadier.";
     const { res, ms } = await postSet(eight({ 3: ["knee_tracking"] }));
     expect(res.body.score).toMatchObject({
       source: "phone",
@@ -197,12 +199,30 @@ describe("rest-time loop", () => {
       "Keep your knees out next time.",
       "Great job!",
       "2 of 8 reps had knees drifting in.",
+      "You're letting your knees cave in.",
+      "You are leaning a little far forward.",
     ]) {
       expect(suggestionProblems(bad).length).toBeGreaterThan(0);
       net.suggestion = bad;
       const { res } = await postSet(eight({ 0: ["knee_tracking"] }));
       expect(res.body.rest_note.source).toBe("fixed");
     }
+  });
+
+  it("rejects a suggestion that drops or invents numbers (§7: numbers over adjectives)", () => {
+    const original = "Your reps took about 0.8 s on the way down. Around 2 s gives you more control.";
+    expect(suggestionProblems("A slower descent of about two seconds adds control.", original)).toContain(
+      "drops the original's numbers (0.8, 2)",
+    );
+    expect(
+      suggestionProblems(
+        "The way down took about 0.8 s. Closer to 2 s tends to give more control.",
+        original,
+      ),
+    ).toEqual([]);
+    expect(
+      suggestionProblems("The way down took about 0.8 s. Around 2 s or 3 s adds control.", original),
+    ).toContain("adds numbers the original doesn't have (3)");
   });
 
   it("fills {t} for duration rules from the flagged reps' time", async () => {
@@ -214,8 +234,9 @@ describe("rest-time loop", () => {
 
   it("saves the score and note so GET /sets/:id/rest-note returns the same", async () => {
     Object.assign(net, { databricks: "ok", labels: "clean", llm: "ok" });
-    net.suggestion = "Knees tracking over the toes tends to feel steadier through the whole rep.";
+    net.suggestion = "Knees drifted inward on 1 rep. Tracking over the toes tends to feel steadier.";
     const { res, api } = await postSet(eight({ 2: ["knee_tracking"] }));
+    expect(res.body.rest_note.source).toBe("llm");
     const again = await api.get(`/sets/${res.body.set_id}/rest-note`);
     expect(again.status).toBe(200);
     expect(again.body).toEqual({

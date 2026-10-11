@@ -487,13 +487,16 @@ erDiagram
     USER ||--o{ PLAN : "has"
     PLAN ||--o{ PLAN_ITEM : "lists"
     EXERCISE ||--o{ PLAN_ITEM : "used in"
+    USER ||--o{ EXERCISE_PREFERENCE : "rates"
+    EXERCISE ||--o{ EXERCISE_PREFERENCE : "rated in"
     USER ||--o{ REHAB_PLAN : "enters from physio"
     REHAB_PLAN ||--o{ REHAB_LIMIT : "sets"
     REHAB_PLAN { uuid id string from_physio date start date review_on }
     REHAB_LIMIT { string exercise_id string joint float max_range_deg int sets int reps }
     INJURY { uuid id string body_part date since }
-    PLAN { uuid id date week_of jsonb ai_sources }
-    PLAN_ITEM { uuid id int sets int reps text swap_note }
+    PLAN { uuid id date week_of string source jsonb ai_sources jsonb notes }
+    PLAN_ITEM { uuid id int sets int reps text reason text swap_note text safety_note }
+    EXERCISE_PREFERENCE { string exercise_id string rating }
     EXERCISE { string id string name jsonb form_spec }
 ```
 
@@ -535,6 +538,7 @@ erDiagram
 | `GET /sets/:id/rest-note` | Rest note for the last set |
 | `GET /me/progress` · `GET /me/insights` | Progress and risk insights (read from Neon) |
 | `POST /plans/generate` · `GET /plans/current` | Planner (see [§10](#10-workout-planner-and-advice)) |
+| `PUT /me/exercise-preferences/:exerciseId` · `GET /me/exercise-preferences` | Thumbs up/down on an exercise, from any screen; feeds the planner |
 | `GET /feed` · `POST /posts` · `POST /posts/:id/kudos` · `POST /posts/:id/comments` | Social |
 | `POST /advice` | Ask the community; an AI-suggested first answer is attached |
 | `GET /buddies/suggestions` · `POST /buddies/:id/request` | Buddy matching |
@@ -572,6 +576,12 @@ flowchart LR
 
 - **Sources:** [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (800+ exercises, public domain) and short injury-modification notes written by the team, citing public guidelines (CDC/NIH). Don't scrape ExRx.
 - **Safety check:** drops anything contraindicated for a reported injury, caps weekly volume increases at 10%, puts compound and machine work first for beginners, and adds "check with your physio" notes. Every plan item stores the chunks it came from, so the app can show "why this exercise".
+- **Exercises:** the five camera-tracked exercises come first. Library exercises can be planned too; they're added to `exercises` on first use without a form spec (`has_spec: false`), so the app shows them as logged by hand. A library exercise that loads an injured joint is filtered out in the vector search and again in code. A tracked exercise whose spec has an `injury_override` for that joint stays, with the spec's note, unless the injury is severe.
+- **Looking back (temporal history):** the last six weeks, with recent weeks counting more (a set's weight halves every two weeks). Per exercise: sessions, sets and reps, clean share and its trend, medals, PRs, and whether it was done when planned. Plus the range-of-motion trend and how much of the last plan was done. These set each item's sets and reps (up when work is clean and medalled, down when form or range dips) and the weekly cap: total reps at most 10% over the last week with training.
+- **Likes and dislikes (vector store):** thumbs up/down per exercise, plus habits from the same history (done often, completed rather than skipped, clean form). They give each exercise a score and, folded together, one taste vector per user in the exercise-embedding space (`exercise_taste`). Liked exercises rank higher, and the taste vector pulls similar library exercises up. A disliked one is swapped for a safe exercise of the same kind when there is one. Preferences only re-rank exercises that already passed the safety check.
+- **Week and schedule:** a plan covers the current week from Monday in the user's time zone, on the days from their onboarding schedule, 3 to 5 exercises a day. Regenerating makes a new plan for the week, keeps the days already past, and leaves the old plan as history. Plans give sets and reps, not weights.
+- **Without the LLM:** with no `HF_TOKEN`, or if gpt-oss fails or is slow, a rule-based plan is built from the same history, preferences, search and safety check (`source: "rules"`).
+- **Rehab first:** while a rehab plan from a physio is active, `POST /plans/generate` returns 409. The physio's plan is the plan.
 
 ### 10.2 Advice questions
 

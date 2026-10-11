@@ -18,6 +18,7 @@ import type {
   ExportSession,
   JointFrame,
 } from "../../../../../specs/set-record/types.js";
+import type { Env } from "../../env.js";
 export type {
   JointFrame,
   Rep as FinishedRep,
@@ -33,27 +34,10 @@ export const VALUES_PER_JOINT = 3; // x, y, confidence
 
 export type ExportStatus = "pending" | "uploading" | "exported" | "failed";
 
+// Implemented by drizzleExportStatusStore (services/exportQueue.ts).
 export interface ExportStatusStore {
   claim?(sessionId: string): Promise<boolean>;
   set(sessionId: string, status: ExportStatus, error?: string): Promise<void>;
-}
-
-// Works with the tagged template from @neondatabase/serverless: neonExportStatusStore(neon(url)).
-// Expects these columns on sessions (DB-04):
-//   export_status text not null default 'pending', export_error text, exported_at timestamptz
-type SqlTag = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
-
-export function neonExportStatusStore(sql: SqlTag): ExportStatusStore {
-  return {
-    async set(sessionId, status, error) {
-      await sql`
-        UPDATE sessions
-        SET export_status = ${status},
-            export_error  = ${error ?? null},
-            exported_at   = CASE WHEN ${status} = 'exported' THEN now() ELSE exported_at END
-        WHERE id = ${sessionId}`;
-    },
-  };
 }
 
 // ---- Config ----
@@ -69,7 +53,18 @@ export interface UploadConfig {
   baseDelayMs: number;
 }
 
-export function uploadConfigFromEnv(env = process.env): UploadConfig {
+type UploadEnv = Pick<
+  Env,
+  | "DATABRICKS_HOST"
+  | "DATABRICKS_CLIENT_ID"
+  | "DATABRICKS_CLIENT_SECRET"
+  | "DATABRICKS_OAUTH_SCOPES"
+  | "DATABRICKS_VOLUME_PATH"
+  | "SPOTTER_PSEUDONYM_SECRET"
+>;
+
+/** From the validated env (src/env.ts); scripts can pass process.env. */
+export function uploadConfigFromEnv(env: UploadEnv = process.env): UploadConfig {
   const required = [
     "DATABRICKS_HOST",
     "DATABRICKS_CLIENT_ID",

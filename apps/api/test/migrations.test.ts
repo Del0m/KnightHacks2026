@@ -18,13 +18,13 @@ afterAll(() => close());
 const unit = (i: number) => Array.from({ length: 384 }, (_, j) => (j === i ? 1 : 0));
 
 describe("migrations", () => {
-  it.each([7, 8])(
+  it.each([7, 8, 9, 10])(
     "upgrades data after %i migrations, including on_device defaults and legacy aggregates",
     async (appliedCount) => {
       const client = new PGlite({ extensions: { vector } });
       try {
         const migrations = readMigrationFiles({ migrationsFolder });
-        expect(migrations).toHaveLength(9);
+        expect(migrations).toHaveLength(11);
         for (const migration of migrations.slice(0, appliedCount)) {
           await client.exec(`BEGIN;\n${migration.sql.join("\n")}\nCOMMIT;`);
         }

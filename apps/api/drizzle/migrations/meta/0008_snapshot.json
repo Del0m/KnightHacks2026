@@ -1,5 +1,5 @@
 {
-  "id": "3ef3a55b-4c12-496b-a872-8e9636bbf838",
+  "id": "861fff46-ba7e-44ad-b74f-e5ec653a0f9f",
   "prevId": "6e26155e-406b-4a40-afe3-3b6879a314a1",
   "version": "7",
   "dialect": "postgresql",
@@ -449,18 +449,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "lowering_ms": {
-          "name": "lowering_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rising_ms": {
-          "name": "rising_ms",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "tempo_ms": {
           "name": "tempo_ms",
           "type": "integer",
@@ -558,7 +546,8 @@
           "type": "inference_mode",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'on_device'"
         },
         "medal": {
           "name": "medal",
@@ -689,18 +678,6 @@
         "weight_kg": {
           "name": "weight_kg",
           "type": "real",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "end_reason": {
-          "name": "end_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "partial_reps": {
-          "name": "partial_reps",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -1513,6 +1490,128 @@
           ]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.moderation_blocks": {
+      "name": "moderation_blocks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "moderated_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "post_id": {
+          "name": "post_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "categories": {
+          "name": "categories",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "moderation_blocks_author_created_idx": {
+          "name": "moderation_blocks_author_created_idx",
+          "columns": [
+            {
+              "expression": "author_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "moderation_blocks_post_idx": {
+          "name": "moderation_blocks_post_idx",
+          "columns": [
+            {
+              "expression": "post_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "moderation_blocks_author_id_users_id_fk": {
+          "name": "moderation_blocks_author_id_users_id_fk",
+          "tableFrom": "moderation_blocks",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "moderation_blocks_post_id_posts_id_fk": {
+          "name": "moderation_blocks_post_id_posts_id_fk",
+          "tableFrom": "moderation_blocks",
+          "tableTo": "posts",
+          "columnsFrom": [
+            "post_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -2853,8 +2952,7 @@
       "name": "inference_mode",
       "schema": "public",
       "values": [
-        "coreml",
-        "vision",
+        "on_device",
         "cloud"
       ]
     },
@@ -2874,6 +2972,14 @@
         "requested",
         "accepted",
         "declined"
+      ]
+    },
+    "public.moderated_kind": {
+      "name": "moderated_kind",
+      "schema": "public",
+      "values": [
+        "post",
+        "comment"
       ]
     },
     "public.post_kind": {

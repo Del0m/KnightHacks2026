@@ -50,6 +50,17 @@ Before judging, set `DATABASE_URL` and `DEMO_DATABASE_URL` to `demo` and run `np
 - A plan's limits apply from its `start_on`: before that, `GET /me/limits` returns the plan with `started: false` and empty `limits`, and the Databricks export leaves `rehab_start_on` empty.
 - Every response with plan data carries the fixed disclaimer. There's no public read path.
 
+## Planner (AI-12, BE-08)
+
+Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check), `planHistory.ts` (six weeks of history), `preferences.ts` (likes, dislikes, taste vector). Architecture §10.1 has the why.
+
+- `POST /plans/generate?tz=` makes this week's plan (201) and `GET /plans/current?tz=` returns it (404 before there is one). `tz` decides which Monday starts the week and which days have passed.
+- Errors: 409 `rehab_plan_active` while a rehab plan is active; 422 `no_training_days` when none are left this week; 503 `no_exercises` when neither specs nor the library are loaded.
+- Each item has `exercise { id, name, tracked }`, `sets`, `reps`, `reason`, `swap_note`, `safety_note`, `sources` (chunk ids and titles) and the user's `rating`. The plan has `source` (`llm` or `rules`), `notes` (physio, volume cap, left-out exercises) and `history` (the six-week summary it used).
+- `PUT /me/exercise-preferences/:exerciseId` with `{ "rating": "like" | "dislike" | "neutral" }` works for tracked ids (`squat`) and library ids (`Dumbbell_Lunges`); `neutral` clears it.
+- Needs `npm run db:load-specs` for the tracked exercises. `rag:ingest` (CONN-08) adds the library and injury notes; without it plans use the five tracked exercises only. Without `HF_TOKEN` every plan is a rules plan.
+- A new spec in `specs/exercises` also needs an entry in `TRACKED` in `planner.ts` (movement pattern, joints it loads, library twin) before the planner uses it.
+
 ## Conventions
 
 - JSON is **snake_case** on the wire, matching the shared set record (AI-08) and the Databricks payloads. TypeScript and Drizzle use camelCase; `send()` in `src/http.ts` converts responses.
@@ -68,6 +79,7 @@ Before judging, set `DATABASE_URL` and `DEMO_DATABASE_URL` to `demo` and run `np
 | `POST /posts`, `GET/POST /posts/:id/comments`, `POST/DELETE /posts/:id/kudos`, `POST/DELETE /follows/:userId`                                                                                                   | BE-10        |
 | `GET /buddies/suggestions`, `GET /buddies`, `POST /buddies/:id/request`, `POST /buddies/:id/accept`, `POST /buddies/:id/decline`                                                                                | BE-12        |
 | `GET /me/progress?days=`, `GET /me/insights`                                                                                                                                                                    | BE-13        |
+| `POST /plans/generate?tz=`, `GET /plans/current?tz=`, `GET /me/exercise-preferences`, `PUT /me/exercise-preferences/:exerciseId`                                                                                | BE-08        |
 | `GET/POST /me/rehab-plans`, `GET/PUT/DELETE /me/rehab-plans/:id`, `POST /me/rehab-plans/:id/limits`, `PUT/DELETE /me/rehab-plans/:id/limits/:limitId`, `GET /me/rehab-plans/active/today?tz=`, `GET /me/limits` | BE-15        |
 
 ## How the CONN pieces are wired
@@ -80,6 +92,7 @@ Each one switches on when its env vars are set; without them the API still runs.
 | CONN-06 insight sync       | The above plus `DATABRICKS_WAREHOUSE_ID`                                      | Every 15 min, gold tables are upserted into `progress_daily` and `risk_insights` (`/me/insights`). Run it on one API instance only |
 | CONN-09 moderation         | `HF_TOKEN`                                                                    | Llama Guard checks posts and comments; blocked content returns 422 with a friendly message                                         |
 | CONN-08 RAG ingest         | `HF_TOKEN` (run `npm run rag:ingest` in `rag/`)                               | Writes `doc_chunks`; needs migration `0001` on the branch first                                                                    |
+| AI-12 planner              | `HF_TOKEN`                                                                    | gpt-oss drafts plans and bge-small embeds the search; without it, plans come from the rules planner                                |
 | CONN-05 set scoring        | Not wired yet (BE-07)                                                         | The phone can send `medal`, `clean_share`, `score_source` and per-rep `clean` on each set                                          |
 | CONN-08 profile embeddings | Not written yet                                                               | When `profiles.embedding` is set, buddy matching ranks by it automatically                                                         |
 
