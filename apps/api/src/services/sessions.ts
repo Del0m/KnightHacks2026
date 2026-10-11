@@ -5,6 +5,7 @@ import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { conflict, isUniqueViolation, notFound } from "../http.js";
 import type { Logger } from "pino";
+import type { SetEndReason, Severity } from "../../../../specs/set-record/types.js";
 import { injuryGroup } from "../integrations/databricks/upload.js";
 import type { RestTimeDeps } from "./restTime.js";
 import type { BufferedSetJoints, ExportQueue, ExportSession, JointsBuffer } from "./exportQueue.js";
@@ -24,22 +25,22 @@ const { sessions, sets, reps, formFlags, medals, personalRecords, profiles, inju
   schema;
 
 export interface NewSet {
-  setIndex?: number;
+  setIndex: number;
   exerciseId: string;
   weightKg: number | null;
-  medal?: MedalTier | null;
-  cleanShare?: number | null;
-  scoreSource?: "databricks" | "phone" | null;
-  fps?: number;
+  endReason: SetEndReason;
+  partialReps: number;
+  fps: number | null;
   frames?: { t_ms: number; kp: number[] }[];
   reps: {
     tempoMs: number;
     rangeDeg: number;
     quality?: number | null;
-    clean?: boolean;
     startMs?: number | null;
     endMs?: number | null;
-    flags: { ruleId: string; severity?: string }[];
+    loweringMs?: number | null;
+    risingMs?: number | null;
+    flags: { ruleId: string; severity: Severity }[];
   }[];
 }
 
@@ -66,11 +67,10 @@ async function ownSession(db: Db, userId: string, sessionId: string) {
 }
 
 export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessionId: string, input: NewSet) {
-  let position = input.setIndex;
+  const position = input.setIndex;
   try {
     const result = await db.transaction(async (tx) => {
-      // Lock the session row. Concurrent sets for the same session then take turns, so they can't
-      // pick the same position, and none can land after finishSession (which takes the same lock)
+      // Lock the session row so no set can land after finishSession (which takes the same lock)
       // has computed the medal.
       const [session] = await tx
         .select({ finishedAt: sessions.finishedAt })
@@ -81,14 +81,6 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
       if (!session) throw notFound("Session");
       if (session.finishedAt) throw conflict("This session is already finished");
 
-      // After the highest position, not count(*): explicit set_index values can leave gaps.
-      position ??= (
-        await tx
-          .select({ next: sql<number>`coalesce(max(${sets.position}) + 1, 0)::int` })
-          .from(sets)
-          .where(eq(sets.sessionId, sessionId))
-      )[0]!.next;
-
       const repRows = input.reps.map((r, i) => ({
         position: i,
         tempoMs: Math.round(r.tempoMs),
@@ -98,6 +90,8 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
         clean: r.flags.length === 0,
         startMs: r.startMs ?? null,
         endMs: r.endMs ?? null,
+        loweringMs: r.loweringMs ?? null,
+        risingMs: r.risingMs ?? null,
       }));
       const cleanCount = repRows.filter((r) => r.clean).length;
 
@@ -109,9 +103,9 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
           exerciseId: input.exerciseId,
           reps: repRows.length,
           weightKg: input.weightKg,
-          medal: input.medal ?? null,
+          endReason: input.endReason,
+          partialReps: input.partialReps,
           cleanShare: repRows.length ? cleanCount / repRows.length : null, // INT-06: from the flags
-          scoreSource: input.scoreSource ?? null,
         })
         .returning();
 
@@ -124,7 +118,7 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
           input.reps[rep.position]!.flags.map((f) => ({
             repId: rep.id,
             ruleId: f.ruleId,
-            severity: f.severity ?? "info",
+            severity: f.severity,
           })),
         );
         if (flagRows.length) await tx.insert(formFlags).values(flagRows);
@@ -133,11 +127,11 @@ export async function addSet(db: Db, joints: JointsBuffer, userId: string, sessi
     });
 
     if (input.frames?.length) {
-      joints.put(sessionId, result.position, { fps: input.fps ?? 0, frames: input.frames });
+      joints.put(sessionId, result.position, { fps: input.fps, frames: input.frames });
     }
     return result;
   } catch (err) {
-    // Only an explicit set_index can collide now; auto positions are assigned under the lock.
+    // The phone supplies set_index; duplicate positions cannot overwrite an existing set.
     if (isUniqueViolation(err)) throw conflict(`Set ${position} was already recorded for this session`);
     throw err;
   }
@@ -377,27 +371,37 @@ export async function buildExportSession(
         ? activePlan.startOn
         : null,
     sets: setRows.map((s) => ({
+      set_index: s.position,
       exercise_id: s.exerciseId,
       weight_kg: s.weightKg,
       medal: s.medal,
-      fps: frames.get(s.position)?.fps ?? 0,
+      end_reason: s.endReason,
+      partial_reps: s.partialReps,
+      fps: frames.get(s.position)?.frames.length ? frames.get(s.position)!.fps : null,
       frames: frames.get(s.position)?.frames ?? [],
       reps: repRows
         .filter((r) => r.setId === s.id)
         .map((r) => ({
+          rep_index: r.position,
           start_ms: r.startMs ?? null, // unknown, not 0: 0..0 would fail the pipeline's bounds check
           end_ms: r.endMs ?? null,
           tempo_ms: r.tempoMs,
           range_deg: r.rangeDeg,
-          quality: flagRows.some((f) => f.repId === r.id && f.ruleId === "manual_unscored")
-            ? null
-            : (r.quality ?? (r.clean ? 1 : 0)),
+          quality: r.quality,
+          lowering_ms: r.loweringMs,
+          rising_ms: r.risingMs,
           flags: flagRows
             .filter((f) => f.repId === r.id)
-            .map((f) => ({ rule_id: f.ruleId, severity: f.severity })),
+            .map((f) => ({ rule_id: f.ruleId, severity: exportSeverity(f.severity), rep_index: r.position })),
         })),
     })),
   };
+}
+
+// Migration 0010 rewrites legacy severities to form; this covers rows written by an older API
+// after that, so one odd value never blocks finishing a session.
+function exportSeverity(severity: string): Severity {
+  return severity === "safety" ? "safety" : "form";
 }
 
 // Feed copy follows §7: describe what happened, good news first, never "bad" or "wrong".

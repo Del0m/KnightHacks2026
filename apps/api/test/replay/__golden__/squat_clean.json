@@ -79,74 +79,99 @@
     ]
   },
   "set_payload": {
+    "schema_version": 1,
+    "set_index": 0,
     "exercise_id": "squat",
     "weight_kg": null,
+    "end_reason": "still",
+    "partial_reps": 0,
     "fps": 15,
     "frames": {
-      "count": 398,
-      "sha256": "9942dacd341743a2"
+      "count": 361,
+      "sha256": "b96fd93d0360d9f9"
     },
     "reps": [
       {
+        "rep_index": 0,
+        "start_ms": 1000,
+        "end_ms": 2800,
         "tempo_ms": 1800,
-        "range_deg": 83.5,
+        "range_deg": 78.9,
         "quality": null,
-        "start_ms": 1867,
-        "end_ms": 4067,
+        "lowering_ms": 800,
+        "rising_ms": 1000,
         "flags": []
       },
       {
+        "rep_index": 1,
+        "start_ms": 3666,
+        "end_ms": 5466,
         "tempo_ms": 1800,
-        "range_deg": 79.6,
+        "range_deg": 75.4,
         "quality": null,
-        "start_ms": 4533,
-        "end_ms": 6733,
+        "lowering_ms": 800,
+        "rising_ms": 1000,
         "flags": []
       },
       {
+        "rep_index": 2,
+        "start_ms": 6333,
+        "end_ms": 8066,
         "tempo_ms": 1733,
-        "range_deg": 86.6,
+        "range_deg": 80.5,
         "quality": null,
-        "start_ms": 7200,
-        "end_ms": 9400,
+        "lowering_ms": 733,
+        "rising_ms": 1000,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 2
           }
         ]
       },
       {
+        "rep_index": 3,
+        "start_ms": 8933,
+        "end_ms": 10733,
         "tempo_ms": 1800,
-        "range_deg": 81.8,
+        "range_deg": 76.2,
         "quality": null,
-        "start_ms": 9800,
-        "end_ms": 11933,
+        "lowering_ms": 800,
+        "rising_ms": 1000,
         "flags": []
       },
       {
+        "rep_index": 4,
+        "start_ms": 11600,
+        "end_ms": 13400,
         "tempo_ms": 1800,
-        "range_deg": 77,
+        "range_deg": 73.1,
         "quality": null,
-        "start_ms": 12467,
-        "end_ms": 14667,
+        "lowering_ms": 733,
+        "rising_ms": 1067,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 4
           }
         ]
       },
       {
+        "rep_index": 5,
+        "start_ms": 14266,
+        "end_ms": 16066,
         "tempo_ms": 1800,
-        "range_deg": 84.2,
+        "range_deg": 80.5,
         "quality": null,
-        "start_ms": 15133,
-        "end_ms": 17267,
+        "lowering_ms": 734,
+        "rising_ms": 1066,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 5
           }
         ]
       }
@@ -160,6 +185,8 @@
       "exercise_id": "squat",
       "reps": 6,
       "weight_kg": null,
+      "end_reason": "still",
+      "partial_reps": 0,
       "medal": "bronze",
       "clean_share": 0.5,
       "score_source": "databricks",
@@ -235,7 +262,7 @@
         "startedAt": "2026-10-10T15:00:00.000Z",
         "finishedAt": "2026-10-10T15:05:00.000Z",
         "device": "replay",
-        "inferenceMode": "on_device",
+        "inferenceMode": "coreml",
         "medal": "bronze",
         "formScore": 0.5,
         "exportStatus": "exported",
@@ -252,6 +279,8 @@
           "exerciseId": "squat",
           "reps": 6,
           "weightKg": null,
+          "endReason": "still",
+          "partialReps": 0,
           "medal": "bronze",
           "cleanShare": 0.5,
           "scoreSource": "databricks",
@@ -305,10 +334,12 @@
           "id": "<id 3>",
           "setId": "<id 1>",
           "position": 0,
-          "startMs": 1867,
-          "endMs": 4067,
+          "startMs": 1000,
+          "endMs": 2800,
+          "loweringMs": 800,
+          "risingMs": 1000,
           "tempoMs": 1800,
-          "rangeDeg": 83.5,
+          "rangeDeg": 78.9,
           "quality": null,
           "clean": true
         },
@@ -316,10 +347,12 @@
           "id": "<id 4>",
           "setId": "<id 1>",
           "position": 1,
-          "startMs": 4533,
-          "endMs": 6733,
+          "startMs": 3666,
+          "endMs": 5466,
+          "loweringMs": 800,
+          "risingMs": 1000,
           "tempoMs": 1800,
-          "rangeDeg": 79.6,
+          "rangeDeg": 75.4,
           "quality": null,
           "clean": true
         },
@@ -327,10 +360,12 @@
           "id": "<id 5>",
           "setId": "<id 1>",
           "position": 2,
-          "startMs": 7200,
-          "endMs": 9400,
+          "startMs": 6333,
+          "endMs": 8066,
+          "loweringMs": 733,
+          "risingMs": 1000,
           "tempoMs": 1733,
-          "rangeDeg": 86.6,
+          "rangeDeg": 80.5,
           "quality": null,
           "clean": false
         },
@@ -338,10 +373,12 @@
           "id": "<id 6>",
           "setId": "<id 1>",
           "position": 3,
-          "startMs": 9800,
-          "endMs": 11933,
+          "startMs": 8933,
+          "endMs": 10733,
+          "loweringMs": 800,
+          "risingMs": 1000,
           "tempoMs": 1800,
-          "rangeDeg": 81.8,
+          "rangeDeg": 76.2,
           "quality": null,
           "clean": true
         },
@@ -349,10 +386,12 @@
           "id": "<id 7>",
           "setId": "<id 1>",
           "position": 4,
-          "startMs": 12467,
-          "endMs": 14667,
+          "startMs": 11600,
+          "endMs": 13400,
+          "loweringMs": 733,
+          "risingMs": 1067,
           "tempoMs": 1800,
-          "rangeDeg": 77,
+          "rangeDeg": 73.1,
           "quality": null,
           "clean": false
         },
@@ -360,10 +399,12 @@
           "id": "<id 8>",
           "setId": "<id 1>",
           "position": 5,
-          "startMs": 15133,
-          "endMs": 17267,
+          "startMs": 14266,
+          "endMs": 16066,
+          "loweringMs": 734,
+          "risingMs": 1066,
           "tempoMs": 1800,
-          "rangeDeg": 84.2,
+          "rangeDeg": 80.5,
           "quality": null,
           "clean": false
         }
@@ -411,10 +452,10 @@
             "set_index": 0,
             "exercise_id": "squat",
             "fps": 15,
-            "frame_count": 398,
+            "frame_count": 361,
             "first_t_ms": 0,
-            "last_t_ms": 26467,
-            "frames_sha256": "9942dacd341743a2"
+            "last_t_ms": 24000,
+            "frames_sha256": "b96fd93d0360d9f9"
           }
         ]
       },
@@ -427,7 +468,7 @@
           "started_at": "2026-10-10T15:00:00.000Z",
           "finished_at": "2026-10-10T15:05:00.000Z",
           "device": "replay",
-          "inference_mode": "on_device",
+          "inference_mode": "coreml",
           "medal": "bronze",
           "form_score": 0.5,
           "experience_level": "beginner",
@@ -441,74 +482,91 @@
               "exercise_id": "squat",
               "weight_kg": null,
               "medal": "bronze",
-              "frame_count": 398,
+              "end_reason": "still",
+              "partial_reps": 0,
+              "frame_count": 361,
               "reps": [
                 {
                   "rep_index": 0,
-                  "start_ms": 1867,
-                  "end_ms": 4067,
+                  "start_ms": 1000,
+                  "end_ms": 2800,
                   "tempo_ms": 1800,
-                  "range_deg": 83.5,
-                  "quality": 1,
+                  "range_deg": 78.9,
+                  "quality": null,
+                  "lowering_ms": 800,
+                  "rising_ms": 1000,
                   "flags": []
                 },
                 {
                   "rep_index": 1,
-                  "start_ms": 4533,
-                  "end_ms": 6733,
+                  "start_ms": 3666,
+                  "end_ms": 5466,
                   "tempo_ms": 1800,
-                  "range_deg": 79.6,
-                  "quality": 1,
+                  "range_deg": 75.4,
+                  "quality": null,
+                  "lowering_ms": 800,
+                  "rising_ms": 1000,
                   "flags": []
                 },
                 {
                   "rep_index": 2,
-                  "start_ms": 7200,
-                  "end_ms": 9400,
+                  "start_ms": 6333,
+                  "end_ms": 8066,
                   "tempo_ms": 1733,
-                  "range_deg": 86.6,
-                  "quality": 0,
+                  "range_deg": 80.5,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 1000,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 2
                     }
                   ]
                 },
                 {
                   "rep_index": 3,
-                  "start_ms": 9800,
-                  "end_ms": 11933,
+                  "start_ms": 8933,
+                  "end_ms": 10733,
                   "tempo_ms": 1800,
-                  "range_deg": 81.8,
-                  "quality": 1,
+                  "range_deg": 76.2,
+                  "quality": null,
+                  "lowering_ms": 800,
+                  "rising_ms": 1000,
                   "flags": []
                 },
                 {
                   "rep_index": 4,
-                  "start_ms": 12467,
-                  "end_ms": 14667,
+                  "start_ms": 11600,
+                  "end_ms": 13400,
                   "tempo_ms": 1800,
-                  "range_deg": 77,
-                  "quality": 0,
+                  "range_deg": 73.1,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 1067,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 4
                     }
                   ]
                 },
                 {
                   "rep_index": 5,
-                  "start_ms": 15133,
-                  "end_ms": 17267,
+                  "start_ms": 14266,
+                  "end_ms": 16066,
                   "tempo_ms": 1800,
-                  "range_deg": 84.2,
-                  "quality": 0,
+                  "range_deg": 80.5,
+                  "quality": null,
+                  "lowering_ms": 734,
+                  "rising_ms": 1066,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 5
                     }
                   ]
                 }

@@ -14,10 +14,10 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import type { SetEndReason } from "../../../../specs/set-record/types.js";
 
 export const medalTier = pgEnum("medal_tier", ["bronze", "silver", "gold"]);
-// Matches FinishedSession.inference_mode in src/integrations/databricks/upload.ts.
-export const inferenceMode = pgEnum("inference_mode", ["on_device", "cloud"]);
+export const inferenceMode = pgEnum("inference_mode", ["coreml", "vision", "cloud"]);
 // Matches ExportStatus in src/integrations/databricks/upload.ts.
 export const exportStatus = pgEnum("export_status", ["pending", "uploading", "exported", "failed"]);
 
@@ -31,7 +31,7 @@ export const sessions = pgTable(
     startedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp({ withTimezone: true }),
     device: text(),
-    inferenceMode: inferenceMode().notNull().default("on_device"),
+    inferenceMode: inferenceMode().notNull(),
     medal: medalTier(),
     formScore: real(), // clean reps / total reps, set on finish
     exportStatus: exportStatus().notNull().default("pending"),
@@ -55,6 +55,8 @@ export const sets = pgTable(
     exerciseId: text().notNull(),
     reps: integer().notNull(),
     weightKg: real(),
+    endReason: text().$type<SetEndReason>(),
+    partialReps: integer(),
     medal: medalTier(),
     cleanShare: real(),
     scoreSource: text(), // "databricks" | "phone" (CONN-05)
@@ -79,6 +81,8 @@ export const reps = pgTable(
     position: integer().notNull(),
     startMs: integer(),
     endMs: integer(),
+    loweringMs: integer(),
+    risingMs: integer(),
     tempoMs: integer().notNull(),
     rangeDeg: real().notNull(),
     quality: real(),

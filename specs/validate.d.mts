@@ -12,3 +12,6 @@ export function loadBanned(): BannedPhrases;
 
 /** Problems with a note's phrasing, or [] if it reads as a description rather than a command. */
 export function checkNote(text: string, banned: BannedPhrases, options?: { placeholders?: string[] }): string[];
+
+/** Returns "path: problem" strings for `value` against a JSON Schema (the subset validate.mjs supports); [] when it matches. */
+export function validateSchema(value: unknown, schema: object, root?: object, path?: string): string[];

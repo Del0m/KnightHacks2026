@@ -151,14 +151,16 @@ def generate(user_ids: list[str], weeks: int, secret: str, recovery: dict, now: 
                             "rep_index": rep_index, "start_ms": t, "end_ms": t + duration,
                             "tempo_ms": duration, "range_deg": round(min(ranges.values()), 1),
                             "quality": round(0.55 if flagged else rng.uniform(0.8, 0.98), 2),
-                            "flags": [{"rule_id": "depth", "severity": "form"}] if flagged else [],
+                            "lowering_ms": None, "rising_ms": None,
+                            "flags": [{"rule_id": "depth", "severity": "form", "rep_index": rep_index}] if flagged else [],
                         })
                         t += duration + 600
                     lo, hi = spec["kg"]
                     sets_meta.append({
                         "set_index": set_index, "exercise_id": exercise,
                         "weight_kg": round(lo + (hi - lo) * (0.4 + 0.1 * week), 1) if hi else None,
-                        "medal": None, "frame_count": len(frames), "reps": reps,
+                        "medal": None, "end_reason": None, "partial_reps": None,
+                        "frame_count": len(frames), "reps": reps,
                     })
                     joints_lines.append(json.dumps({"session_id": session_id, "set_index": set_index,
                                                      "exercise_id": exercise, "fps": FPS, "frames": frames}))
@@ -166,7 +168,7 @@ def generate(user_ids: list[str], weeks: int, secret: str, recovery: dict, now: 
                 meta = {
                     "schema_version": SCHEMA_VERSION, "session_id": session_id, "user_id": pseudonym,
                     "started_at": day.isoformat(), "finished_at": (day + timedelta(minutes=35)).isoformat(),
-                    "device": "synthetic", "inference_mode": "on_device", "medal": None, "form_score": None,
+                    "device": "synthetic", "inference_mode": "coreml", "medal": None, "form_score": None,
                     "experience_level": level,
                     "injury_groups": [f"{injury[0]}:{injury[1]}"] if injury else [],
                     "rehab_start_on": start.date().isoformat() if injury else None,
