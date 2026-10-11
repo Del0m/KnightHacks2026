@@ -17,6 +17,7 @@ namespace margelo::nitro::steadyforumpose {
       prototype.registerHybridMethod("createPoseDetector", &HybridPoseDetectorFactorySpec::createPoseDetector);
       prototype.registerHybridMethod("createBasicPoseDetector", &HybridPoseDetectorFactorySpec::createBasicPoseDetector);
       prototype.registerHybridMethod("poseModelId", &HybridPoseDetectorFactorySpec::poseModelId);
+      prototype.registerHybridMethod("createCloudFrameEncoder", &HybridPoseDetectorFactorySpec::createCloudFrameEncoder);
       prototype.registerHybridMethod("benchmarkPoseModel", &HybridPoseDetectorFactorySpec::benchmarkPoseModel);
     });
   }

@@ -8,10 +8,14 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `CloudFrame` to properly resolve imports.
+namespace margelo::nitro::steadyforumpose { struct CloudFrame; }
 // Forward declaration of `HybridCameraFrameOutputSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridCameraFrameOutputSpec; }
 // Forward declaration of `HybridCameraOutputSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridCameraOutputSpec; }
+// Forward declaration of `HybridCloudFrameEncoderSpec` to properly resolve imports.
+namespace margelo::nitro::steadyforumpose { class HybridCloudFrameEncoderSpec; }
 // Forward declaration of `HybridFrameSpec` to properly resolve imports.
 namespace margelo::nitro::camera { class HybridFrameSpec; }
 // Forward declaration of `HybridPoseDetectorFactorySpec` to properly resolve imports.
@@ -32,6 +36,8 @@ namespace margelo::nitro::steadyforumpose { struct PoseResult; }
 namespace VisionCamera { class HybridCameraFrameOutputSpec_cxx; }
 // Forward declaration of `HybridCameraOutputSpec_cxx` to properly resolve imports.
 namespace VisionCamera { class HybridCameraOutputSpec_cxx; }
+// Forward declaration of `HybridCloudFrameEncoderSpec_cxx` to properly resolve imports.
+namespace SteadyForumPose { class HybridCloudFrameEncoderSpec_cxx; }
 // Forward declaration of `HybridFrameSpec_cxx` to properly resolve imports.
 namespace VisionCamera { class HybridFrameSpec_cxx; }
 // Forward declaration of `HybridPoseDetectorFactorySpec_cxx` to properly resolve imports.
@@ -40,6 +46,8 @@ namespace SteadyForumPose { class HybridPoseDetectorFactorySpec_cxx; }
 namespace SteadyForumPose { class HybridPoseDetectorSpec_cxx; }
 
 // Include C++ defined types
+#include "CloudFrame.hpp"
+#include "HybridCloudFrameEncoderSpec.hpp"
 #include "HybridPoseDetectorFactorySpec.hpp"
 #include "HybridPoseDetectorSpec.hpp"
 #include "Joint.hpp"
@@ -118,6 +126,21 @@ namespace margelo::nitro::steadyforumpose::bridge::swift {
     return optional.value();
   }
   
+  // pragma MARK: std::optional<double>
+  /**
+   * Specialized version of `std::optional<double>`.
+   */
+  using std__optional_double_ = std::optional<double>;
+  inline std::optional<double> create_std__optional_double_(const double& value) noexcept {
+    return std::optional<double>(value);
+  }
+  inline bool has_value_std__optional_double_(const std::optional<double>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline double get_std__optional_double_(const std::optional<double>& optional) noexcept {
+    return optional.value();
+  }
+  
   // pragma MARK: std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>
   /**
    * Specialized version of `std::shared_ptr<margelo::nitro::camera::HybridFrameSpec>`.
@@ -158,6 +181,27 @@ namespace margelo::nitro::steadyforumpose::bridge::swift {
   }
   inline Result_PoseDetection_ create_Result_PoseDetection_(const std::exception_ptr& error) noexcept {
     return Result<PoseDetection>::withError(error);
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridCloudFrameEncoderSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridCloudFrameEncoderSpec>`.
+   */
+  using std__shared_ptr_HybridCloudFrameEncoderSpec_ = std::shared_ptr<HybridCloudFrameEncoderSpec>;
+  std::shared_ptr<HybridCloudFrameEncoderSpec> create_std__shared_ptr_HybridCloudFrameEncoderSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridCloudFrameEncoderSpec_(std__shared_ptr_HybridCloudFrameEncoderSpec_ cppType);
+  
+  // pragma MARK: std::weak_ptr<HybridCloudFrameEncoderSpec>
+  using std__weak_ptr_HybridCloudFrameEncoderSpec_ = std::weak_ptr<HybridCloudFrameEncoderSpec>;
+  inline std__weak_ptr_HybridCloudFrameEncoderSpec_ weakify_std__shared_ptr_HybridCloudFrameEncoderSpec_(const std::shared_ptr<HybridCloudFrameEncoderSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: Result<CloudFrame>
+  using Result_CloudFrame_ = Result<CloudFrame>;
+  inline Result_CloudFrame_ create_Result_CloudFrame_(const CloudFrame& value) noexcept {
+    return Result<CloudFrame>::withValue(value);
+  }
+  inline Result_CloudFrame_ create_Result_CloudFrame_(const std::exception_ptr& error) noexcept {
+    return Result<CloudFrame>::withError(error);
   }
   
   // pragma MARK: std::shared_ptr<Promise<PoseBenchmark>>
@@ -244,6 +288,15 @@ namespace margelo::nitro::steadyforumpose::bridge::swift {
   }
   inline Result_std__string_ create_Result_std__string_(const std::exception_ptr& error) noexcept {
     return Result<std::string>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<HybridCloudFrameEncoderSpec>>
+  using Result_std__shared_ptr_HybridCloudFrameEncoderSpec__ = Result<std::shared_ptr<HybridCloudFrameEncoderSpec>>;
+  inline Result_std__shared_ptr_HybridCloudFrameEncoderSpec__ create_Result_std__shared_ptr_HybridCloudFrameEncoderSpec__(const std::shared_ptr<HybridCloudFrameEncoderSpec>& value) noexcept {
+    return Result<std::shared_ptr<HybridCloudFrameEncoderSpec>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_HybridCloudFrameEncoderSpec__ create_Result_std__shared_ptr_HybridCloudFrameEncoderSpec__(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<HybridCloudFrameEncoderSpec>>::withError(error);
   }
   
   // pragma MARK: Result<std::shared_ptr<Promise<PoseBenchmark>>>

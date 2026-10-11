@@ -1,5 +1,5 @@
 import { NitroModules } from 'react-native-nitro-modules'
-import type { PoseBenchmark, PoseDetector, PoseDetectorFactory } from './specs/PoseDetector.nitro'
+import type { CloudFrameEncoder, PoseBenchmark, PoseDetector, PoseDetectorFactory } from './specs/PoseDetector.nitro'
 
 let factory: PoseDetectorFactory | undefined
 
@@ -18,6 +18,12 @@ export function createBasicPoseDetector(): PoseDetector {
   return factory.createBasicPoseDetector()
 }
 
+/** Creates the encoder that turns camera frames into upright JPEGs for the cloud pose relay (iPhone only). */
+export function createCloudFrameEncoder(): CloudFrameEncoder {
+  factory ??= NitroModules.createHybridObject<PoseDetectorFactory>('PoseDetectorFactory')
+  return factory.createCloudFrameEncoder()
+}
+
 /** Fingerprint of the bundled YOLOv8 models; changes when a model is re-exported or replaced. */
 export function getPoseModelId(): string {
   factory ??= NitroModules.createHybridObject<PoseDetectorFactory>('PoseDetectorFactory')
@@ -33,4 +39,6 @@ export function benchmarkPoseModel(size: number, warmUpMs: number, measureMs: nu
   return factory.benchmarkPoseModel(size, warmUpMs, measureMs)
 }
 
-export type { PoseBenchmark, PoseDetector, PoseDetection, PoseResult, Joint } from './specs/PoseDetector.nitro'
+export type {
+  CloudFrame, CloudFrameEncoder, PoseBenchmark, PoseDetector, PoseDetection, PoseResult, Joint,
+} from './specs/PoseDetector.nitro'
