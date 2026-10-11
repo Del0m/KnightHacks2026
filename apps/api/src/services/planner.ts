@@ -31,6 +31,7 @@ import {
   type ExerciseHistory,
   type History,
 } from "./planHistory.js";
+import { ADVICE_DISCLAIMER } from "./advice.js";
 import { loadRatings, normalize, preferences, rebuildTaste, type Preference } from "./preferences.js";
 import { activePlan } from "./rehab.js";
 import type { LogLike } from "./restNote.js";
@@ -1038,6 +1039,8 @@ async function chunkTitles(db: Db, ids: string[]): Promise<Map<string, string>> 
 
 function planNotes(ctx: Context, items: DraftItem[], capped: boolean): string[] {
   const notes: string[] = [];
+  // Anything built from the injury notes carries the consult-a-doctor disclaimer (Architecture §13).
+  if (items.some((i) => i.sources.some((id) => id.startsWith("injury_note:")))) notes.push(ADVICE_DISCLAIMER);
   const parts = [...new Set(ctx.injuries.map((i) => i.bodyPart).filter((p) => p !== "other"))];
   if (parts.length) {
     notes.push(
