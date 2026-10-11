@@ -23,3 +23,7 @@ Foreground session refresh also preserves an already server-confirmed account du
 References: [Better Auth Expo integration](https://better-auth.com/docs/integrations/expo) and installed `@better-auth/expo` client implementation. The hosted service's treatment of `expo-origin` was established by the live probe rather than assumed from the integration guide's self-hosted server example.
 
 The final realm-separation Release was installed on the connected iPhone. The owner cannot currently inspect Render environment settings; the expected JWKS URL is assumed as requested, not independently verified. Public key endpoint validation is confirmed, but live account API acceptance still needs the phone test/server configuration check. No server authorization was bypassed.
+
+## Confirmed hosted JWKS value
+
+The owner supplied a screenshot showing `NEON_AUTH_JWKS_URL` set to the Neon auth base ending `/neondb/auth/`. A public unauthenticated check returned 404 for that exact URL. The correct endpoint, ending `/neondb/auth/.well-known/jwks.json`, returned 200 with one signing key. Render must use the full signing-key URL and redeploy. This is a server configuration change; changing the phone's auth base URL would be incorrect. The hosted deployment has not yet been reconfigured or verified with a real account token.

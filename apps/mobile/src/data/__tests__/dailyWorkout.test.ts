@@ -4,8 +4,11 @@ import { readPrescription } from '@/screens/Planner/plan';
 test('a daily routine is stable, full body, and supported by camera tracking', () => {
  const routine = dailyWorkout('2026-10-11');
  expect(dailyWorkout('2026-10-11')).toEqual(routine);
- expect(routine.map(e => e.id).sort()).toEqual(['curl', 'lunge', 'press', 'push_up', 'squat']);
- expect(readPrescription(routine)).toHaveLength(5);
+ expect(routine).toHaveLength(3);
+ expect(new Set(routine.map(e => e.id)).size).toBe(3);
+ expect(routine.some(e => ['squat', 'lunge'].includes(e.id))).toBe(true);
+ expect(routine.some(e => ['push_up', 'press'].includes(e.id))).toBe(true);
+ expect(readPrescription(routine)).toHaveLength(3);
  for (const item of routine) {
   expect(item.tracked).toBe(true);
   expect(item.sets).toBeGreaterThanOrEqual(2);
@@ -25,4 +28,16 @@ test('callers cannot mutate the next daily routine', () => {
  routine[0].reps = 99;
  routine.reverse();
  expect(dailyWorkout('2026-10-11')[0].reps).toBeLessThanOrEqual(12);
+});
+
+test('three-exercise days retain full-body coverage and rotate through the catalog', () => {
+ const seen = new Set<string>();
+ for (let day = 1; day <= 31; day++) {
+  const routine = dailyWorkout(`2026-10-${String(day).padStart(2, '0')}`);
+  expect(routine).toHaveLength(3);
+  expect(routine.some(e => ['squat', 'lunge'].includes(e.id))).toBe(true);
+  expect(routine.some(e => ['push_up', 'press'].includes(e.id))).toBe(true);
+  routine.forEach(e => seen.add(e.id));
+ }
+ expect([...seen].sort()).toEqual(['curl', 'lunge', 'press', 'push_up', 'squat']);
 });

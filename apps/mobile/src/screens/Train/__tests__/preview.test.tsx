@@ -57,7 +57,7 @@ test('autoplay starts after the motion preference finishes loading', () => {
   expect(screen.root.findByType('Preview').props).toMatchObject({ selected: dailyWorkout()[0].id, playing: true });
 });
 
-test('Train displays the same five prescriptions used by the daily workout', () => {
+test('Train displays the same three prescriptions used by the daily workout', () => {
  act(() => { screen = create(<TrainScreen />); });
  for (const item of dailyWorkout()) {
   const row = screen.root.findByProps({ testID: `exercise-${item.id}` });

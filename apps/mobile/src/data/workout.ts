@@ -21,7 +21,11 @@ export function dailyWorkout(date = calendarDay()) {
   const [year, month, day] = date.split('-').map(Number);
   const ordinal = Math.floor(Date.UTC(year, month - 1, day) / 86400000);
   const offset = ordinal % practiceExercises.length;
-  return [...practiceExercises.slice(offset), ...practiceExercises.slice(0, offset)].map((exercise, index) => ({
+  const rotated = [...practiceExercises.slice(offset), ...practiceExercises.slice(0, offset)];
+  const selected = rotated.slice(0, 3);
+  // Keep both upper- and lower-body work when the rotation reaches two leg exercises.
+  if (!selected.some(e => e.id === 'press' || e.id === 'push_up')) selected[2] = rotated.find(e => e.id === 'press' || e.id === 'push_up')!;
+  return selected.map((exercise, index) => ({
     ...exercise,
     sets: 2 + ((Math.floor(ordinal / 5) >> index) & 1),
     reps: 8 + 2 * ((ordinal + index) % 3),
