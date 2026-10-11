@@ -20,7 +20,7 @@ The rule check reuses the phone's engine, so it lives in `apps/mobile`:
 ```sh
 cd apps/mobile
 npx jest src/engine/__tests__/labelCheck.test.ts
-npx --yes tsx@4.19.2 scripts/check-rule-labels.ts /path/to/labelling-export-all-bundle_<id>.json /path/to/rule-report.md
+npx --yes tsx@4.19.2 scripts/check-rule-labels.ts /path/to/labelling-export-all-bundle_<id>.json /path/to/rule-report.md --ignore-label fast_lowering
 ```
 
 ## What the loader checks

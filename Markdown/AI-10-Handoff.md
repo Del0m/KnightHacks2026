@@ -61,17 +61,31 @@ The pilot's `manifest.json` records the remaining deficit: 35 squat, and 40 each
 
 ## Rules against the human labels (same export)
 
-`apps/mobile/scripts/check-rule-labels.ts` replays each labelled clip through the phone's engine and rules (base specs, the clip's recorded view), pairs engine reps with the human reps by frame overlap, and reports agreement per rule. Run it from `apps/mobile` with `npx --yes tsx@4.19.2 scripts/check-rule-labels.ts <bundle> <report.md>`, and keep the report outside the repo.
+`apps/mobile/scripts/check-rule-labels.ts` replays each labelled clip through the phone's engine and rules (current specs, the clip's recorded view). It pairs engine reps with the human reps by frame overlap and reports agreement per rule. Run it from `apps/mobile`:
 
-- All 35 labelled reps match an engine rep. The rerun flags the same rules as the capture-time suggestions on all 37 engine reps in those clips, so the replay is faithful.
-- **`tempo` (`fast_lowering`)** flags all 20 push-ups (precision 13/20, recall 13/13). Lowering takes 334–534 ms on reps labelled `fast_lowering` and 333–401 ms on reps labelled `clean`, all well under the 800 ms threshold. No threshold separates the labels, so the timing does not explain them. On squats it flags 8/10 (precision 2/8, recall 2/2). A threshold fitted on the one squat clip with both labels (≥ 634 ms) gets 4/5 on the other clip.
+```sh
+npx --yes tsx@4.19.2 scripts/check-rule-labels.ts <bundle> <report.md> --ignore-label fast_lowering
+```
+
+Keep the report outside the repo.
+
+**Decisions from the owner (2026-10-10):**
+
+- **The `fast_lowering` labels in this export are disregarded.** The other labels on those reps still count. In the push-up clip, lowering time did not separate the reps labelled `fast_lowering` (334–534 ms) from those labelled `clean` (333–401 ms).
+- **A push-up of about one second is the owner's normal pace.** At that pace the push-up `tempo` rule (lowering from 150° to the bottom) measured 333–534 ms against an 800 ms threshold, so it flagged every rep. The threshold is now **250 ms**. At about 15 fps lowering times come in ~67 ms steps, and a clean one-second push-up can measure 267 ms, so 250 is the step below that. A drop to the floor (133–200 ms) still flags. The rest note no longer gives a 2 s target, and the shoulder override stays at 1200 ms.
+
+**Results with those decisions:**
+
+- **Matching:** all 35 labelled reps match an engine rep. On squat and press, the replay flags the same rules as the capture-time suggestions on every rep, so the replay is faithful. On push-ups it differs on all 22 reps, because capture used the old 800 ms threshold.
+- **Push-up `tempo`** flags 0/20 (it flagged 20/20 before).
+- **Squat `tempo`** still flags 8/10 at its 800 ms threshold, with lowering at 0–866 ms. That threshold is unchanged and may have the same problem as the push-up one did.
 - **Shoulder press `lockout` (`incomplete_lockout`)** flags all 5 reps (precision 1/5). Peak elbow angle is 140–150° against a 150° target in this front view.
-- **`wrist_stack` (`wrists_off_stack`)** flags neither labelled rep. Forearm tilt overlaps between the labelled (20.5–27.2°) and clean (18.6–29.1°) reps.
+- **`wrist_stack` (`wrists_off_stack`)** flags neither labelled rep. Forearm tilt overlaps between the labelled reps (20.5–27.2°) and the clean ones (18.6–29.1°).
 - **Squat `trunk_lean` (`forward_lean`)** flags 3 reps, none of them the labelled one (36.4°, inside the 26–50° range of the others).
 - **Push-up `depth`** flags 2 reps that nobody labelled `partial_range`.
 - **Not judged for view:** `hip_sag`, `back_arch` and `knee_tracking` are judged only in the view these clips weren't recorded in.
 
-**What this supports:** nothing yet. Push-up and press each have one clip, so any threshold that fits them can't be checked on another clip. The participant labelled their own reps, so the labels have no second opinion. **No spec values are changed.** The open questions to settle before changing any spec are whether the 800 ms push-up `tempo` threshold is meant for this lifter's pace, and whether the press `lockout` target suits a front view.
+**What this supports:** only the push-up `tempo` change, which rests on the owner's stated pace, not on fitting the labels. Push-up and press each have one clip, so a threshold fitted to them can't be checked on another clip. Every label is the participant's own, with no second opinion. Still open: the squat `tempo` threshold, and whether the press `lockout` target suits a front view.
 
 ## What to deliver
 
