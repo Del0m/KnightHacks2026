@@ -159,16 +159,22 @@ def gold_training_features():
 
 
 @dp.materialized_view(name=f"{GOLD}.gold_injury_risk_scores",
-                      comment="Heuristic training-load and form-trend score per lifter and body part. Not a diagnosis.")
+                      comment="Heuristic training-load and form-trend score per lifter and body part. "
+                              "Range is the injured side when known (range_side = injured), else the smaller side (min). "
+                              "Not a diagnosis.")
 def gold_injury_risk_scores():
     reps = spark.read.table("silver_reps").filter(~F.array_contains(F.col("flags"), "manual_unscored")).withColumn("body_part", body_part(F.col("exercise_id")))
+    # Keep each range separately until after rolling aggregation. The side known on
+    # the prediction date selects BOTH windows, without rewriting earlier dates.
+    reps = reps.withColumn("min_range", F.least("left_range_deg", "right_range_deg"))
     daily = reps.groupBy("user_id", "body_part", "session_date").agg(
         F.count("*").alias("reps"),
         F.sum(F.when(F.size("flags") > 0, 1).otherwise(0)).alias("flagged_reps"),
         # Bodyweight sets count each rep as 1 kg so they still add load.
         F.sum(F.coalesce("weight_kg", F.lit(1.0))).alias("volume"),
-        F.sum(F.least("left_range_deg", "right_range_deg")).alias("sum_min_range"),
-        F.count(F.least("left_range_deg", "right_range_deg")).alias("n_range"),
+        *[expr for side, column in (("left", "left_range_deg"), ("right", "right_range_deg"), ("min", "min_range"))
+          for expr in (F.sum(column).alias(f"sum_{side}"), F.count(column).alias(f"n_{side}"))],
+        F.max(F.when(F.col("injured_side").isin("left", "right"), F.col("injured_side"))).alias("tagged_side"),
         F.sum("asymmetry").alias("sum_asym"),
         F.count("asymmetry").alias("n_asym"),
         F.sum("lowering_ms").alias("sum_lowering"),
@@ -182,12 +188,21 @@ def gold_injury_risk_scores():
         return F.try_divide(F.sum(num).over(w), F.sum(den).over(w))
 
     w7, w28 = roll(7), roll(28)
+    history = Window.partitionBy("user_id", "body_part").orderBy("day").rowsBetween(Window.unboundedPreceding, 0)
+    daily = daily.withColumn("resolved_side", F.last("tagged_side", ignorenulls=True).over(history))
+
+    def range_ratio(w):
+        return (F.when(F.col("resolved_side") == "left", ratio("sum_left", "n_left", w))
+                .when(F.col("resolved_side") == "right", ratio("sum_right", "n_right", w))
+                .otherwise(ratio("sum_min", "n_min", w)))
+
     feats = daily.select(
         "user_id", "body_part", "day", F.col("session_date").alias("date"),
         ratio("flagged_reps", "reps", w7).alias("flag_rate_7d"),
         ratio("flagged_reps", "reps", w28).alias("flag_rate_28d"),
-        ratio("sum_min_range", "n_range", w7).alias("range_7d"),
-        ratio("sum_min_range", "n_range", w28).alias("range_28d"),
+        range_ratio(w7).alias("range_7d"),
+        range_ratio(w28).alias("range_28d"),
+        F.when(F.col("resolved_side").isNotNull(), "injured").otherwise("min").alias("range_side"),
         ratio("sum_asym", "n_asym", w7).alias("asymmetry_7d"),
         F.sum("volume").over(w7).alias("volume_7d"),
         F.sum("volume").over(w28).alias("volume_28d"),

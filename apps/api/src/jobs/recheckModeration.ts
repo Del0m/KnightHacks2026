@@ -45,7 +45,7 @@ interface Item {
 
 async function pending(db: Db): Promise<Item[]> {
   const p = await db
-    .select({ id: posts.id, authorId: posts.authorId, body: posts.body, createdAt: posts.createdAt })
+    .select({ id: posts.id, authorId: posts.authorId, body: posts.body, data: posts.data, createdAt: posts.createdAt })
     .from(posts)
     .where(eq(posts.moderationChecked, false))
     .orderBy(asc(posts.createdAt))
@@ -63,7 +63,11 @@ async function pending(db: Db): Promise<Item[]> {
     .orderBy(asc(comments.createdAt))
     .limit(BATCH);
   return [
-    ...p.map((r) => ({ kind: "post" as const, id: r.id, postId: null, authorId: r.authorId, body: r.body, at: r.createdAt })),
+    ...p.map((r) => {
+      const data = r.data as Record<string, unknown> | null;
+      const title = typeof data?.title === "string" ? data.title : null;
+      return { kind: "post" as const, id: r.id, postId: null, authorId: r.authorId, body: [title, r.body].filter(Boolean).join("\n"), at: r.createdAt };
+    }),
     ...c.map((r) => ({ kind: "comment" as const, id: r.id, postId: r.postId, authorId: r.authorId, body: r.body, at: r.createdAt })),
   ]
     .sort((a, b) => a.at.getTime() - b.at.getTime())
