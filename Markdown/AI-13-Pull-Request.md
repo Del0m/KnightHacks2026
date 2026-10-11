@@ -1,7 +1,7 @@
 Closes #53.
 
 This adds the advice answer writer in `apps/api/src/services/advice.ts`. BE-11 (#22) hands it a community advice question and the sources it retrieved, and gets back one of three results:
-- **An answer:** a short gpt-oss answer, where every sentence is supported by the reputable sources it cites.
+- **An answer:** a short gpt-oss answer, where every sentence is supported by the reputable sources it cites. It always ends with the disclaimer "This is general information, not medical advice. Always consult a doctor before acting on it."
 - **The fixed reply:** for a question that mentions pain or an acute sign. The model never sees the question.
 - **No AI answer:** community answers carry the thread.
 
@@ -11,7 +11,7 @@ The answers are only as good as their sources, so this branch also re-sources th
 - Every section now names the NHS, AAOS OrthoInfo, MedlinePlus, ChoosePT, Cleveland Clinic or Harvard Health pages that support it. Each claim was checked against the fetched pages.
 - Each note ends with the full warning-sign list from its NHS page.
 
-Branched from `main` at `5b83b0c`, and `main` hasn't moved since. Built in a separate worktree, so the AI-09 labelling checkout was not touched.
+Branched from `main` at `5b83b0c`, and merged with `main` at `f030778` (AI-12 planner, CONN-08 profile embeddings). Built in a separate worktree, so the AI-09 labelling checkout was not touched.
 
 ## What it produces
 
@@ -64,11 +64,13 @@ Branched from `main` at `5b83b0c`, and `main` hasn't moved since. Built in a sep
     - programming tips no such page states are marked as team guidance
     - each note ends with the warning signs its NHS page lists
   - **Two independent passes:** a second subagent, which didn't write the notes, re-checked every claim, and its fixes were applied.
-  - **Review status:** all five notes are `reviewed: false`.
+  - **Review status:** all five notes passed the team's medical review on 2026-10-10 and are `reviewed: true`.
 - **`specs/validate.mjs`.** The shared tone check now reads Unicode hyphens (U+2010, U+2011) as hyphens. A live answer starting "Push‑ups…" was being rejected as the command "push", and rest notes had the same bug.
 - **`scripts/advice-samples.ts` (`npm run advice:samples`).** It runs the 20 sample questions on the real chain and writes `docs/reviews/advice-<date>.md`, including a "Reviewer notes" line per question.
 - **`test/fixtures/advice-samples.json`.** 20 questions, with sources generated from the rewritten notes (`parseNote`/`noteChunks`) and the real free-exercise-db entries at the pinned commit (`exerciseChunk`).
 - **Docs.** Root `Architecture.md` §10.1 (sources) and §10.2 (the writer, the pain rule, the allow-list, the guard and the claim check), plus the design note.
+
+- **Disclaimer.** `ADVICE_DISCLAIMER` ends every AI answer's text, so it shows wherever the answer does. It's added after the guard and the claim check, which judge only the model's words. Plans that cite an injury note carry it too: `planner.ts` (AI-12) adds it to the plan notes. The AI-12 planner test now matches the knee note's sections by heading, since re-sourcing moved them.
 
 ### Decisions taken
 
@@ -92,17 +94,19 @@ Branched from `main` at `5b83b0c`, and `main` hasn't moved since. Built in a sep
 | `a5614e0` | 22 of 146 |
 | `231b072` | 18 of 165 |
 | `8968c38` | 1 advice test and 1 spec test |
+| `ab57491` | 6 of 149 (the disclaimer) |
+| `d214c50` | 1 of 16 planner tests (the plan disclaimer) |
 
 The implementations made them pass without changing the tests.
 
 Run from `apps/api`, `npx vitest run`:
 
 ```
- Test Files  24 passed (24)
-      Tests  333 passed (333)
+ Test Files  26 passed (26)
+      Tests  355 passed (355)
 ```
 
-On `main` this was 21 files and 145 tests. The two flaky tests there (rest-time "2.5 s cap" and seed "resets") failed once in a parallel run, then passed alone and in every run on this branch.
+After merging `main` at `f030778`. On `main` at `5b83b0c` this was 21 files and 145 tests. The two flaky tests there (rest-time "2.5 s cap" and seed "resets") failed once in a parallel run, then passed alone and in every run on this branch.
 
 `npm run -s typecheck` and `npx eslint .` show no output. `npx prettier --check` on the changed files is clean. Three files on `main` already fail prettier and aren't touched here.
 
@@ -121,16 +125,19 @@ In the final run:
 - **Latency:** 0.7 to 1.9 s for answers with both model calls, with one outlier at 5.4 s.
 - **Grounding:** every answer sentence traces to its source, numbers included (6 to 10 inches, the first six weeks, 10 to 30 seconds).
 
+## After merge
+
+- **Re-ingest the injury notes** so the live library has the re-sourced sections: `cd rag && npm ci && npm run rag:ingest`, with `DATABASE_URL` and `HF_TOKEN` in `apps/api/.env`. It upserts the new sections and deletes the old ones. Not run yet, because the local `DATABASE_URL` is still the template placeholder.
+
+## Reviews
+
+- **Medical review of the five notes:** approved by the team on 2026-10-10. The notes are `reviewed: true`. The reviewer notes are in the review doc.
+- **Team review of the sample answers:** approved on 2026-10-10. Recorded in `docs/reviews/advice-2026-10-10.md`.
+
 ## Not checked
 
-- **Medical review of the five notes.** They're `reviewed: false`, and ingest skips them until someone sets them back. Until then, re-ingesting removes the injury notes from the live library.
-  - **Ankle weight bearing:** the NHS says to keep weight off for 2 to 3 days, and AAOS says early weight bearing. The note follows the NHS for the first days, then weight bearing as tolerated.
-  - **Shoulder and knee emergency signs:** these come from the generic NHS sprains page, because those NHS pages have no emergency list.
-  - **Lower back:** the wording of the sexual-function warning sign.
-  - **Team-guidance sections:** whether they're sound.
-- **Team review of the live answers:** the reviewer-notes lines in `docs/reviews/advice-2026-10-10.md` are blank.
-- **Re-ingest into Neon:** not run, because it writes to the database. After review, run `npm run rag:ingest` in `rag/`.
 - **Variability:** one live run per stage. Answers vary between runs, and the long-run rejection rate is unmeasured.
+- **Disclaimer in the live run:** the final live run predates the disclaimer. It's covered by the tests (every `ai` result ends with it, and the claim check never sees it).
 
 ## Known limits
 
@@ -156,4 +163,4 @@ In the final run:
 
 - BE-11: retrieval, query embeddings, answered-question embeddings, `POST /advice` and the comment insert.
 - FE-11 and FE-12: the "AI suggestion" label, the sources display and the ask flow.
-- The medical review, the team review of the answers, and the re-ingest (see "Not checked").
+- The re-ingest into Neon (see "After merge").
