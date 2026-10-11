@@ -67,6 +67,24 @@ The hook caps inference at 15 fps. The dropped count tracks camera-pipeline drop
 
 This branch uses a standalone debug entry point. FE-01's navigation and theme are now on main; preserve them when integrating this plugin. FE-05 replaces the debug screen with the live-set screen. Both can reuse `src/pose/usePoseOutput.ts` and the native plugin in `modules/steadyforum-pose/`.
 
+## Cloud tracking (iOS)
+
+Phones that fail the on-device benchmark, or users who pick cloud, stream frames to the API's `/pose/stream` relay. This runs only on iPhone, and only in the camera check and debug screen. Android, web and the workout screen are not wired up yet.
+
+- **Phone config:** `EXPO_PUBLIC_API_URL` (https becomes wss) and a signed-in Neon Auth session. The phone never sees the Hugging Face token.
+- **API config:** `POSE_ENDPOINT_URL` (see `apps/api/README.md`).
+- **Consent:** asked in the camera check, per account.
+- **When cloud stops answering:** the camera check shows "Reconnecting…" and recovery choices. "Use local tracking" appears only if this iPhone passed the benchmark.
+- **Debug screen:** shows the source, the cloud status, fps, dropped frames and capture-to-result latency. Use it for the device check: after warm-up you should see at least 8 fresh poses per second, held for 60 s.
+
+Tests:
+
+```bash
+npx jest src/pose src/screens/LiveSet               # mobile, cloud client and screens
+(cd ../api && npx vitest run test/pose-stream.test.ts)  # relay
+(cd ../../ml/pose_export/PoseBench/PoseCore && swift test)  # encoder orientation and size
+```
+
 ## Troubleshooting
 
 | Symptom | Fix |
