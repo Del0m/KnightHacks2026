@@ -5,13 +5,15 @@
 // A blocked post or comment is a 422 moderation_blocked. When it's self-harm, details.support is
 // true: the app should show the message with support resources, not as an error. Other blocks
 // are logged to moderation_blocks.
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { Router, type Request } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { badRequest, conflict, HttpError, notFound, parse, send, userId } from "../http.js";
 import { BLOCKED_MESSAGE, type Moderator } from "../services/moderation.js";
+import { isAbusiveComment } from "../services/commentSafety.js";
+import { notBlocked } from "../services/blocks.js";
 import { visiblePostsFilter } from "./feed.js";
 
 const { posts, comments, kudos, follows, users, profiles, sessions, moderationBlocks } = schema;
@@ -21,6 +23,7 @@ export const postInput = z
     // Advice questions go through POST /advice (BE-11) once it exists.
     kind: z.enum(["session", "pr", "medal", "goal"]),
     body: z.string().trim().min(1).max(2000),
+    title: z.string().trim().max(100).optional(),
     session_id: z.string().uuid().nullable().optional(),
     data: z.record(z.unknown()).nullable().optional(),
   })
@@ -35,8 +38,24 @@ async function moderate(
   text: string,
   target: { kind: "post" } | { kind: "comment"; postId: string },
 ) {
-  const verdict = await moderator.check(text, target.kind);
-  if (verdict.allowed) return;
+  const verdict =
+    target.kind === "comment" && isAbusiveComment(text)
+      ? {
+          allowed: false as const,
+          message: "Please keep comments respectful. Reword your comment before posting.",
+          categories: ["local_abuse"],
+        }
+      : await moderator.check(text, target.kind);
+  if (verdict.allowed) {
+    if (target.kind === "comment" && verdict.checked === false) {
+      throw new HttpError(
+        503,
+        "moderation_unavailable",
+        "Comments cannot be checked right now. Your draft is saved; try again shortly.",
+      );
+    }
+    return;
+  }
   if (verdict.support) {
     throw new HttpError(422, "moderation_blocked", verdict.message || BLOCKED_MESSAGE, { support: true });
   }
@@ -108,7 +127,10 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         .where(and(eq(sessions.id, input.session_id), eq(sessions.userId, me)));
       if (!own) throw notFound("Session");
     }
-    await moderate(db, moderator, req, input.body, { kind: "post" });
+    const title =
+      input.title ??
+      (input.data?.title === undefined ? undefined : parse(z.string().trim().max(100), input.data.title));
+    await moderate(db, moderator, req, [title, input.body].filter(Boolean).join("\n"), { kind: "post" });
     const [row] = await db
       .insert(posts)
       .values({
@@ -116,7 +138,7 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         kind: input.kind,
         body: input.body,
         sessionId: input.session_id ?? null,
-        data: input.data ?? null,
+        data: title !== undefined ? { ...input.data, title } : (input.data ?? null),
       })
       .returning();
     send(res, row, 201);
@@ -137,9 +159,15 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
       .from(comments)
       .leftJoin(users, eq(users.id, comments.authorId))
       .leftJoin(profiles, eq(profiles.userId, comments.authorId))
-      .where(eq(comments.postId, postId))
+      .where(and(eq(comments.postId, postId), notBlocked(me, comments.authorId)))
       .orderBy(asc(comments.createdAt));
-    send(res, rows);
+    const unsafeIds = rows.filter((row) => isAbusiveComment(row.body)).map((row) => row.id);
+    if (unsafeIds.length)
+      await db.delete(comments).where(and(eq(comments.postId, postId), inArray(comments.id, unsafeIds)));
+    send(
+      res,
+      rows.filter((row) => !unsafeIds.includes(row.id)),
+    );
   });
 
   router.post("/posts/:id/comments", async (req, res) => {

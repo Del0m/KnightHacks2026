@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Text, View, LayoutAnimation } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { AppPage, Action, pageStyles } from '@/components/AppPage';
 import { GlassSurface } from '@/components/GlassSurface';
@@ -54,21 +54,22 @@ function FeedSession({ initialExamples = false }: { initialExamples?: boolean })
   finally { kudosLocks.current.delete(post.id); if (controller.current && !controller.current.signal.aborted) setPendingKudos([...kudosLocks.current]); }
  }
  function retry() { void load(failedRefresh.current || !ready); }
+ function toggleFilters() { LayoutAnimation.configureNext({ duration: 220, create: { type: 'easeInEaseOut', property: 'scaleY' }, update: { type: 'easeInEaseOut' }, delete: { type: 'easeInEaseOut', property: 'opacity' } }); setFiltersOpen(v => !v); }
  const visible = examples ? preview.filter(p => type === 'recent' || postType(p) === type) : posts;
- function created(body: string) {
+ function created(body: string, title?: string) {
   if (editor) {
    const id = editor.id;
    const update = (rows: FeedPost[]) => rows.map(p => p.id === id ? { ...p, comment_count: p.comment_count + 1 } : p);
    if (examples) setPreview(update); else setPosts(update);
   } else {
-   if (examples) setPreview(rows => [{ id: `example-new-${Date.now()}`, kind: 'goal', body, created_at: new Date().toISOString(), author: { id: 'example-you', handle: null, display_name: 'You' }, data: { post_type: 'custom' }, kudos_count: 0, comment_count: 0, viewer_gave_kudos: false }, ...rows]);
+   if (examples) setPreview(rows => [{ id: `example-new-${Date.now()}`, kind: 'goal', body, created_at: new Date().toISOString(), author: { id: 'example-you', handle: null, display_name: 'You' }, data: { post_type: 'custom', ...(title ? { title } : {}) }, kudos_count: 0, comment_count: 0, viewer_gave_kudos: false }, ...rows]);
    if (type !== 'recent') setType('recent'); else if (!examples) void load(true);
   }
  }
  return <AppPage title="Feed" scrollable={false}>
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><Text style={[ui.pageTitle, { marginTop: 8 }]}>Feed</Text><View style={{ flexDirection: 'row', gap: 10 }}>
    <PolishedPressable accessibilityRole="button" accessibilityLabel="New post" onPress={() => setEditor(null)} style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }}><GlassSurface radius={23} tint="#EDE4FB" colored /><FeedIcon name="plus" /></PolishedPressable>
-   <PolishedPressable accessibilityRole="button" accessibilityLabel="Filter feed" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(v => !v)} style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }}><GlassSurface radius={23} /><FeedIcon name="filter" /></PolishedPressable>
+   <PolishedPressable accessibilityRole="button" accessibilityLabel="Filter feed" accessibilityState={{ expanded: filtersOpen }} onPress={() => toggleFilters()} style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' }}><GlassSurface radius={23} /><FeedIcon name="filter" /></PolishedPressable>
   </View></View>
   {filtersOpen && <View style={{ borderRadius: 20, padding: 12, gap: 4 }}><GlassSurface radius={20} tint="#EDE4FB" colored />{([['recent', 'Recent'], ['custom', 'Custom posts'], ['medal', 'Medals'], ['pr', 'Personal records']] as const).map(([value, label]) => <PolishedPressable key={value} accessibilityRole="button" accessibilityState={{ selected: type === value }} onPress={() => { setType(value); setFiltersOpen(false); }} style={{ minHeight: 44, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 12, backgroundColor: type === value ? 'rgba(255,255,255,.65)' : 'transparent' }}><Text style={[ui.label, { color: c.text }]}>{label}</Text></PolishedPressable>)}
    <PolishedPressable accessibilityRole="button" onPress={() => { setExamples(v => !v); setType('recent'); setFiltersOpen(false); }} style={{ minHeight: 44, borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 12, justifyContent: 'center' }}><Text style={ui.label}>{examples ? 'Return to live feed' : 'Preview 10 examples'}</Text></PolishedPressable>

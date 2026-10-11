@@ -40,5 +40,5 @@ async function writePost(request: ApiRequest, path: string, body: object) {
  }
  return response.json();
 }
-export function createPost(request: ApiRequest, body: string) { return writePost(request, '/posts', { kind: 'goal', body: body.trim(), data: { post_type: 'custom' } }); }
+export function createPost(request: ApiRequest, body: string, title = '') { return writePost(request, '/posts', { ...(title.trim() ? { title: title.trim() } : {}), kind: 'goal', body: body.trim(), data: { post_type: 'custom' } }); }
 export function createComment(request: ApiRequest, id: string, body: string) { return writePost(request, `/posts/${encodeURIComponent(id)}/comments`, { body: body.trim() }); }

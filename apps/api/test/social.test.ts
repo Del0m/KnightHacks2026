@@ -7,6 +7,7 @@ import { setup } from "./helpers.js";
 
 const moderator: Moderator = {
   async check(text) {
+    if (text === "moderation unavailable") return { allowed: true, checked: false };
     if (/hopeless/i.test(text))
       return { allowed: false, message: "Call or text 988.", support: true, categories: ["S11"] };
     if (/forbidden/i.test(text))
@@ -264,24 +265,22 @@ it("filters public post types before pagination, including old personal records"
   const author = await t.as("type-filter-author");
   const reader = await t.as("type-filter-reader");
   await author.get("/me/profile");
-  await t.db
-    .insert(schema.posts)
-    .values([
-      ...Array.from({ length: 25 }, (_, i) => ({
-        authorId: "type-filter-author",
-        kind: "goal" as const,
-        body: `Custom ${i}`,
-        data: { post_type: "custom" },
-        createdAt: new Date("2026-10-10T12:00:00Z"),
-      })),
-      {
-        authorId: "type-filter-author",
-        kind: "pr" as const,
-        body: "Squat personal record",
-        data: { exercise_id: "squat", value: 20 },
-        createdAt: new Date("2026-08-01T12:00:00Z"),
-      },
-    ]);
+  await t.db.insert(schema.posts).values([
+    ...Array.from({ length: 25 }, (_, i) => ({
+      authorId: "type-filter-author",
+      kind: "goal" as const,
+      body: `Custom ${i}`,
+      data: { post_type: "custom" },
+      createdAt: new Date("2026-10-10T12:00:00Z"),
+    })),
+    {
+      authorId: "type-filter-author",
+      kind: "pr" as const,
+      body: "Squat personal record",
+      data: { exercise_id: "squat", value: 20 },
+      createdAt: new Date("2026-08-01T12:00:00Z"),
+    },
+  ]);
   const records = await reader.get("/feed?scope=public&type=pr");
   expect(records.status).toBe(200);
   expect(records.body.posts.map((p: { body: string }) => p.body)).toContain("Squat personal record");
@@ -297,4 +296,46 @@ it("filters public post types before pagination, including old personal records"
     ),
   ).toBe(true);
   expect((await reader.get("/feed?scope=public&type=invalid")).status).toBe(400);
+});
+
+it("blocks obvious comment abuse without an AI token and removes legacy abusive comments", async () => {
+  const api = await t.as("comment-safety");
+  const post = (await api.post("/posts", { kind: "goal", body: "A good workout" })).body;
+  expect((await api.post(`/posts/${post.id}/comments`, { body: "moderation unavailable" })).status).toBe(503);
+  for (const body of ["You're stupid", "go kill yourself", "you are disgusting"]) {
+    expect((await api.post(`/posts/${post.id}/comments`, { body })).status).toBe(422);
+  }
+  expect(
+    (await api.post(`/posts/${post.id}/comments`, { body: "My form needs work, but I'm improving" })).status,
+  ).toBe(201);
+  const [legacy] = await t.db
+    .insert(schema.comments)
+    .values({ postId: post.id, authorId: "comment-safety", body: "you are worthless" })
+    .returning();
+  const result = await api.get(`/posts/${post.id}/comments`);
+  expect(result.body).toHaveLength(1);
+  expect(await t.db.select().from(schema.comments).where(eq(schema.comments.id, legacy.id))).toHaveLength(0);
+});
+it("stores and moderates a custom post title", async () => {
+  const api = await t.as("post-title");
+  const saved = await api.post("/posts", { kind: "goal", title: "Leg day", body: "Three solid sets" });
+  expect(saved.status).toBe(201);
+  expect(saved.body.data.title).toBe("Leg day");
+  const override = await api.post("/posts", {
+    kind: "goal",
+    title: "",
+    body: "Friendly text",
+    data: { title: "forbidden" },
+  });
+  expect(override.status).toBe(201);
+  expect(override.body.data.title).toBe("");
+  expect(
+    (await api.post("/posts", { kind: "goal", body: "Friendly text", data: { title: "forbidden" } })).status,
+  ).toBe(422);
+  expect((await api.post("/posts", { kind: "goal", title: "forbidden", body: "Nice session" })).status).toBe(
+    422,
+  );
+  expect(
+    (await api.post("/posts", { kind: "goal", title: "x".repeat(101), body: "Nice session" })).status,
+  ).toBe(400);
 });
