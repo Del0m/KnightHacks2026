@@ -4,6 +4,7 @@ import type { BenchmarkResult } from '../benchmark';
 import { __clearPoseStoreForTests, loadBenchmark, loadCloudConsent, loadPreference, saveBenchmark } from '../modeStore';
 import {
   __resetPoseModeForTests,
+  reportCloudAvailability,
   rerunBenchmark,
   startPoseBenchmark,
   usePoseMode,
@@ -19,11 +20,11 @@ const slow = (size: number) => ({ size, model: `yolov8n-pose-${size}`, meanMs: 1
 const cached = (modelId: string): BenchmarkResult =>
   ({ modelId, size: 320, fps: 100, meanMs: 9, p95Ms: 10, ranAt: 1, error: null });
 
-/** Renders the hook and returns a getter for its latest value. */
-function renderMode() {
+/** Renders the hook for a signed-in account and returns a getter for its latest value. */
+function renderMode(accountId: string | null = 'user-1') {
   let latest!: PoseModeState;
   function Probe() {
-    latest = usePoseMode();
+    latest = usePoseMode(accountId);
     return null;
   }
   let renderer: ReturnType<typeof create>;
@@ -102,7 +103,7 @@ describe('usePoseMode', () => {
     act(() => hook.get().setCloudConsent(true));
     // Cloud is unreachable until CONN-11, so consenting leads to `paused`.
     expect(hook.get()).toMatchObject({ mode: 'paused', needsCloudConsent: false, cloudConsent: true });
-    expect(loadCloudConsent()).toBe(true);
+    expect(loadCloudConsent('user-1')).toBe(true);
     hook.unmount();
   });
 
@@ -149,16 +150,7 @@ describe('usePoseMode', () => {
 });
 
 describe('usePoseMode cloud reachability (AI-17)', () => {
-  const { checkCloudReachable, CLOUD_RECHECK_MS } = jest.requireActual('../usePoseMode') as typeof import('../usePoseMode');
-  const { saveCloudConsent } = jest.requireActual('../modeStore') as typeof import('../modeStore');
-
-  /** A relay that answers `ready`, or closes, on connect. */
-  const relay = (answer: () => 'ready' | 'close') => (_url: string, _token: string) => {
-    const s = { readyState: 1, onopen: null, onmessage: null as null | ((e: { data: unknown }) => void), onerror: null,
-      onclose: null as null | ((e: unknown) => void), send() {}, close() {} };
-    setTimeout(() => (answer() === 'ready' ? s.onmessage?.({ data: '{"type":"ready"}' }) : s.onclose?.({})), 0);
-    return s;
-  };
+  const { saveCloudConsent, savePreference } = jest.requireActual('../modeStore') as typeof import('../modeStore');
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -167,36 +159,37 @@ describe('usePoseMode cloud reachability (AI-17)', () => {
     jest.mocked(getPoseModelId).mockReturnValue('model-a');
     // A slow iPhone that has consented: it wants cloud mode.
     saveBenchmark({ modelId: 'model-a', size: 256, fps: 5, meanMs: 200, p95Ms: 250, ranAt: 1, error: null });
-    saveCloudConsent(true);
+    saveCloudConsent('user-1', true);
   });
   afterEach(() => jest.useRealTimers());
 
-  function render(cloud?: Parameters<typeof usePoseMode>[0]) {
-    let latest!: PoseModeState;
-    function Probe() { latest = usePoseMode(cloud); return null; }
-    let renderer: ReturnType<typeof create>;
-    act(() => { renderer = create(React.createElement(Probe)); });
-    return { get: () => latest, unmount: () => act(() => renderer.unmount()) };
-  }
-  const settle = async () => { await act(async () => { await jest.advanceTimersByTimeAsync(1); }); };
-
-  it('is paused until the relay is checked, then cloud once it answers', async () => {
-    let answer: 'ready' | 'close' = 'close';
-    const hook = render({ url: 'wss://api.test/pose/stream', getToken: async () => 'jwt', createSocket: relay(() => answer) as never });
-    await settle();
+  it('is paused until the transport reports the relay available, and paused again when it drops', () => {
+    const hook = renderMode();
     expect(hook.get().mode).toBe('paused');
-
-    answer = 'ready';
-    await act(async () => { await jest.advanceTimersByTimeAsync(CLOUD_RECHECK_MS); });
-    await settle();
+    act(() => reportCloudAvailability(true));
     expect(hook.get().mode).toBe('cloud');
+    act(() => reportCloudAvailability(false));
+    expect(hook.get().mode).toBe('paused');
     hook.unmount();
   });
 
-  it('stays unreachable when signed out, and without a cloud check', async () => {
-    expect(await checkCloudReachable({ url: 'wss://x', getToken: async () => null })).toBe(false);
-    const hook = render();
-    await settle();
+  it('never probes the relay itself: no timers, no sockets', () => {
+    const hook = renderMode();
+    act(() => { jest.advanceTimersByTime(120_000); });
+    expect(jest.getTimerCount()).toBe(0);
+    expect(hook.get().mode).toBe('paused');
+    hook.unmount();
+  });
+
+  it('pauses a capable, cloud-preferring iPhone when cloud is unreachable; Core ML never starts on its own', () => {
+    saveBenchmark({ modelId: 'model-a', size: 320, fps: 60, meanMs: 9, p95Ms: 10, ranAt: 1, error: null });
+    savePreference('cloud');
+    __resetPoseModeForTests();
+    const hook = renderMode();
+    expect(hook.get().mode).toBe('paused');
+    act(() => reportCloudAvailability(true));
+    expect(hook.get().mode).toBe('cloud');
+    act(() => reportCloudAvailability(false));
     expect(hook.get().mode).toBe('paused');
     hook.unmount();
   });

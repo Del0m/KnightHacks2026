@@ -79,8 +79,15 @@ describe('selectPoseMode: the user switches on-device to cloud', () => {
     expect(selectPoseMode({ ...wantsCloud, cloudConsent: false })).toBe('coreml');
   });
 
-  it('falls back to on-device instead of pausing when cloud drops', () => {
-    expect(selectPoseMode({ ...wantsCloud, cloudReachable: false })).toBe('coreml');
+  it('pauses instead of falling back to on-device when cloud drops (Core ML takes a tap)', () => {
+    expect(selectPoseMode({ ...wantsCloud, cloudReachable: false })).toBe('paused');
+  });
+
+  it('never picks Core ML on its own for a consented, cloud-preferring phone', () => {
+    for (const coremlFps of [12, 30, 60, 120]) {
+      expect(selectPoseMode({ ...wantsCloud, coremlFps, cloudReachable: false })).toBe('paused');
+      expect(selectPoseMode({ ...wantsCloud, coremlFps, cloudReachable: true })).toBe('cloud');
+    }
   });
 
   it('switches back to YOLOv8 when the user returns to automatic', () => {
