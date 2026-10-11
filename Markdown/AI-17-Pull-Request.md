@@ -1,4 +1,4 @@
-Refs #108. The device gate below hasn't been run yet, so this PR doesn't close the issue.
+Refs #108. Cloud tracking works on a physical iPhone, but the 8 fps / 60 s numbers haven't been recorded yet, so this PR doesn't close the issue (see Device check).
 
 This adds cloud pose tracking on iPhone. It runs in the camera check and the pose debug screen, through the authenticated `/pose/stream` relay that's already in place. The pose output and the relay protocol are unchanged. What's new:
 
@@ -8,7 +8,7 @@ This adds cloud pose tracking on iPhone. It runs in the camera check and the pos
 - Consent is stored per account.
 - The camera check offers Core ML only when the user taps for it, and never switches on its own.
 
-**Stacked on #135** (the SteadyForum rename): this branch starts from `codex/steadyforum-ci`, so merge #135 first. Android, web and automatic workout recording (INT-11, #109) are not part of this PR. The settings-screen consent toggle stays in FE-15 (#40).
+Rebased onto `main` after #135 (the SteadyForum rename) merged. Android, web and automatic workout recording (INT-11, #109) are not part of this PR. The settings-screen consent toggle stays in FE-15 (#40).
 
 PR #131 had already merged a first cloud client on `main`. This PR replaces its frame encoder (VisionCamera + nitro-image) and its probe-based reachability check, and tightens the client.
 
@@ -60,6 +60,7 @@ PR #131 had already merged a first cloud client on `main`. This PR replaces its 
     - Streams only while eligible.
     - Shows the source, cloud status and capture-to-result latency next to fps and dropped.
     - Resets the form engine, rules and clock on any interruption or source switch.
+    - Gains a **Use cloud** / **Use automatic** toggle. A phone that passes the benchmark otherwise never runs cloud, and the settings toggle is FE-15.
 - **Engine:** the clip recorder and `useFormEngine` time no-person frames by their capture time.
 - **`app.json`:** the camera permission text no longer says "Video never leaves your phone".
 - **Docs:**
@@ -83,6 +84,7 @@ PR #131 had already merged a first cloud client on `main`. This PR replaces its 
 | 4. Lifecycle and eligibility | `Tests: 5 failed, 21 passed, 26 total` | `Tests: 26 passed, 26 total` |
 | 5. Sources, staleness, resets | `Tests: 7 failed, 30 passed, 37 total` | `Tests: 37 passed, 37 total` |
 | 5b. Capture time in recording | `Tests: 1 failed, 7 passed, 8 total` | `Tests: 8 passed, 8 total` |
+| Debug-screen cloud toggle | `Tests: 1 failed, 15 passed, 16 total` | `Tests: 16 passed, 16 total` |
 
 **Deliberate regressions** (temporary, not committed):
 
@@ -96,8 +98,7 @@ PR #131 had already merged a first cloud client on `main`. This PR replaces its 
 `cd apps/mobile && npx jest --ci` (the baseline before this PR was 808 tests):
 
 ```
-Test Suites: 77 passed, 77 total
-Tests:       854 passed, 854 total
+Tests:       855 passed, 855 total
 ```
 
 `npx tsc --noEmit`: clean. `npx expo lint`: `✖ 6 problems (0 errors, 6 warnings)`; the baseline was 9 warnings.
@@ -117,14 +118,23 @@ Executed 77 tests, with 0 failures (0 unexpected)
 
 **Native build:** `npx expo prebuild -p ios`, then `pod install`, then `xcodebuild … -sdk iphonesimulator` (iPhone 17 Pro, Xcode 26.6) gave `** BUILD SUCCEEDED **`. The generated Info.plist has the new camera text.
 
-## Device gate (to fill in)
+## Device check
 
-This needs a physical iPhone with the API's `POSE_ENDPOINT_URL` set:
+**Setup:** an iPhone 17 Pro Max with a debug build over USB. The API ran on a laptop with `POSE_ENDPOINT_URL` set; the phone reached it at `http://<host>.local:3000`. For that local test only, the HTTPS check in `api.ts` was relaxed for `.local` hosts. That change isn't in this PR.
 
-- [ ] Front and back cameras, switching between them, and asymmetric poses (one arm raised) come back on the correct side and upright.
-- [ ] Disconnect and recovery, warming from cold, consent revocation mid-stream, and explicit **Use local tracking**.
-- [ ] After warm-up: **at least 8 fresh pose responses per second for 60 s**, each fresh to within 1 s. Record capture-to-result latency, delivered fps, drops and queue bounds from the debug screen.
-- [ ] If 8 fps isn't reached, name the bottleneck and link a backend issue. #108 stays open and the gate stays as it is.
+Done:
+
+- [x] Cloud tracking works end to end on the phone: socket auth, warming, then tracking.
+- [x] Frames arrive upright.
+- [x] Recovery behaved as intended while the endpoint was rejecting calls (HTTP 403, see below): the client backed off and showed "Reconnecting…".
+- [x] **Endpoint timing**, measured from the laptop with a warm endpoint over keep-alive: round trip **79 ms median** (64–290 ms), endpoint inference **12 ms**. That allows about 12 fps with one frame in flight.
+
+Still to do:
+
+- [ ] **The gate:** at least 8 fresh pose responses per second for 60 s, each fresh to within 1 s, with capture-to-result latency, fps and drops from the debug screen.
+- [ ] Explicit **Use local tracking**, consent revocation mid-stream, and switching cameras during cloud tracking.
+
+**Hugging Face token:** the endpoint belongs to the `bubblesmal` account. A personal fine-grained token gets **403** (`missing permissions: inference.endpoints.infer.write`), even when it has that permission for its own account. The API's `HF_TOKEN` must be `bubblesmal`'s token (as `docs/runbooks/demo-checklist.md` says), or the endpoint has to move into a shared organisation.
 
 ## Not included
 
