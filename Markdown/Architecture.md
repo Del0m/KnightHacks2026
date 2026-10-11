@@ -1,6 +1,6 @@
 # Architecture: SteadyForum (working name)
 
-A quiet AI spotter for new gym-goers and people returning from injury. The user's phone films the set and runs the pose AI on its own neural processor, and the user gets a short, kind note between sets instead of being talked at mid-rep. SteadyForum also plans workouts around injuries and connects beginners through a Strava-style social feed.
+A quiet AI coach for new gym-goers and people returning from injury. The user's phone films the set and runs the pose AI on its own neural processor, and the user gets a short, kind note between sets instead of being talked at mid-rep. SteadyForum also plans workouts around injuries and connects beginners through a Strava-style social feed.
 
 > **Visual overview for non-engineers:** https://claude.ai/artifact/GEo4ve7Br3rcUVVMibxYwY (hand-drawn diagrams of everything below).
 >
@@ -601,7 +601,7 @@ flowchart LR
 ## 15. Repository layout
 
 ```
-spotter/
+steadyforum/
 ├── apps/
 │   ├── mobile/                # React Native + Expo (web + iOS)
 │   │   ├── src/screens/       # LiveSet, Planner, Feed, Buddies, Progress

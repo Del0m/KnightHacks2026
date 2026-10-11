@@ -1,4 +1,4 @@
-"""CONN-12 publisher: honours SPOTTER_DATASET_REPO from apps/api/.env, and refuses to publish a
+"""CONN-12 publisher: honours STEADYFORUM_DATASET_REPO from apps/api/.env, and refuses to publish a
 selection with non-synthetic sessions.
 
     uv run --with pytest --with pyarrow --with requests --with huggingface_hub pytest ml/space
@@ -23,7 +23,7 @@ def load(monkeypatch, tmp_path, env_text):
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module, "OUT", tmp_path / "out")
-    monkeypatch.delenv("SPOTTER_DATASET_REPO", raising=False)
+    monkeypatch.delenv("STEADYFORUM_DATASET_REPO", raising=False)
     return module
 
 
@@ -44,7 +44,7 @@ def rows(devices):
 
 
 def test_pushes_to_the_repo_set_in_dot_env(monkeypatch, tmp_path):
-    module = load(monkeypatch, tmp_path, "SPOTTER_DATASET_REPO=review-owner/custom-dataset\nHF_WRITE_TOKEN=hf_test\n")
+    module = load(monkeypatch, tmp_path, "STEADYFORUM_DATASET_REPO=review-owner/custom-dataset\nHF_WRITE_TOKEN=hf_test\n")
     monkeypatch.setattr(module, "query_arrow", lambda sql: rows(["synthetic"]) if "DISTINCT" in sql else rows(["synthetic"]).drop(["device"]))
     calls = []
 
@@ -66,7 +66,7 @@ def test_pushes_to_the_repo_set_in_dot_env(monkeypatch, tmp_path):
     module.main()
     assert calls == [("create", "review-owner/custom-dataset"), ("folder", "review-owner/custom-dataset"),
                      ("file", "review-owner/custom-dataset")]
-    os.environ.pop("SPOTTER_DATASET_REPO", None)
+    os.environ.pop("STEADYFORUM_DATASET_REPO", None)
     os.environ.pop("HF_WRITE_TOKEN", None)
 
 

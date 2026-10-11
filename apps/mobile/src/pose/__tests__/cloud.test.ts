@@ -41,7 +41,7 @@ describe('frame encoding', () => {
   });
 
   it('turns the API URL into the relay URL', () => {
-    expect(poseStreamUrl('https://api.spotter.app/')).toBe('wss://api.spotter.app/pose/stream');
+    expect(poseStreamUrl('https://api.steadyforum.app/')).toBe('wss://api.steadyforum.app/pose/stream');
     expect(poseStreamUrl('http://localhost:3000')).toBe('ws://localhost:3000/pose/stream');
     expect(() => poseStreamUrl('ftp://x')).toThrow();
   });

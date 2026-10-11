@@ -102,7 +102,7 @@ A seated shoulder press on an iPhone 17 Pro Max (front camera, Release build, on
 | `wrist_stack` value | 20° | 35° |
 | `tempo` | 800 ms | 600 ms |
 
-**Debug screen.** It's reached at `spotter://pose-debug`, a new dev route; the screen had no route since expo-router became the entry.
+**Debug screen.** It's reached at `steadyforum://pose-debug`, a new dev route; the screen had no route since expo-router became the entry.
 - It runs `useFormRules`: flagged joints draw amber and larger.
 - The readout shows each flag's value against its limit (`tempo 0.5s < 0.6s`) and the set summary with its rest note.
 - An **End set** button ends the set by hand. FE-05 / INT-02 need one on the live screen too: a set taken to failure can't rely on standing still.
@@ -247,7 +247,7 @@ From the repo root, `node --test specs/*.test.mjs`:
 These are not part of AI-07:
 - **`fix(mobile)` commits:** the launch crash and the Reanimated dependency. Both are broken on `main`, so they could go in a separate PR.
 - **`feat(pose)` commits:** the `pose-debug` route and the debug screen changes, for testing on a device. They can be dropped before merge if a dev route isn't wanted.
-- **`ios/`** was regenerated locally with `expo prebuild --clean`, so the `spotter://` scheme is registered. It's gitignored, so there's nothing in the diff, but anyone with an old `ios/` folder needs to run prebuild again.
+- **`ios/`** was regenerated locally with `expo prebuild --clean`, so the `steadyforum://` scheme is registered. It's gitignored, so there's nothing in the diff, but anyone with an old `ios/` folder needs to run prebuild again.
 
 ## Not included
 

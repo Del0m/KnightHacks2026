@@ -89,13 +89,13 @@ Architecture §1.1: "Pain mentioned anywhere routes to 'please check with your p
 - pain or hurting at rest, at night, or that keeps someone awake;
 - pain or hurting during or right after an exercise ("hurts when I squat", "pain while pressing").
 
-Not a red flag on its own: a past or recovering injury ("since my knee injury last year", "two years ago", "recovering from", "coming back from", "cleared by my physio", weeks, months or years ago). Spotter is for getting back to training after an injury (§1.1), so these get a cautious, sourced answer unless another red flag is present ("since my knee injury it swells up" is still acute).
+Not a red flag on its own: a past or recovering injury ("since my knee injury last year", "two years ago", "recovering from", "coming back from", "cleared by my physio", weeks, months or years ago). SteadyForum is for getting back to training after an injury (§1.1), so these get a cautious, sourced answer unless another red flag is present ("since my knee injury it swells up" is still acute).
 
 Not a red flag: soreness, stiffness, tightness, tiredness, a burn, DOMS ("sore two days after squats"). Negated pain is not a red flag ("doesn't hurt", "no pain", "pain-free", "without pain") unless the sentence goes on with a contrast ("isn't painful at rest, only when I squat", "doesn't hurt at rest but does when I squat"). Look-alike words don't count: "numbers", "pop a pre-workout", "tear down my routine", "can't lift my bodyweight".
 
 ## Fixed reply
 
-`PAIN_REPLY` = "Pain like this is worth having a doctor or physiotherapist look at before training on it. Spotter can't assess injuries, so there's no AI suggestion for this question."
+`PAIN_REPLY` = "Pain like this is worth having a doctor or physiotherapist look at before training on it. SteadyForum can't assess injuries, so there's no AI suggestion for this question."
 
 ## Answer guard (`answerProblems`)
 

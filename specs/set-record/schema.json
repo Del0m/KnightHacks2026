@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://spotter.app/specs/set-record/schema.json",
+  "$id": "https://steadyforum.app/specs/set-record/schema.json",
   "$ref": "#/$defs/SetRecord",
-  "title": "Spotter set record",
+  "title": "SteadyForum set record",
   "description": "The finished-set payload and everything derived from it, defined once (INT-01). Field meanings, units and clocks: docs/specs/set-record-format.md. TS types: generate-types.mjs writes types.ts from this file.",
   "$defs": {
     "ExerciseId": {

@@ -167,7 +167,7 @@ Earlier work was also test-first: the rule check, the per-label timing table, th
 
 ## Unchecked
 
-- **The Databricks pipeline test** (`databricks/pipelines/spotter_sessions/tests/test_set_record.py`) reads the regenerated SetRecord fixtures but needs `pyspark` and `pytest`, which aren't installed locally. It wasn't run.
+- **The Databricks pipeline test** (`databricks/pipelines/steadyforum_sessions/tests/test_set_record.py`) reads the regenerated SetRecord fixtures but needs `pyspark` and `pytest`, which aren't installed locally. It wasn't run.
 - **The capture rate.** It runs at about 15 fps, so lowering times come in ~67 ms steps. The 250 ms threshold sits one step under the shortest clean one-second push-up seen (267 ms in synthetic data, 333 ms in real data). A faster capture rate would measure finer, but hasn't been tried.
 - **The device.** The app has not been run on a phone with the new spec.
 - **The `tsx` runner.** It's fetched by `npx` at a pinned version, not added as a dependency.

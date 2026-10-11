@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createBasicPoseDetector, createPoseDetector } from 'spotter-pose';
+import { createBasicPoseDetector, createPoseDetector } from 'steadyforum-pose';
 import type { CameraFrameOutput, Frame } from 'react-native-vision-camera';
 import { useFrameOutput } from 'react-native-vision-camera';
 import { createSynchronizable, scheduleOnRN } from 'react-native-worklets';

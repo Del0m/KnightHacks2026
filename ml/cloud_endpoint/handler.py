@@ -1,6 +1,6 @@
 """CONN-11: Hugging Face Inference Endpoint custom handler for cloud pose mode (Architecture §4.1).
 
-Phones that can't run YOLOv8n-pose on-device stream frames to the Spotter API over a WebSocket;
+Phones that can't run YOLOv8n-pose on-device stream frames to the SteadyForum API over a WebSocket;
 the API forwards each frame here and relays the joints back. This handler returns exactly the
 pose result contract (docs/pose/pose-result-contract.md), so the phone's rep counter and form
 rules can't tell cloud results from on-device ones.

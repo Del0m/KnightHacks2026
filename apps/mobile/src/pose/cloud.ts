@@ -1,4 +1,4 @@
-// Cloud pose client (AI-17, Architecture §4.1): streams camera frames to the Spotter API's
+// Cloud pose client (AI-17, Architecture §4.1): streams camera frames to the SteadyForum API's
 // /pose/stream relay (CONN-11) and turns its replies into the same PoseDetection the on-device
 // detectors produce. The protocol is in apps/api/src/routes/poseStream.ts:
 //

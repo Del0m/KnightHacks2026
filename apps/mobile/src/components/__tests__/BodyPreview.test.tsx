@@ -11,7 +11,7 @@ jest.mock('@/hooks/useReducedMotion', () => ({ useReducedMotion: () => false }))
 jest.mock('@/components/PolishedPressable', () => ({ PolishedPressable: 'Retry' }));
 jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]) }));
 jest.mock('react-native-webview', () => ({ WebView: require('react').forwardRef((props: object, ref: unknown) => {
-  require('react').useImperativeHandle(ref, () => ({ injectJavaScript: (script: string) => new Function('window', script)({ spotterNativeReceive: (data: object) => commands.push(data) }) }));
+  require('react').useImperativeHandle(ref, () => ({ injectJavaScript: (script: string) => new Function('window', script)({ steadyforumNativeReceive: (data: object) => commands.push(data) }) }));
   return require('react').createElement('NativePreview', props);
 }) }));
 let screen: ReturnType<typeof create>;
@@ -22,18 +22,18 @@ beforeEach(() => {
 afterEach(() => { act(() => screen.unmount()); jest.restoreAllMocks(); });
 test('ready synchronizes the exercise and playback; backgrounding pauses and resume restores playback', () => {
   act(() => { screen = create(<BodyPreview selected="curl" playing />); });
-  act(() => screen.root.findByType('NativePreview').props.onMessage({ nativeEvent: { data: '{"type":"spotter:model-ready"}' } }));
-  expect(commands).toContainEqual({ type: 'spotter:select', id: 'curl' });
+  act(() => screen.root.findByType('NativePreview').props.onMessage({ nativeEvent: { data: '{"type":"steadyforum:model-ready"}' } }));
+  expect(commands).toContainEqual({ type: 'steadyforum:select', id: 'curl' });
   act(() => appStateListener('active'));
-  expect(commands.at(-1)).toEqual({ type: 'spotter:pause', playing: true });
+  expect(commands.at(-1)).toEqual({ type: 'steadyforum:pause', playing: true });
   act(() => appStateListener('background'));
-  expect(commands.slice(-2)).toEqual([{ type: 'spotter:active', active: false }, { type: 'spotter:pause', playing: false }]);
+  expect(commands.slice(-2)).toEqual([{ type: 'steadyforum:active', active: false }, { type: 'steadyforum:pause', playing: false }]);
   act(() => appStateListener('active'));
-  expect(commands.at(-1)).toEqual({ type: 'spotter:pause', playing: true });
+  expect(commands.at(-1)).toEqual({ type: 'steadyforum:pause', playing: true });
   commands.length = 0;
   act(() => screen.update(<BodyPreview selected="curl" playing={false} />));
-  expect(commands).not.toContainEqual({ type: 'spotter:select', id: 'curl' });
-  expect(commands.at(-1)).toEqual({ type: 'spotter:pause', playing: false });
+  expect(commands).not.toContainEqual({ type: 'steadyforum:select', id: 'curl' });
+  expect(commands.at(-1)).toEqual({ type: 'steadyforum:pause', playing: false });
 });
 test('renderer failure exposes retry and retry remounts the bundled offline preview', () => {
   act(() => { screen = create(<BodyPreview selected="squat" playing={false} />); });
@@ -48,21 +48,21 @@ test('single-finger drag messages scroll the parent page without changing the mo
   const scroll = jest.fn();
   act(() => { screen = create(<PageScroll.Provider value={scroll}><BodyPreview selected="curl" playing /></PageScroll.Provider>); });
   commands.length = 0;
-  act(() => screen.root.findByType('NativePreview').props.onMessage({ nativeEvent: { data: '{"type":"spotter:model-scroll","delta":40}' } }));
+  act(() => screen.root.findByType('NativePreview').props.onMessage({ nativeEvent: { data: '{"type":"steadyforum:model-scroll","delta":40}' } }));
   expect(scroll).toHaveBeenCalledWith(40);
   expect(commands).toEqual([]);
 });
 
 test('rotation changes turn the figure without restarting its animation', () => {
   act(() => { screen = create(<BodyPreview selected="lunge" playing rotation={0} />); });
-  act(() => screen.root.findByType('NativePreview').props.onMessage({ nativeEvent: { data: '{"type":"spotter:model-ready"}' } }));
-  expect(commands).not.toContainEqual({ type: 'spotter:rotate', degrees: 0 });
+  act(() => screen.root.findByType('NativePreview').props.onMessage({ nativeEvent: { data: '{"type":"steadyforum:model-ready"}' } }));
+  expect(commands).not.toContainEqual({ type: 'steadyforum:rotate', degrees: 0 });
   commands.length = 0;
   act(() => screen.update(<BodyPreview selected="lunge" playing rotation={45} />));
-  expect(commands).toContainEqual({ type: 'spotter:rotate', degrees: 45 });
-  expect(commands).not.toContainEqual({ type: 'spotter:select', id: 'lunge' });
+  expect(commands).toContainEqual({ type: 'steadyforum:rotate', degrees: 45 });
+  expect(commands).not.toContainEqual({ type: 'steadyforum:select', id: 'lunge' });
   act(() => screen.update(<BodyPreview selected="lunge" playing rotation={0} />));
-  expect(commands).toContainEqual({ type: 'spotter:rotate', degrees: 0 });
+  expect(commands).toContainEqual({ type: 'steadyforum:rotate', degrees: 0 });
 });
 
 test('native scrolling owns one finger while two fingers zoom the model', () => {
@@ -76,5 +76,5 @@ test('native scrolling owns one finger while two fingers zoom the model', () => 
     pinch.onPanResponderGrant?.(touches(100) as never, {} as never);
     pinch.onPanResponderMove?.(touches(200) as never, {} as never);
   });
-  expect(commands).toContainEqual({ type: 'spotter:zoom', factor: .5 });
+  expect(commands).toContainEqual({ type: 'steadyforum:zoom', factor: .5 });
 });

@@ -1,4 +1,4 @@
-# Spotter API
+# SteadyForum API
 
 Express + TypeScript on Neon Postgres (Drizzle ORM, `@neondatabase/serverless`). See `Architecture.md` §9.
 
@@ -29,7 +29,7 @@ npm run dev            # http://localhost:3000/health
 
 Every teammate works on their own branch (`dev-<name>`), so migrations never collide with the demo.
 
-1. In the Neon console, open the `spotter` project, go to **Branches**, and copy the **pooled** connection string of `dev-<name>` into `DATABASE_URL` in `.env`.
+1. In the Neon console, open the `steadyforum` project, go to **Branches**, and copy the **pooled** connection string of `dev-<name>` into `DATABASE_URL` in `.env`.
 2. Change a schema file in `drizzle/schema/`.
 3. `npm run db:generate -- --name short_description` writes `drizzle/migrations/NNNN_short_description.sql`. Read it, then commit it with the schema change.
 4. `npm run db:migrate` applies it to your branch. It's safe to re-run; applied migrations are tracked in `drizzle.__drizzle_migrations`.
@@ -66,7 +66,7 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 
 - `POST /advice` with `{ "body": "..." }` saves the question as an `advice` post. It returns 201 with `{ post, outcome, reply, reason? }`, where `outcome` is `ai`, `fixed_pain` or `none`.
 - Moderation is the same as for posts: a blocked question is a 422 and nothing is saved.
-- The first answer is a normal comment, so `GET /posts/:id/comments` shows it. `ai_suggested: true` marks the AI answer and `sources` lists what it cites. `author: null` means Spotter posted it.
+- The first answer is a normal comment, so `GET /posts/:id/comments` shows it. `ai_suggested: true` marks the AI answer and `sources` lists what it cites. `author: null` means SteadyForum posted it.
 - Without `HF_TOKEN` there's no AI answer, but questions that mention pain still get the fixed reply.
 
 ## Recovery (BE-16, BE-17)
@@ -128,9 +128,9 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 | `NODE_ENV`, `PORT`, `LOG_LEVEL`                              | Server basics                                                                                                     | `development`, `3000`, `info`                                                                   |
 | `CORS_ORIGINS`                                               | Browser calls from the Expo web build                                                                             | No CORS headers (native apps don't need them)                                                   |
 | `DATABRICKS_HOST`, `_CLIENT_ID`, `_CLIENT_SECRET`            | Service principal for every Databricks call                                                                       | No uploads, scoring or sync                                                                     |
-| `SPOTTER_PSEUDONYM_SECRET`                                   | Pseudonymous user ids for Databricks (CONN-02, CONN-06, CONN-13). Never rotate it                                 | No uploads or sync; account deletion can't queue the Databricks delete                          |
-| `DATABRICKS_OAUTH_SCOPES`                                    | Scopes requested for the service principal                                                                        | `all-apis`, which `spotter-api` doesn't have: set `files model-serving sql`                     |
-| `DATABRICKS_VOLUME_PATH`                                     | Where finished sessions upload (CONN-02)                                                                          | `/Volumes/spotter/raw/sessions`                                                                 |
+| `STEADYFORUM_PSEUDONYM_SECRET`                                   | Pseudonymous user ids for Databricks (CONN-02, CONN-06, CONN-13). Never rotate it                                 | No uploads or sync; account deletion can't queue the Databricks delete                          |
+| `DATABRICKS_OAUTH_SCOPES`                                    | Scopes requested for the service principal                                                                        | `all-apis`, which `steadyforum-api` doesn't have: set `files model-serving sql`                     |
+| `DATABRICKS_VOLUME_PATH`                                     | Where finished sessions upload (CONN-02)                                                                          | `/Volumes/steadyforum/raw/sessions`                                                                 |
 | `DATABRICKS_SERVING_ENDPOINT`, `DATABRICKS_SCORE_TIMEOUT_MS` | Set scoring during rest (CONN-05)                                                                                 | The phone's rule score; 1200 ms budget. The endpoint scales to zero, so warm it before a demo   |
 | `DATABRICKS_WAREHOUSE_ID`                                    | Insight sync reads (CONN-06). The id is in the warehouse URL (`/sql/warehouses/<id>`), not the `?o=` workspace id | No sync                                                                                         |
 | `INSIGHT_SYNC_ENABLED`                                       | Starts the 15-minute gold → Neon sync on this instance. Set `true` on **exactly one** deployed instance           | Sync doesn't run here                                                                           |

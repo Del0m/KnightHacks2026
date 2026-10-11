@@ -99,7 +99,7 @@ function select(id){
 }
 buttons.forEach(button=>button.onclick=()=>select(button.dataset.exercise));
 pauseButton.onclick=()=>{const playing=movement.pause();pauseButton.textContent=playing?'Pause movement':'Resume movement';};
-try{const [gltf,dumbbell]=await Promise.all([new GLTFLoader().loadAsync('./rigged-human.glb'),new GLTFLoader().loadAsync('./dumbbell.glb')]);gltf.scene.traverse(o=>{if(o.isMesh){o.material=glass;o.frustumCulled=false;bodyMeshes.push(o);}});scene.add(gltf.scene);movement=createMovement(gltf.scene,dumbbell.scene);buttons.forEach(b=>b.disabled=false);document.body.classList.add('ready');status.textContent='';notify('spotter:model-ready');}catch(error){status.textContent='Model could not load. Please reload the preview.';notify('spotter:model-error');console.error(error)}
+try{const [gltf,dumbbell]=await Promise.all([new GLTFLoader().loadAsync('./rigged-human.glb'),new GLTFLoader().loadAsync('./dumbbell.glb')]);gltf.scene.traverse(o=>{if(o.isMesh){o.material=glass;o.frustumCulled=false;bodyMeshes.push(o);}});scene.add(gltf.scene);movement=createMovement(gltf.scene,dumbbell.scene);buttons.forEach(b=>b.disabled=false);document.body.classList.add('ready');status.textContent='';notify('steadyforum:model-ready');}catch(error){status.textContent='Model could not load. Please reload the preview.';notify('steadyforum:model-error');console.error(error)}
 let previous=performance.now();
 const orbit=new THREE.Spherical(),offset=new THREE.Vector3();
 renderer.setAnimationLoop(()=>{
@@ -130,13 +130,13 @@ renderer.setAnimationLoop(()=>{
 
 function receive(data){
  if(!movement)return;
- if(data?.type==='spotter:select'&&[null,'curl','squat','press','push_up','lunge'].includes(data.id))select(data.id);
- if(data?.type==='spotter:zoom')zoom(data.factor);
- if(data?.type==='spotter:rotate')rotate(data.degrees);
- if(data?.type==='spotter:pause'&&typeof data.playing==='boolean'&&movement.playing!==data.playing)movement.pause();
- if(data?.type==='spotter:active'&&typeof data.active==='boolean'){active=data.active;if(!active&&movement.playing)movement.pause();}
- if(data?.type==='spotter:motion'&&typeof data.reduced==='boolean')nativeReduced=data.reduced;
+ if(data?.type==='steadyforum:select'&&[null,'curl','squat','press','push_up','lunge'].includes(data.id))select(data.id);
+ if(data?.type==='steadyforum:zoom')zoom(data.factor);
+ if(data?.type==='steadyforum:rotate')rotate(data.degrees);
+ if(data?.type==='steadyforum:pause'&&typeof data.playing==='boolean'&&movement.playing!==data.playing)movement.pause();
+ if(data?.type==='steadyforum:active'&&typeof data.active==='boolean'){active=data.active;if(!active&&movement.playing)movement.pause();}
+ if(data?.type==='steadyforum:motion'&&typeof data.reduced==='boolean')nativeReduced=data.reduced;
 }
-if(window.ReactNativeWebView)window.spotterNativeReceive=receive;
+if(window.ReactNativeWebView)window.steadyforumNativeReceive=receive;
 window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===parent)receive(event.data);});
 </script></body></html>

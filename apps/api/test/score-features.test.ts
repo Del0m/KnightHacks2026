@@ -1,5 +1,5 @@
 // CONN-05: the API computes the form model's frame-derived features the same way the pipeline
-// does for training (databricks/pipelines/spotter_sessions/tests/test_feature_parity.py runs the
+// does for training (databricks/pipelines/steadyforum_sessions/tests/test_feature_parity.py runs the
 // same fixtures), and sends them to Model Serving.
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";

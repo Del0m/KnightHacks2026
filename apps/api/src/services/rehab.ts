@@ -10,7 +10,7 @@ import { HttpError, notFound } from "../http.js";
 const { rehabPlans, rehabLimits, exercises, injuries, sessions, sets, milestones } = schema;
 
 export const REHAB_DISCLAIMER =
-  "Spotter tracks your physio's plan. Any pain is worth raising with your physio or a doctor.";
+  "SteadyForum tracks your physio's plan. Any pain is worth raising with your physio or a doctor.";
 
 // GET /me/limits is read by the phone (AI-16, INT-07). Bump this when its shape changes.
 export const LIMITS_VERSION = 1;

@@ -82,7 +82,7 @@ jest.mock('expo-file-system', () => {
 
 import { checkForModelUpdates, downloadedModelUri } from '../modelUpdates';
 
-const REPO = 'bubblesmal/spotter-models';
+const REPO = 'bubblesmal/steadyforum-models';
 const url = (path: string) => `https://huggingface.co/${REPO}/resolve/main/${path}`;
 
 function publish(version: number, weights: string, corrupt = false) {

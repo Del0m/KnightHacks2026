@@ -100,7 +100,7 @@ describe("POST /advice", () => {
     expect(res.body.post).not.toHaveProperty("embedding");
     expect(res.body.outcome).toBe("ai");
     expect(res.body.reply).toMatchObject({
-      author_id: null, // posted by Spotter
+      author_id: null, // posted by SteadyForum
       ai_suggested: true,
       body: `The bodyweight squat is listed as a beginner strength exercise. ${ADVICE_DISCLAIMER}`,
       sources: [

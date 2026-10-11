@@ -15,7 +15,7 @@ async function bundle() {
   const imports = script.match(/import[^;]+;/g).join('');
   script = script.replace(/import[^;]+;/g, '');
   const result = await build({
-    stdin: { contents: `${imports}(async()=>{${script}})().catch(()=>window.ReactNativeWebView?.postMessage(JSON.stringify({type:'spotter:model-error'})));`, resolveDir: model },
+    stdin: { contents: `${imports}(async()=>{${script}})().catch(()=>window.ReactNativeWebView?.postMessage(JSON.stringify({type:'steadyforum:model-error'})));`, resolveDir: model },
     alias: { three: path.join(model, 'three.module.js') },
     bundle: true, minify: true, format: 'iife', target: 'es2020', write: false,
   });

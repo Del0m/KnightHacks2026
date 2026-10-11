@@ -1,0 +1,244 @@
+name: SteadyForum CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+
+jobs:
+  api:
+    name: API tests, types and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/api/package-lock.json
+            rag/package-lock.json
+            apps/mobile/package-lock.json
+      - name: Install API dependencies
+        run: npm ci
+      - name: Install RAG dependencies used by integration tests
+        run: npm ci --prefix ../../rag
+      - name: Install mobile dependencies for cross-package integration imports
+        run: npm ci --prefix ../mobile
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test API with in-memory Postgres
+        run: |
+          mkdir -p ../../test-results
+          npm test -- --reporter=default --reporter=junit --outputFile.junit=../../test-results/api.xml
+      - name: Upload API report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: api-test-results
+          path: test-results/api.xml
+          retention-days: 7
+          if-no-files-found: warn
+
+  mobile:
+    name: Mobile tests, types and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          package_json_file: apps/mobile/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: apps/mobile/pnpm-lock.yaml
+      - name: Install mobile dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Test mobile app
+        run: |
+          mkdir -p ../../test-results
+          pnpm test --ci --runInBand --json --outputFile=../../test-results/mobile.json
+      - name: Upload mobile report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mobile-test-results
+          path: test-results/mobile.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  contracts:
+    name: Schemas and labelling tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Validate exercise definitions
+        run: node specs/validate.mjs
+      - name: Test shared contracts and labelling
+        run: |
+          mkdir -p test-results
+          node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/contracts.xml specs/*.test.mjs ml/labelling/tests/*.test.mjs
+      - name: Upload contract report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: contract-test-results
+          path: test-results/contracts.xml
+          retention-days: 7
+          if-no-files-found: warn
+
+  python:
+    name: Model export, cloud pose and synthetic data tests
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ml/pose_export
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: '3.11'
+          enable-cache: true
+          cache-dependency-glob: ml/pose_export/uv.lock
+      - name: Install OpenMP runtime required by XGBoost
+        run: brew install libomp
+      - name: Install locked ML test dependencies
+        run: uv sync --locked --group dev
+      - name: Test exports, real cloud inference and synthetic sessions
+        run: |
+          mkdir -p ../../test-results
+          # Keep Torch pose inference and XGBoost notebook tests in separate processes.
+          uv run --locked --no-sync pytest tests ../cloud_endpoint/tests -q --junitxml=../../test-results/python.xml
+          uv run --locked --no-sync pytest ../../databricks/notebooks/tests -q --junitxml=../../test-results/notebooks.xml
+      - name: Upload Python report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: python-test-results
+          path: |
+            test-results/python.xml
+            test-results/notebooks.xml
+          retention-days: 7
+          if-no-files-found: warn
+
+  spark:
+    name: Spark pipeline integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: databricks/pipelines
+    env:
+      PYSPARK_PYTHON: ${{ github.workspace }}/databricks/pipelines/.venv/bin/python
+      PYSPARK_DRIVER_PYTHON: ${{ github.workspace }}/databricks/pipelines/.venv/bin/python
+      SPARK_LOCAL_IP: 127.0.0.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: '3.11'
+          enable-cache: true
+          cache-dependency-glob: databricks/pipelines/uv.lock
+      - name: Install locked Spark test dependencies
+        run: uv sync --locked
+      - name: Test bronze, silver and gold pipelines
+        run: |
+          mkdir -p ../../test-results
+          uv run --locked --no-sync pytest -q --junitxml=../../test-results/spark.xml
+      - name: Upload Spark report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: spark-test-results
+          path: test-results/spark.xml
+          retention-days: 7
+          if-no-files-found: warn
+
+  swift:
+    name: Native Swift pose tests
+    runs-on: macos-15
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ml/pose_export/PoseBench/PoseCore
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Test native pose processing
+        run: |
+          mkdir -p ../../../../test-results
+          set -o pipefail
+          swift test 2>&1 | tee ../../../../test-results/swift.log
+      - name: Upload Swift report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: swift-test-results
+          path: test-results/swift.log
+          retention-days: 7
+          if-no-files-found: warn
+
+  all-checks:
+    name: All checks passed
+    if: always()
+    needs: [api, mobile, contracts, python, spark, swift]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every test job to succeed
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          printf '%s\n' '| Job | Result |' '| --- | --- |' >> "$GITHUB_STEP_SUMMARY"
+          jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"' <<< "$JOB_RESULTS" >> "$GITHUB_STEP_SUMMARY"
+          jq -e 'all(.[]; .result == "success")' <<< "$JOB_RESULTS"

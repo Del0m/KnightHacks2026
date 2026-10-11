@@ -12,10 +12,10 @@ export default function Html({ children }: { children: ReactNode }) {
         <meta name="description" content="SteadyForum. Workout tracking and community." />
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: `
-          :root { --spotter-background: ${colors.background}; --spotter-surface: ${colors.surface};
-            --spotter-text: ${colors.text}; --spotter-muted: ${colors.muted};
-            --spotter-blue: ${colors.primary}; --spotter-sky: ${colors.primarySoft};
-            --spotter-border: ${colors.border}; color-scheme: light; }
+          :root { --steadyforum-background: ${colors.background}; --steadyforum-surface: ${colors.surface};
+            --steadyforum-text: ${colors.text}; --steadyforum-muted: ${colors.muted};
+            --steadyforum-blue: ${colors.primary}; --steadyforum-sky: ${colors.primarySoft};
+            --steadyforum-border: ${colors.border}; color-scheme: light; }
           [data-testid^="exercise-"] { transition: background-color 350ms ease, border-color 350ms ease; }
           [data-testid="glass-playback"], [data-testid="glass-navigation"], [data-testid="glass-action"] {
             isolation: isolate; overflow: hidden; background-color: rgba(236,248,255,.2) !important;
@@ -28,9 +28,9 @@ export default function Html({ children }: { children: ReactNode }) {
             -webkit-backdrop-filter: blur(7px) saturate(150%);
             backdrop-filter: blur(7px) saturate(150%);
           }
-          @supports (backdrop-filter: url(#spotter-glass-lens)) {
+          @supports (backdrop-filter: url(#steadyforum-glass-lens)) {
             [data-testid="glass-playback"]::before, [data-testid="glass-navigation"]::before, [data-testid="glass-action"]::before {
-              backdrop-filter: url(#spotter-glass-lens) blur(3px) saturate(150%);
+              backdrop-filter: url(#steadyforum-glass-lens) blur(3px) saturate(150%);
             }
           }
           [data-testid="glass-action"] { background-color: rgba(109,180,223,.32) !important; }
@@ -47,17 +47,17 @@ export default function Html({ children }: { children: ReactNode }) {
             [role="button"]:not([aria-disabled="true"]):hover, [role="tab"]:hover, [role="radio"]:hover, [role="checkbox"]:hover { scale: 1.02; }
           }
           input { transition: border-color 200ms ease, box-shadow 200ms ease; }
-          input:focus { border-color: var(--spotter-blue); box-shadow: 0 2px 0 rgba(78,162,213,.2); }
+          input:focus { border-color: var(--steadyforum-blue); box-shadow: 0 2px 0 rgba(78,162,213,.2); }
           @media (prefers-reduced-motion: reduce) { [role="button"], [role="tab"], [role="radio"], [role="checkbox"], input, [data-testid^="exercise-"] { transition: none; scale: 1 !important; } }
-          body { background: var(--spotter-background); color: var(--spotter-text); }
+          body { background: var(--steadyforum-background); color: var(--steadyforum-text); }
           a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [role="tab"]:focus-visible {
-            outline: 3px solid var(--spotter-blue); outline-offset: 4px;
+            outline: 3px solid var(--steadyforum-blue); outline-offset: 4px;
           }
         ` }} />
       </head>
       <body>
         <svg aria-hidden="true" width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }}>
-          <defs><filter id="spotter-glass-lens" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+          <defs><filter id="steadyforum-glass-lens" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
             <feTurbulence type="fractalNoise" baseFrequency="0.012 0.035" numOctaves="1" seed="4" result="lens" />
             <feDisplacementMap in="SourceGraphic" in2="lens" scale="14" xChannelSelector="R" yChannelSelector="G" />
           </filter></defs>

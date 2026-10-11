@@ -3,14 +3,14 @@ import { Text, View } from 'react-native';
 import { useCameraPermission } from 'react-native-vision-camera';
 import { PoseDebugScreen } from '../PoseDebugScreen';
 import { usePoseOutput } from '../usePoseOutput';
-import { benchmarkPoseModel } from 'spotter-pose';
+import { benchmarkPoseModel } from 'steadyforum-pose';
 import { __clearPoseStoreForTests } from '../modeStore';
 import { __resetPoseModeForTests, startPoseBenchmark } from '../usePoseMode';
 
 const { act, create } = require('react-test-renderer');
 
 jest.mock('../usePoseOutput', () => ({ usePoseOutput: jest.fn() }));
-jest.mock('spotter-pose', () => ({ benchmarkPoseModel: jest.fn(), getPoseModelId: jest.fn(() => 'model-a') }));
+jest.mock('steadyforum-pose', () => ({ benchmarkPoseModel: jest.fn(), getPoseModelId: jest.fn(() => 'model-a') }));
 jest.mock('../PoseSkeleton', () => ({
   PoseSkeleton: (props: unknown) => require('react').createElement('PoseSkeleton', props),
 }));

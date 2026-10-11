@@ -30,9 +30,9 @@ export const envSchema = z.object({
   DATABRICKS_CLIENT_SECRET: optional,
   // CONN-06: the gold-table sync also needs the SQL warehouse.
   DATABRICKS_WAREHOUSE_ID: optional,
-  SPOTTER_PSEUDONYM_SECRET: optional,
+  STEADYFORUM_PSEUDONYM_SECRET: optional,
   // OAuth scopes assigned to the service principal, space-separated (e.g. "files model-serving sql").
-  // Defaults to "all-apis", which spotter-api doesn't have, so set it.
+  // Defaults to "all-apis", which steadyforum-api doesn't have, so set it.
   DATABRICKS_OAUTH_SCOPES: optional,
   DATABRICKS_VOLUME_PATH: optional.refine(
     (v) => v === undefined || v.startsWith("/Volumes/"),
@@ -88,7 +88,7 @@ export function databricksConfigured(env: Env): boolean {
     env.DATABRICKS_HOST &&
     env.DATABRICKS_CLIENT_ID &&
     env.DATABRICKS_CLIENT_SECRET &&
-    env.SPOTTER_PSEUDONYM_SECRET,
+    env.STEADYFORUM_PSEUDONYM_SECRET,
   );
 }
 

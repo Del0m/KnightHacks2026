@@ -11,7 +11,6 @@
 //
 // --demo targets DEMO_DATABASE_URL (the branch the demo app reads); otherwise DATABASE_URL.
 // Reads apps/api/.env. Nothing here changes Databricks; steps 4-5 write to the chosen Neon branch.
-import { runClip } from "../../mobile/src/engine/__fixtures__/run.js";
 import { createNeonDb } from "../src/db.js";
 import { DatabricksScorer, scoreConfigFromEnv } from "../src/integrations/databricks/score.js";
 import { hfEmbedder } from "../src/integrations/huggingface/embeddings.js";
@@ -92,7 +91,7 @@ await step(`Insight sync into ${useDemo ? "DEMO" : "DATABASE"}_URL`, async () =>
   try {
     const r = await runInsightSync({ db: { query }, config: syncConfigFromEnv(env as never), log: { info() {}, error() {} } });
     if (r.failed.length) throw new Error(`synced, but couldn't read: ${r.failed.map((f) => f.table).join(", ")}`);
-    if (r.progress + r.risk + r.rom === 0) throw new Error("ran, but matched no users: is this branch seeded, with the same SPOTTER_PSEUDONYM_SECRET?");
+    if (r.progress + r.risk + r.rom === 0) throw new Error("ran, but matched no users: is this branch seeded, with the same STEADYFORUM_PSEUDONYM_SECRET?");
     return `${r.progress} progress, ${r.risk} risk, ${r.rom} range-of-motion rows`;
   } finally {
     await close();

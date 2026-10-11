@@ -176,7 +176,7 @@ The validator checks the ordering both for the base spec and for the result of a
 
 **Several injuries (AI-07):** apply the overrides in the order `knee`, `shoulder`, `lower_back`. For a numeric value, keep the more conservative one: whichever is less far past `start_exit` in the rep's direction for `target`/`count_min`, and the stricter bound for rule values. Specs only define single-injury overrides.
 
-Overrides lower demands or tighten safety limits. Spotter never diagnoses or prescribes. A physio's own limits (`REHAB_LIMIT`) are applied by AI-07 on top and are out of scope here.
+Overrides lower demands or tighten safety limits. SteadyForum never diagnoses or prescribes. A physio's own limits (`REHAB_LIMIT`) are applied by AI-07 on top and are out of scope here.
 
 ## Tone rules (validator-enforced)
 

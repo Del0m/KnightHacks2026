@@ -71,7 +71,7 @@ The confidence and visibility values come out of the exported model already squa
 
 This is what `PoseDecoder.decode` does. A server running the raw model should do the same.
 
-1. **Pick one person.** Take the column with the highest row-4 value. Spotter tracks one lifter, so there's no need for non-maximum suppression (the usual step that merges overlapping detections of several people).
+1. **Pick one person.** Take the column with the highest row-4 value. SteadyForum tracks one lifter, so there's no need for non-maximum suppression (the usual step that merges overlapping detections of several people).
 2. **Threshold.** If that confidence is below **0.25**, there's no person: return nothing.
 3. **Undo the letterbox.** Vision's `.scaleFit` shrank the frame to fit inside the square input and padded the rest equally on both sides. With frame size `W × H` and input size `S`:
 
@@ -164,14 +164,14 @@ Basic mode is a manual, iPhone-only option that uses Apple Vision body pose inst
 - **Same frame path.** It uses the same Vision Camera frame output, throttle and `ImageOrientation` calibration as the Core ML detector.
 - **Different request.** `VNDetectHumanBodyPoseRequest` replaces `VNCoreMLRequest`. There is no square model input, so there is no letterbox to undo.
 - **Same result.** `VisionPoseMapper` converts Vision's points to a `PoseResult` with `source = "vision"`. The joint mapping, y flip and score rule are in [pose-result-contract.md](pose-result-contract.md#apple-vision-mapping).
-- **JS entry.** `useBasicPoseOutput` in `src/pose/basic.ts`, or `usePoseOutput({ engine: 'vision' })`. Both call `createBasicPoseDetector()` from `spotter-pose`, backed by the native `HybridBasicPoseDetector`. Both detectors share `PoseFrameReader` for orientation and timestamps.
+- **JS entry.** `useBasicPoseOutput` in `src/pose/basic.ts`, or `usePoseOutput({ engine: 'vision' })`. Both call `createBasicPoseDetector()` from `steadyforum-pose`, backed by the native `HybridBasicPoseDetector`. Both detectors share `PoseFrameReader` for orientation and timestamps.
 - **Debug screen.** A Core ML / Vision toggle switches detectors on the same camera feed.
 
 ## In-app benchmark and mode selection (AI-04)
 
 On first launch an iPhone measures YOLOv8n-pose and picks a pose mode (Architecture §4.1). Unlike PoseBench's 10 s camera run above, this check is short, silent and needs no camera.
 
-- **Native loop.** `benchmarkPoseModel(size, warmUpMs, measureMs)` on the `spotter-pose` factory runs on a serial background queue and returns a promise.
+- **Native loop.** `benchmarkPoseModel(size, warmUpMs, measureMs)` on the `steadyforum-pose` factory runs on a serial background queue and returns a promise.
   - It builds one mid-gray 1080×1920 frame in the camera's own pixel format (`420f`), so Vision does the same conversion and scaling as on a live frame.
   - It runs `PoseModelRunner`, the same model, request and decode code as the live `HybridPoseDetector`.
   - The first inference pays for Core ML's lazy model load and is never counted.

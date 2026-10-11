@@ -60,7 +60,7 @@ export const comments = pgTable(
     body: text().notNull(),
     aiSuggested: boolean().notNull().default(false),
     // BE-11: what an AI-suggested answer cites, shown under it: [{ id, kind, title, url, post_id }].
-    // A comment with no author is posted by Spotter itself (the AI answer or the fixed pain reply).
+    // A comment with no author is posted by SteadyForum itself (the AI answer or the fixed pain reply).
     sources: jsonb(),
     // INT-04: false when moderation was unreachable at posting; jobs/recheckModeration.ts re-checks.
     moderationChecked: boolean().notNull().default(true),

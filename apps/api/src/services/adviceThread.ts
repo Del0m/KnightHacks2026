@@ -5,7 +5,7 @@
 //   2. sources are retrieved with pgvector: the nearest injury-note sections and exercises in
 //      doc_chunks, and community answers to similar advice questions the asker can see
 //   3. the writer's result is stored as the first comment: the AI answer (ai_suggested, with the
-//      sources it cites) or the fixed pain reply. Neither has an author: Spotter posts them.
+//      sources it cites) or the fixed pain reply. Neither has an author: SteadyForum posts them.
 // Moderation runs before any of this, in the route.
 //
 // Every step after the post is saved is best-effort: if embedding, retrieval or the model fails,
@@ -204,7 +204,7 @@ export async function askAdvice(
       .insert(comments)
       .values({
         postId: post!.id,
-        authorId: null, // posted by Spotter
+        authorId: null, // posted by SteadyForum
         body: answer.text,
         aiSuggested: answer.kind === "ai",
         sources:

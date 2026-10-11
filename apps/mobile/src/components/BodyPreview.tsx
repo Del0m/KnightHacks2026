@@ -30,7 +30,7 @@ export function BodyPreview({ selected, playing, height = 300, rotation = 0 }: {
       onPanResponderGrant: event => { pinchDistance.current = distance(event.nativeEvent.touches); },
       onPanResponderMove: event => {
         const next = distance(event.nativeEvent.touches), previous = pinchDistance.current;
-        if (next > 8 && previous > 8) send({ type: 'spotter:zoom', factor: Math.max(.5, Math.min(2, previous / next)) });
+        if (next > 8 && previous > 8) send({ type: 'steadyforum:zoom', factor: Math.max(.5, Math.min(2, previous / next)) });
         pinchDistance.current = next;
       },
       onPanResponderRelease: () => { pinchDistance.current = 0; },
@@ -41,24 +41,24 @@ export function BodyPreview({ selected, playing, height = 300, rotation = 0 }: {
   /* eslint-enable react-hooks/refs, react-hooks/preserve-manual-memoization */
   const syncPlayback = useCallback(() => {
     const active = focused.current && foreground.current;
-    send({ type: 'spotter:active', active });
-    send({ type: 'spotter:pause', playing: active && playing });
+    send({ type: 'steadyforum:active', active });
+    send({ type: 'steadyforum:pause', playing: active && playing });
   }, [playing, send]);
   const syncSelection = useEffectEvent(() => {
-    send({ type: 'spotter:motion', reduced: reduced !== false });
-    send({ type: 'spotter:select', id: selected });
+    send({ type: 'steadyforum:motion', reduced: reduced !== false });
+    send({ type: 'steadyforum:select', id: selected });
     rotationSent.current = rotation;
-    if (rotation) send({ type: 'spotter:rotate', degrees: rotation });
+    if (rotation) send({ type: 'steadyforum:rotate', degrees: rotation });
     syncPlayback();
   });
   useEffect(() => { if (ready) syncSelection(); }, [selected, ready]);
-  useEffect(() => { if (ready && rotation !== rotationSent.current) { send({ type: 'spotter:rotate', degrees: rotation }); rotationSent.current = rotation; } }, [rotation, ready, send]);
+  useEffect(() => { if (ready && rotation !== rotationSent.current) { send({ type: 'steadyforum:rotate', degrees: rotation }); rotationSent.current = rotation; } }, [rotation, ready, send]);
   useEffect(() => { if (ready) syncPlayback(); }, [playing, ready, syncPlayback]);
-  useEffect(() => { if (ready) send({ type: 'spotter:motion', reduced: reduced !== false }); }, [reduced, ready, send]);
+  useEffect(() => { if (ready) send({ type: 'steadyforum:motion', reduced: reduced !== false }); }, [reduced, ready, send]);
   useFocusEffect(useCallback(() => {
     focused.current = true;
     if (ready) syncPlayback();
-    return () => { focused.current = false; send({ type: 'spotter:active', active: false }); };
+    return () => { focused.current = false; send({ type: 'steadyforum:active', active: false }); };
   }, [ready, send, syncPlayback]));
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => { foreground.current = state === 'active'; if (ready) syncPlayback(); });

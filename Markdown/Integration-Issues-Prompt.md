@@ -11,7 +11,7 @@ The 75 existing issues (DB, BE, FE, AI, CONN and PITCH) each build one piece. Th
 - **The set record is defined in three places.**
   - `upload.ts` has a `FinishedSession` stub "mirroring AI-08".
   - `score.ts` has a `ScoreRep` stub.
-  - `databricks/pipelines/spotter_sessions/bronze.py` has explicit Spark schemas with the comment "Keep them in sync with upload.ts".
+  - `databricks/pipelines/steadyforum_sessions/bronze.py` has explicit Spark schemas with the comment "Keep them in sync with upload.ts".
   - AI-08 (`apps/mobile/src/engine/setRecord.ts`) and DB-04 (the Neon `sets`, `reps` and `form_flags` tables) will each add a fourth and fifth copy.
 - **Identifiers already disagree:**
   - **Exercise ids:** the FE catalogue in `apps/mobile/src/data/workout.ts` uses `'curl' | 'squat' | 'press'`. The specs in `specs/exercises/*.json` use `bicep_curl`, `squat`, `shoulder_press`, `push_up` and `lunge`.
@@ -42,7 +42,7 @@ Read them fully. The issues must cite real paths and sections.
 2. **`issues/issues.json`.** All 75 issues; read each body and its "Depends on". `issues/create_issues.sh` shows how they were created.
 3. **What's live on GitHub:** `gh issue list --repo Del0m/KnightHacks2026 --state all --limit 200`. Note which are closed. CONN-01 to CONN-09 and AI-01 to AI-05 are closed.
 4. **PR #83 body:** `gh pr view 83 --repo Del0m/KnightHacks2026`. Its "Needs follow-up before it runs in the app" list is integration work that no issue owns yet.
-5. **The PR #83 code:** the files under `apps/api/src/`, `databricks/pipelines/spotter_sessions/*.py`, `databricks/setup.sql` and `rag/`. Read the header comment of each file; they list their stubs.
+5. **The PR #83 code:** the files under `apps/api/src/`, `databricks/pipelines/steadyforum_sessions/*.py`, `databricks/setup.sql` and `rag/`. Read the header comment of each file; they list their stubs.
 6. **The engine:** `docs/superpowers/specs/2026-10-10-form-engine-design.md` and `apps/mobile/src/engine/` (`types.ts`, `engine.ts`, `useFormEngine.ts`, `recording.ts`, `specs.ts`). AI-06 is in progress on branch `ai-06-form-engine`, and these files may not be on `main` yet. Check with `git status` and `git log`. `recording.ts` defines the recorded-clip format, which an end-to-end test can reuse. `apps/mobile/metro.config.js` adds `../../specs` to `watchFolders`, so specs are bundled into the app.
 7. **The pose layer:** `docs/pose/pose-result-contract.md` and `apps/mobile/src/pose/` (`types.ts`, `mode.ts`, `usePoseMode.ts`, `usePoseOutput.ts`).
 8. **The FE app:** `apps/mobile/src/app/` (expo-router tabs, `workout.tsx`), `src/screens/*`, `src/state/Training.tsx` and `src/data/workout.ts`. The FE issues say `src/screens/LiveSet/`, while the app actually routes through `src/app/`. The issues need to name the real location.

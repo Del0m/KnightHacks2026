@@ -1,4 +1,4 @@
-// BE-11: ask the community for advice; Spotter adds a suggested first answer (Architecture §10.2).
+// BE-11: ask the community for advice; SteadyForum adds a suggested first answer (Architecture §10.2).
 //
 //   POST /advice { body }  -> 201 { post, outcome, reply, reason? }
 //     outcome "ai"          reply is the AI-suggested comment (ai_suggested: true, with its sources)

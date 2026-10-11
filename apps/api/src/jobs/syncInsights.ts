@@ -1,9 +1,10 @@
 // CONN-06: every 15 minutes, copy gold tables from Databricks into Neon (Architecture §11.3).
 // The app only ever reads Neon, so it never waits on a cold warehouse or a spent quota.
 //
-//   spotter.gold.gold_user_progress_daily -> progress_daily   key (user_id, date, exercise_id)
-//   spotter.gold.gold_injury_risk_scores  -> risk_insights    key (user_id, body_part, as_of)
-//   spotter.gold.gold_rom_trend           -> rom_trend        key (user_id, angle, side, week)
+//   steadyforum.gold.gold_user_progress_daily -> progress_daily   key (user_id, date, exercise_id)
+//   steadyforum.gold.gold_injury_risk_scores  -> risk_insights    key (user_id, body_part, as_of)
+//     (AI-14: gold_injury_risk_model_scores is read first; see readRiskRows)
+//   steadyforum.gold.gold_rom_trend           -> rom_trend        key (user_id, angle, side, week)
 //
 // Databricks only knows pseudonymous ids (CONN-02), so we map them back by computing the
 // pseudonym of every Neon user. Rows for unknown pseudonyms (deleted accounts, synthetic demo
@@ -24,6 +25,7 @@ import { pseudonymize } from "../integrations/databricks/upload";
 export const SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const BATCH_SIZE = 500;
 const ROM_LOOKBACK_DAYS = 120;
+const DEFAULT_LOOKBACK_DAYS = 49;
 
 // ---- Config ----
 
@@ -44,7 +46,7 @@ type SyncEnv = Pick<
   | "DATABRICKS_CLIENT_SECRET"
   | "DATABRICKS_OAUTH_SCOPES"
   | "DATABRICKS_WAREHOUSE_ID"
-  | "SPOTTER_PSEUDONYM_SECRET"
+  | "STEADYFORUM_PSEUDONYM_SECRET"
   | "SYNC_LOOKBACK_DAYS"
 >;
 
@@ -55,7 +57,7 @@ export function syncConfigFromEnv(env: SyncEnv = process.env): SyncConfig {
     "DATABRICKS_CLIENT_ID",
     "DATABRICKS_CLIENT_SECRET",
     "DATABRICKS_WAREHOUSE_ID",
-    "SPOTTER_PSEUDONYM_SECRET",
+    "STEADYFORUM_PSEUDONYM_SECRET",
   ] as const;
   const missing = required.filter((k) => !env[k]);
   if (missing.length) throw new Error(`Missing env for insight sync: ${missing.join(", ")}`);
@@ -66,8 +68,8 @@ export function syncConfigFromEnv(env: SyncEnv = process.env): SyncConfig {
     clientSecret: env.DATABRICKS_CLIENT_SECRET!,
     scopes: env.DATABRICKS_OAUTH_SCOPES || "all-apis",
     warehouseId: env.DATABRICKS_WAREHOUSE_ID!,
-    pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET!,
-    lookbackDays: Number(env.SYNC_LOOKBACK_DAYS) || 49,
+    pseudonymSecret: env.STEADYFORUM_PSEUDONYM_SECRET!,
+    lookbackDays: Number(env.SYNC_LOOKBACK_DAYS) || DEFAULT_LOOKBACK_DAYS,
   };
 }
 
@@ -148,9 +150,73 @@ export function explainRisk(bodyPart: string, features: string[]): string {
 
 // ---- Databricks ----
 
+// AI-14: the trained model's scores (risk_model.py) win when they exist and are fresh; until then,
+// or if that table is empty, stale or unreadable, the heuristic scores are used as before. Both
+// tables have the same columns and the same top_features family names, so the upsert and
+// explainRisk() don't care.
+export type RiskSource = "model" | "heuristic";
+const RISK_TABLES: Record<RiskSource, string> = {
+  model: "steadyforum.gold.gold_injury_risk_model_scores",
+  heuristic: "steadyforum.gold.gold_injury_risk_scores",
+};
+// The scoring job runs daily; a latest run older than this means it has stopped.
+export const MODEL_MAX_AGE_HOURS = 36;
+
+const riskStatement = (table: string, days: number, extra = "") => `
+      SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features${extra}
+      FROM ${table}
+      WHERE date >= date_sub(current_date(), ${days}) AND score IS NOT NULL`;
+
+// Age of the model's latest scoring run, on Databricks' clock so the API's clock doesn't matter.
+const modelStatement = (days: number) =>
+  riskStatement(
+    RISK_TABLES.model,
+    days,
+    ",\n             timestampdiff(MINUTE, max(scored_at) OVER (), current_timestamp()) AS scored_minutes_ago",
+  );
+
+type ModelRow = RiskRow & { scored_minutes_ago?: number | null };
+
+// Why the model rows can't be used, or null when they're fresh. A missing column (undefined) is
+// trusted; a null age means no row has a scored_at.
+function modelStaleness(rows: ModelRow[]): string | null {
+  const ages = rows.map((r) => r.scored_minutes_ago).filter((a) => a !== undefined);
+  if (ages.some((a) => a === null || Number.isNaN(Number(a)))) return "stale (no scored_at)";
+  const oldest = Math.max(...ages.map(Number));
+  if (oldest > MODEL_MAX_AGE_HOURS * 60) {
+    return `stale (latest scores ${Math.floor(oldest / 60)} h old, limit ${MODEL_MAX_AGE_HOURS} h)`;
+  }
+  return null;
+}
+
+// If the heuristic read throws too, the error propagates so the caller can leave Neon as it was.
+export async function readRiskRows(
+  query: (sql: string) => Promise<RiskRow[]>,
+  log: LogLike = console,
+  days = DEFAULT_LOOKBACK_DAYS,
+): Promise<{ rows: RiskRow[]; source: RiskSource }> {
+  let why: string;
+  try {
+    const modelRows = (await query(modelStatement(days))) as ModelRow[];
+    const stale = modelRows.length > 0 ? modelStaleness(modelRows) : null;
+    if (modelRows.length > 0 && !stale) {
+      // Back to the plain RiskRow shape for the upsert.
+      const rows = modelRows.map(({ scored_minutes_ago: _age, ...row }) => row);
+      log.info(`[insights] risk scores from ${RISK_TABLES.model} (${rows.length} rows)`);
+      return { rows, source: "model" };
+    }
+    why = stale ?? "no rows";
+  } catch (err) {
+    why = err instanceof Error ? err.message.split("\n")[0]! : String(err);
+  }
+  const rows = await query(riskStatement(RISK_TABLES.heuristic, days));
+  log.info(`[insights] risk scores from ${RISK_TABLES.heuristic} (model table: ${why})`);
+  return { rows, source: "heuristic" };
+}
+
 async function getToken(cfg: SyncConfig): Promise<string> {
   // Our own OAuth M2M call so we can request the service principal's scopes; the driver's
-  // built-in OAuth asks for "all-apis", which spotter-api doesn't have.
+  // built-in OAuth asks for "all-apis", which steadyforum-api doesn't have.
   const basic = Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString("base64");
   const res = await fetch(`${cfg.host}/oidc/v1/token`, {
     method: "POST",
@@ -197,17 +263,21 @@ export async function readGold(cfg: SyncConfig, log: LogLike = console): Promise
       SELECT user_id, CAST(session_date AS STRING) AS date, exercise_id,
              sets, reps, clean_reps, clean_share, volume_kg,
              avg_range_deg, avg_quality, est_1rm_kg, is_pr
-      FROM spotter.gold.gold_user_progress_daily
+      FROM steadyforum.gold.gold_user_progress_daily
       WHERE session_date >= date_sub(current_date(), ${days})`);
-    const risk = await read<RiskRow>("gold_injury_risk_scores", `
-      SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features
-      FROM spotter.gold.gold_injury_risk_scores
-      WHERE date >= date_sub(current_date(), ${days}) AND score IS NOT NULL`);
+    // Model first, heuristic fallback; only a failed heuristic read counts as a failed table.
+    let risk: RiskRow[] | null = null;
+    try {
+      risk = (await readRiskRows((sql) => run<RiskRow>(sql), log, days)).rows;
+    } catch (err) {
+      const error = err instanceof Error ? err.message.split("\n")[0]! : String(err);
+      failed.push({ table: "gold_injury_risk_scores", error });
+    }
     // Range of motion is charted from the start of a rehab plan, so it looks further back.
     const rom = await read<RomRow>("gold_rom_trend", `
       SELECT user_id, angle, side, CAST(week AS STRING) AS week, peak_range_deg,
              baseline_range_deg, healthy_side_range_deg, change_deg
-      FROM spotter.gold.gold_rom_trend
+      FROM steadyforum.gold.gold_rom_trend
       WHERE week >= date_sub(current_date(), ${Math.max(days, ROM_LOOKBACK_DAYS)})`);
     return { progress, risk, rom, failed };
   } finally {
