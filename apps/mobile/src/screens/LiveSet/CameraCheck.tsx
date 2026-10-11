@@ -52,6 +52,10 @@ function ModeCheck({ exercise, local, onUseLocal, onContinue }: { exercise: stri
   useEffect(() => { void startPoseBenchmark(); }, []);
   if (mode.benchmarking || mode.mode === 'pending') return <View style={s.group}><ActivityIndicator accessibilityLabel="Preparing the camera" color={c.primary} /><Text style={s.text}>Getting the camera ready…</Text><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} /></View>;
   const cloudMode = mode.mode === 'cloud' || mode.mode === 'paused';
+  if (mode.mode === 'unavailable' && mode.needsCloudConsent && userId) return <View style={s.group}>
+    <Text style={s.heading}>Turn on cloud tracking?</Text><Text style={s.text}>This iPhone is too slow to track reps on its own. Cloud tracking sends camera frames to the SteadyForum API for pose detection. Frames are processed in memory and never stored.</Text>
+    <GlassChoice label="Allow cloud tracking" primary selected onPress={() => mode.setCloudConsent(true)} /><GlassChoice compact label="Use basic tracking" onPress={() => mode.setPreference('vision')} /><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />
+  </View>;
   if (!cloudMode && mode.mode !== 'coreml' && mode.mode !== 'vision') return <View style={s.group}>
     <Text style={s.heading}>Try basic on-device tracking.</Text><Text style={s.text}>The main tracker isn’t available on this phone right now. Basic tracking uses Apple Vision on your iPhone.</Text>
     <GlassChoice label="Use basic tracking" primary selected onPress={() => mode.setPreference('vision')} /><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />

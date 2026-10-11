@@ -10,7 +10,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.knighthacks.steadyforum",
       "infoPlist": {
-        "NSCameraUsageDescription": "SteadyForum uses the camera to see your form. Video never leaves your phone."
+        "NSCameraUsageDescription": "SteadyForum uses the camera to see your form. Frames are processed on your iPhone or, if you turn on cloud tracking, sent to SteadyForum for pose detection and never stored."
       }
     },
     "android": {

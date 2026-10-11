@@ -13,6 +13,7 @@ import { restNote } from '../engine/rules';
 import type { ExerciseSpec, RepResult } from '../engine/types';
 import { createPoseClock } from '../engine/poseClock';
 import { createClipRecorder } from '../engine/recording';
+import { useAuth } from '../screens/Auth/session';
 
 type Size = { width: number; height: number };
 
@@ -76,7 +77,8 @@ export function PoseDebugScreen() {
 }
 
 function PoseCamera() {
-  const poseMode = usePoseMode();
+  const auth = useAuth();
+  const poseMode = usePoseMode(auth.user?.id ?? null);
   const [position, setPosition] = useState<'front' | 'back'>('front');
   // The camera's detector would compete with the benchmark for the Neural Engine, so it is unmounted.
   if (poseMode.benchmarking) {
