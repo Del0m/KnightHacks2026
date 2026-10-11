@@ -11,6 +11,7 @@ import { buddiesRouter } from "./routes/buddies.js";
 import { exercisesRouter } from "./routes/exercises.js";
 import { feedRouter } from "./routes/feed.js";
 import { healthRouter } from "./routes/health.js";
+import { mediaRouter } from "./routes/media.js";
 import { meRouter } from "./routes/me.js";
 import { plansRouter } from "./routes/plans.js";
 import { progressRouter } from "./routes/progress.js";
@@ -22,6 +23,7 @@ import { socialRouter } from "./routes/social.js";
 import { disabledExportQueue, JointsBuffer, type ExportQueue } from "./services/exportQueue.js";
 import { AdviceWriter } from "./services/advice.js";
 import type { AdviceDeps } from "./services/adviceThread.js";
+import type { MediaDeps } from "./services/feedMedia.js";
 import { allowAllModerator, type Moderator } from "./services/moderation.js";
 import type { IntegrationStatus } from "./services/integrationStatus.js";
 import type { PlannerDeps } from "./services/planner.js";
@@ -42,6 +44,7 @@ export interface AppDeps {
   planner?: PlannerDeps; // AI-12: gpt-oss and the query embedder; defaults to the rules planner
   recovery?: RecoveryOptions; // BE-16/BE-17: tests pin the clock
   advice?: AdviceDeps; // BE-11: AI-13 writer and the query embedder; defaults to no AI answer
+  media?: MediaDeps; // feed photos and videos: R2 storage and the photo check; defaults to off
   profileEmbeddings?: ProfileEmbeddings; // CONN-08: buddy-matching embeddings; off without HF_TOKEN
   integrations?: IntegrationStatus; // INT-04: per-integration state for GET /health
 }
@@ -92,12 +95,14 @@ export function createApp(deps: AppDeps): express.Express {
 
   // Everything below needs a Neon Auth token.
   const provision = userProvisioner(deps.db, deps.pseudonymSecret);
+  const media: MediaDeps = deps.media ?? { storage: null, checkImage: null, log: logger };
   app.use(requireAuth(deps.verifyToken, provision));
   app.use(
     meRouter(deps.db, {
       pseudonymSecret: deps.pseudonymSecret,
       onAccountDeleted: provision.forget,
       profileEmbeddings: deps.profileEmbeddings,
+      media,
     }),
   );
   app.use(sessionsRouter(deps.db, { exportQueue, joints, log: logger, rest: deps.rest }));
@@ -106,8 +111,9 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(rehabRouter(deps.db));
   app.use(recoveryRouter(deps.db, deps.recovery));
   app.use(plansRouter(deps.db, deps.planner ?? { llm: null, embed: null, log: logger }));
-  app.use(feedRouter(deps.db));
-  app.use(socialRouter(deps.db, moderator));
+  app.use(feedRouter(deps.db, media));
+  app.use(socialRouter(deps.db, moderator, media));
+  app.use(mediaRouter(deps.db, media));
   app.use(
     adviceRouter(
       deps.db,

@@ -4,7 +4,14 @@
 // error messages: those can carry hosts or ids from the env.
 
 export type IntegrationName =
-  "databricks_export" | "insight_sync" | "set_scoring" | "llm" | "moderation" | "embeddings" | "cloud_pose";
+  | "databricks_export"
+  | "insight_sync"
+  | "set_scoring"
+  | "llm"
+  | "moderation"
+  | "embeddings"
+  | "cloud_pose"
+  | "media_storage";
 
 export type IntegrationState = "live" | "disabled" | "error";
 

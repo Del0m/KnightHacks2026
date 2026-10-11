@@ -542,6 +542,7 @@ erDiagram
 | `PUT /me/exercise-preferences/:exerciseId` · `GET /me/exercise-preferences` | Thumbs up/down on an exercise, from any screen; feeds the planner |
 | `GET /feed` · `POST /posts` · `POST /posts/:id/kudos` · `POST /posts/:id/comments` | Social |
 | `POST /advice` | Ask the community; an AI-suggested first answer is attached |
+| `POST /media/uploads` · `POST /posts { media_ids }` · `POST /posts/:id/report` | Feed photos and videos (R2), and reporting a post |
 | `GET /me/rom-trend` · `GET /me/physio-report` · `POST /me/physio-report/share` · `GET /reports/:token` | Range-of-motion trend and the physio report; a report is only public through a link the user makes, which expires and can be revoked |
 | `GET /me/milestones` · `POST /me/milestones/:id/accept` · `POST /me/milestones/:id/dismiss` | Back-to-gym suggestion; the user always decides |
 | `GET /buddies/suggestions` · `POST /buddies/:id/request` | Buddy matching |
@@ -743,7 +744,7 @@ flowchart LR
 
 ## 13. Privacy and video lifecycle
 
-**Rule: we keep pose, not people.** Video is processed on the phone and never uploaded, except for clips a user explicitly donates for training.
+**Rule: we keep pose, not people.** Workout video is processed on the phone and never uploaded, except for clips a user explicitly donates for training. The one other upload is a photo or video a member deliberately picks and posts to the feed (below); the workout camera never attaches anything by itself.
 
 ```mermaid
 flowchart LR
@@ -757,7 +758,8 @@ flowchart LR
 - **Pseudonymous IDs** in Databricks, never email or handle.
 - **Injury data** is private by default and only used for buddy matching if the user opts in.
 - **No medical claims.** Every injury-related screen shows a disclaimer, and anything built from the injury notes (AI advice answers, the planner's sources) carries "always consult a doctor" (`ADVICE_DISCLAIMER` in `apps/api/src/services/advice.ts`).
-- **Account deletion** cascades in Neon and queues a delete job in Databricks.
+- **Feed photos and videos** are chosen and posted by the member. They go straight from the phone to a private Cloudflare R2 bucket through a short-lived signed URL; Neon keeps only the metadata. The feed shows them through view URLs that expire in an hour, only on posts the viewer can see. Photos are checked by Llama Guard 4 before the post is saved; videos can't be checked automatically, so a member report hides a video post until it's reviewed.
+- **Account deletion** cascades in Neon, deletes the member's feed photos and videos from R2, and queues a delete job in Databricks.
 
 ---
 

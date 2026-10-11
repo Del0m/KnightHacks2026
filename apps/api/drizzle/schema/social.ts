@@ -38,6 +38,8 @@ export const posts = pgTable(
     embedding: vector({ dimensions: EMBEDDING_DIMENSIONS }),
     // INT-04: false when moderation was unreachable at posting; jobs/recheckModeration.ts re-checks.
     moderationChecked: boolean().notNull().default(true),
+    // Hidden from everyone but the author while a report is reviewed (drizzle/schema/media.ts).
+    hiddenAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

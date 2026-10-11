@@ -1,12 +1,14 @@
 // BE-09: feed built on read (§12): own posts, followed users, and beginners at the same gym,
-// newest first, with a keyset cursor on (created_at, id). Blocked users are hidden both ways.
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+// newest first, with a keyset cursor on (created_at, id). Blocked users are hidden both ways, and
+// a post hidden pending review (a reported video) is shown only to its author.
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { badRequest, parse, send, userId } from "../http.js";
 import { notBlocked } from "../services/blocks.js";
+import { mediaForPosts, type MediaDeps } from "../services/feedMedia.js";
 
 const { posts, users, profiles, follows, kudos, comments } = schema;
 
@@ -31,8 +33,9 @@ export function decodeCursor(raw: string): Cursor {
 }
 
 export function visiblePostsFilter(me: string, publicFeed = false) {
+  const notHidden = or(isNull(posts.hiddenAt), eq(posts.authorId, me));
   // Public discovery reads shared posts only, never raw workout sessions.
-  if (publicFeed) return notBlocked(me, posts.authorId);
+  if (publicFeed) return and(notBlocked(me, posts.authorId), notHidden);
   const myGym = sql`(select ${profiles.gymPlaceId} from ${profiles} where ${profiles.userId} = ${me})`;
   return and(
     or(
@@ -41,10 +44,11 @@ export function visiblePostsFilter(me: string, publicFeed = false) {
       and(eq(profiles.experienceLevel, "beginner"), sql`${profiles.gymPlaceId} = ${myGym}`),
     ),
     notBlocked(me, posts.authorId),
+    notHidden,
   );
 }
 
-export function feedRouter(db: Db): Router {
+export function feedRouter(db: Db, mediaDeps: MediaDeps = { storage: null, checkImage: null }): Router {
   const router = Router();
 
   router.get("/feed", async (req, res) => {
@@ -66,6 +70,7 @@ export function feedRouter(db: Db): Router {
         body: posts.body,
         data: posts.data,
         sessionId: posts.sessionId,
+        hiddenAt: posts.hiddenAt, // set only on the author's own post under review
         createdAt: posts.createdAt,
         cursorTs: sql<string>`to_char(${posts.createdAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
         author: {
@@ -100,8 +105,13 @@ export function feedRouter(db: Db): Router {
 
     const page = rows.slice(0, FEED_PAGE_SIZE);
     const last = page.at(-1);
+    const media = await mediaForPosts(
+      db,
+      mediaDeps,
+      page.map((p) => p.id),
+    );
     send(res, {
-      posts: page.map(({ cursorTs: _c, ...p }) => p),
+      posts: page.map(({ cursorTs: _c, ...p }) => ({ ...p, media: media.get(p.id) ?? [] })),
       nextCursor:
         rows.length > FEED_PAGE_SIZE && last ? encodeCursor({ ts: last.cursorTs, id: last.id }) : null,
     });
