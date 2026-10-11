@@ -148,13 +148,17 @@ jobs:
       - name: Test exports, real cloud inference and synthetic sessions
         run: |
           mkdir -p ../../test-results
-          uv run --locked --no-sync pytest tests ../cloud_endpoint/tests ../../databricks/notebooks/tests -q --junitxml=../../test-results/python.xml
+          # Keep Torch pose inference and XGBoost notebook tests in separate processes.
+          uv run --locked --no-sync pytest tests ../cloud_endpoint/tests -q --junitxml=../../test-results/python.xml
+          uv run --locked --no-sync pytest ../../databricks/notebooks/tests -q --junitxml=../../test-results/notebooks.xml
       - name: Upload Python report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: python-test-results
-          path: test-results/python.xml
+          path: |
+            test-results/python.xml
+            test-results/notebooks.xml
           retention-days: 7
           if-no-files-found: warn
 

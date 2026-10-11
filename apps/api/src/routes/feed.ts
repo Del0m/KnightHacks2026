@@ -1,6 +1,6 @@
 // BE-09: feed built on read (§12): own posts, followed users, and beginners at the same gym,
 // newest first, with a keyset cursor on (created_at, id). Blocked users are hidden both ways.
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
@@ -30,7 +30,9 @@ export function decodeCursor(raw: string): Cursor {
   return { ts, id };
 }
 
-export function visiblePostsFilter(me: string) {
+export function visiblePostsFilter(me: string, publicFeed = false) {
+  // Public discovery reads shared posts only, never raw workout sessions.
+  if (publicFeed) return notBlocked(me, posts.authorId);
   const myGym = sql`(select ${profiles.gymPlaceId} from ${profiles} where ${profiles.userId} = ${me})`;
   return and(
     or(
@@ -47,7 +49,14 @@ export function feedRouter(db: Db): Router {
 
   router.get("/feed", async (req, res) => {
     const me = userId(req);
-    const { cursor } = parse(z.object({ cursor: z.string().max(200).optional() }), req.query);
+    const { cursor, scope, type } = parse(
+      z.object({
+        cursor: z.string().max(200).optional(),
+        scope: z.enum(["following", "public"]).default("following"),
+        type: z.enum(["custom", "medal", "pr"]).optional(),
+      }),
+      req.query,
+    );
     const after = cursor ? decodeCursor(cursor) : null;
 
     const rows = await db
@@ -74,7 +83,13 @@ export function feedRouter(db: Db): Router {
       .leftJoin(profiles, eq(profiles.userId, posts.authorId))
       .where(
         and(
-          visiblePostsFilter(me),
+          visiblePostsFilter(me, scope === "public"),
+          type
+            ? inArray(
+                posts.kind,
+                type === "custom" ? ["goal", "advice"] : type === "medal" ? ["session", "medal"] : ["pr"],
+              )
+            : undefined,
           after
             ? sql`(${posts.createdAt}, ${posts.id}) < (${after.ts}::timestamptz, ${after.id}::uuid)`
             : undefined,

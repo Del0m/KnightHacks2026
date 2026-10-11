@@ -9,7 +9,7 @@
 | API | Typecheck, ESLint, all Vitest tests using in-memory PGlite and local HTTP sockets; installs RAG and mobile dependencies for integration imports | Ubuntu 24.04, Node 22, npm |
 | Mobile | Typecheck, Expo lint, all Jest tests | Ubuntu 24.04, Node 22, pnpm version from `apps/mobile/package.json` |
 | Contracts | Exercise validation, shared schema tests, all labelling tests | Ubuntu 24.04, Node 22 |
-| Python | Export contract checks, real YOLO cloud pose inference, synthetic session contracts | macOS 15, Python 3.11, locked uv dependencies |
+| Python | Export contract checks, real YOLO cloud pose inference, synthetic session and injury-risk model contracts | macOS 15, Python 3.11, locked uv dependencies |
 | Spark | Bronze/silver/gold integration tests, session round trips and medal parity | Ubuntu 24.04, Java 21, Python 3.11 for both driver and workers |
 | Swift | All PoseCore tests and Swift package compilation | macOS 15, runner-provided Swift/Xcode |
 
@@ -36,3 +36,5 @@ The cloud pose tests download public YOLO model weights into a temporary directo
 Verification only was explicitly selected for this pipeline. Existing package managers and lockfiles are retained. Node 22 follows the repository's supported runtime; Java 21 and explicit Python worker paths prevent the runtime mismatches found during local testing. macOS jobs cover the Apple-native library and ML dependencies. The workflow uses a read-only repository token and does not persist checkout credentials.
 
 These automated tests do not replace rebuilding and testing the complete iOS app on a device, or checking renamed resources against deployed services. Those rollout steps remain in `docs/runbooks/steadyforum-rename.md`.
+
+Notebook model tests install pinned XGBoost 2.1.3, pandas and scikit-learn from the ML dev dependency group. Pose inference and notebook tests run in separate Python processes because the combined native ML runtimes crashed on macOS during validation. Both suites produce JUnit reports.

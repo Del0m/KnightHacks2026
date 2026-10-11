@@ -41,8 +41,19 @@ describe("moderation re-check", () => {
     const threat = (await author.post("/posts", { kind: "goal", body: "a veiled threat" })).body;
     const sad = (await author.post("/posts", { kind: "goal", body: "I feel hopeless" })).body;
     await fan.post("/follows/rc-author");
-    const comment = (await fan.post(`/posts/${fine.id}/comments`, { body: "a threat in a comment" })).body;
-    expect(comment.moderation_checked).toBe(false);
+    const blockedWhileDown = await fan.post(`/posts/${fine.id}/comments`, { body: "a threat in a comment" });
+    expect(blockedWhileDown.status).toBe(503);
+    // Legacy unchecked comments still need the main re-check/deletion behavior.
+    const [comment] = await t.db
+      .insert(schema.comments)
+      .values({
+        postId: fine.id,
+        authorId: "rc-fan",
+        body: "a threat in a comment",
+        moderationChecked: false,
+      })
+      .returning();
+    expect(comment.moderationChecked).toBe(false);
 
     // Still down: nothing changes, and the run stops early.
     expect(await runModerationRecheck({ db: t.db, moderator })).toEqual({
@@ -86,4 +97,19 @@ describe("moderation re-check", () => {
     const post = (await api.post("/posts", { kind: "goal", body: "3 gold workouts this month" })).body;
     expect(post.moderation_checked).toBe(true);
   });
+});
+
+it("rechecks a pending custom post's title together with its body", async () => {
+  down = true;
+  const api = await t.as("rc-title");
+  const post = (await api.post("/posts", { kind: "goal", title: "a veiled threat", body: "Nice session" }))
+    .body;
+  expect(post.moderation_checked).toBe(false);
+  down = false;
+  expect(await runModerationRecheck({ db: t.db, moderator })).toEqual({
+    checked: 0,
+    removed: 1,
+    unreachable: false,
+  });
+  expect(await postRow(post.id)).toBeUndefined();
 });

@@ -12,15 +12,19 @@ import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { badRequest, conflict, HttpError, notFound, parse, send, userId } from "../http.js";
 import { BLOCKED_MESSAGE, type Moderator } from "../services/moderation.js";
+import { isAbusiveComment } from "../services/commentSafety.js";
+import { notBlocked } from "../services/blocks.js";
 import { visiblePostsFilter } from "./feed.js";
 
 const { posts, comments, kudos, follows, users, profiles, sessions, moderationBlocks } = schema;
+const COMMENT_BLOCKED_MESSAGE = "SteadyForm is for lifting others up, not weighing them down.";
 
 export const postInput = z
   .object({
     // Advice questions go through POST /advice (BE-11), which adds the AI-suggested first answer.
     kind: z.enum(["session", "pr", "medal", "goal"]),
     body: z.string().trim().min(1).max(2000),
+    title: z.string().trim().max(100).optional(),
     session_id: z.string().uuid().nullable().optional(),
     data: z.record(z.unknown()).nullable().optional(),
   })
@@ -36,13 +40,24 @@ export async function moderate(
   text: string,
   target: { kind: "post"; checkAs?: "advice" } | { kind: "comment"; postId: string },
 ): Promise<{ checked: boolean }> {
-  const verdict = await moderator.check(
-    text,
-    target.kind === "post" ? (target.checkAs ?? "post") : "comment",
-  );
-  // checked: false means moderation was unreachable; the content is saved and re-checked later
-  // (jobs/recheckModeration.ts, INT-04).
-  if (verdict.allowed) return { checked: verdict.checked !== false };
+  const verdict =
+    target.kind === "comment" && isAbusiveComment(text)
+      ? {
+          allowed: false as const,
+          message: COMMENT_BLOCKED_MESSAGE,
+          categories: ["local_abuse"],
+        }
+      : await moderator.check(text, target.kind === "post" ? (target.checkAs ?? "post") : "comment");
+  if (verdict.allowed) {
+    if (target.kind === "comment" && verdict.checked === false) {
+      throw new HttpError(
+        503,
+        "moderation_unavailable",
+        "Comments cannot be checked right now. Your draft is saved; try again shortly.",
+      );
+    }
+    return { checked: verdict.checked !== false };
+  }
   if (verdict.support) {
     throw new HttpError(422, "moderation_blocked", verdict.message || BLOCKED_MESSAGE, { support: true });
   }
@@ -58,7 +73,11 @@ export async function moderate(
   } catch (err) {
     req.log?.error({ err }, "couldn't log blocked content");
   }
-  throw new HttpError(422, "moderation_blocked", verdict.message || BLOCKED_MESSAGE);
+  throw new HttpError(
+    422,
+    "moderation_blocked",
+    target.kind === "comment" ? COMMENT_BLOCKED_MESSAGE : verdict.message || BLOCKED_MESSAGE,
+  );
 }
 
 async function visiblePost(db: Db, me: string, postId: string) {
@@ -66,7 +85,7 @@ async function visiblePost(db: Db, me: string, postId: string) {
     .select({ id: posts.id })
     .from(posts)
     .leftJoin(profiles, eq(profiles.userId, posts.authorId))
-    .where(and(eq(posts.id, postId), visiblePostsFilter(me)));
+    .where(and(eq(posts.id, postId), visiblePostsFilter(me, true)));
   if (!row) throw notFound("Post");
   return row;
 }
@@ -122,7 +141,12 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         .where(and(eq(sessions.id, input.session_id), eq(sessions.userId, me)));
       if (!own) throw notFound("Session");
     }
-    const { checked } = await moderate(db, moderator, req, input.body, { kind: "post" });
+    const title =
+      input.title ??
+      (input.data?.title === undefined ? undefined : parse(z.string().trim().max(100), input.data.title));
+    const { checked } = await moderate(db, moderator, req, [title, input.body].filter(Boolean).join("\n"), {
+      kind: "post",
+    });
     const [row] = await db
       .insert(posts)
       .values({
@@ -130,7 +154,7 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         kind: input.kind,
         body: input.body,
         sessionId: input.session_id ?? null,
-        data: input.data ?? null,
+        data: title !== undefined ? { ...input.data, title } : (input.data ?? null),
         moderationChecked: checked,
       })
       .returning();
@@ -149,13 +173,19 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         aiSuggested: comments.aiSuggested,
         sources: comments.sources, // BE-11: what an AI answer cites
         createdAt: comments.createdAt,
-        author: { id: users.id, handle: users.handle },
+        author: { id: users.id, handle: users.handle, displayName: profiles.displayName },
       })
       .from(comments)
       .leftJoin(users, eq(users.id, comments.authorId))
-      .where(eq(comments.postId, postId))
+      .leftJoin(profiles, eq(profiles.userId, comments.authorId))
+      .where(and(eq(comments.postId, postId), notBlocked(me, comments.authorId)))
       .orderBy(asc(comments.createdAt));
-    send(res, rows);
+    send(
+      res,
+      rows
+        .filter((row) => !isAbusiveComment(row.body))
+        .map((row) => ({ ...row, author: row.author?.id ? row.author : null })),
+    );
   });
 
   router.post("/posts/:id/comments", async (req, res) => {

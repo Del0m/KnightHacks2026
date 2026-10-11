@@ -660,7 +660,12 @@ flowchart LR
 | Gold | `gold_workout_medals` | session, medal tier, clean-rep share |
 | Gold | `gold_rom_trend` | user, joint, side, week, peak range, change vs injured-side baseline and healthy side |
 | Gold | `gold_training_features` | 32-frame rep windows plus labels |
-| Gold | `gold_injury_risk_scores` | user, body part, score, top contributing features, date |
+| Gold | `gold_injury_risk_scores` | user, body part, date, 7- and 28-day features, `range_side` (`injured` or `min`), heuristic score, top contributing features, `weak_label` |
+| Gold | `gold_injury_risk_model_scores` | user, body part, date (latest per lifter and body part), model score, top contributing features, `model_version` (champion run id), `scored_at` |
+| Gold | `gold_risk_feature_importance` | `model_version`, feature, family, gain, rank, `trained_at` |
+| Gold | `gold_risk_model_metrics` | predictor (`model` or `heuristic`), ROC-AUC, PR-AUC, Brier, `model_version`, test positives and rows |
+
+The last three are written by the `risk_model` notebook ([§11.2](#112-injury-risk-model)), not the pipeline. Every injury-risk table carries the comment "Not a diagnosis".
 
 ### 11.2 Injury-risk model
 
@@ -672,9 +677,38 @@ This is a **training-load and form-trend score, not a diagnosis.** Example featu
 - Acute-to-chronic volume ratio above 1.5.
 - Tempo speeding up under fatigue.
 
-**Labels:** at hackathon scale there are no real injury labels. Start with a rule-based weak label, train XGBoost on it to show the MLflow workflow, and explain feature importance in the dashboard. Tell judges the labels are heuristic.
+**Range side:** range uses the injured side when `silver_reps` knows it, and the smaller of left and right otherwise. For each prediction date, the side is resolved from the latest tagged day on or before that date, then applied consistently across both the 7- and 28-day windows. Future tags cannot change historical features. `range_side` records which was used. The heuristic and the model share this one definition.
 
-**Demo data:** a notebook generates about 200 synthetic users × 6 weeks of sessions with realistic progressions and injury patterns. Real sessions recorded at the hackathon are layered on top.
+**Heuristic score and weak label (pipeline, `gold_injury_risk_scores`):** a weighted sum of the five families above (`flag_rate_rising` 0.30; `range_shrinking`, `asymmetry` and `acute_chronic_load` 0.20 each; `tempo_speeding_up` 0.10), with `weak_label = score >= 0.5`. At hackathon scale there are no real injury labels, so **the labels are heuristic.** Tell judges so.
+
+**Model (`databricks/notebooks/risk_model.py`, a daily job after the pipeline):**
+
+- **Label = a forecast.** For each lifter, body part and day D, the label is whether the heuristic flag is raised on any tracked day in (D, D+7]. Rows without 7 days of later data are scored but not trained on. A same-day label would only teach the model the rule it's computed from.
+- **Features:** the 7- and 28-day columns plus their changes, grouped into the same five families the app explains, and a one-hot body part. Missing values stay missing (XGBoost handles them).
+- **Training:** XGBoost with `scale_pos_weight` for the class imbalance. Train and test are split by lifter, so no lifter is in both. Scores are corrected back to the real class prior, so they read as probabilities.
+- **Evaluation:** ROC-AUC, PR-AUC and Brier on the held-out lifters, for the model **and for the heuristic's own score used as next week's predictor**, so the model's value over the rule is measured, not assumed. If either split has only one class, training is skipped, the existing champion still scores, and the job fails so it shows up.
+- **MLflow:** each run logs params, both sets of metrics, the class balance, the importance tables and the input dataset to the experiment `/Users/<owner>/steadyforum_injury_risk`. The model is a run artifact (`runs:/<run_id>/model`). The **champion** is the run tagged `champion=true`; a new run takes the tag only if its test PR-AUC is at least the champion's.
+- **Unity Catalog:** registering `steadyforum.ml.injury_risk` is opt-in (`register_uc` widget, off by default). On Free Edition the artifact upload to the catalog's default storage is denied, so a failed attempt tags the run `uc_registration=skipped` and deletes the half-made version. When registration works, the `champion` alias follows the champion run.
+- **Outputs**, overwritten each run from the champion:
+  - `gold_injury_risk_model_scores`: each lifter and body part's latest day, with `top_features` = up to 3 families whose XGBoost contribution is at least 0.01, largest first.
+  - `gold_risk_feature_importance`: gain per feature and family.
+  - `gold_risk_model_metrics`: model vs heuristic test metrics.
+
+**In the app:** the Neon sync reads the model scores first. It falls back to the heuristic table when the model table is missing, empty, unreadable or more than 36 hours old ([§11.3](#113-getting-insights-back-to-the-app)). Both tables have the same columns and family names, so `explainRisk()` and the "not a diagnosis" disclaimer work for either. Neon doesn't record which source a score came from.
+
+**Dashboard:** the AI/BI dashboard "SteadyForum: injury-risk trends" (`databricks/dashboards/injury_risk.lvdash.json`) shows:
+- feature importance by family
+- held-out model vs heuristic metrics
+- the model score distribution by body part (latest day)
+- the share of lifters with a heuristic score of at least 0.5 per week, from the heuristic history, since the model table holds only the latest day
+- a "not a diagnosis" note
+
+**Demo data:** a notebook generates synthetic users × 6 weeks of sessions with realistic progressions and injury patterns.
+- Besides the three recovery users, 30% of the others get a side-tagged injury.
+- Half of those train through it: from week 3 or 4 their load jumps, and over two weeks the injured side loses range, the lowering speeds up and more reps are flagged, so most of them cross the heuristic flag.
+- The training run used `data/synthetic-training-ids.json`: the 30 demo accounts plus 70 training-only ids.
+
+Real sessions recorded at the hackathon are layered on top.
 
 ### 11.3 Getting insights back to the app
 
