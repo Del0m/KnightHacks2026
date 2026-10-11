@@ -8,8 +8,8 @@ import { pageColors } from '@/theme/tokens';
 import { readPublicWorkout } from '@/screens/Summary/workoutPost';
 import { medalTier, postType, type FeedPost } from './feedApi';
 const ui = pageStyles('Feed'), c = pageColors('Feed');
-export function FeedIcon({ name, color = c.text }: { name: 'rep' | 'comment' | 'filter' | 'plus' | 'close'; color?: string }) {
- const paths = { rep: 'M12.409 13.017A5 5 0 0 1 22 15c0 3.866-4 7-9 7-4.077 0-8.153-.82-10.371-2.462-.426-.316-.631-.832-.62-1.362C2.118 12.723 2.627 2 10 2a3 3 0 0 1 3 3 2 2 0 0 1-2 2c-1.105 0-1.64-.444-2-1 M15 14a5 5 0 0 0-7.584 2 M9.964 6.825C8.019 7.977 9.5 13 8 15', comment: 'M4 4h16v12H9l-5 4V4z', filter: 'M4 6h16M7 12h10M10 18h4', plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18' };
+export function FeedIcon({ name, color = c.text }: { name: 'comment' | 'filter' | 'plus' | 'close'; color?: string }) {
+ const paths = { comment: 'M4 4h16v12H9l-5 4V4z', filter: 'M4 6h16M7 12h10M10 18h4', plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18' };
  return <Svg width={22} height={22} viewBox="0 0 24 24" accessibilityElementsHidden><Path d={paths[name]} fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" /></Svg>;
 }
 const metals = {
@@ -55,7 +55,7 @@ export function FeedCard({ post, pending, onKudos, onComment = () => {} }: { pos
    {type === 'medal' && tier && <View style={{ paddingTop: 46 }}><MedalBadge tier={tier} /></View>}
   </View>
   <View style={[styles.actions, { borderTopColor: metal?.edge ?? c.border }]}>
-   <PolishedPressable accessibilityRole="button" accessibilityLabel={`${post.viewer_gave_kudos ? 'Remove rep' : 'Rep post'}, ${post.kudos_count}`} accessibilityState={{ selected: post.viewer_gave_kudos, disabled: pending }} disabled={pending} onPress={onKudos} style={styles.action}><View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>{post.viewer_gave_kudos ? <Text accessibilityElementsHidden style={{ fontSize: 21, lineHeight: 24 }}>💪</Text> : <FeedIcon name="rep" />}</View><Text style={[ui.label, { color: post.viewer_gave_kudos ? c.primary : c.text }]}>Rep · {post.kudos_count}</Text></PolishedPressable>
+   <PolishedPressable accessibilityRole="button" accessibilityLabel={`${post.viewer_gave_kudos ? 'Remove rep' : 'Rep post'}, ${post.kudos_count}`} accessibilityState={{ selected: post.viewer_gave_kudos, disabled: pending }} disabled={pending} onPress={onKudos} style={styles.action}><View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}><Text accessibilityElementsHidden style={{ fontSize: 21, lineHeight: 24, opacity: post.viewer_gave_kudos ? 1 : .25 }}>💪</Text></View><Text style={[ui.label, { color: post.viewer_gave_kudos ? c.primary : c.text }]}>Rep · {post.kudos_count}</Text></PolishedPressable>
    <PolishedPressable accessibilityRole="button" accessibilityLabel={`Comment on post, ${post.comment_count} comments`} onPress={onComment} style={styles.action}><FeedIcon name="comment" /><Text style={[ui.label, { color: c.text }]}>Comment · {post.comment_count}</Text></PolishedPressable>
   </View>
  </View>;
