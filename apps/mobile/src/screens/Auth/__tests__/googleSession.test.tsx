@@ -74,3 +74,31 @@ it('on the web, sends the browser to Google and back to this site', async () => 
     if (!hadLocation) delete (globalThis as { location?: unknown }).location;
   }
 });
+
+it('on the web, finishes a Google sign-in by sending Neon its session verifier once', async () => {
+  const { Platform } = require('react-native');
+  const os = Object.getOwnPropertyDescriptor(Platform, 'OS')!;
+  const hadLocation = 'location' in globalThis, hadHistory = 'history' in globalThis;
+  const listeners = { add: window.addEventListener, remove: window.removeEventListener };
+  const replaceState = jest.fn();
+  Object.defineProperty(Platform, 'OS', { configurable: true, get: () => 'web' });
+  Object.defineProperty(globalThis, 'location', { configurable: true, value: {
+    origin: 'https://steadyforum.fit', search: '?neon_auth_session_verifier=v123&tab=feed',
+    href: 'https://steadyforum.fit/?neon_auth_session_verifier=v123&tab=feed',
+  } });
+  Object.defineProperty(globalThis, 'history', { configurable: true, value: { state: null, replaceState } });
+  window.addEventListener = jest.fn(); window.removeEventListener = jest.fn();
+  jest.mocked(client.getSession).mockResolvedValue({ data: { user: google, session: {} }, error: null } as never);
+  try {
+    await mount();
+    expect(client.getSession).toHaveBeenCalledWith({ query: { disableCookieCache: true, neon_auth_session_verifier: 'v123' } });
+    expect(auth.user?.id).toBe('google-user');
+    expect(replaceState).toHaveBeenCalledWith(null, '', 'https://steadyforum.fit/?tab=feed'); // verifier removed, rest kept
+  } finally {
+    unmount();
+    Object.defineProperty(Platform, 'OS', os);
+    window.addEventListener = listeners.add; window.removeEventListener = listeners.remove;
+    if (!hadLocation) delete (globalThis as { location?: unknown }).location;
+    if (!hadHistory) delete (globalThis as { history?: unknown }).history;
+  }
+});

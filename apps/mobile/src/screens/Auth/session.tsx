@@ -19,6 +19,19 @@ type AuthContextValue = AuthState & {
   getApiToken: () => Promise<string | null>;
 };
 const AuthContext = createContext<AuthContextValue | null>(null);
+// Neon Auth comes back from Google (web) with ?neon_auth_session_verifier=…. Browsers partition the
+// cookie it set during that redirect, so get-session must carry the verifier once to set the session
+// cookie for this site; then it's removed from the address bar.
+const SESSION_VERIFIER = 'neon_auth_session_verifier';
+function sessionVerifier(): string | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.location?.search) return null;
+  return new URLSearchParams(window.location.search).get(SESSION_VERIFIER);
+}
+function clearSessionVerifier() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(SESSION_VERIFIER);
+  window.history.replaceState(window.history.state, '', url.href);
+}
 const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Please try again.';
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, loading: authConfigured, error: null });
@@ -32,8 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (activeUser.current !== (next.user?.id ?? null)) ++generation.current;
       commit(next);
     }
+    const verifier = sessionVerifier();
     try {
-      const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } });
+      const query = verifier ? { disableCookieCache: true, [SESSION_VERIFIER]: verifier } : { disableCookieCache: true };
+      const { data, error } = await authClient.getSession({ query: query as { disableCookieCache: boolean } });
+      if (verifier) clearSessionVerifier(); // single use, whether or not it worked
       if (error?.status === 401) { apply({ user: null, loading: false, error: 'Your authentication session expired. Please log in again.' }); return; }
       if (error) throw new Error('Could not restore your session. Check your connection and try again.');
       apply({ user: data?.user ?? null, loading: false, error: null });
