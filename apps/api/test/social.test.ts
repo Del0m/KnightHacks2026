@@ -259,3 +259,42 @@ it("public feed includes historical shared workouts from unfollowed users, never
     .values({ blockerId: "public-workout-reader", blockedId: "public-workout-author" });
   expect((await publicPosts()).some((p) => p.id === shared.body.id)).toBe(false);
 });
+
+it("filters public post types before pagination, including old personal records", async () => {
+  const author = await t.as("type-filter-author");
+  const reader = await t.as("type-filter-reader");
+  await author.get("/me/profile");
+  await t.db
+    .insert(schema.posts)
+    .values([
+      ...Array.from({ length: 25 }, (_, i) => ({
+        authorId: "type-filter-author",
+        kind: "goal" as const,
+        body: `Custom ${i}`,
+        data: { post_type: "custom" },
+        createdAt: new Date("2026-10-10T12:00:00Z"),
+      })),
+      {
+        authorId: "type-filter-author",
+        kind: "pr" as const,
+        body: "Squat personal record",
+        data: { exercise_id: "squat", value: 20 },
+        createdAt: new Date("2026-08-01T12:00:00Z"),
+      },
+    ]);
+  const records = await reader.get("/feed?scope=public&type=pr");
+  expect(records.status).toBe(200);
+  expect(records.body.posts.map((p: { body: string }) => p.body)).toContain("Squat personal record");
+  expect(records.body.posts.every((p: { kind: string }) => p.kind === "pr")).toBe(true);
+  expect(
+    (await reader.get("/feed?scope=public&type=custom")).body.posts.every((p: { kind: string }) =>
+      ["goal", "advice"].includes(p.kind),
+    ),
+  ).toBe(true);
+  expect(
+    (await reader.get("/feed?scope=public&type=medal")).body.posts.every((p: { kind: string }) =>
+      ["session", "medal"].includes(p.kind),
+    ),
+  ).toBe(true);
+  expect((await reader.get("/feed?scope=public&type=invalid")).status).toBe(400);
+});

@@ -62,10 +62,28 @@ it('does not double-count kudos already included by a concurrent refresh', async
  jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
  let screen: ReturnType<typeof create>;
  await act(async () => { screen = create(<FeedScreen />); });
- act(() => screen.root.findByType('Button').props.onPress());
+ act(() => screen.root.findAllByType('Button').find((n: any) => n.props.accessibilityLabel === 'Rep post, 1').props.onPress());
  page = { ...page, kudos_count: 2, viewer_gave_kudos: true };
  await act(async () => { screen.root.findByType(FlatList).props.onRefresh(); });
  await act(async () => { release({ ok: true }); });
  expect(screen.root.findByType(FlatList).props.data[0].kudos_count).toBe(2);
+ act(() => screen.unmount());
+});
+
+it('previews ten examples without publishing and filters them by type', async () => {
+ const apiFetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ posts: [], next_cursor: null }) });
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<FeedScreen />); });
+ const press = (label: string) => act(() => screen.root.findAllByType('Button').find((n: any) => n.props.accessibilityLabel === label || n.findAllByType(Text).some((t: any) => t.props.children === label)).props.onPress());
+ press('Filter feed'); press('Preview 10 examples');
+ expect(screen.root.findByType(FlatList).props.data).toHaveLength(10);
+ const calls = apiFetch.mock.calls.length;
+ press('Rep post, 12');
+ expect(screen.root.findByType(FlatList).props.data[0].viewer_gave_kudos).toBe(true);
+ expect(apiFetch.mock.calls).toHaveLength(calls);
+ press('Filter feed'); press('Personal records');
+ expect(screen.root.findByType(FlatList).props.data).toHaveLength(3);
+ expect(screen.root.findByType(FlatList).props.data.every((p: any) => p.kind === 'pr')).toBe(true);
  act(() => screen.unmount());
 });

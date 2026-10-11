@@ -132,10 +132,11 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         body: comments.body,
         aiSuggested: comments.aiSuggested,
         createdAt: comments.createdAt,
-        author: { id: users.id, handle: users.handle },
+        author: { id: users.id, handle: users.handle, displayName: profiles.displayName },
       })
       .from(comments)
       .leftJoin(users, eq(users.id, comments.authorId))
+      .leftJoin(profiles, eq(profiles.userId, comments.authorId))
       .where(eq(comments.postId, postId))
       .orderBy(asc(comments.createdAt));
     send(res, rows);

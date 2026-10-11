@@ -14,7 +14,7 @@ Share to feed starts off. Selecting it reveals an explicit Share workout button.
 
 The account-gated Feed uses a FlatList with the same glass page frame, cursor pagination from `GET /feed`, pull-to-refresh, deduplication, loading/empty/end/error states, and retry without discarding loaded posts. It renders session, PR, medal, goal, and advice posts using backend author, body, date, kudos and comment counts. Gold workout cards have a gold glass tint, rim, and explicit label.
 
-Kudos uses the existing POST/DELETE endpoints, prevents duplicate taps, and only updates after success. A refresh that already contains the mutation does not double-adjust its count. Requests are canceled on blur, account changes remount the feed, and late account responses are discarded. Comment counts are displayed; composing/browsing comments belongs to FE-11.
+Kudos uses the existing POST/DELETE endpoints, prevents duplicate taps, and only updates after success. A refresh that already contains the mutation does not double-adjust its count. Requests are canceled on blur, account changes remount the feed, and late account responses are discarded. Comment counts are displayed; the Feed follow-up below adds composing and browsing comments.
 
 ## Deployment and checks
 
@@ -53,3 +53,16 @@ The app now requests `GET /feed?scope=public`, which retrieves persisted shared 
 Public-discovery regression tests cover historical pagination, an unfollowed advanced author at another gym, existing shared workout data and author names, exclusion of an unshared session, kudos/comments, and blocking in both directions. API tests passed 28 files / 537 tests; Feed tests passed 2 suites / 9 tests; mobile/API TypeScript passed; mobile lint has zero errors and eight existing warnings; changed API files pass lint/formatting.
 
 The owner approved temporary Cloudflare testing after reviewing token transit and alternatives. Both HTTP/2 TCP and QUIC outbound connections on port 7844 failed in the execution environment; no tunnel registered, and the mobile API URL was deliberately left unchanged. The local API remains running on port 3000. The owner was asked to start the downloaded official `/private/tmp/cloudflared` utility in Terminal and provide its registered HTTPS URL before the app is reconfigured.
+
+
+## Feed cards, composing, and example preview
+
+The Feed now distinguishes custom posts (light purple glass), workout medals (bronze, silver, or gold glass with a medal on the right), and personal records (clear glass with softened rainbow reflections confined to the rim). Public workout cards render shared exercises and positive highlights. The UI calls kudos “Rep”; existing database and endpoint names are preserved.
+
+The circular filter beside Feed selects Recent, Custom posts, Medals, or Personal records. The API filters before cursor pagination, so older records remain discoverable even beyond a page of custom posts. Comments include profile display names. New Post opens an animated bottom sheet at 55% of the screen height, with an expanding text field that fills the sheet, a 500-character limit and counter; comments use a taller sheet and retain their existing 1,000-character contract. Submission is explicit, guarded against duplicate taps, and preserves rejected drafts. A delayed comments read cannot erase a just-submitted comment.
+
+Filter → Preview 10 examples shows three fictional custom posts, four medals (including all three tiers), and three records. Preview reactions, comments, and posts remain local and never write fake identities or workouts to Neon. `/feed-examples` offers the same fictional preview for layout checking. Live Feed still requires a confirmed account.
+
+The owner's temporary tunnel stopped returning API responses after the Mac changed networks. Cloudflare returned HTTP 530, while the local API remained available. Returning to the iPhone hotspot restored a new approved HTTPS tunnel, whose database readiness returned `ok`. Only the ignored local mobile environment was updated; no tunnel URL or private credentials are committed. The refreshed iPhone requested `/me/profile` and `/feed?scope=public`, both HTTP 200.
+
+Verification: API 28 files / 538 tests passed. Both TypeScript checks passed; mobile lint has zero errors and eight existing warnings, and changed API files pass lint. Feed regression coverage includes server-side type pagination, local-only examples, explicit posting, moderation drafts, comment races, and the 500-character limit. The owner confirmed posts load again on the connected iPhone. Follow-up softened the rim and filled the composer with the text field. Both GET and POST comment results deduplicate by ID, and sheets can shrink when the keyboard opens. Native keyboard appearance remains a manual check. Final mobile suite: 71 suites / 749 tests; latest Feed checks: four suites / 18 tests. Web export passes.
