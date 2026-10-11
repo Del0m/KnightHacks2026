@@ -6,7 +6,7 @@ import type { PGlite } from "@electric-sql/pglite";
 import { eq } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { ingest, type Chunk } from "../../../rag/ingest.js";
+import { exerciseLoads, ingest, type Chunk } from "../../../rag/ingest.js";
 import { schema } from "../src/db.js";
 import { pseudonymize } from "../src/integrations/databricks/upload.js";
 import { runInsightSync, syncConfigFromEnv, type SyncConfig } from "../src/jobs/syncInsights.js";
@@ -89,6 +89,27 @@ describe("CONN-08 RAG ingest", () => {
     const rows = await t.db.select().from(schema.docChunks);
     expect(rows.map((r) => r.id)).toEqual(["exercise:Goblet_Squat#0"]);
     expect(rows[0]!.contentHash).toMatch(/^[0-9a-f]{64}$/);
+
+    // Same text, new metadata (e.g. a new loads rule): written without re-embedding.
+    embed.mockClear();
+    const retagged = [{ ...edited[0]!, metadata: { loads: ["ankle", "knee"] } }];
+    expect(await ingest(client, embed, retagged)).toMatchObject({ embedded: 0, metadataUpdated: 1 });
+    expect(embed).not.toHaveBeenCalled();
+    const [row] = await t.db.select().from(schema.docChunks);
+    expect(row!.metadata).toEqual({ loads: ["ankle", "knee"] });
+    expect(await ingest(client, embed, retagged)).toMatchObject({ metadataUpdated: 0 });
+  });
+
+  it("tags the wrists for pressing and hands-down work, and the ankles for squats and step-ups", () => {
+    const ex = (name: string, force: string | null, primaryMuscles: string[], secondaryMuscles: string[] = []) =>
+      exerciseLoads({ name, force, category: "strength", primaryMuscles, secondaryMuscles });
+    expect(ex("Pushups", "push", ["chest"], ["shoulders", "triceps"])).toEqual(["elbow", "shoulder", "wrist"]);
+    expect(ex("Barbell Bench Press - Medium Grip", "push", ["chest"], ["triceps"])).toContain("wrist");
+    expect(ex("Plank", "static", ["abdominals"])).toEqual(["wrist"]);
+    expect(ex("Bodyweight Squat", "push", ["quadriceps"], ["glutes"])).toEqual(["ankle", "hip", "knee"]);
+    expect(ex("Step-up with Knee Raise", "push", ["glutes"])).toContain("ankle");
+    expect(ex("Standing Cable Wood Chop", "pull", ["abdominals"])).not.toContain("ankle");
+    expect(ex("Seated Cable Rows", "pull", ["middle back"], ["biceps"])).toEqual(["elbow", "shoulder"]);
   });
 });
 

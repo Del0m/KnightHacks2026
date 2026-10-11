@@ -80,10 +80,26 @@ const MUSCLE_LOADS: Record<string, string[]> = {
   neck: ["neck"],
 };
 
-export function exerciseChunk(e: Exercise): Chunk {
+// Joints a movement loads that its muscles don't show: pressing and holding the body up on the
+// hands loads the wrists (chest -> shoulder and triceps -> elbow miss them), and squats, split
+// squats and step-ups bend the ankle even when calves aren't listed.
+const PRESSING_MUSCLES = ["chest", "triceps", "shoulders"];
+const ON_HANDS = /push-?up|plank|mountain climber|handstand|burpee|bear crawl|\bdips?\b/i;
+const ANKLE_BEND = /squat|lunge|split|step-?up|jump|\bhops?\b|\bskip/i;
+
+export function exerciseLoads(e: Pick<Exercise, "name" | "force" | "category" | "primaryMuscles" | "secondaryMuscles">): string[] {
   const loads = new Set<string>();
   for (const m of [...e.primaryMuscles, ...e.secondaryMuscles]) for (const j of MUSCLE_LOADS[m] ?? []) loads.add(j);
   if (e.category === "plyometrics") ["knee", "ankle"].forEach((j) => loads.add(j)); // landings
+  if ((e.force === "push" && e.primaryMuscles.some((m) => PRESSING_MUSCLES.includes(m))) || ON_HANDS.test(e.name)) {
+    loads.add("wrist");
+  }
+  if (ANKLE_BEND.test(e.name)) loads.add("ankle");
+  return [...loads].sort();
+}
+
+export function exerciseChunk(e: Exercise): Chunk {
+  const loads = exerciseLoads(e);
 
   const traits = [e.mechanic, e.force && `${e.force} movement`].filter(Boolean).join(", ");
   const content = [
@@ -108,7 +124,7 @@ export function exerciseChunk(e: Exercise): Chunk {
       force: e.force,
       primary_muscles: e.primaryMuscles,
       secondary_muscles: e.secondaryMuscles,
-      loads: [...loads].sort(),
+      loads,
       source_url: EXERCISE_DB_URL,
     },
   };
@@ -233,6 +249,7 @@ export interface IngestResult {
   total: number;
   embedded: number;
   unchanged: number;
+  metadataUpdated: number; // unchanged text, new metadata (e.g. loads), written without re-embedding
   deleted: number;
   skippedDrafts: string[];
 }
@@ -276,12 +293,37 @@ export async function ingest(db: Db, embed: Embed, chunks: Chunk[], skippedDraft
     console.log(`[rag] embedded ${Math.min(i + EMBED_BATCH, changed.length)}/${changed.length}`);
   }
 
+  // Unchanged text keeps its embedding, but its metadata may still have changed (e.g. a new loads
+  // rule), so write that without calling the embedder. jsonb compares by value, so only rows that
+  // actually differ are touched.
+  const unchanged = chunks.filter((c) => existing.get(c.id) === hash(c.content));
+  let metadataUpdated = 0;
+  for (let w = 0; w < unchanged.length; w += WRITE_BATCH) {
+    const rows = unchanged.slice(w, w + WRITE_BATCH);
+    const updated = await rowsOf<{ id: string }>(
+      db,
+      `UPDATE doc_chunks SET metadata = t.metadata::jsonb, updated_at = now()
+       FROM unnest($1::text[], $2::text[]) AS t(id, metadata)
+       WHERE doc_chunks.id = t.id AND doc_chunks.metadata IS DISTINCT FROM t.metadata::jsonb
+       RETURNING doc_chunks.id`,
+      [rows.map((c) => c.id), rows.map((c) => JSON.stringify(c.metadata))],
+    );
+    metadataUpdated += updated.length;
+  }
+
   // Chunks that no longer exist (exercise removed, note section deleted or back to draft).
   const keep = new Set(chunks.map((c) => c.id));
   const stale = [...existing.keys()].filter((id) => !keep.has(id));
   if (stale.length) await db.query("DELETE FROM doc_chunks WHERE id = ANY($1::text[])", [stale]);
 
-  return { total: chunks.length, embedded: changed.length, unchanged: chunks.length - changed.length, deleted: stale.length, skippedDrafts };
+  return {
+    total: chunks.length,
+    embedded: changed.length,
+    unchanged: chunks.length - changed.length,
+    metadataUpdated,
+    deleted: stale.length,
+    skippedDrafts,
+  };
 }
 
 // ---- CLI ----
@@ -295,7 +337,9 @@ async function main() {
   const db: Db = { query: (text, params) => sql.query(text, params as unknown[]) };
   const r = await ingest(db, hfEmbedder(process.env.HF_TOKEN!), chunks, skippedDrafts);
 
-  console.log(`[rag] ${r.total} chunks: ${r.embedded} embedded, ${r.unchanged} unchanged, ${r.deleted} deleted`);
+  console.log(
+    `[rag] ${r.total} chunks: ${r.embedded} embedded, ${r.unchanged} unchanged (${r.metadataUpdated} with new metadata), ${r.deleted} deleted`,
+  );
   if (r.skippedDrafts.length) {
     console.log(`[rag] skipped draft notes (reviewed: false): ${r.skippedDrafts.join(", ")}. Use --include-drafts to ingest them.`);
   }
