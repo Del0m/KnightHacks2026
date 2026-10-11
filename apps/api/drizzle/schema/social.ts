@@ -33,6 +33,8 @@ export const posts = pgTable(
     body: text().notNull(),
     sessionId: uuid().references(() => sessions.id, { onDelete: "set null" }),
     data: jsonb(), // card payload: medal tier, PR value, goal progress
+    // INT-04: false when moderation was unreachable at posting; jobs/recheckModeration.ts re-checks.
+    moderationChecked: boolean().notNull().default(true),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -53,6 +55,8 @@ export const comments = pgTable(
     authorId: text().references(() => users.id, { onDelete: "cascade" }),
     body: text().notNull(),
     aiSuggested: boolean().notNull().default(false),
+    // INT-04: false when moderation was unreachable at posting; jobs/recheckModeration.ts re-checks.
+    moderationChecked: boolean().notNull().default(true),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("comments_post_created_idx").on(t.postId, t.createdAt)],

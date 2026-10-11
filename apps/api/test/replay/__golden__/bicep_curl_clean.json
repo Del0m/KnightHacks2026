@@ -306,7 +306,7 @@
         ]
       },
       "rest_note": {
-        "text": "1 of 8 reps were clean. Your reps took about 1.6 s on the way down. Around 2 s gives you more control.",
+        "text": "1 of 8 reps were clean. Your reps took about 0.7 s on the way down. Around 2 s gives you more control.",
         "source": "fixed",
         "rule_id": "tempo"
       },
@@ -410,7 +410,7 @@
             "clean_share": 0.125
           },
           "restNote": {
-            "text": "1 of 8 reps were clean. Your reps took about 1.6 s on the way down. Around 2 s gives you more control.",
+            "text": "1 of 8 reps were clean. Your reps took about 0.7 s on the way down. Around 2 s gives you more control.",
             "source": "fixed",
             "rule_id": "tempo"
           },

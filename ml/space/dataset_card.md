@@ -9,7 +9,7 @@ tags:
   - form-feedback
   - synthetic
 size_categories:
-  - 1K<n<10K
+  - 10K<n<100K
 configs:
   - config_name: default
     data_files:
@@ -29,10 +29,10 @@ Rep-level body-pose windows from **Spotter**, a phone app that counts reps and c
 
 | Split | Reps | Lifters | Labels |
 |---|---|---|---|
-| train | 7,102 | 24 | clean 6,993 · partial_range 109 |
-| test | 1,864 | 7 | clean 1,784 · partial_range 77 · fast_lowering 3 |
+| train | 26,120 | 84 | clean 25,040 · partial_range 832 · fast_lowering 248 |
+| test | 5,351 | 16 | clean 5,006 · partial_range 290 · fast_lowering 55 |
 
-Exercises: bicep curl (1,773), shoulder press (1,742), push-up (1,432), squat (1,218), lunge (937). Levels: beginner, intermediate and advanced. Splits are **by lifter** (a stable hash of the lifter id), so no lifter appears in both.
+Exercises: squat (6,966), shoulder press (6,636), lunge (6,596), push-up (6,090), bicep curl (5,183). Levels: beginner, intermediate and advanced. Splits are **by lifter** (a stable hash of the lifter id), so no lifter appears in both.
 
 ## Columns
 
@@ -60,14 +60,15 @@ x = np.array(ds["train"][0]["window"]).reshape(32, 17, 2)   # frames x joints x 
 
 ## Collection
 
-1. **Sessions.** A generator notebook (`databricks/notebooks/generate_synthetic_sessions.py` in the Spotter repo) writes six weeks of workouts for 30 synthetic lifters in exactly the format the app uploads: per-rep aggregates plus per-frame joints. Joint positions come from a simple body model driven by each exercise's joint-angle curve, with noise and lifter-to-lifter variation. Three lifters follow a knee or shoulder recovery story.
+1. **Sessions.** A generator notebook (`databricks/notebooks/generate_synthetic_sessions.py` in the Spotter repo) writes six weeks of workouts for synthetic lifters (100 in this release) in exactly the format the app uploads: per-rep aggregates plus per-frame joints. Joint positions come from a simple body model driven by each exercise's joint-angle curve, with noise and lifter-to-lifter variation. Three lifters follow a knee or shoulder recovery story.
 2. **Pipeline.** A Databricks medallion pipeline (bronze → silver → gold) parses the uploads, cuts the frames into reps, normalises the joints and resamples each rep to 32 frames (`gold_training_features`).
-3. **Labels.** Each rep is labelled by Spotter's **form rules** (the same spec-driven rules the app runs on the phone), not by people. They're weak labels: consistent, but only as good as the rules.
+3. **Synthetic only.** The release selects sessions whose `device` is `synthetic` (set by the generator) and refuses to publish anything else, so app recordings never end up here.
+4. **Labels.** Each rep is labelled by Spotter's **form rules** (the same spec-driven rules the app runs on the phone), not by people. They're weak labels: consistent, but only as good as the rules.
 
 ## Limitations
 
 - **Synthetic only.** Real movement is messier than the generator: occlusion, odd camera angles, loose clothing and lighting don't appear here. Don't expect a model trained on this alone to work on real video.
-- **Heavily imbalanced.** About 98% of reps are `clean`, and `knees_in` and `forward_lean` don't occur yet. A classifier trained on this will mostly learn "clean". Weight the classes or treat it as anomaly detection.
+- **Heavily imbalanced.** About 96% of reps are `clean`, and `knees_in` and `forward_lean` don't occur yet. A classifier trained on this will mostly learn "clean". Weight the classes or treat it as anomaly detection.
 - **Rule labels.** The labels reproduce the rules, so a model trained on them can at best match the rules.
 
 ## Roadmap
