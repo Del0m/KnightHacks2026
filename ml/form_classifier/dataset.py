@@ -34,6 +34,8 @@ class Rep:
     validity: np.ndarray  # (FRAMES, JOINTS), bool
     duration_ms: float
     clip_id: str
+    start_frame: int
+    position: float = 0.0  # rank / (clip rep count - 1); a singleton has position 0
 
 
 @dataclass
@@ -95,6 +97,10 @@ def _parse_rep(row: dict, clip_ids: set) -> Rep:
     if row.get("exercise_id") not in EXERCISES:
         raise BundleError(f"rep {rep_id} has unknown exercise_id {row.get('exercise_id')!r}")
 
+    start_frame = row.get("start_frame")
+    if type(start_frame) is not int or start_frame < 0:
+        raise BundleError(f"rep {rep_id} start_frame must be a non-negative integer")
+
     return Rep(
         rep_id=rep_id,
         exercise_id=row["exercise_id"],
@@ -103,6 +109,7 @@ def _parse_rep(row: dict, clip_ids: set) -> Rep:
         validity=validity,
         duration_ms=float(row.get("duration_ms", 0.0)),
         clip_id=row["clip_id"],
+        start_frame=start_frame,
     )
 
 
@@ -138,6 +145,15 @@ def load_bundle(path: str) -> Bundle:
 
     if not reps:
         raise BundleError("bundle contains no reps")
+
+    by_clip: Dict[str, List[Rep]] = {}
+    for rep in reps:
+        by_clip.setdefault(rep.clip_id, []).append(rep)
+    for clip_reps in by_clip.values():
+        # rep_id breaks equal-start ties deterministically, independent of export row order.
+        ordered = sorted(clip_reps, key=lambda rep: (rep.start_frame, rep.rep_id))
+        for rank, rep in enumerate(ordered):
+            rep.position = rank / (len(ordered) - 1) if len(ordered) > 1 else 0.0
 
     by_exercise: Dict[str, int] = {}
     by_label: Dict[str, int] = {}
