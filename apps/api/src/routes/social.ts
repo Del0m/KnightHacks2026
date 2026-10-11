@@ -17,6 +17,7 @@ import { notBlocked } from "../services/blocks.js";
 import { visiblePostsFilter } from "./feed.js";
 
 const { posts, comments, kudos, follows, users, profiles, sessions, moderationBlocks } = schema;
+const COMMENT_BLOCKED_MESSAGE = "SteadyForm is for lifting others up, not weighing them down.";
 
 export const postInput = z
   .object({
@@ -42,7 +43,7 @@ async function moderate(
     target.kind === "comment" && isAbusiveComment(text)
       ? {
           allowed: false as const,
-          message: "Please keep comments respectful. Reword your comment before posting.",
+          message: COMMENT_BLOCKED_MESSAGE,
           categories: ["local_abuse"],
         }
       : await moderator.check(text, target.kind);
@@ -71,7 +72,11 @@ async function moderate(
   } catch (err) {
     req.log?.error({ err }, "couldn't log blocked content");
   }
-  throw new HttpError(422, "moderation_blocked", verdict.message || BLOCKED_MESSAGE);
+  throw new HttpError(
+    422,
+    "moderation_blocked",
+    target.kind === "comment" ? COMMENT_BLOCKED_MESSAGE : verdict.message || BLOCKED_MESSAGE,
+  );
 }
 
 async function visiblePost(db: Db, me: string, postId: string) {

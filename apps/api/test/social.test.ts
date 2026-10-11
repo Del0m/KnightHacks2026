@@ -51,7 +51,9 @@ describe("posts, comments, kudos, follows", () => {
     const comment = await fan.post(`/posts/${post.id}/comments`, { body: "Nice work!" });
     expect(comment.status).toBe(201);
     expect(comment.body.ai_suggested).toBe(false);
-    expect((await fan.post(`/posts/${post.id}/comments`, { body: "forbidden words" })).status).toBe(422);
+    const blockedComment = await fan.post(`/posts/${post.id}/comments`, { body: "forbidden words" });
+    expect(blockedComment.status).toBe(422);
+    expect(blockedComment.body.message).toBe("SteadyForm is for lifting others up, not weighing them down.");
 
     const comments = await fan.get(`/posts/${post.id}/comments`);
     expect(comments.body).toHaveLength(1);
