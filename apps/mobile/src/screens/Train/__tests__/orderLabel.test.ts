@@ -1,5 +1,6 @@
 import { orderLabel } from '../index';
 
+jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: null }) }));
 jest.mock('react-native-webview', () => ({ WebView: 'WebView' }));
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));

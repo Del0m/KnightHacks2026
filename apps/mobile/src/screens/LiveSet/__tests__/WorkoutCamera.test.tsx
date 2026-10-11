@@ -31,8 +31,8 @@ it('counts fixture reps through the actual engine and saves measured feedback wh
 });
 it.each(['manual', 'automatic'])('keeps the rear camera active for the %s completion pulse and hands off the set once', end => {
   jest.useFakeTimers(); Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
-  const complete = jest.fn(), manual = jest.fn(), finishing = jest.fn(); let screen: ReturnType<typeof create>;
-  act(() => { screen = create(<WorkoutCamera initialPosition="back" spec={cameraSpec('curl')} baseline={.7} onComplete={complete} onFinishing={finishing} onManual={manual} />); });
+  const complete = jest.fn(), manual = jest.fn(), finishing = jest.fn(), recorded = jest.fn(); let screen: ReturnType<typeof create>;
+  act(() => { screen = create(<WorkoutCamera initialPosition="back" spec={cameraSpec('curl')} baseline={.7} onComplete={complete} onFinishing={finishing} onRecorded={recorded} onManual={manual} />); });
   for (const result of clip.frames) act(() => mockOnPose({ result: result as PoseResult, latencyMs: 10 }));
   if (end === 'manual') act(() => screen.root.findAllByType('Choice').find((n: any) => n.props.label === 'Done with set').props.onPress());
   else {
@@ -44,7 +44,10 @@ it.each(['manual', 'automatic'])('keeps the rear camera active for the %s comple
     act(() => jest.advanceTimersByTime(1));
     act(() => mockOnPose({ latencyMs: 10 }));
   }
-  expect(finishing).toHaveBeenCalledTimes(1);
+  expect(finishing).toHaveBeenCalledTimes(1); expect(recorded).toHaveBeenCalledTimes(1);
+  expect(recorded.mock.calls[0][0]).toMatchObject({ schema_version: 1, set_index: 0 });
+  expect(recorded.mock.calls[0][0].frames.length).toBeGreaterThan(0);
+  expect(recorded.mock.calls[0][2]).toBe('coreml');
   const fallback = screen.root.findAllByType('Choice').find((n: any) => n.props.label === 'Track manually');
   expect(fallback.props.disabled).toBe(true); act(() => fallback.props.onPress()); expect(manual).not.toHaveBeenCalled();
   expect(screen.root.findByType('Camera').props.torchMode).toBe('on');

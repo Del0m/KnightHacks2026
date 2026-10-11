@@ -19,7 +19,7 @@ export function isPermanentUploadFailure(error: unknown): error is WorkoutUpload
 }
 
 /** Stable set_index makes an interrupted save safe to resume on the same session. */
-export async function uploadWorkout(api: ApiRequest, checkpoint: UploadCheckpoint, sessionStart: SessionStart, sets: WorkoutSet[], onCheckpoint: () => void = () => {}) {
+export async function uploadWorkout(api: ApiRequest, checkpoint: UploadCheckpoint, sessionStart: SessionStart, sets: WorkoutSet[], onCheckpoint: () => void = () => {}, options: { finalize?: boolean; onSetResult?: (index: number, result: import('@/screens/LiveSet/restCardContent').ServerRestResult) => void } = {}) {
   if (sets.some(set => !('schema_version' in set))) throw new WorkoutUploadError(400, 'Older or manual sets are retained on this device; they cannot be uploaded as measured pose data.');
   const request = timedRequest(api);
   async function post(path: string, body: object) {
@@ -40,7 +40,10 @@ export async function uploadWorkout(api: ApiRequest, checkpoint: UploadCheckpoin
     // This checkpoint owns the session and each index. 409 means this set already
     // committed, or the session finished before its response reached the phone.
     if (!response.ok && response.status !== 409) throw new WorkoutUploadError(response.status, 'Could not save your sets. Keep this screen open and try again.');
+    if (response.ok && options.onSetResult && 'set_index' in sets[i]) { const result = readSetResult(await response.json()); if (result) options.onSetResult((sets[i] as SetRecord).set_index, result); }
+    onCheckpoint();
   }
+  if (options.finalize === false) return;
   const response = await request(`/sessions/${checkpoint.sessionId}/finish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   // The API returns 409 on a repeated finish after an earlier response was lost.
   if (!response.ok && response.status !== 409) throw new WorkoutUploadError(response.status, 'Could not finish your workout. Keep this screen open and try again.');
@@ -70,9 +73,12 @@ export async function uploadLiveSet(api: ApiRequest, checkpoint: UploadCheckpoin
   if (response.status === 409) return null;
   if (!response.ok) throw new Error('Set saved on this device. Server sync will retry.');
   const result = await response.json();
-  // Only a validated rest result can replace the immediate phone feedback.
-  if (!['gold', 'silver', 'bronze'].includes(result.score?.medal) || !['phone', 'databricks'].includes(result.score?.source) || typeof result.rest_note?.text !== 'string' || !['fixed', 'llm'].includes(result.rest_note?.source)) return null;
-  return result as import('@/screens/LiveSet/restCardContent').ServerRestResult;
+  return readSetResult(result);
+}
+
+function readSetResult(result: any): import('@/screens/LiveSet/restCardContent').ServerRestResult | null {
+  if (!['gold', 'silver', 'bronze'].includes(result?.score?.medal) || !['phone', 'databricks'].includes(result?.score?.source) || typeof result?.rest_note?.text !== 'string' || !['fixed', 'llm'].includes(result?.rest_note?.source)) return null;
+  return result;
 }
 
 function timedRequest(request: ApiRequest): ApiRequest {

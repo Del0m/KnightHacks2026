@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 import { calendarDay, initialProfile, readSaved, type Profile, readWorkoutDetails, type WorkoutDetailSet, type Workout } from '@/data/workout';
 type State = { profile: Profile; workouts: Workout[] };
 const empty: State = { profile: initialProfile, workouts: [] };
-type TrainingValue = State & { updateProfile: (p: Partial<Profile>) => void; finish: (sets: number, reps: number, minutes: number, details?: WorkoutDetailSet[]) => string; removeWorkout: (id: string) => void };
+type TrainingValue = State & { updateProfile: (p: Partial<Profile>) => void; finish: (sets: number, reps: number, minutes: number, details?: WorkoutDetailSet[], id?: string) => string; removeWorkout: (id: string) => void };
 const Training = createContext<TrainingValue | null>(null);
 export function TrainingProvider({ children, accountId }: { children: ReactNode; accountId?: string }) {
   // Guest history remains in its old key; it is never assigned to a new account.
@@ -27,9 +27,9 @@ function TrainingSession({ children, storageKey: key }: { children: ReactNode; s
     currentState.current = next; saveTraining(key, next); setState(next);
   }
   function updateProfile(profile: Partial<Profile>) { publish(state => ({ ...state, profile: { ...state.profile, ...profile } })); }
-  function finish(sets: number, reps: number, minutes: number, details?: WorkoutDetailSet[]) {
-    const now = new Date(), id = `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`;
-    publish(state => ({ ...state, workouts: [{ id, day: calendarDay(now), finishedAt: now.toISOString(), sets, reps, minutes, details: readWorkoutDetails(details) }, ...state.workouts].slice(0, 500) })); return id;
+  function finish(sets: number, reps: number, minutes: number, details?: WorkoutDetailSet[], savedId?: string) {
+    const now = new Date(), id = savedId ?? `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`;
+    publish(state => ({ ...state, workouts: [{ id, day: calendarDay(now), finishedAt: now.toISOString(), sets, reps, minutes, details: readWorkoutDetails(details) }, ...state.workouts.filter(w => w.id !== id)].slice(0, 500) })); return id;
   }
   function removeWorkout(id: string) { publish(state => ({ ...state, workouts: state.workouts.filter(w => w.id !== id) })); }
   return <Training.Provider value={{ ...state, updateProfile, finish, removeWorkout }}>{children}</Training.Provider>;

@@ -54,8 +54,8 @@
     "partial_reps": 1,
     "fps": 15,
     "frames": {
-      "count": 260,
-      "sha256": "6da9ce4a13069de7"
+      "count": 200,
+      "sha256": "acd21673fe95371a"
     },
     "reps": [
       {
@@ -305,10 +305,10 @@
             "set_index": 0,
             "exercise_id": "squat",
             "fps": 15,
-            "frame_count": 260,
+            "frame_count": 200,
             "first_t_ms": 0,
-            "last_t_ms": 17266,
-            "frames_sha256": "6da9ce4a13069de7"
+            "last_t_ms": 13266,
+            "frames_sha256": "acd21673fe95371a"
           }
         ]
       },
@@ -337,7 +337,7 @@
               "medal": "bronze",
               "end_reason": "still",
               "partial_reps": 1,
-              "frame_count": 260,
+              "frame_count": 200,
               "reps": [
                 {
                   "rep_index": 0,

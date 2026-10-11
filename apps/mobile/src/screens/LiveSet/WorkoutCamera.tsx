@@ -16,7 +16,7 @@ import { ui } from '@/components/AppPage';
 import { useTorchPulse } from './useTorchPulse';
 import { setFeedback, type SetFeedback } from './setRecord';
 
-type Props = { setIndex?: number; onFinishing?: () => void; manualLabel?: string; initialPosition?: 'front' | 'back'; spec: ExerciseSpec; onComplete: (record: WorkoutSet, feedback: SetFeedback, inferenceMode: PoseEngine) => void; onManual: () => void; baseline: number };
+type Props = { onRecorded?: (record: WorkoutSet, feedback: SetFeedback, inferenceMode: PoseEngine) => void; setIndex?: number; onFinishing?: () => void; manualLabel?: string; initialPosition?: 'front' | 'back'; spec: ExerciseSpec; onComplete: (record: WorkoutSet, feedback: SetFeedback, inferenceMode: PoseEngine) => void; onManual: () => void; baseline: number };
 export default function WorkoutCamera(props: Props) {
   if (Platform.OS !== 'ios') return <Fallback label={props.manualLabel} onManual={props.onManual} message="Camera rep tracking is available in the iPhone app." />;
   return <PermissionCamera {...props} />;
@@ -32,7 +32,7 @@ function PermissionCamera(props: Props) {
   return <TrackedCamera {...props} engine={mode.mode} size={mode.size} />;
 }
 function Fallback({ message, onManual, label = 'Track manually' }: { message: string; onManual: () => void; label?: string }) { return <View style={s.group}><Text style={ui.muted}>{message}</Text><GlassChoice compact label={label} onPress={onManual} /></View>; }
-function TrackedCamera({ spec, engine, size, onComplete, onManual, onFinishing, baseline, initialPosition, setIndex = 0, manualLabel = 'Track manually' }: Props & { engine: PoseEngine; size: 320 | 256 }) {
+function TrackedCamera({ spec, engine, size, onComplete, onRecorded, onManual, onFinishing, baseline, initialPosition, setIndex = 0, manualLabel = 'Track manually' }: Props & { engine: PoseEngine; size: 320 | 256 }) {
   const [position, setPosition] = useState<'front' | 'back'>(initialPosition ?? 'front');
   const device = useCameraDevice(position);
   const [detection, setDetection] = useState<PoseDetection | null>(null);
@@ -45,6 +45,7 @@ function TrackedCamera({ spec, engine, size, onComplete, onManual, onFinishing, 
     if (completed.current || summary.total_reps === 0) return;
     completed.current = true; onFinishing?.();
     const record = capture.finish(summary), feedback = setFeedback(spec, summary, baseline);
+    onRecorded?.(record, feedback, engine);
     pulse.signal(() => onComplete(record, feedback, engine));
   } });
   const form = useFormEngine(spec, { imageAspect: image ? image.width / image.height : undefined, onEvent: event => { capture.event(event); rules.onEvent(event); } });

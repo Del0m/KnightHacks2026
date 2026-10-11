@@ -3,6 +3,7 @@ import React from 'react';
 import TrainScreen from '../index';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 const { act, create } = require('react-test-renderer');
+jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: null }) }));
 jest.mock('@/hooks/useReducedMotion', () => ({ useReducedMotion: jest.fn() }));
 jest.mock('@/state/Training', () => ({ useTraining: () => ({ workouts: [] }) }));
 jest.mock('@/components/AppPage', () => ({ ui: {}, AppPage: (props: unknown) => require('react').createElement('Page', props), Action: 'Action' }));

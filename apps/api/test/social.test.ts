@@ -184,7 +184,7 @@ describe("blocked content", () => {
 
 it("shares a completed session only once across retries and enforces ownership", async () => {
   const api = await t.as("share-retry");
-  const session = await api.post("/sessions");
+  const session = await api.post("/sessions", { inference_mode: "vision" });
   const path = `/sessions/${session.body.id}/share`;
   const body = { body: "Workout complete.", data: { tier: "bronze" } };
   expect((await api.put(path, body)).status).toBe(409);

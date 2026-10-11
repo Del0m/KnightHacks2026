@@ -1,6 +1,7 @@
 import React from 'react';
 import WorkoutEntry from '@/app/workout';
 import { exercises } from '@/data/workout';
+import { readActiveWorkout } from '@/services/workoutQueue';
 import { uploadWorkout } from '@/services/workoutApi';
 
 const { act, create } = jest.requireActual('react-test-renderer');
@@ -32,11 +33,15 @@ test('manual sets save locally once and can be undone without uploading pose dat
     press('Finish Workout');
     expect(mockFinish).toHaveBeenCalledTimes(1);
     expect(mockFinish).toHaveBeenCalledWith(totalSets,
-      exercises.reduce((total, exercise) => total + exercise.sets * exercise.reps, 0), 1, expect.any(Array));
+      exercises.reduce((total, exercise) => total + exercise.sets * exercise.reps, 0), 1, expect.any(Array), expect.any(String));
     expect(uploadWorkout).not.toHaveBeenCalled();
     expect(screen.root.findByType('WorkoutSummary').props.records).toHaveLength(totalSets);
     act(() => screen.root.findByType('WorkoutSummary').props.onUndo());
     expect(mockRemove).toHaveBeenCalledWith('local-workout');
+    expect(screen.root.findByType('Page').props.intro).toBe('Session complete');
+    expect(readActiveWorkout('signed-in')?.sets).toHaveLength(totalSets);
+    act(() => screen.unmount());
+    act(() => { screen = create(<WorkoutEntry />); });
     expect(screen.root.findByType('Page').props.intro).toBe('Session complete');
   } finally {
     act(() => screen.unmount());

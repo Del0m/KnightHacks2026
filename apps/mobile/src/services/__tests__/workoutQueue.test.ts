@@ -1,4 +1,4 @@
-import { queueWorkout, syncWorkouts, readFailedWorkouts, readWorkoutResult } from '../workoutQueue';
+import { queueWorkout, syncWorkouts, readFailedWorkouts, readWorkoutResult, saveActiveWorkout, readActiveWorkout, clearActiveWorkout } from '../workoutQueue';
 const sessionStart = { inference_mode: 'coreml' as const };
 const measured = { schema_version: 1 as const, set_index: 0, exercise_id: 'squat', weight_kg: null, end_reason: 'manual' as const, partial_reps: 0, fps: null, frames: [], reps: [] };
 const mockData = new Map<string, string>();
@@ -57,4 +57,60 @@ it.each([401, 403, 408, 429, 500])('keeps HTTP %s failures retryable', async sta
   request.mockResolvedValue(response(200));
   await syncWorkouts('a', request);
   expect(request).toHaveBeenCalledTimes(2);
+});
+
+it('makes unfinished sets durable and uploads them without finalizing the session', async () => {
+ const draft = { id: 'active', startedAt: '2026-10-10T12:00:00Z', sets: [measured], sessionStart, checkpoint: {}, feedbacks: [null], exercise: 'squat', mode: 'camera' as const, restUntil: Date.now() + 45000 };
+ saveActiveWorkout('a', draft);
+ expect(readActiveWorkout('a')?.sets).toEqual([measured]); expect(readActiveWorkout('b')).toBeNull();
+ const request = jest.fn().mockResolvedValueOnce(response(201, { id: 'session' })).mockResolvedValue(response(201));
+ await syncWorkouts('a', request);
+ expect(request.mock.calls.map(c => c[0])).toEqual(['/sessions', '/sessions/session/sets']);
+ expect(readActiveWorkout('a')?.checkpoint.sessionId).toBe('session');
+ clearActiveWorkout('a', 'different'); expect(readActiveWorkout('a')).not.toBeNull();
+ clearActiveWorkout('a', 'active'); expect(readActiveWorkout('a')).toBeNull();
+});
+it('retries an active set after a lost response with the same session and set index, then finalizes separately', async () => {
+ const draft = { id: 'active', startedAt: '2026-10-10T12:00:00Z', sets: [measured], sessionStart, checkpoint: {}, feedbacks: [null], exercise: 'squat', mode: 'camera' as const, restUntil: 0 };
+ saveActiveWorkout('a', draft);
+ const request = jest.fn().mockResolvedValueOnce(response(201, { id: 'session' })).mockRejectedValueOnce(new Error('offline'));
+ await expect(syncWorkouts('a', request)).rejects.toThrow('offline');
+ const restored = readActiveWorkout('a')!; expect(restored.sets).toHaveLength(1); expect(restored.checkpoint.sessionId).toBe('session');
+ request.mockResolvedValue(response(409)); await syncWorkouts('a', request);
+ expect(request.mock.calls.filter(c => c[0] === '/sessions')).toHaveLength(1);
+ expect(request.mock.calls.some(c => c[0].endsWith('/finish'))).toBe(false);
+ queueWorkout('a', { ...readActiveWorkout('a')!, phase: 'finish' }); request.mockResolvedValue(response(200));
+ await syncWorkouts('a', request); expect(request.mock.calls.at(-1)![0]).toBe('/sessions/session/finish');
+ expect(request.mock.calls.filter(c => c[0].endsWith('/sets')).every(c => JSON.parse(c[1].body).set_index === 0)).toBe(true);
+});
+it('keeps guest/manual active sets local and restores them without assigning them to an account', async () => {
+ saveActiveWorkout(null, { id: 'guest', startedAt: '2026-10-10T12:00:00Z', sets: [{ exercise_id: 'squat', reps: [] }], checkpoint: {}, feedbacks: [null], exercise: 'squat', mode: 'manual', restUntil: 0 });
+ expect(readActiveWorkout(null)?.id).toBe('guest'); expect(readActiveWorkout('a')).toBeNull();
+ const request = jest.fn(); await syncWorkouts('a', request); expect(request).not.toHaveBeenCalled();
+});
+
+it('retains a second set queued while the first upload is in flight', async () => {
+ const draft = { id: 'racing', startedAt: '2026-10-10T12:00:00Z', sets: [measured], sessionStart, checkpoint: {}, feedbacks: [null], exercise: 'squat', mode: 'camera' as const, restUntil: 0 };
+ saveActiveWorkout('a', draft);
+ let release!: (r: Response) => void;
+ const request = jest.fn().mockResolvedValueOnce(response(201, { id: 'session' })).mockImplementationOnce(() => new Promise<Response>(r => { release = r; })).mockResolvedValue(response(201));
+ const worker = syncWorkouts('a', request);
+ while (!release) await Promise.resolve();
+ saveActiveWorkout('a', { ...draft, sets: [measured, { ...measured, set_index: 1 }], feedbacks: [null, null] });
+ release(response(201)); await worker;
+ expect(readActiveWorkout('a')?.sets).toHaveLength(2);
+ expect(request.mock.calls.filter(c => c[0] === '/sessions')).toHaveLength(1);
+ expect(request.mock.calls.filter(c => c[0].endsWith('/sets')).map(c => JSON.parse(c[1].body).set_index)).toEqual([0, 0, 1]);
+ expect(request.mock.calls.some(c => c[0].endsWith('/finish'))).toBe(false);
+});
+it('keeps a finish queued during an active upload and does not lose the created session checkpoint', async () => {
+ const draft = { id: 'finishing', startedAt: '2026-10-10T12:00:00Z', sets: [measured], sessionStart, checkpoint: {}, feedbacks: [null], exercise: 'squat', mode: 'camera' as const, restUntil: 0 };
+ saveActiveWorkout('a', draft);
+ let release!: (r: Response) => void;
+ const request = jest.fn().mockImplementationOnce(() => new Promise<Response>(r => { release = r; })).mockResolvedValue(response(200));
+ const worker = syncWorkouts('a', request);
+ queueWorkout('a', { ...draft, phase: 'finish' }); release(response(201, { id: 'session' })); await worker;
+ expect(request.mock.calls.filter(c => c[0] === '/sessions')).toHaveLength(1);
+ expect(request.mock.calls.filter(c => c[0].endsWith('/finish'))).toHaveLength(1);
+ expect(readWorkoutResult('a', 'finishing')).not.toBeNull();
 });

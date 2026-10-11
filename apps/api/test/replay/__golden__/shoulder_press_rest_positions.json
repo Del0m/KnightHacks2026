@@ -54,8 +54,8 @@
     "partial_reps": 3,
     "fps": 15,
     "frames": {
-      "count": 424,
-      "sha256": "ff1082f2d2932be8"
+      "count": 364,
+      "sha256": "0975996cec843523"
     },
     "reps": [
       {
@@ -280,10 +280,10 @@
             "set_index": 0,
             "exercise_id": "shoulder_press",
             "fps": 15,
-            "frame_count": 424,
+            "frame_count": 364,
             "first_t_ms": 0,
-            "last_t_ms": 28200,
-            "frames_sha256": "ff1082f2d2932be8"
+            "last_t_ms": 24200,
+            "frames_sha256": "0975996cec843523"
           }
         ]
       },
@@ -312,7 +312,7 @@
               "medal": "gold",
               "end_reason": "still",
               "partial_reps": 3,
-              "frame_count": 424,
+              "frame_count": 364,
               "reps": [
                 {
                   "rep_index": 0,

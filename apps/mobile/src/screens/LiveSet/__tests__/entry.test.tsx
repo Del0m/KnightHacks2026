@@ -4,12 +4,15 @@ import { Text } from 'react-native';
 import CameraSetupScreen from '../index';
 import WorkoutEntry from '@/app/workout';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@/screens/Auth/session';
+import { readActiveWorkout } from '@/services/workoutQueue';
 import { useTraining } from '@/state/Training';
 const { act, create } = require('react-test-renderer');
 jest.mock('expo-router', () => ({ router: { replace: jest.fn(), back: jest.fn(), canGoBack: () => true }, useLocalSearchParams: jest.fn(), Redirect: (props: unknown) => require('react').createElement('Redirect', props) }));
 jest.mock('@/components/AppPage', () => ({ ui: {}, AppPage: (props: unknown) => require('react').createElement('Page', props), Action: 'Action' }));
-jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: null }) }));
-jest.mock('@/services/workoutQueue', () => ({ queueWorkout: jest.fn(), syncWorkouts: jest.fn() }));
+jest.mock('@/screens/Auth/session', () => ({ useAuth: jest.fn(() => ({ user: null })) }));
+const mockDraftStorage = new Map<string, string>();
+jest.mock('react-native-mmkv', () => ({ createMMKV: () => ({ getString: (key: string) => mockDraftStorage.get(key), set: (key: string, value: string) => mockDraftStorage.set(key, value) }) }));
 jest.mock('@/state/Training', () => ({ useTraining: jest.fn() }));
 jest.mock('../WorkoutCamera', () => ({ __esModule: true, default: 'WorkoutCamera' }));
 jest.mock('@/screens/Summary', () => ({ WorkoutSummary: 'WorkoutSummary' }));
@@ -19,7 +22,7 @@ jest.mock('@/components/GlassChoice', () => ({ GlassChoice: 'Choice' }));
 jest.mock('../CameraCheck', () => ({ __esModule: true, default: 'CameraCheck' }));
 jest.mock('../PlacementDiagram', () => ({ PlacementDiagram: 'Diagram' }));
 const finish = jest.fn(() => 'saved');
-beforeEach(() => { jest.clearAllMocks(); jest.mocked(useLocalSearchParams).mockReturnValue({}); jest.mocked(useTraining).mockReturnValue({ workouts: [], finish } as never); });
+beforeEach(() => { mockDraftStorage.clear(); jest.clearAllMocks(); jest.mocked(useAuth).mockReturnValue({ user: null } as never); jest.mocked(useLocalSearchParams).mockReturnValue({}); jest.mocked(useTraining).mockReturnValue({ workouts: [], finish } as never); });
 test('a direct workout entry starts camera setup first', () => {
   let screen: ReturnType<typeof create>;
   act(() => { screen = create(<WorkoutEntry />); });
@@ -40,13 +43,14 @@ test('camera setup starts a prepared workout and rechecks preserve an existing s
   expect(router.back).toHaveBeenCalledTimes(1);
   act(() => screen.unmount());
 });
-test('leaving during rest saves completed camera sets and returns to Train', () => {
+test('leaving during rest preserves the unfinished workout without finalizing it', () => {
   jest.mocked(useLocalSearchParams).mockReturnValue({ setup: 'done', mode: 'camera', exercise: 'curl' });
   let screen: ReturnType<typeof create>;
   act(() => { screen = create(<WorkoutEntry />); });
   act(() => screen.root.findByType('WorkoutCamera').props.onComplete({ exercise_id: 'bicep_curl', reps: [{ quality: null, flags: [], tempo_ms: 2000, range_deg: 100 }] }, null));
   act(() => screen.root.findByType('Page').props.headerAction.props.onPress());
-  expect(finish).toHaveBeenCalledWith(1, 1, 1, [{ exercise_id: 'bicep_curl', reps: 1 }]);
+  expect(finish).not.toHaveBeenCalled();
+  expect(readActiveWorkout(null)?.sets).toHaveLength(1);
   expect(router.replace).toHaveBeenCalledWith('/');
   act(() => screen.unmount());
 });
@@ -108,4 +112,52 @@ test('rest expiry after the final set does not start another camera set', () => 
   expect(screen.root.findAllByType('WorkoutSummary')).toHaveLength(1);
   act(() => screen.unmount()); expect(jest.getTimerCount()).toBe(0);
   jest.useRealTimers();
+});
+
+test('persists before the completion pulse and restores the same next set after remount', () => {
+ jest.useFakeTimers();
+ jest.mocked(useLocalSearchParams).mockReturnValue({ setup: 'done', mode: 'camera', exercise: 'curl' });
+ let screen: ReturnType<typeof create>; act(() => { screen = create(<WorkoutEntry />); });
+ act(() => screen.root.findByType('WorkoutCamera').props.onRecorded(countedSet, null, 'vision'));
+ const saved = readActiveWorkout(null)!; expect(saved.sets).toHaveLength(1);
+ expect(screen.root.findAllByType('WorkoutCamera')).toHaveLength(1);
+ // Termination during the pulse: no completion callback or Finish is needed.
+ act(() => screen.unmount()); jest.mocked(useLocalSearchParams).mockReturnValue({});
+ act(() => { screen = create(<WorkoutEntry />); });
+ expect(screen.root.findAllByType('Redirect')).toHaveLength(0);
+ expect(screen.root.findAllByType('WorkoutCamera')).toHaveLength(0);
+ act(() => jest.advanceTimersByTime(45000));
+ expect(screen.root.findByType('WorkoutCamera').props.setIndex).toBe(1);
+ expect(readActiveWorkout(null)?.id).toBe(saved.id); expect(finish).not.toHaveBeenCalled();
+ act(() => screen.unmount()); jest.useRealTimers();
+});
+
+
+test('auth refresh after resuming preserves newer completed sets and a cleared draft', () => {
+  jest.useFakeTimers();
+  const account = { id: 'resume-refresh' };
+  const request = jest.fn(async () => { throw new Error('offline'); });
+  jest.mocked(useAuth).mockReturnValue({ user: account, apiFetch: request } as never);
+  jest.mocked(useLocalSearchParams).mockReturnValue({ setup: 'done', mode: 'camera', exercise: 'curl' });
+  let screen: ReturnType<typeof create>;
+  act(() => { screen = create(<WorkoutEntry />); });
+  act(() => screen.root.findByType('WorkoutCamera').props.onComplete(countedSet, null));
+  act(() => screen.unmount());
+  act(() => { screen = create(<WorkoutEntry />); });
+  act(() => screen.root.findAllByType('Action').find((n: any) => n.props.children === 'Start next set now').props.onPress());
+  act(() => screen.root.findByType('WorkoutCamera').props.onComplete(countedSet, null));
+  expect(readActiveWorkout(account.id)?.sets).toHaveLength(2);
+  jest.mocked(useAuth).mockReturnValue({ user: account, apiFetch: jest.fn(request) } as never);
+  act(() => screen.update(<WorkoutEntry />));
+  expect(readActiveWorkout(account.id)?.sets).toHaveLength(2);
+  for (let i = 2; i < 9; i++) {
+    act(() => screen.root.findAllByType('Action').find((n: any) => n.props.children === 'Start next set now').props.onPress());
+    act(() => screen.root.findByType('WorkoutCamera').props.onComplete(countedSet, null));
+  }
+  act(() => screen.root.findAllByType('Action').find((n: any) => n.props.children === 'Finish Workout').props.onPress());
+  expect(readActiveWorkout(account.id)).toBeNull();
+  jest.mocked(useAuth).mockReturnValue({ user: account, apiFetch: jest.fn(request) } as never);
+  act(() => screen.update(<WorkoutEntry />));
+  expect(readActiveWorkout(account.id)).toBeNull();
+  act(() => screen.unmount()); jest.useRealTimers();
 });
