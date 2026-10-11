@@ -390,7 +390,7 @@ with mlflow.start_run(run_name="injury_risk_xgboost") as run:
         example = build_features(_trainable(test_df)).head(5)
         info = mlflow.xgboost.log_model(
             xgb_model=model,
-            name="model",
+            artifact_path="model",  # MLflow 2.x on serverless; 3.x still accepts it
             signature=infer_signature(example, model.predict_proba(example)[:, 1]),
             input_example=example,
             pip_requirements=[f"xgboost=={xgboost.__version__}", f"pandas=={pd.__version__}",
