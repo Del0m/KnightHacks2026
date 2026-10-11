@@ -97,6 +97,27 @@ describe('PoseDebugScreen', () => {
     expect(jest.mocked(usePoseOutput).mock.calls.at(-1)![0].engine).toBe('coreml');
   });
 
+  it('lets a fast phone choose cloud tracking, and go back to automatic', () => {
+    saveBenchmark({ modelId: 'model-a', size: 320, fps: 60, meanMs: 9, p95Ms: 10, ranAt: 1, error: null });
+    saveCloudConsent('user-1', true);
+    __resetPoseModeForTests();
+    act(() => { renderer = create(React.createElement(PoseDebugScreen)); });
+    const last = () => jest.mocked(usePoseOutput).mock.calls.at(-1)![0];
+    expect(last().engine).toBe('coreml');
+    expect(last().cloud).toBeNull();
+
+    const toggle = () => renderer.root.findByProps({ testID: 'pose-cloud-toggle' });
+    expect(JSON.stringify(renderer.toJSON())).toContain('Use cloud');
+    act(() => toggle().props.onPress());
+    expect(last().engine).toBe('cloud');
+    expect(last().cloud).not.toBeNull();
+    expect(JSON.stringify(renderer.toJSON())).toContain('Use automatic');
+
+    act(() => toggle().props.onPress());
+    expect(last().engine).toBe('coreml');
+    expect(last().cloud).toBeNull();
+  });
+
   it('re-runs the benchmark with the camera unmounted, then uses the size that passed', async () => {
     let finish!: (v: unknown) => void;
     jest.mocked(benchmarkPoseModel).mockReturnValueOnce(new Promise((r) => { finish = r; }) as never);
