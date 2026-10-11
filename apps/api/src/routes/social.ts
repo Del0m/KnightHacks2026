@@ -21,7 +21,7 @@ const COMMENT_BLOCKED_MESSAGE = "SteadyForm is for lifting others up, not weighi
 
 export const postInput = z
   .object({
-    // Advice questions go through POST /advice (BE-11) once it exists.
+    // Advice questions go through POST /advice (BE-11), which adds the AI-suggested first answer.
     kind: z.enum(["session", "pr", "medal", "goal"]),
     body: z.string().trim().min(1).max(2000),
     title: z.string().trim().max(100).optional(),
@@ -32,12 +32,13 @@ export const postInput = z
 
 export const commentInput = z.object({ body: z.string().trim().min(1).max(1000) }).strict();
 
-async function moderate(
+// Also used by POST /advice (BE-11): an advice question is a post, checked as "advice".
+export async function moderate(
   db: Db,
   moderator: Moderator,
   req: Request,
   text: string,
-  target: { kind: "post" } | { kind: "comment"; postId: string },
+  target: { kind: "post"; checkAs?: "advice" } | { kind: "comment"; postId: string },
 ): Promise<{ checked: boolean }> {
   const verdict =
     target.kind === "comment" && isAbusiveComment(text)
@@ -46,7 +47,7 @@ async function moderate(
           message: COMMENT_BLOCKED_MESSAGE,
           categories: ["local_abuse"],
         }
-      : await moderator.check(text, target.kind);
+      : await moderator.check(text, target.kind === "post" ? (target.checkAs ?? "post") : "comment");
   if (verdict.allowed) {
     if (target.kind === "comment" && verdict.checked === false) {
       throw new HttpError(
@@ -126,7 +127,8 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         .returning();
       return created;
     });
-    send(res, post);
+    const { embedding: _embedding, ...shared } = post!; // advice-only column
+    send(res, shared);
   });
 
   router.post("/posts", async (req, res) => {
@@ -156,7 +158,8 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         moderationChecked: checked,
       })
       .returning();
-    send(res, row, 201);
+    const { embedding: _embedding, ...post } = row!; // advice-only column
+    send(res, post, 201);
   });
 
   router.get("/posts/:id/comments", async (req, res) => {
@@ -168,6 +171,7 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         id: comments.id,
         body: comments.body,
         aiSuggested: comments.aiSuggested,
+        sources: comments.sources, // BE-11: what an AI answer cites
         createdAt: comments.createdAt,
         author: { id: users.id, handle: users.handle, displayName: profiles.displayName },
       })
@@ -178,7 +182,9 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
       .orderBy(asc(comments.createdAt));
     send(
       res,
-      rows.filter((row) => !isAbusiveComment(row.body)),
+      rows
+        .filter((row) => !isAbusiveComment(row.body))
+        .map((row) => ({ ...row, author: row.author?.id ? row.author : null })),
     );
   });
 

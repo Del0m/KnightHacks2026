@@ -7,7 +7,7 @@ import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { HttpError, notFound } from "../http.js";
 
-const { rehabPlans, rehabLimits, exercises, injuries, sessions, sets } = schema;
+const { rehabPlans, rehabLimits, exercises, injuries, sessions, sets, milestones } = schema;
 
 export const REHAB_DISCLAIMER =
   "Spotter tracks your physio's plan. Any pain is worth raising with your physio or a doctor.";
@@ -147,6 +147,24 @@ export async function activePlan(db: Db, userId: string): Promise<PlanRow | null
   return plan ?? null;
 }
 
+/**
+ * The plan whose limits the phone applies: the active plan, or else the latest plan the user finished
+ * by accepting the back-to-gym milestone (BE-17). Moving on to gym plans doesn't lift the physio's
+ * limits; they stay until the user edits or deletes them, or starts another plan.
+ */
+export async function limitsPlan(db: Db, userId: string): Promise<PlanRow | null> {
+  const active = await activePlan(db, userId);
+  if (active) return active;
+  const [graduated] = await db
+    .select({ plan: rehabPlans })
+    .from(rehabPlans)
+    .innerJoin(milestones, and(eq(milestones.rehabPlanId, rehabPlans.id), eq(milestones.status, "accepted")))
+    .where(and(eq(rehabPlans.userId, userId), eq(rehabPlans.status, "done")))
+    .orderBy(desc(milestones.decidedAt))
+    .limit(1);
+  return graduated?.plan ?? null;
+}
+
 export async function ownLimit(db: Db, planId: string, limitId: string): Promise<LimitRow> {
   const [limit] = await db
     .select()
@@ -167,7 +185,8 @@ export async function assertOwnInjury(db: Db, userId: string, injuryId: string):
 // ---- GET /me/limits ----
 
 // The one read the phone needs to build each effective spec: base spec, then the injury
-// overrides for these body parts, then the active plan's limits (INT-07 order).
+// overrides for these body parts, then the plan's limits (INT-07 order): the active plan, or the
+// one finished through the back-to-gym milestone (limitsPlan).
 // A plan's limits only apply from its start_on (in the user's time zone): before that the
 // phone gets the plan with started: false and no limits, so it never caps range early.
 export async function effectiveLimits(db: Db, userId: string, today: string, timeZone: string) {
@@ -177,7 +196,7 @@ export async function effectiveLimits(db: Db, userId: string, today: string, tim
       .from(injuries)
       .where(eq(injuries.userId, userId))
       .orderBy(injuries.bodyPart, injuries.side),
-    activePlan(db, userId),
+    limitsPlan(db, userId),
   ]);
   const applies = plan !== null && started(plan, today);
   const limits = applies ? await limitsFor(db, [plan.id]) : [];

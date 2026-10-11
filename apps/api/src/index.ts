@@ -16,6 +16,7 @@ import { hfQueryEmbedder } from "./integrations/huggingface/embed.js";
 import { hfEmbedder } from "./integrations/huggingface/embeddings.js";
 import { profileEmbeddings } from "./services/profileEmbeddings.js";
 import { RestNoteWriter } from "./services/restNote.js";
+import { AdviceWriter } from "./services/advice.js";
 import {
   databricksExportQueue,
   disabledExportQueue,
@@ -144,6 +145,10 @@ const planner = {
   log: logger,
 };
 
+// BE-11: AI-13 writes the suggested first answer to advice questions; without HF_TOKEN there is none
+// (the fixed pain reply still works, it needs no model).
+const advice = { writer: new AdviceWriter(llm, logger), embed: planner.embed, log: logger };
+
 const verifyToken = neonAuthVerifier(env.NEON_AUTH_JWKS_URL, {
   issuer: env.NEON_AUTH_ISSUER,
   audience: env.NEON_AUTH_AUDIENCE,
@@ -157,6 +162,7 @@ const app = createApp({
   verifyToken,
   rest,
   planner,
+  advice,
   // CONN-08: buddy-matching embeddings, refreshed when goals or bio change.
   profileEmbeddings: env.HF_TOKEN
     ? profileEmbeddings(

@@ -100,3 +100,7 @@ Refocusing Feed retains the mounted list, loaded pages and pagination cursor dur
 Regression tests reproduced all three original failures before implementation. The corrected social/moderation tests pass (28 tests), as do all four Feed suites (21 tests), both typechecks and lint checks. Mobile lint retains nine warnings and zero errors.
 
 A refocus regression also covers multiple pages of new posts. Background refresh follows fresh cursors until cached posts overlap or the new feed ends before preserving the previous tail cursor, so newly arrived posts cannot fall into a pagination gap.
+
+Main subsequently added BE-11 advice and BE-16/BE-17 recovery routes. The approved second merge preserves exported advice moderation (`checkAs: advice`) and all FE-11 protections. Comment responses retain main's source citations and normalize absent AI authors to null. The additive 0012 migration was applied before restarting the local testing API.
+
+Final second-merge validation: 32 API files / 573 tests pass, 4 Feed suites / 21 tests pass, both TypeScript checks and changed API lint pass; mobile lint has zero errors and nine warnings. Local API health is live after restart; private environment values remain absent from outgoing changes/history.
