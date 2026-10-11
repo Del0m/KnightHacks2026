@@ -29,6 +29,7 @@ final class HybridBasicPoseDetector: HybridPoseDetectorSpec {
     let mapped = VisionPoseMapper.map(people: people, timestampMs: f.timestampMs)
     let latencyMs = (CACurrentMediaTime() - start) * 1000
 
-    return PoseDetection(result: mapped.map(PoseFrameReader.toNitro), latencyMs: latencyMs)
+    return PoseDetection(result: mapped.map(PoseFrameReader.toNitro), latencyMs: latencyMs,
+                         timestampMs: Double(f.timestampMs))
   }
 }

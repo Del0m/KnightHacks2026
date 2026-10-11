@@ -17,7 +17,7 @@ Pod::Spec.new do |s|
     # Implementation (Swift)
     "ios/**/*.{swift}",
   ]
-  s.frameworks = ["Vision", "CoreML", "AVFoundation"]
+  s.frameworks = ["Vision", "CoreML", "CoreImage", "AVFoundation"]
 
   load 'nitrogen/generated/ios/SteadyForumPose+autolinking.rb'
   add_nitrogen_files(s)

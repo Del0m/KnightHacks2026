@@ -29,6 +29,7 @@ final class HybridPoseDetector: HybridPoseDetectorSpec {
                                  timestampMs: f.timestampMs)
     let latencyMs = (CACurrentMediaTime() - start) * 1000
 
-    return PoseDetection(result: decoded.map(PoseFrameReader.toNitro), latencyMs: latencyMs)
+    return PoseDetection(result: decoded.map(PoseFrameReader.toNitro), latencyMs: latencyMs,
+                         timestampMs: Double(f.timestampMs))
   }
 }
