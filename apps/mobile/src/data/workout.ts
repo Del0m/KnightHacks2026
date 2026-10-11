@@ -1,4 +1,4 @@
-import type { Schedule } from '@/screens/Onboarding/model';
+import type { Schedule } from '../screens/Onboarding/model';
 export type ExerciseId = 'curl' | 'squat' | 'press' | 'push_up' | 'lunge';
 export const exercises = [
   { id: 'curl' as const, name: 'Bicep curl', muscles: 'Biceps', sets: 3, reps: 12, equipment: 'Dumbbells' },
