@@ -73,6 +73,19 @@ describe('useFormEngine', () => {
     act(() => renderer.unmount());
   });
 
+  it('times no-person cloud frames by their capture time, so a run of them ends the set', () => {
+    jest.useFakeTimers(); // wall time stands still: only the capture times move
+    try {
+      const absentEnd = loadFixtures().find((c) => c.name === 'squat_absent_end')!;
+      const { latest, renderer } = mount(getSpec('squat')!);
+      for (const f of absentEnd.frames) {
+        act(() => latest.current!.onPose(isAbsentFrame(f) ? { latencyMs: 5, timestampMs: f.timestamp_ms } : { result: f, latencyMs: 5, timestampMs: f.timestamp_ms }));
+      }
+      expect(latest.current!.ended).toBe(true);
+      act(() => renderer.unmount());
+    } finally { jest.useRealTimers(); }
+  });
+
   it('ends and resets a set', () => {
     const { latest, renderer } = mount(getSpec('squat')!);
     act(() => latest.current!.endSet());
