@@ -187,6 +187,23 @@ class BundleTests(unittest.TestCase):
         self.assertFalse(folds["squat_b"]["per_class"]["fast_lowering"]["in_training"])
         self.assertTrue(folds["squat_a"]["per_class"]["clean"]["in_training"])
 
+    def test_training_coverage_distinguishes_other_exercise_labels(self):
+        rng = np.random.default_rng(7)
+        result = cross_validate(self.load_rows([
+            _rep(0, "a", "squat", "fast_lowering", rng),
+            _rep(1, "a", "squat", "clean", rng),
+            _rep(2, "b", "squat", "clean", rng),
+            _rep(3, "push", "push_up", "fast_lowering", rng),
+        ]))
+        fold = next(row for row in result["clips"] if row["clip_id"] == "a")
+        coverage = fold["per_class"]["fast_lowering"]
+        self.assertTrue(coverage["in_training"])
+        self.assertFalse(coverage["in_training_same_exercise"])
+        self.assertEqual(coverage["in_training_same_exercise_reps"], 0)
+        self.assertTrue(fold["per_class"]["clean"]["in_training_same_exercise"])
+        self.assertFalse(result["per_class"]["fast_lowering"]["in_training_same_exercise"])
+        self.assertFalse(fold["position_only"]["per_class"]["fast_lowering"]["in_training_same_exercise"])
+
     def test_baselines_use_only_scored_reps(self):
         result = cross_validate(self.confounded_bundle())
         self.assertEqual(result["majority_label"], "clean")
