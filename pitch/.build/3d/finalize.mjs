@@ -1,0 +1,5 @@
+import {finalizePresentation} from '/Users/brayden/.codex/plugins/cache/openai-primary-runtime/presentations/26.1009.11318/skills/presentations/container_tools/artifact_tool_utils.mjs';
+const root='/Users/brayden/Downloads/KnightHacks2026/pitch';
+const skill='/Users/brayden/.codex/plugins/cache/openai-primary-runtime/presentations/26.1009.11318/skills/presentations';
+const x=await finalizePresentation({workspaceDir:root,candidatePath:root+'/.build/3d/candidate.pptx',finalPath:root+'/output/SteadyForum-3D-Pitch.pptx',pythonExecutable:'/Users/brayden/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3',integrityValidatorPath:skill+'/container_tools/inspect_presentation_package_integrity.py',layoutValidatorPath:skill+'/container_tools/inspect_presentation_layout_geometry.py',layoutArgs:['--expected-slide-size-emu','12192000,6858000','--validate-heading-fit'],explicitTotalSlideCount:3,fontPolicy:{basis:'design',families:['Avenir Next']},verifyArtifactToolImport:true,receiptPath:root+'/.build/3d/validation.json'});
+console.log('Validated 3D pitch deck:',x.finalPath);

@@ -11,9 +11,9 @@ function validAuthUrl(value: string | undefined) {
   try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash; } catch { return false; }
 }
 export const authConfigured = validAuthUrl(authUrl);
-// "Continue with Google" shows only once Google is enabled in Neon Auth (Console > Auth >
-// OAuth providers), so the button never leads to a "provider not found" error.
-export const googleSignInEnabled = authConfigured && process.env.EXPO_PUBLIC_GOOGLE_SIGN_IN?.trim() === 'true';
+// Google is configured in Neon Auth for this project. Keep an explicit opt-out
+// for environments using a different provider configuration.
+export const googleSignInEnabled = authConfigured && process.env.EXPO_PUBLIC_GOOGLE_SIGN_IN?.trim() !== 'false';
 // Neon Auth exposes Better Auth APIs. The Expo adapter keeps native cookies in
 // SecureStore; the browser uses the provider's HttpOnly cookie, never localStorage.
 export const authClient = authConfigured ? createAuthClient({

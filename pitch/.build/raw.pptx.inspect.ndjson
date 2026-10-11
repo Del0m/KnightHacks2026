@@ -1,0 +1,47 @@
+{"kind":"deck","id":"pr/4d3bg7","name":"Deck"}
+{"kind":"layout","id":"ly/4fe9wnit","editable":false,"name":"Master","type":"master"}
+{"kind":"layout","id":"ly/xsfetsn6","editable":false,"name":"Title Slide","type":"title","placeholders":[{"name":"title","type":"title"},{"name":"subtitle","type":"subtitle"}]}
+{"kind":"layout","id":"ly/atsv69sf","editable":false,"name":"Section Header","type":"sectionHeader","placeholders":[{"name":"title","type":"title"}]}
+{"kind":"layout","id":"ly/vuh0vqps","editable":false,"name":"Title and Body","type":"tx","placeholders":[{"name":"title","type":"title"},{"name":"body","type":"body"}]}
+{"kind":"layout","id":"ly/qlojmds7","editable":false,"name":"Title and Two Column","type":"twoColTx","placeholders":[{"name":"title","type":"title"},{"name":"Left column","type":"body"},{"name":"Right column","type":"body"}]}
+{"kind":"layout","id":"ly/9orqp0zi","editable":false,"name":"Title and One Column","type":"tx","placeholders":[{"name":"title","type":"title"},{"name":"body","type":"body"}]}
+{"kind":"layout","id":"ly/u1orqlon","editable":false,"name":"Blank","type":"blank"}
+{"kind":"slide","id":"sl/tc5urr","slideIndex":0,"layout":{"id":"ly/u1orqlon","name":"Blank"},"title":"SteadyForum","textShapes":2,"backgroundColor":"rgba(245,250,254,1)"}
+{"kind":"shape","id":"sh/rmlsvid8","slideIndex":0,"position":{"left":92,"top":228,"width":72,"height":6},"name":"!!accent","geometry":"rect","fillColor":"#397BAA","lineWidth":0}
+{"kind":"textbox","id":"sh/cne94net","slideIndex":0,"position":{"left":88,"top":266,"width":1040,"height":120},"name":"!!title","text":"SteadyForum","geometry":"rect","lineWidth":0,"style":{"fontSize":100,"typeface":"Arial","color":"#213D4D","bold":true,"alignment":"left"}}
+{"kind":"textbox","id":"sh/donaxsve","slideIndex":0,"position":{"left":94,"top":411,"width":1020,"height":68},"name":"!!tagline","text":"The future of working out without getting hurt","geometry":"rect","lineWidth":0,"style":{"fontSize":31,"typeface":"Arial","color":"#4F6878","alignment":"left"}}
+{"kind":"shape","id":"sh/epwr6xwz","slideIndex":0,"position":{"left":0,"top":0,"width":300,"height":650},"name":"phone-rim","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"shape","id":"sh/zq5sz2d4","slideIndex":0,"position":{"left":3,"top":3,"width":294,"height":644},"name":"phone-body","geometry":"roundRect","fillColor":"#101820","lineWidth":0}
+{"kind":"shape","id":"sh/1cna1cva","slideIndex":0,"position":{"left":114,"top":10,"width":72,"height":16},"name":"phone-island","geometry":"roundRect","fillColor":"#060A0E","lineWidth":0}
+{"kind":"shape","id":"sh/mdwraxwv","slideIndex":0,"position":{"left":110,"top":634,"width":80,"height":4},"name":"phone-home","geometry":"roundRect","fillColor":"#CFD8DE","lineWidth":0}
+{"kind":"shape","id":"sh/neps32dg","slideIndex":0,"position":{"left":-2,"top":116,"width":3,"height":35},"name":"phone-button","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"shape","id":"sh/falsn6ls","slideIndex":0,"position":{"left":-2,"top":160,"width":3,"height":58},"name":"phone-volume","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"shape","id":"sh/u9cbu147","slideIndex":0,"position":{"left":299,"top":171,"width":3,"height":65},"name":"phone-power","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"image","id":"im/9gr6p4ju","slideIndex":0,"position":{"left":12,"top":26,"width":276,"height":598.32},"fit":"contain","name":"","geometry":"roundRect","alt":"Actual SteadyForum Train screen"}
+{"kind":"notes","id":"nt/tc5urr","slideIndex":0,"text":"Product screen supplied by the presenter: IMG_6540.PNG. Morph object matching and rotation follow Microsoft PowerPoint Morph guidance: https://support.microsoft.com/en-us/powerpoint/morph-transition-tips-and-tricks"}
+{"kind":"slide","id":"sl/81u4i9","slideIndex":1,"layout":{"id":"ly/u1orqlon","name":"Blank"},"title":"SteadyForum","textShapes":2,"backgroundColor":"rgba(245,250,254,1)"}
+{"kind":"shape","id":"sh/u1kb6psr","slideIndex":1,"position":{"left":92,"top":224,"width":72,"height":6},"name":"!!accent","geometry":"rect","fillColor":"#397BAA","lineWidth":0}
+{"kind":"textbox","id":"sh/h4vuhkbi","slideIndex":1,"position":{"left":88,"top":264,"width":700,"height":100},"name":"!!title","text":"SteadyForum","geometry":"rect","lineWidth":0,"style":{"fontSize":72,"typeface":"Arial","color":"#213D4D","bold":true,"alignment":"left"}}
+{"kind":"textbox","id":"sh/w32t8fax","slideIndex":1,"position":{"left":94,"top":379,"width":640,"height":120},"name":"!!tagline","text":"The future of working out\nwithout getting hurt","geometry":"rect","lineWidth":0,"style":{"fontSize":31,"typeface":"Arial","color":"#4F6878","alignment":"left"}}
+{"kind":"shape","id":"sh/jqdcjuto","slideIndex":1,"position":{"left":0,"top":0,"width":300,"height":650},"name":"phone-rim","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"shape","id":"sh/i54baps3","slideIndex":1,"position":{"left":3,"top":3,"width":294,"height":644},"name":"phone-body","geometry":"roundRect","fillColor":"#101820","lineWidth":0}
+{"kind":"shape","id":"sh/4rmtcza9","slideIndex":1,"position":{"left":114,"top":10,"width":72,"height":16},"name":"phone-island","geometry":"roundRect","fillColor":"#060A0E","lineWidth":0}
+{"kind":"shape","id":"sh/zu9s7qt4","slideIndex":1,"position":{"left":110,"top":634,"width":80,"height":4},"name":"phone-home","geometry":"roundRect","fillColor":"#CFD8DE","lineWidth":0}
+{"kind":"shape","id":"sh/y90belcz","slideIndex":1,"position":{"left":-2,"top":116,"width":3,"height":35},"name":"phone-button","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"shape","id":"sh/0jytwzu1","slideIndex":1,"position":{"left":-2,"top":160,"width":3,"height":58},"name":"phone-volume","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"shape","id":"sh/1k7ap4bm","slideIndex":1,"position":{"left":299,"top":171,"width":3,"height":65},"name":"phone-power","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"image","id":"im/kna5cji5","slideIndex":1,"position":{"left":12,"top":26,"width":276,"height":598.32},"fit":"contain","name":"","geometry":"roundRect","alt":"Actual SteadyForum Train screen"}
+{"kind":"notes","id":"nt/81u4i9","slideIndex":1,"text":"Product screen supplied by the presenter: IMG_6540.PNG. Morph object matching and rotation follow Microsoft PowerPoint Morph guidance: https://support.microsoft.com/en-us/powerpoint/morph-transition-tips-and-tricks"}
+{"kind":"slide","id":"sl/sv00i9","slideIndex":2,"layout":{"id":"ly/u1orqlon","name":"Blank"},"title":"SteadyForum","textShapes":2,"backgroundColor":"rgba(245,250,254,1)"}
+{"kind":"shape","id":"sh/ju9cfyp0","slideIndex":2,"position":{"left":-900,"top":224,"width":72,"height":6},"name":"!!accent","geometry":"rect","fillColor":"#397BAA","lineWidth":0}
+{"kind":"textbox","id":"sh/4vido3ql","slideIndex":2,"position":{"left":-1200,"top":264,"width":700,"height":100},"name":"!!title","text":"SteadyForum","geometry":"rect","lineWidth":0,"style":{"fontSize":72,"typeface":"Arial","color":"#213D4D","bold":true,"alignment":"left"}}
+{"kind":"textbox","id":"sh/5wruh876","slideIndex":2,"position":{"left":-1200,"top":379,"width":640,"height":120},"name":"!!tagline","text":"The future of working out\nwithout getting hurt","geometry":"rect","lineWidth":0,"style":{"fontSize":31,"typeface":"Arial","color":"#4F6878","alignment":"left"}}
+{"kind":"shape","id":"sh/6x0vqd8r","slideIndex":2,"position":{"left":0,"top":0,"width":300,"height":650},"name":"phone-rim","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"shape","id":"sh/ri9cjipc","slideIndex":2,"position":{"left":3,"top":3,"width":294,"height":644},"name":"phone-body","geometry":"roundRect","fillColor":"#101820","lineWidth":0}
+{"kind":"shape","id":"sh/tkruls7i","slideIndex":2,"position":{"left":114,"top":10,"width":72,"height":16},"name":"phone-island","geometry":"roundRect","fillColor":"#060A0E","lineWidth":0}
+{"kind":"shape","id":"sh/el0vud8n","slideIndex":2,"position":{"left":110,"top":634,"width":80,"height":4},"name":"phone-home","geometry":"roundRect","fillColor":"#CFD8DE","lineWidth":0}
+{"kind":"shape","id":"sh/fmtcnip8","slideIndex":2,"position":{"left":-2,"top":116,"width":3,"height":35},"name":"phone-button","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"shape","id":"sh/3ul03ihk","slideIndex":2,"position":{"left":-2,"top":160,"width":3,"height":58},"name":"phone-volume","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"shape","id":"sh/itcjad0z","slideIndex":2,"position":{"left":299,"top":171,"width":3,"height":65},"name":"phone-power","geometry":"roundRect","fillColor":"#596571","lineWidth":0}
+{"kind":"image","id":"im/1srud8f6","slideIndex":2,"position":{"left":12,"top":26,"width":276,"height":598.32},"fit":"contain","name":"","geometry":"roundRect","alt":"Actual SteadyForum Train screen"}
+{"kind":"notes","id":"nt/sv00i9","slideIndex":2,"text":"Product screen supplied by the presenter: IMG_6540.PNG. Morph object matching and rotation follow Microsoft PowerPoint Morph guidance: https://support.microsoft.com/en-us/powerpoint/morph-transition-tips-and-tricks"}

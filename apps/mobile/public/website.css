@@ -2,6 +2,13 @@
 html [data-testid^="glass-action"] > div:first-child { opacity: .4; }
 /* Web-only layout. Native screens and model bundles retain their current design. */
 html [data-testid^="web-"] { display: contents; }
+html [data-testid="web-auth-actions"] {
+  display: flex; flex-direction: row; gap: 12px; align-items: stretch;
+}
+html [data-testid="web-auth-actions"] > [role="button"] {
+  flex: 1; min-width: 0; min-height: 64px; margin-top: 0 !important;
+  padding: 12px !important;
+}
 html [data-testid^="page-"] { min-width: 0; }
 html [data-testid="model-rotation"] > div:nth-child(2) {
   background-color: #fff !important;

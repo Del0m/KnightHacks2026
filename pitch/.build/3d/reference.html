@@ -1,0 +1,3109 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title data-i18n="pageTitle">iPhone 15 Pro — 3D screenshot mockup</title>
+
+        <!-- PWA: installable + offline -->
+        <link rel="manifest" href="manifest.webmanifest" />
+        <meta name="theme-color" content="#1e1e26" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta
+            name="apple-mobile-web-app-status-bar-style"
+            content="black-translucent"
+        />
+        <meta
+            name="apple-mobile-web-app-title"
+            content="Mockup Studio"
+        />
+        <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+        <style>
+            :root {
+                --bg: #ffffff;
+                --panel: #1e1e26;
+                --panel-2: #262631;
+                --border: #34343f;
+                --text: #e8e8ee;
+                --text-dim: #9a9aa8;
+                --accent: #6b6bff;
+                --accent-hover: #8080ff;
+                --radius: 10px;
+            }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            html,
+            body {
+                height: 100%;
+            }
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+                    sans-serif;
+                background: var(--bg);
+                color: var(--text);
+                overflow: hidden;
+                display: flex;
+            }
+            #stage {
+                position: relative;
+                flex: 1;
+                min-width: 0;
+            }
+            #canvas-wrap {
+                position: absolute;
+                inset: 0;
+            }
+            canvas {
+                display: block;
+                width: 100%;
+                height: 100%;
+            }
+
+            #panel {
+                width: 400px;
+                flex-shrink: 0;
+                background: var(--panel);
+                border-left: 1px solid var(--border);
+                padding: 18px;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 11px;
+            }
+            h1 {
+                font-size: 15px;
+                font-weight: 600;
+                letter-spacing: 0.2px;
+            }
+            h1 span {
+                color: var(--text-dim);
+                font-weight: 400;
+            }
+            .group {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .group-title {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                color: var(--text-dim);
+                font-weight: 600;
+            }
+            button,
+            select {
+                font: inherit;
+                font-size: 13px;
+                background: var(--panel-2);
+                color: var(--text);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 9px 12px;
+                cursor: pointer;
+                transition:
+                    background 0.12s,
+                    border-color 0.12s;
+                text-align: left;
+            }
+            select {
+                width: 100%;
+                -webkit-appearance: none;
+                appearance: none;
+                background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%239a9aa8' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+                background-repeat: no-repeat;
+                background-position: right 12px center;
+            }
+            button:hover {
+                background: #303040;
+                border-color: #45455a;
+            }
+            button:active {
+                transform: scale(0.985);
+            }
+            button.primary {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: #fff;
+            }
+            button.primary:hover {
+                background: var(--accent-hover);
+            }
+            #btn-spin {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            #btn-spin .icon-sync {
+                flex-shrink: 0;
+            }
+            #btn-spin.active {
+                border-color: var(--accent);
+                color: #fff;
+                animation: spin-btn-pulse 1.8s ease-in-out infinite;
+            }
+            #btn-spin.active:hover {
+                animation-play-state: paused;
+                background: var(--accent-hover);
+            }
+            #btn-spin.active .icon-sync {
+                animation: spin 1.1s linear infinite;
+            }
+            @keyframes spin-btn-pulse {
+                0%,
+                100% {
+                    background: var(--accent);
+                }
+                50% {
+                    background: var(--accent-hover);
+                }
+            }
+            #orientation-switch button {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                padding: 9px 8px;
+            }
+            #orientation-switch button.active {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: #fff;
+            }
+            #orientation-switch button.active:hover {
+                background: var(--accent-hover);
+            }
+            #orientation-switch svg {
+                flex-shrink: 0;
+            }
+            .preset-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 8px;
+            }
+            .preset-grid button {
+                position: relative;
+                text-align: center;
+                padding: 10px 8px;
+                font-size: 12px;
+            }
+            .preset-grid button.active {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: #fff;
+            }
+            .preset-grid button.active:hover {
+                background: var(--accent-hover);
+            }
+            /* Active-angle dot: left = normal, right = mirrored. Absolutely placed so the label stays centered. */
+            .preset-grid button.active::before {
+                content: "";
+                position: absolute;
+                top: 50%;
+                left: 8px;
+                transform: translateY(-50%);
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                background: #fff;
+            }
+            .preset-grid button.active.mirror::before {
+                left: auto;
+                right: 8px;
+            }
+            .slider-row {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .slider-row label {
+                font-size: 12px;
+                color: var(--text-dim);
+                display: flex;
+                justify-content: space-between;
+            }
+            .slider-row label b {
+                color: var(--text);
+                font-weight: 500;
+                font-variant-numeric: tabular-nums;
+            }
+            input[type="range"] {
+                width: 100%;
+                accent-color: var(--accent);
+            }
+            .hint {
+                font-size: 11px;
+                color: var(--text-dim);
+                line-height: 1.5;
+            }
+            #drop-note {
+                position: absolute;
+                inset: 0;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                background: rgba(10, 10, 16, 0.78);
+                z-index: 10;
+                font-size: 16px;
+                color: var(--text);
+                pointer-events: none;
+                border: 2px dashed var(--accent);
+            }
+            #loader {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: var(--text-dim);
+                font-size: 14px;
+                z-index: 5;
+                text-align: center;
+            }
+            .spinner {
+                width: 28px;
+                height: 28px;
+                margin: 0 auto 10px;
+                border: 3px solid var(--border);
+                border-top-color: var(--accent);
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+            }
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+            .divider {
+                height: 1px;
+                background: var(--border);
+            }
+            details summary {
+                cursor: pointer;
+                font-size: 12px;
+                color: var(--text-dim);
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                user-select: none;
+            }
+            details[open] summary {
+                margin-bottom: 8px;
+            }
+            .row-2 {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            #sheet-handle {
+                display: none;
+            }
+
+            /* ---- Mobile PORTRAIT: fullscreen 3D + iOS-style bottom sheet ---- */
+            @media (max-width: 760px) and (orientation: portrait),
+                (pointer: coarse) and (orientation: portrait) {
+                :root {
+                    --peek: 128px;
+                    --sheet-h: 68vh;
+                } /* collapsed peek + opened sheet height */
+                html,
+                body {
+                    background: #ffffff;
+                } /* white shows through the sheet's rounded corners */
+                body {
+                    display: block;
+                }
+                /* White backdrop fills the whole viewport so nothing dark shows behind the sheet corners */
+                #stage {
+                    position: fixed;
+                    inset: 0;
+                    background: #ffffff;
+                }
+                #canvas-wrap {
+                    position: absolute;
+                    left: 0;
+                    right: 0;
+                    top: 0;
+                    bottom: var(--peek);
+                }
+
+                #panel {
+                    position: fixed;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    width: 100%;
+                    height: var(--sheet-h);
+                    max-height: var(--sheet-h);
+                    border-left: none;
+                    border-top: 1px solid var(--border);
+                    border-radius: 18px 18px 0 0;
+                    box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.12); /* subtle edge, no dark smear on the white bg */
+                    padding: 0 18px calc(18px + env(safe-area-inset-bottom))
+                        18px;
+                    gap: 10px;
+                    z-index: 20;
+                    /* Collapsed by default: only the handle + a peek row show above the fold */
+                    transform: translateY(calc(var(--sheet-h) - var(--peek)));
+                    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+                    overflow-y: auto;
+                    -webkit-overflow-scrolling: touch;
+                    overscroll-behavior: contain;
+                    touch-action: pan-y; /* allow the sheet body to scroll */
+                }
+                #panel.expanded {
+                    transform: translateY(0);
+                }
+                #panel.dragging {
+                    transition: none;
+                    overflow-y: hidden;
+                }
+
+                #sheet-handle {
+                    display: block;
+                    position: sticky;
+                    top: 0;
+                    margin: 0 -18px 8px;
+                    padding: 12px 0 10px;
+                    background: var(--panel);
+                    border-radius: 18px 18px 0 0;
+                    cursor: grab;
+                    z-index: 3;
+                    touch-action: none; /* the handle is the drag zone */
+                    flex-shrink: 0;
+                }
+                #sheet-handle::before {
+                    content: "";
+                    display: block;
+                    width: 40px;
+                    height: 5px;
+                    margin: 0 auto;
+                    background: #4a4a58;
+                    border-radius: 3px;
+                }
+
+                #panel h1 {
+                    display: none;
+                }
+                button {
+                    font-size: 15px;
+                    padding: 13px 14px;
+                }
+                .preset-grid {
+                    grid-template-columns: 1fr 1fr; /* narrow bottom sheet: keep 2 per row */
+                }
+                .preset-grid button {
+                    font-size: 14px;
+                    padding: 13px 8px;
+                }
+                input[type="range"] {
+                    height: 28px;
+                }
+            }
+
+            /* ---- Mobile LANDSCAPE: 3D on the left, scrollable panel on the right ---- */
+            @media (pointer: coarse) and (orientation: landscape),
+                (max-height: 560px) and (orientation: landscape) {
+                body {
+                    display: flex;
+                    height: 100vh;
+                    height: 100dvh;
+                }
+                #sheet-handle {
+                    display: none;
+                }
+                #stage {
+                    position: relative;
+                    flex: 1;
+                    min-width: 0;
+                    height: 100vh;
+                    height: 100dvh;
+                    background: #ffffff;
+                }
+                #canvas-wrap {
+                    position: absolute;
+                    inset: 0;
+                } /* full height — no bottom-sheet inset in landscape */
+                #panel {
+                    position: relative;
+                    transform: none;
+                    width: 290px;
+                    /* 100dvh = the ACTUAL visible height on iOS Safari (100vh over-measures in landscape,
+         pushing the last items below the fold with nothing to scroll them up) */
+                    height: 100vh;
+                    height: 100dvh;
+                    max-height: 100vh;
+                    max-height: 100dvh;
+                    border-left: 1px solid var(--border);
+                    border-top: none;
+                    border-radius: 0;
+                    box-shadow: none;
+                    overflow-y: auto;
+                    -webkit-overflow-scrolling: touch;
+                    overscroll-behavior: contain;
+                    touch-action: pan-y;
+                    /* Extra bottom padding clears iOS Safari's collapsing toolbar so the last item is always reachable */
+                    padding: 16px 16px calc(80px + env(safe-area-inset-bottom))
+                        16px;
+                    padding-right: calc(16px + env(safe-area-inset-right));
+                    gap: 9px;
+                }
+                #panel h1 {
+                    display: none;
+                }
+                button {
+                    font-size: 14px;
+                }
+                .preset-grid {
+                    grid-template-columns: 1fr 1fr; /* narrow side panel: keep 2 per row */
+                }
+                .preset-grid button {
+                    font-size: 13px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div id="stage">
+            <div id="canvas-wrap"></div>
+            <div id="loader">
+                <div class="spinner"></div>
+                <span data-i18n="loading">Loading iPhone 15 Pro…</span>
+            </div>
+            <div id="drop-note" data-i18n="dropNote">Drop a .glb model here</div>
+        </div>
+
+        <aside id="panel">
+            <div id="sheet-handle"></div>
+            <h1>Phone mockup <span>studio</span></h1>
+
+            <div class="group">
+                <div class="group-title" data-i18n="langTitle">Language</div>
+                <select id="lang-select"></select>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="group">
+                <div class="group-title" data-i18n="modelTitle">iPhone model</div>
+                <select id="model-select"></select>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="group">
+                <div class="group-title" data-i18n="orientationTitle">Orientation</div>
+                <div class="row-2" id="orientation-switch">
+                    <button data-orient="portrait" class="active">
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="14"
+                            height="14"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <rect x="6" y="3" width="12" height="18" rx="2" />
+                            <path d="M11 18h2" />
+                        </svg>
+                        <span data-i18n="orientationPortrait">Portrait</span>
+                    </button>
+                    <button data-orient="landscape">
+                        <svg
+                            viewBox="0 0 24 24"
+                            width="14"
+                            height="14"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <rect x="3" y="6" width="18" height="12" rx="2" />
+                            <path d="M18 11v2" />
+                        </svg>
+                        <span data-i18n="orientationLandscape">Landscape</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="group">
+                <div class="group-title" data-i18n="captureTitle">Screen capture</div>
+                <button class="primary" id="btn-import">
+                    <i></i><span data-i18n="btnImport">Import screenshot…</span>
+                </button>
+                <div class="hint" data-i18n="captureHint">
+                    Use an iPhone screenshot (portrait). It maps onto the glass
+                    and rotates in 3D.
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <details open id="filters-block">
+                <summary data-i18n="filtersTitle">Screen filters</summary>
+                <div class="group" style="margin-top: 4px">
+                    <div class="slider-row">
+                        <label
+                            ><span data-i18n="brightness">Brightness</span>
+                            <b id="v-f-bri">100%</b></label
+                        ><input
+                            type="range"
+                            id="f-bri"
+                            min="0"
+                            max="200"
+                            value="100"
+                        />
+                    </div>
+                    <div class="slider-row">
+                        <label
+                            ><span data-i18n="contrast">Contrast</span>
+                            <b id="v-f-con">100%</b></label
+                        ><input
+                            type="range"
+                            id="f-con"
+                            min="0"
+                            max="200"
+                            value="100"
+                        />
+                    </div>
+                    <div class="slider-row">
+                        <label
+                            ><span data-i18n="saturation">Saturation</span>
+                            <b id="v-f-sat">100%</b></label
+                        ><input
+                            type="range"
+                            id="f-sat"
+                            min="0"
+                            max="200"
+                            value="100"
+                        />
+                    </div>
+                    <button id="btn-filters-reset" data-i18n="btnResetFilters">
+                        Reset filters
+                    </button>
+                    <div class="hint" data-i18n="filtersHint">
+                        Applies live to the imported screenshot.
+                    </div>
+                </div>
+            </details>
+
+            <div class="divider"></div>
+
+            <div class="group">
+                <div class="group-title" data-i18n="anglesTitle">Ad angles</div>
+                <div class="preset-grid" id="presets"></div>
+                <button id="btn-spin">
+                    <svg
+                        class="icon-sync"
+                        viewBox="0 0 24 24"
+                        width="15"
+                        height="15"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                        <path d="M21 3v5h-5" />
+                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                        <path d="M8 16H3v5" />
+                    </svg>
+                    <span data-i18n="btnSpin">Toggle auto-spin</span>
+                </button>
+            </div>
+
+            <div class="divider"></div>
+
+            <details open>
+                <summary data-i18n="sceneTitle">Scene</summary>
+                <div class="group" style="margin-top: 4px">
+                    <div class="slider-row">
+                        <label
+                            ><span data-i18n="brightness">Brightness</span>
+                            <b id="v-env">100%</b></label
+                        ><input
+                            type="range"
+                            id="env"
+                            min="30"
+                            max="220"
+                            value="100"
+                        />
+                    </div>
+                    <div class="group-title" data-i18n="rotationTitle">Rotation</div>
+                    <div class="slider-row">
+                        <label
+                            ><span data-i18n="rotationX">Axis X</span>
+                            <b id="v-rot-x">0%</b></label
+                        ><input
+                            type="range"
+                            id="rot-x"
+                            min="0"
+                            max="100"
+                            value="0"
+                        />
+                    </div>
+                    <div class="slider-row">
+                        <label
+                            ><span data-i18n="rotationY">Axis Y</span>
+                            <b id="v-rot-y">0%</b></label
+                        ><input
+                            type="range"
+                            id="rot-y"
+                            min="0"
+                            max="100"
+                            value="0"
+                        />
+                    </div>
+                    <div class="slider-row">
+                        <label
+                            ><span data-i18n="rotationZ">Axis Z</span>
+                            <b id="v-rot-z">0%</b></label
+                        ><input
+                            type="range"
+                            id="rot-z"
+                            min="0"
+                            max="100"
+                            value="0"
+                        />
+                    </div>
+                    <div class="hint" data-i18n="sceneHint">
+                        Drag &amp; drop a .glb onto the viewport anytime.
+                    </div>
+                </div>
+            </details>
+
+            <div
+                style="
+                    margin-top: auto;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                "
+            >
+                <div class="hint" id="status"></div>
+                <button class="primary" id="btn-download">
+                    <i></i><span id="btn-download-label" data-i18n="btnDownload"
+                        >Download PNG (transparent)</span
+                    >
+                </button>
+            </div>
+        </aside>
+
+        <input type="file" id="file-shot" accept="image/*" hidden />
+
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+                }
+            }
+        </script>
+
+        <script type="module">
+            import * as THREE from "three";
+            import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+            import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+            import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+            // Selectable iPhone models. rot = model-space rotation making height=Y and screen face +Z.
+            // uv = extra transform applied to imported screenshots (each glb maps its screen differently).
+            // fixes15 = aggressive material passes tuned for the 15 Pro Max glb only.
+            const MODELS = [
+                {
+                    id: "ip15promax",
+                    label: "iPhone 15 Pro Max",
+                    url: "source/apple_iphone_15_pro_max_black(2).glb",
+                    screenMat: "pIJKfZsazmcpEiU",
+                    rot: [0, Math.PI, 0],
+                    uv: { rot: Math.PI, mirrorX: true },
+                    fixes15: true,
+                },
+                {
+                    id: "ip17promax",
+                    label: "iPhone 17 Pro Max",
+                    url: "source/iphone_17_pro_max.glb?v=68",
+                    screenMat: "screen.001",
+                    rot: [0, Math.PI / 2, 0],
+                    // Visible face of the screen mesh samples u -0.9528..0.0197, v 0.0019..1.0019 (the other
+                    // face is inside). Affine-remap that window to the full canvas; negative scale = the 180° flip.
+                    uv: {
+                        repeat: [-1.028278, -1],
+                        offset: [0.020257, 1.0019],
+                        clamp: true,
+                    },
+                    // This glb has NO bezel: the screen runs edge-to-edge. Composite a black border (with rounded
+                    // inner corners) onto imported screenshots so it frames like the 17 Pro.
+                    screenInset: { border: 26, radius: 162 },
+                    // black.002 is the front black surround; its only VISIBLE part is the Dynamic Island pill (the
+                    // rest sits behind the screen/glass). By default it's lit + tone-mapped, rendering light gray —
+                    // lock it to the same flat unlit deep black as the 15 Pro Max island.
+                    // Frame/rails/back: real "Cosmic Orange" = anodized aluminium — a DEEP saturated orange with a
+                    // fine bead-blasted micro-sparkle and a soft metallic sheen (bright on the frame edges/chamfers,
+                    // matte on the flat back). The scene light rig is bright, so metallic surfaces wash pale — the
+                    // base colors are deliberately deep/burnt so they land on cosmic orange after the wash. High
+                    // roughness on the flat panels stops the front light forming a hotspot (the Apple logo shares
+                    // basecolor.001, so a low-roughness frame lit the logo as a bright blob).
+                    tweaks: {
+                        "black.002": {
+                            color: 0x000000,
+                            emissive: 0x000000,
+                            emissiveIntensity: 1,
+                            metalness: 0,
+                            roughness: 1,
+                            envMapIntensity: 0,
+                            toneMapped: false,
+                        },
+                        // Frame face: visible sandblast grain; high roughness (the flat area shouldn't hotspot).
+                        "basecolor.001": {
+                            color: 0xac3d04,
+                            metalness: 0.55,
+                            roughness: 0.8,
+                            envMapIntensity: 0.42,
+                            anodized: { repeat: [38, 72], normalScale: 0.16 },
+                        },
+                        // Apple logo (split off from basecolor.001 into its own material): slightly DARKER than the
+                        // back panel + fine grain, so it reads as a subtle recessed logo. polygonOffset pulls it
+                        // forward so it wins the depth test against the back panel (Material.005) — no z-fight streaks.
+                        logo_face: {
+                            color: 0x9d3804,
+                            metalness: 0.4,
+                            roughness: 0.88,
+                            envMapIntensity: 0.28,
+                            anodized: { repeat: [40, 55], normalScale: 0.03, fine: true },
+                            polygonOffset: true,
+                            polygonOffsetFactor: -4,
+                            polygonOffsetUnits: -4,
+                        },
+                        // Side rails/chamfers + camera lens rings (shared material): grainy anodized finish to match
+                        // the body — low-ish metalness + high roughness so the rings read as sandblasted, not shiny
+                        // metal (per request: lens should adopt the grain texture, not a mirror-metal ring).
+                        "metalframe.002": {
+                            color: 0xa83a02,
+                            metalness: 0.5,
+                            roughness: 0.82,
+                            envMapIntensity: 0.35,
+                            anodized: { repeat: [40, 40], normalScale: 0.16 },
+                        },
+                        // Back panels use the FINE-only grain (no coarse octave) so the big flat area stays smooth
+                        // and even. Color is the base cosmic orange lightened ~1.1x (the logo container).
+                        "backpanel.001": {
+                            color: 0xbd4304,
+                            metalness: 0.5,
+                            roughness: 0.82,
+                            envMapIntensity: 0.35,
+                            anodized: { repeat: [40, 55], normalScale: 0.05, fine: true },
+                        },
+                        // Big flat back panel (the Apple-logo container): subtle FINE grain + matte satin, ~1.1x lighter.
+                        "Material.005": {
+                            color: 0xbd4304,
+                            metalness: 0.5,
+                            roughness: 0.82,
+                            envMapIntensity: 0.35,
+                            anodized: { repeat: [40, 55], normalScale: 0.05, fine: true },
+                        },
+                    },
+                },
+                {
+                    id: "ip17pro",
+                    label: "iPhone 17 Pro",
+                    url: "source/iphone_17_pro.glb",
+                    screenMat: "OLED",
+                    rot: [0, Math.PI, 0],
+                    uv: { mirrorX: true },
+                    // Glass: front cover is a 25% black film with mirror roughness — it grays the screenshot out
+                    // and catches a big specular blob. Make it near-invisible and reflection-free.
+                    // Display_Frame (bezel ring) + OLED_off (Dynamic Island pill) are glossy black: lock them to
+                    // flat unlit deep black so no light reflects on the screen borders or the island.
+                    tweaks: {
+                        Glass: {
+                            roughness: 1,
+                            metalness: 0,
+                            envMapIntensity: 0,
+                            opacity: 0.03,
+                        },
+                        Display_Frame: {
+                            color: 0x000000,
+                            emissive: 0x0d0d0f,
+                            emissiveIntensity: 1,
+                            metalness: 0,
+                            roughness: 1,
+                            envMapIntensity: 0,
+                            toneMapped: false,
+                        },
+                        OLED_off: {
+                            color: 0x000000,
+                            emissive: 0x0d0d0f,
+                            emissiveIntensity: 1,
+                            metalness: 0,
+                            roughness: 1,
+                            envMapIntensity: 0,
+                            toneMapped: false,
+                        },
+                    },
+                },
+                {
+                    id: "galaxys25ultra",
+                    label: "Samsung Galaxy S25 Ultra",
+                    url: "source/samsung_galaxy_s25_ultra.glb",
+                    screenMat: "Screen", // display mesh material
+                    rot: [0, 0, 0], // glb is already height=Y with the screen facing +Z
+                    uv: {},
+                    // Match the real "Titanium Black" finish: a LIGHT silver titanium frame/rails against a
+                    // MATTE near-black rear panel (the signature two-tone look).
+                    // "Screen glass" = cover glass; its mirror reflection drops a bright blob over the
+                    //   screenshot, so make it matte + near-invisible.
+                    // "Body*" = frame/rails -> light brushed silver titanium (metallic sheen).
+                    // "Back glass" = rear panel -> matte frosted near-black (no gloss).
+                    tweaks: {
+                        "Screen glass": {
+                            roughness: 1,
+                            metalness: 0,
+                            envMapIntensity: 0,
+                            opacity: 0.03,
+                            transparent: true
+                        },
+                        // Frame/rails: reuse the iPhone 15 Pro Max's brushed-titanium normal + roughness maps
+                        // (transplanted into this glb) for realistic micro-detail, but in a LIGHTER silver
+                        // titanium. metalness/roughness stay at 1 so the maps drive the variation as multipliers.
+                        Body: {
+                            color: 0x8a8a8d,
+                            metalness: 1.0,
+                            roughness: 1.0,
+                            envMapIntensity: 0.85
+                        },
+                        "Body .001": {
+                            color: 0x848487,
+                            metalness: 1.0,
+                            roughness: 1.0,
+                            envMapIntensity: 0.85
+                        },
+                        "Body .002": {
+                            color: 0x7d7d81,
+                            metalness: 1.0,
+                            roughness: 1.0,
+                            envMapIntensity: 0.8
+                        },
+                        // Side buttons: their own material (clone of Body with the brushed maps stripped) so
+                        // they stay SMOOTH metal instead of inheriting the frame's grainy normal map.
+                        Button: {
+                            color: 0x888a8c,
+                            metalness: 0.9,
+                            roughness: 0.4,
+                            envMapIntensity: 0.8
+                        },
+                        "Back glass": {
+                            color: 0x2b2927,
+                            metalness: 0.0,
+                            roughness: 0.9,
+                            envMapIntensity: 0.15
+                        },
+                        // "Back glass flash" is the LED flash dot. The light rig washes any warm diffuse to
+                        // white, so lock it UNLIT: black base + a warm pale-yellow emissive (toneMapped off) so
+                        // it reads as a soft cream-yellow dot instead of blowing out white.
+                        "Back glass flash": {
+                            color: 0x000000,
+                            emissive: 0xf0dea0,
+                            emissiveIntensity: 1,
+                            metalness: 0.0,
+                            roughness: 1.0,
+                            envMapIntensity: 0.0,
+                            toneMapped: false
+                        },
+                        // Outer rim of each lens (+ Samsung logo): polished dark metal that catches a bright
+                        // specular reflection on its edge.
+                        "Camera body": {
+                            color: 0x232326,
+                            metalness: 1.0,
+                            roughness: 0.28,
+                            envMapIntensity: 0.85
+                        },
+                        // The ring just inside the outer rim — SAME polished metal reflection as the rim. This is
+                        // a dedicated clone of the lens "Camera" material, so the screen border (which shares the
+                        // original "Camera") does NOT get this metallic look.
+                        Camera_ring: {
+                            color: 0x232326,
+                            metalness: 1.0,
+                            roughness: 0.28,
+                            envMapIntensity: 0.85
+                        },
+                        // Front-camera punch-hole ring (split off from "Camera_ring"): pure matte black so the
+                        // light rig can't drop the two bright specular glints the metal rings show. No reflection.
+                        Camera_ring_front: {
+                            color: 0x000000,
+                            emissive: 0x000000,
+                            emissiveIntensity: 1,
+                            metalness: 0,
+                            roughness: 1,
+                            envMapIntensity: 0,
+                            toneMapped: false
+                        },
+                        // Original "Camera" = the screen's thin side-border layer + front-camera cutout rim.
+                        // Pure matte black so no metallic ring shows around the punch-hole.
+                        Camera: {
+                            color: 0x000000,
+                            emissive: 0x000000,
+                            emissiveIntensity: 1,
+                            metalness: 0,
+                            roughness: 1,
+                            envMapIntensity: 0,
+                            toneMapped: false
+                        },
+                        // Lens cover glass: fully matte + near-invisible so the flare behind shows and it drops
+                        // no bright specular band.
+                        "Camera glass": {
+                            color: 0x000000,
+                            metalness: 0,
+                            roughness: 1.0,
+                            envMapIntensity: 0.0,
+                            transparent: true,
+                            opacity: 0.04
+                        },
+                        // Inner annulus around the lens — flat unlit deep charcoal (light rig would lift it grey).
+                        Dark: {
+                            color: 0x000000,
+                            emissive: 0x141416,
+                            emissiveIntensity: 1,
+                            metalness: 0,
+                            roughness: 1,
+                            envMapIntensity: 0,
+                            toneMapped: false
+                        },
+                        // Inner lens element: base-color texture is a lens photo (black dome + blue central
+                        // glint), self-lit via emissive so the flare reads regardless of lighting.
+                        "Camera lens": {
+                            color: 0x000000,
+                            emissiveFromMap: true,
+                            emissiveIntensity: 1.0,
+                            metalness: 0.0,
+                            roughness: 1.0,
+                            envMapIntensity: 0.0
+                        }
+                    },
+                },
+            ];
+            let currentModel = MODELS[0];
+            const EMBEDDED_MODELS = null; // standalone build replaces this with {id: base64, ...}
+
+            // --- i18n ---
+            // Keys mirror data-i18n attributes in the HTML + status/preset strings referenced from JS.
+            const TRANSLATIONS = {
+                en: {
+                    name: "English",
+                    pageTitle: "iPhone 15 Pro — 3D screenshot mockup",
+                    loading: "Loading iPhone 15 Pro…",
+                    dropNote: "Drop a .glb model here",
+                    langTitle: "Language",
+                    modelTitle: "iPhone model",
+                    orientationTitle: "Orientation",
+                    orientationPortrait: "Portrait",
+                    orientationLandscape: "Landscape",
+                    captureTitle: "Screen capture",
+                    btnImport: "Import screenshot…",
+                    captureHint:
+                        "Use an iPhone screenshot (portrait). It maps onto the glass and rotates in 3D.",
+                    filtersTitle: "Screen filters",
+                    brightness: "Brightness",
+                    contrast: "Contrast",
+                    saturation: "Saturation",
+                    btnResetFilters: "Reset filters",
+                    filtersHint: "Applies live to the imported screenshot.",
+                    anglesTitle: "Ad angles",
+                    btnSpin: "Toggle auto-spin",
+                    sceneTitle: "Scene",
+                    rotationTitle: "Rotation",
+                    rotationX: "Axis X",
+                    rotationY: "Axis Y",
+                    rotationZ: "Axis Z",
+                    sceneHint: "Drag & drop a .glb onto the viewport anytime.",
+                    btnDownload: "Download PNG (transparent)",
+                    btnSaveImage: "Save image",
+                    statusModelLoaded: "Model loaded · {name}",
+                    statusModelLoadedFile: "Model loaded · {name}",
+                    statusScreenNotFound:
+                        "Loaded, but screen material not found — use a different .glb.",
+                    statusLoadFailed: "Load failed.",
+                    statusScreenshot: "Screenshot: {name}",
+                    statusImageFailed: "Couldn't load image.",
+                    statusNothingToExport: "Nothing to export.",
+                    statusDownloaded: "Downloaded {w}×{h} ({kb} KB)",
+                    statusSaved: "Saved · {w}×{h}",
+                    statusReady: "Ready · {w}×{h}",
+                    loadErrorTitle: "Couldn't load model.",
+                    loadErrorHint:
+                        "Open this HTML next to the .glb, or drop a file in.",
+                    presetHero: "Hero",
+                    presetStraight: "Straight",
+                    presetFloating: "Floating",
+                    presetTilt: "Tilt",
+                    presetBack: "Back",
+                    presetLowAngle: "Low angle",
+                    presetTopDown: "Top down",
+                    presetBackAngle: "Back angle",
+                    presetProfile: "Profile",
+                    presetDramatic: "Dramatic",
+                    presetIsometric: "Isometric",
+                    presetOverhead: "Overhead",
+                },
+                fr: {
+                    name: "Français",
+                    pageTitle: "iPhone 15 Pro — Maquette 3D",
+                    loading: "Chargement de l'iPhone 15 Pro…",
+                    dropNote: "Déposez un modèle .glb ici",
+                    langTitle: "Langue",
+                    modelTitle: "Modèle d'iPhone",
+                    orientationTitle: "Orientation",
+                    orientationPortrait: "Portrait",
+                    orientationLandscape: "Paysage",
+                    captureTitle: "Capture d'écran",
+                    btnImport: "Importer une capture d'écran…",
+                    captureHint:
+                        "Utilisez une capture d'écran iPhone (portrait). Elle s'applique sur l'écran et tourne en 3D.",
+                    filtersTitle: "Filtres d'écran",
+                    brightness: "Luminosité",
+                    contrast: "Contraste",
+                    saturation: "Saturation",
+                    btnResetFilters: "Réinitialiser les filtres",
+                    filtersHint: "S'applique en direct à la capture importée.",
+                    anglesTitle: "Angles publicitaires",
+                    btnSpin: "Rotation automatique",
+                    sceneTitle: "Scène",
+                    rotationTitle: "Rotation",
+                    rotationX: "Axe X",
+                    rotationY: "Axe Y",
+                    rotationZ: "Axe Z",
+                    sceneHint:
+                        "Glissez-déposez un .glb dans la zone 3D à tout moment.",
+                    btnDownload: "Télécharger le PNG (transparent)",
+                    btnSaveImage: "Enregistrer l'image",
+                    statusModelLoaded: "Modèle chargé · {name}",
+                    statusModelLoadedFile: "Modèle chargé · {name}",
+                    statusScreenNotFound:
+                        "Chargé, mais matériau d'écran introuvable — essayez un autre .glb.",
+                    statusLoadFailed: "Échec du chargement.",
+                    statusScreenshot: "Capture d'écran : {name}",
+                    statusImageFailed: "Impossible de charger l'image.",
+                    statusNothingToExport: "Rien à exporter.",
+                    statusDownloaded: "Téléchargé {w}×{h} ({kb} Ko)",
+                    statusSaved: "Enregistré · {w}×{h}",
+                    statusReady: "Prêt · {w}×{h}",
+                    loadErrorTitle: "Impossible de charger le modèle.",
+                    loadErrorHint:
+                        "Ouvrez ce fichier HTML à côté du .glb, ou déposez un fichier.",
+                    presetHero: "Héros",
+                    presetStraight: "Face",
+                    presetFloating: "Flottant",
+                    presetTilt: "Inclinaison",
+                    presetBack: "Dos",
+                    presetLowAngle: "Contre-plongée",
+                    presetTopDown: "Vue de dessus",
+                    presetBackAngle: "Dos incliné",
+                    presetProfile: "Profil",
+                    presetDramatic: "Dramatique",
+                    presetIsometric: "Isométrique",
+                    presetOverhead: "Plongée",
+                },
+                es: {
+                    name: "Español",
+                    pageTitle: "iPhone 15 Pro — Maqueta 3D",
+                    loading: "Cargando iPhone 15 Pro…",
+                    dropNote: "Suelta un modelo .glb aquí",
+                    langTitle: "Idioma",
+                    modelTitle: "Modelo de iPhone",
+                    orientationTitle: "Orientación",
+                    orientationPortrait: "Vertical",
+                    orientationLandscape: "Horizontal",
+                    captureTitle: "Captura de pantalla",
+                    btnImport: "Importar captura de pantalla…",
+                    captureHint:
+                        "Usa una captura de pantalla de iPhone (vertical). Se aplica sobre el cristal y gira en 3D.",
+                    filtersTitle: "Filtros de pantalla",
+                    brightness: "Brillo",
+                    contrast: "Contraste",
+                    saturation: "Saturación",
+                    btnResetFilters: "Restablecer filtros",
+                    filtersHint: "Se aplica en vivo a la captura importada.",
+                    anglesTitle: "Ángulos publicitarios",
+                    btnSpin: "Rotación automática",
+                    sceneTitle: "Escena",
+                    rotationTitle: "Rotación",
+                    rotationX: "Eje X",
+                    rotationY: "Eje Y",
+                    rotationZ: "Eje Z",
+                    sceneHint:
+                        "Arrastra y suelta un .glb en la vista 3D en cualquier momento.",
+                    btnDownload: "Descargar PNG (transparente)",
+                    btnSaveImage: "Guardar imagen",
+                    statusModelLoaded: "Modelo cargado · {name}",
+                    statusModelLoadedFile: "Modelo cargado · {name}",
+                    statusScreenNotFound:
+                        "Cargado, pero no se encontró el material de pantalla — prueba otro .glb.",
+                    statusLoadFailed: "Error al cargar.",
+                    statusScreenshot: "Captura de pantalla: {name}",
+                    statusImageFailed: "No se pudo cargar la imagen.",
+                    statusNothingToExport: "Nada que exportar.",
+                    statusDownloaded: "Descargado {w}×{h} ({kb} KB)",
+                    statusSaved: "Guardado · {w}×{h}",
+                    statusReady: "Listo · {w}×{h}",
+                    loadErrorTitle: "No se pudo cargar el modelo.",
+                    loadErrorHint:
+                        "Abre este HTML junto al .glb, o suelta un archivo.",
+                    presetHero: "Héroe",
+                    presetStraight: "Frontal",
+                    presetFloating: "Flotante",
+                    presetTilt: "Inclinación",
+                    presetBack: "Trasera",
+                    presetLowAngle: "Contrapicado",
+                    presetTopDown: "Vista superior",
+                    presetBackAngle: "Trasera en ángulo",
+                    presetProfile: "Perfil",
+                    presetDramatic: "Dramático",
+                    presetIsometric: "Isométrico",
+                    presetOverhead: "Cenital",
+                },
+                de: {
+                    name: "Deutsch",
+                    pageTitle: "iPhone 15 Pro — 3D-Mockup",
+                    loading: "iPhone 15 Pro wird geladen…",
+                    dropNote: "Ziehe eine .glb-Datei hierher",
+                    langTitle: "Sprache",
+                    modelTitle: "iPhone-Modell",
+                    orientationTitle: "Ausrichtung",
+                    orientationPortrait: "Hochformat",
+                    orientationLandscape: "Querformat",
+                    captureTitle: "Screenshot",
+                    btnImport: "Screenshot importieren…",
+                    captureHint:
+                        "Verwende einen iPhone-Screenshot (Hochformat). Er wird auf das Display gelegt und in 3D gedreht.",
+                    filtersTitle: "Bildschirmfilter",
+                    brightness: "Helligkeit",
+                    contrast: "Kontrast",
+                    saturation: "Sättigung",
+                    btnResetFilters: "Filter zurücksetzen",
+                    filtersHint: "Wird live auf den importierten Screenshot angewendet.",
+                    anglesTitle: "Werbe-Winkel",
+                    btnSpin: "Auto-Drehung umschalten",
+                    sceneTitle: "Szene",
+                    rotationTitle: "Rotation",
+                    rotationX: "Achse X",
+                    rotationY: "Achse Y",
+                    rotationZ: "Achse Z",
+                    sceneHint:
+                        "Jederzeit eine .glb-Datei in die 3D-Ansicht ziehen.",
+                    btnDownload: "PNG herunterladen (transparent)",
+                    btnSaveImage: "Bild speichern",
+                    statusModelLoaded: "Modell geladen · {name}",
+                    statusModelLoadedFile: "Modell geladen · {name}",
+                    statusScreenNotFound:
+                        "Geladen, aber Bildschirmmaterial nicht gefunden — andere .glb verwenden.",
+                    statusLoadFailed: "Laden fehlgeschlagen.",
+                    statusScreenshot: "Screenshot: {name}",
+                    statusImageFailed: "Bild konnte nicht geladen werden.",
+                    statusNothingToExport: "Nichts zu exportieren.",
+                    statusDownloaded: "Heruntergeladen {w}×{h} ({kb} KB)",
+                    statusSaved: "Gespeichert · {w}×{h}",
+                    statusReady: "Bereit · {w}×{h}",
+                    loadErrorTitle: "Modell konnte nicht geladen werden.",
+                    loadErrorHint:
+                        "Öffne diese HTML-Datei neben der .glb-Datei oder ziehe eine Datei hinein.",
+                    presetHero: "Hero",
+                    presetStraight: "Gerade",
+                    presetFloating: "Schwebend",
+                    presetTilt: "Neigung",
+                    presetBack: "Rückseite",
+                    presetLowAngle: "Untersicht",
+                    presetTopDown: "Draufsicht",
+                    presetBackAngle: "Rückseite schräg",
+                    presetProfile: "Profil",
+                    presetDramatic: "Dramatisch",
+                    presetIsometric: "Isometrisch",
+                    presetOverhead: "Draufsicht hoch",
+                },
+                it: {
+                    name: "Italiano",
+                    pageTitle: "iPhone 15 Pro — Mockup 3D",
+                    loading: "Caricamento di iPhone 15 Pro…",
+                    dropNote: "Trascina qui un modello .glb",
+                    langTitle: "Lingua",
+                    modelTitle: "Modello iPhone",
+                    orientationTitle: "Orientamento",
+                    orientationPortrait: "Verticale",
+                    orientationLandscape: "Orizzontale",
+                    captureTitle: "Screenshot",
+                    btnImport: "Importa screenshot…",
+                    captureHint:
+                        "Usa uno screenshot iPhone (verticale). Viene applicato sul vetro e ruota in 3D.",
+                    filtersTitle: "Filtri schermo",
+                    brightness: "Luminosità",
+                    contrast: "Contrasto",
+                    saturation: "Saturazione",
+                    btnResetFilters: "Reimposta filtri",
+                    filtersHint: "Applicato in tempo reale allo screenshot importato.",
+                    anglesTitle: "Angolazioni pubblicitarie",
+                    btnSpin: "Attiva/disattiva rotazione automatica",
+                    sceneTitle: "Scena",
+                    rotationTitle: "Rotazione",
+                    rotationX: "Asse X",
+                    rotationY: "Asse Y",
+                    rotationZ: "Asse Z",
+                    sceneHint:
+                        "Trascina un .glb nella vista 3D in qualsiasi momento.",
+                    btnDownload: "Scarica PNG (trasparente)",
+                    btnSaveImage: "Salva immagine",
+                    statusModelLoaded: "Modello caricato · {name}",
+                    statusModelLoadedFile: "Modello caricato · {name}",
+                    statusScreenNotFound:
+                        "Caricato, ma materiale schermo non trovato — prova un altro .glb.",
+                    statusLoadFailed: "Caricamento non riuscito.",
+                    statusScreenshot: "Screenshot: {name}",
+                    statusImageFailed: "Impossibile caricare l'immagine.",
+                    statusNothingToExport: "Niente da esportare.",
+                    statusDownloaded: "Scaricato {w}×{h} ({kb} KB)",
+                    statusSaved: "Salvato · {w}×{h}",
+                    statusReady: "Pronto · {w}×{h}",
+                    loadErrorTitle: "Impossibile caricare il modello.",
+                    loadErrorHint:
+                        "Apri questo HTML accanto al .glb, oppure trascina un file.",
+                    presetHero: "Hero",
+                    presetStraight: "Frontale",
+                    presetFloating: "Fluttuante",
+                    presetTilt: "Inclinazione",
+                    presetBack: "Retro",
+                    presetLowAngle: "Dal basso",
+                    presetTopDown: "Dall'alto",
+                    presetBackAngle: "Retro inclinato",
+                    presetProfile: "Profilo",
+                    presetDramatic: "Drammatico",
+                    presetIsometric: "Isometrico",
+                    presetOverhead: "Dall'alto in avanti",
+                },
+                pt: {
+                    name: "Português",
+                    pageTitle: "iPhone 15 Pro — Maquete 3D",
+                    loading: "A carregar o iPhone 15 Pro…",
+                    dropNote: "Solte um modelo .glb aqui",
+                    langTitle: "Idioma",
+                    modelTitle: "Modelo de iPhone",
+                    orientationTitle: "Orientação",
+                    orientationPortrait: "Vertical",
+                    orientationLandscape: "Paisagem",
+                    captureTitle: "Captura de ecrã",
+                    btnImport: "Importar captura de ecrã…",
+                    captureHint:
+                        "Use uma captura de ecrã do iPhone (vertical). Ela é aplicada ao ecrã e roda em 3D.",
+                    filtersTitle: "Filtros de ecrã",
+                    brightness: "Brilho",
+                    contrast: "Contraste",
+                    saturation: "Saturação",
+                    btnResetFilters: "Repor filtros",
+                    filtersHint: "Aplicado em direto à captura importada.",
+                    anglesTitle: "Ângulos publicitários",
+                    btnSpin: "Alternar rotação automática",
+                    sceneTitle: "Cena",
+                    rotationTitle: "Rotação",
+                    rotationX: "Eixo X",
+                    rotationY: "Eixo Y",
+                    rotationZ: "Eixo Z",
+                    sceneHint:
+                        "Arraste e solte um .glb na vista 3D a qualquer momento.",
+                    btnDownload: "Transferir PNG (transparente)",
+                    btnSaveImage: "Guardar imagem",
+                    statusModelLoaded: "Modelo carregado · {name}",
+                    statusModelLoadedFile: "Modelo carregado · {name}",
+                    statusScreenNotFound:
+                        "Carregado, mas material do ecrã não encontrado — experimente outro .glb.",
+                    statusLoadFailed: "Falha ao carregar.",
+                    statusScreenshot: "Captura de ecrã: {name}",
+                    statusImageFailed: "Não foi possível carregar a imagem.",
+                    statusNothingToExport: "Nada para exportar.",
+                    statusDownloaded: "Transferido {w}×{h} ({kb} KB)",
+                    statusSaved: "Guardado · {w}×{h}",
+                    statusReady: "Pronto · {w}×{h}",
+                    loadErrorTitle: "Não foi possível carregar o modelo.",
+                    loadErrorHint:
+                        "Abra este HTML junto ao .glb, ou solte um ficheiro.",
+                    presetHero: "Hero",
+                    presetStraight: "Frontal",
+                    presetFloating: "Flutuante",
+                    presetTilt: "Inclinação",
+                    presetBack: "Traseira",
+                    presetLowAngle: "Ângulo baixo",
+                    presetTopDown: "Vista superior",
+                    presetBackAngle: "Traseira inclinada",
+                    presetProfile: "Perfil",
+                    presetDramatic: "Dramático",
+                    presetIsometric: "Isométrico",
+                    presetOverhead: "Vista de cima",
+                },
+                ja: {
+                    name: "日本語",
+                    pageTitle: "iPhone 15 Pro — 3Dモックアップ",
+                    loading: "iPhone 15 Pro を読み込み中…",
+                    dropNote: ".glb モデルをここにドロップ",
+                    langTitle: "言語",
+                    modelTitle: "iPhoneモデル",
+                    orientationTitle: "画面の向き",
+                    orientationPortrait: "縦向き",
+                    orientationLandscape: "横向き",
+                    captureTitle: "スクリーンショット",
+                    btnImport: "スクリーンショットをインポート…",
+                    captureHint:
+                        "iPhoneのスクリーンショット（縦向き）を使用してください。画面に貼り付けられ、3Dで回転します。",
+                    filtersTitle: "画面フィルター",
+                    brightness: "明るさ",
+                    contrast: "コントラスト",
+                    saturation: "彩度",
+                    btnResetFilters: "フィルターをリセット",
+                    filtersHint: "インポートしたスクリーンショットにリアルタイムで適用されます。",
+                    anglesTitle: "広告アングル",
+                    btnSpin: "自動回転の切り替え",
+                    sceneTitle: "シーン",
+                    rotationTitle: "回転",
+                    rotationX: "X軸",
+                    rotationY: "Y軸",
+                    rotationZ: "Z軸",
+                    sceneHint: ".glbファイルをいつでもビューポートにドラッグ＆ドロップできます。",
+                    btnDownload: "PNGをダウンロード（透過）",
+                    btnSaveImage: "画像を保存",
+                    statusModelLoaded: "モデルを読み込みました · {name}",
+                    statusModelLoadedFile: "モデルを読み込みました · {name}",
+                    statusScreenNotFound:
+                        "読み込みましたが、画面のマテリアルが見つかりません — 別の.glbを試してください。",
+                    statusLoadFailed: "読み込みに失敗しました。",
+                    statusScreenshot: "スクリーンショット: {name}",
+                    statusImageFailed: "画像を読み込めませんでした。",
+                    statusNothingToExport: "エクスポートするものがありません。",
+                    statusDownloaded: "ダウンロード完了 {w}×{h} ({kb} KB)",
+                    statusSaved: "保存しました · {w}×{h}",
+                    statusReady: "準備完了 · {w}×{h}",
+                    loadErrorTitle: "モデルを読み込めませんでした。",
+                    loadErrorHint:
+                        "この HTML を .glb と同じ場所で開くか、ファイルをドロップしてください。",
+                    presetHero: "ヒーロー",
+                    presetStraight: "正面",
+                    presetFloating: "浮遊",
+                    presetTilt: "傾ける",
+                    presetBack: "背面",
+                    presetLowAngle: "ローアングル",
+                    presetTopDown: "上から",
+                    presetBackAngle: "背面アングル",
+                    presetProfile: "側面",
+                    presetDramatic: "ドラマチック",
+                    presetIsometric: "アイソメ",
+                    presetOverhead: "俯瞰",
+                },
+                zh: {
+                    name: "中文",
+                    pageTitle: "iPhone 15 Pro — 3D 效果图",
+                    loading: "正在加载 iPhone 15 Pro…",
+                    dropNote: "将 .glb 模型拖放到此处",
+                    langTitle: "语言",
+                    modelTitle: "iPhone 型号",
+                    orientationTitle: "屏幕方向",
+                    orientationPortrait: "竖屏",
+                    orientationLandscape: "横屏",
+                    captureTitle: "屏幕截图",
+                    btnImport: "导入截图…",
+                    captureHint:
+                        "使用 iPhone 截图（竖屏）。它会贴合到屏幕上并进行 3D 旋转。",
+                    filtersTitle: "屏幕滤镜",
+                    brightness: "亮度",
+                    contrast: "对比度",
+                    saturation: "饱和度",
+                    btnResetFilters: "重置滤镜",
+                    filtersHint: "实时应用于导入的截图。",
+                    anglesTitle: "广告角度",
+                    btnSpin: "切换自动旋转",
+                    sceneTitle: "场景",
+                    rotationTitle: "旋转",
+                    rotationX: "X 轴",
+                    rotationY: "Y 轴",
+                    rotationZ: "Z 轴",
+                    sceneHint: "随时将 .glb 文件拖放到视口中。",
+                    btnDownload: "下载 PNG（透明）",
+                    btnSaveImage: "保存图片",
+                    statusModelLoaded: "模型已加载 · {name}",
+                    statusModelLoadedFile: "模型已加载 · {name}",
+                    statusScreenNotFound:
+                        "已加载，但未找到屏幕材质 — 请尝试其他 .glb。",
+                    statusLoadFailed: "加载失败。",
+                    statusScreenshot: "截图：{name}",
+                    statusImageFailed: "无法加载图片。",
+                    statusNothingToExport: "没有可导出的内容。",
+                    statusDownloaded: "已下载 {w}×{h}（{kb} KB）",
+                    statusSaved: "已保存 · {w}×{h}",
+                    statusReady: "就绪 · {w}×{h}",
+                    loadErrorTitle: "无法加载模型。",
+                    loadErrorHint: "请在 .glb 旁边打开此 HTML，或拖入文件。",
+                    presetHero: "主视觉",
+                    presetStraight: "正面",
+                    presetFloating: "悬浮",
+                    presetTilt: "倾斜",
+                    presetBack: "背面",
+                    presetLowAngle: "低角度",
+                    presetTopDown: "俯视",
+                    presetBackAngle: "背面角度",
+                    presetProfile: "侧面",
+                    presetDramatic: "戏剧性",
+                    presetIsometric: "等距",
+                    presetOverhead: "俯瞰",
+                },
+            };
+            const LANG_STORAGE_KEY = "phoneMockupStudio.lang";
+            function detectLang() {
+                const saved = localStorage.getItem(LANG_STORAGE_KEY);
+                if (saved && TRANSLATIONS[saved]) return saved;
+                const candidates = navigator.languages || [
+                    navigator.language || "en",
+                ];
+                for (const tag of candidates) {
+                    const base = tag.slice(0, 2).toLowerCase();
+                    if (TRANSLATIONS[base]) return base;
+                }
+                return "en";
+            }
+            let currentLang = detectLang();
+            function t(key, vars) {
+                const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
+                let str = dict[key] ?? TRANSLATIONS.en[key] ?? key;
+                if (vars) {
+                    for (const [k, v] of Object.entries(vars)) {
+                        str = str.replace("{" + k + "}", v);
+                    }
+                }
+                return str;
+            }
+            function applyTranslations() {
+                document.documentElement.lang = currentLang;
+                document.title = t("pageTitle");
+                document.querySelectorAll("[data-i18n]").forEach((el) => {
+                    el.textContent = t(el.getAttribute("data-i18n"));
+                });
+                // Re-sync dynamic bits that data-i18n can't cover on its own
+                syncFilterLabelsIfReady();
+                updateDownloadButtonLabel();
+            }
+            // These two are wired later in the file (after their elements/state exist); guarded no-ops until then.
+            let syncFilterLabelsIfReady = () => {};
+            let updateDownloadButtonLabel = () => {};
+
+            const wrap = document.getElementById("canvas-wrap");
+            const loaderEl = document.getElementById("loader");
+            const statusEl = document.getElementById("status");
+            let lastW = 0,
+                lastH = 0; // last applied canvas size (for resize dedupe + orientation re-fit)
+
+            const renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true,
+                preserveDrawingBuffer: true,
+            });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.35;
+            wrap.appendChild(renderer.domElement);
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xffffff);
+            const camera = new THREE.PerspectiveCamera(
+                32,
+                wrap.clientWidth / wrap.clientHeight,
+                0.25,
+                100,
+            );
+            camera.position.set(0, 0, 6);
+
+            // Camera stays fixed facing -Z. OrbitControls is kept for zoom only (dolly + pinch); rotation is
+            // handled by the arcball on the model, so there is no camera orbit and thus no pole gimbal.
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.08;
+            controls.enablePan = false;
+            controls.enableRotate = false; // the phone tumbles, not the camera
+            controls.minDistance = 2.2;
+            controls.maxDistance = 14;
+
+            // Environment for realistic titanium/glass reflections
+            const pmrem = new THREE.PMREMGenerator(renderer);
+            const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+            scene.environment = envRT.texture;
+            scene.environmentIntensity = 2.4; // main driver of PBR brightness — was implicitly 1
+
+            // Surround rig: a light from every side so the body is never dark at any rotation.
+            const lightRig = new THREE.Group();
+            scene.add(lightRig);
+            const SIDE_DIRS = [
+                [0, 0, 1],
+                [0, 0, -1], // front / back
+                [1, 0, 0],
+                [-1, 0, 0], // right / left
+                [0, 1, 0],
+                [0, -1, 0], // top / bottom
+                [1, 1, 1],
+                [-1, 1, 1], // angled keys for metal sheen
+                [1, 1, -1],
+                [-1, 1, -1],
+            ];
+            const surroundLights = SIDE_DIRS.map(([x, y, z]) => {
+                const l = new THREE.DirectionalLight(0xffffff, 1.15);
+                l.position.set(x * 6, y * 6, z * 6);
+                lightRig.add(l);
+                return l;
+            });
+            // Soft sky/ground ambient so shadowed sides keep some color
+            const hemi = new THREE.HemisphereLight(0xffffff, 0xdfe4ff, 0.9);
+            scene.add(hemi);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+            // --- Model rig ---
+            // The camera is locked facing -Z; the PHONE tumbles in place (arcball) so a drag always tips it
+            // in the drag direction, at any angle, with no pole/gimbal roll. Compose chain, outer to inner:
+            //   orientRig (portrait/landscape roll about view Z)
+            //     └ arcball (free tumble quaternion driven by drag + presets)
+            //         └ rig  (auto-spin yaw about the phone's own up axis)
+            //             └ modelGroup (each glb's base orientation from fitModel)
+            const orientRig = new THREE.Group();
+            scene.add(orientRig);
+            const arcball = new THREE.Group(); // free-tumble orientation (quaternion)
+            orientRig.add(arcball);
+            const rig = new THREE.Group(); // auto-spin only
+            arcball.add(rig);
+            let modelGroup = null;
+
+            // Arcball state: qArc is where the phone is; qArcTarget is where it's easing to (preset tweens
+            // and drag both write qArcTarget; the render loop slerps qArc toward it for consistent damping).
+            const qArc = new THREE.Quaternion();
+            const qArcTarget = new THREE.Quaternion();
+
+            // Each model's screen material (currentModel.screenMat) gets its emissiveMap swapped with the
+            // imported screenshot for pixel-perfect UV alignment.
+            const APPLE_LOGO_INLAY = "dwrMminMXjXXeek"; // 15 Pro: back Apple logo metal inlay (only used by the logo mesh)
+            const APPLE_LOGO_OVERLAY = "ZQfGMLaFcpPaLMU"; // 15 Pro: glass overlay shared by the logo AND the camera plateau
+            let screenMaterial = null;
+            let originalEmissiveMap = null; // the default titanium wallpaper, kept for "Clear screen"
+
+            const texLoader = new THREE.TextureLoader();
+            let screenTexture = null;
+
+            // Bead-blasted "anodized aluminium" grain for the 17 Pro Max Cosmic Orange finish. Two variants:
+            //   default = a coarse-visible sandblast + fine speckle -> the grainy frame/rails/plateau.
+            //   fine    = a single fine octave only -> the SMOOTH back panel (the coarse octave read as an ugly
+            //             mottled splotch on that big flat area, so the back gets the fine grain alone).
+            // Each is a tangent-space normal map + matching roughness-variation map; the caller tiles (repeat) and
+            // scales (normalScale) per material. Built once, shared.
+            const _anodizedCache = {};
+            function getAnodizedMaps(fine) {
+                const key = fine ? "fine" : "default";
+                if (_anodizedCache[key]) return _anodizedCache[key];
+                const N = 512;
+                // Tileable value-noise field at `cells` resolution, smooth-upsampled to N×N.
+                const valueNoise = (cells, seed0) => {
+                    const g = new Float32Array(cells * cells);
+                    let s = seed0;
+                    const r = () => {
+                        s = (s * 1103515245 + 12345) & 0x7fffffff;
+                        return s / 0x7fffffff;
+                    };
+                    for (let i = 0; i < cells * cells; i++) g[i] = r();
+                    const out = new Float32Array(N * N);
+                    for (let y = 0; y < N; y++)
+                        for (let x = 0; x < N; x++) {
+                            const fx = (x / N) * cells, fy = (y / N) * cells;
+                            const x0 = Math.floor(fx) % cells, y0 = Math.floor(fy) % cells;
+                            const x1 = (x0 + 1) % cells, y1 = (y0 + 1) % cells;
+                            const tx = fx - Math.floor(fx), ty = fy - Math.floor(fy);
+                            const a = g[y0 * cells + x0], b = g[y0 * cells + x1];
+                            const c = g[y1 * cells + x0], d = g[y1 * cells + x1];
+                            const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+                            out[y * N + x] =
+                                a * (1 - sx) * (1 - sy) + b * sx * (1 - sy) + c * (1 - sx) * sy + d * sx * sy;
+                        }
+                    return out;
+                };
+                const hb = new Float32Array(N * N);
+                if (fine) {
+                    const f = valueNoise(300, 55555); // fine octave only -> no coarse mottle
+                    for (let i = 0; i < N * N; i++) hb[i] = f[i];
+                } else {
+                    const coarse = valueNoise(96, 98765), fineN = valueNoise(220, 98765);
+                    for (let i = 0; i < N * N; i++) hb[i] = coarse[i] * 0.7 + fineN[i] * 0.3;
+                }
+                // normal map from the height gradient
+                const nCanvas = document.createElement("canvas");
+                nCanvas.width = nCanvas.height = N;
+                const nCtx = nCanvas.getContext("2d");
+                const nImg = nCtx.createImageData(N, N);
+                const STR = 4.0;
+                for (let y = 0; y < N; y++)
+                    for (let x = 0; x < N; x++) {
+                        const dx = (hb[y * N + ((x + 1) % N)] - hb[y * N + ((x - 1 + N) % N)]) * STR;
+                        const dy = (hb[((y + 1) % N) * N + x] - hb[((y - 1 + N) % N) * N + x]) * STR;
+                        let nx = -dx, ny = -dy, nz = 1;
+                        const len = Math.hypot(nx, ny, nz);
+                        nx /= len; ny /= len; nz /= len;
+                        const idx = (y * N + x) * 4;
+                        nImg.data[idx] = Math.round((nx * 0.5 + 0.5) * 255);
+                        nImg.data[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+                        nImg.data[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+                        nImg.data[idx + 3] = 255;
+                    }
+                nCtx.putImageData(nImg, 0, 0);
+                const normalMap = new THREE.CanvasTexture(nCanvas);
+                normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+                // roughness-variation map (same speckle, mid-gray band; tighter for the fine variant)
+                const rCanvas = document.createElement("canvas");
+                rCanvas.width = rCanvas.height = N;
+                const rCtx = rCanvas.getContext("2d");
+                const rImg = rCtx.createImageData(N, N);
+                const rBase = fine ? 140 : 120, rAmp = fine ? 50 : 90;
+                for (let i = 0; i < N * N; i++) {
+                    const v = Math.round(rBase + hb[i] * rAmp);
+                    const idx = i * 4;
+                    rImg.data[idx] = rImg.data[idx + 1] = rImg.data[idx + 2] = v;
+                    rImg.data[idx + 3] = 255;
+                }
+                rCtx.putImageData(rImg, 0, 0);
+                const roughnessMap = new THREE.CanvasTexture(rCanvas);
+                roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+                _anodizedCache[key] = { normalMap, roughnessMap };
+                return _anodizedCache[key];
+            }
+
+            const gltfLoader = new GLTFLoader();
+
+            function clearModel() {
+                if (modelGroup) {
+                    rig.remove(modelGroup);
+                }
+                modelGroup = null;
+                screenMaterial = null;
+                originalEmissiveMap = null;
+            }
+
+            function fitModel(root) {
+                // Orient first (each glb has its own axes), then normalize: height = 3 world units, centered.
+                const r = currentModel.rot || [0, 0, 0];
+                root.rotation.set(r[0], r[1], r[2]);
+                root.position.set(0, 0, 0);
+                root.scale.setScalar(1);
+                root.updateMatrixWorld(true);
+
+                const box = new THREE.Box3().setFromObject(root);
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                root.scale.setScalar(3.0 / size.y);
+                root.updateMatrixWorld(true);
+
+                const center = new THREE.Box3()
+                    .setFromObject(root)
+                    .getCenter(new THREE.Vector3());
+                root.position.sub(center);
+            }
+
+
+            const bodyMats = []; // dark body materials we brighten; {mat, base:Color}
+            const logoMeshes = []; // Apple-logo mesh(es), lifted off the shell to stop z-fighting
+
+
+            function findScreenMaterial(root) {
+                screenMaterial = null;
+                bodyMats.length = 0;
+                logoMeshes.length = 0;
+                // Materials are SHARED across meshes. Treat each once: re-running a branch on an already
+                // mutated material misclassifies it (e.g. a flat-blacked pill got roughness=1, so on its 2nd
+                // mesh it fell through to bodyMats and was brightened back to gray).
+                const processedMats = new Set();
+                root.traverse((o) => {
+                    if (!o.isMesh) return;
+                    const mats = Array.isArray(o.material)
+                        ? o.material
+                        : [o.material];
+                    for (const m of mats) {
+                        if (!m) continue;
+                        // Per-MESH action, before the material dedupe: hide the logo's small glass overlay
+                        // (z-fights the metal inlay); its shared material still gets processed via the plateau mesh.
+                        if (m.name === APPLE_LOGO_OVERLAY) {
+                            o.geometry.computeBoundingBox();
+                            const bb = o.geometry.boundingBox.getSize(
+                                new THREE.Vector3(),
+                            );
+                            if (Math.max(bb.x, bb.y, bb.z) < 3) {
+                                o.visible = false;
+                                continue;
+                            }
+                        }
+                        if (processedMats.has(m)) continue;
+                        processedMats.add(m);
+                        // Per-model material overrides (e.g. de-reflect a cover glass); hex values for color props.
+                        // Tweaked materials are final: skip all later passes (esp. body brightening, which would
+                        // lift a flat-blacked bezel right back to reflective gray).
+                        const tweak =
+                            currentModel.tweaks && currentModel.tweaks[m.name];
+                        if (tweak) {
+                            for (const [k, v] of Object.entries(tweak)) {
+                                if (k === "emissiveFromMap") {
+                                    // Promote the material's own base-color texture to an emissive map so a
+                                    // photographic detail (e.g. the lens flare) glows at a fixed brightness
+                                    // instead of depending on the light rig / view angle.
+                                    if (v && m.map) {
+                                        m.emissiveMap = m.map;
+                                        m.emissive = new THREE.Color(0xffffff);
+                                        m.toneMapped = false;
+                                    }
+                                } else if (k === "stripMaps") {
+                                    // Drop baked normal/metalness/roughness maps so the surface is perfectly
+                                    // smooth. The 17 Pro Max frame maps add a grainy white sparkle on edges that
+                                    // fights the flat satin-anodized "Cosmic Orange" finish we want.
+                                    if (v) {
+                                        m.normalMap = null;
+                                        m.roughnessMap = null;
+                                        m.metalnessMap = null;
+                                    }
+                                } else if (k === "anodized") {
+                                    // Swap the baked frame maps for the shared anodized grain maps.
+                                    // v = { repeat:[u,v], normalScale:n, fine?:bool }. fine=true uses the
+                                    // single-octave map (smooth back panel); default uses the grainy 2-octave one.
+                                    const { normalMap, roughnessMap } = getAnodizedMaps(v.fine);
+                                    const nm = normalMap.clone();
+                                    const rm = roughnessMap.clone();
+                                    nm.wrapS = nm.wrapT = THREE.RepeatWrapping;
+                                    rm.wrapS = rm.wrapT = THREE.RepeatWrapping;
+                                    const rep = v.repeat || [14, 26];
+                                    nm.repeat.set(rep[0], rep[1]);
+                                    rm.repeat.set(rep[0], rep[1]);
+                                    nm.needsUpdate = rm.needsUpdate = true;
+                                    m.normalMap = nm;
+                                    m.roughnessMap = rm;
+                                    m.metalnessMap = null;
+                                    if (m.normalScale)
+                                        m.normalScale.set(v.normalScale ?? 0.12, v.normalScale ?? 0.12);
+                                } else if (
+                                    (k === "color" || k === "emissive") &&
+                                    m[k]
+                                )
+                                    m[k] = new THREE.Color(v);
+                                else m[k] = v;
+                            }
+                            m.needsUpdate = true;
+                            continue;
+                        }
+                        if (m.name === currentModel.screenMat) {
+                            screenMaterial = m;
+                            // Some models bake the wallpaper into the base map instead of an emissive map — promote it
+                            originalEmissiveMap =
+                                m.emissiveMap || m.map || null;
+                            // Make the screen glow at full brightness regardless of scene lighting
+                            m.emissive = new THREE.Color(0xffffff);
+                            m.emissiveIntensity = 1;
+                            m.toneMapped = false;
+                            // Kill environment/specular reflections so no light hotspot washes over the screenshot
+                            m.metalness = 0;
+                            m.roughness = 1;
+                            m.envMapIntensity = 0;
+                            if ("clearcoat" in m) m.clearcoat = 0;
+                            m.color = new THREE.Color(0x000000); // base black so only the emissive screenshot shows
+                            m.map = null; // diffuse map is dead weight once the screen is emissive-only
+                            m.emissiveMap = originalEmissiveMap;
+                            m.needsUpdate = true;
+                        } else if (m.color) {
+                            // Mirror-glossy PLAIN front parts (front glass, Dynamic Island glass) reflect the
+                            // environment as bright hotspots. Lock them to flat deep black. IMPORTANT: skip any
+                            // material carrying a VISIBLE texture (Apple logo, camera rings) — those keep their look.
+                            // Metalness/roughness-only maps don't define a look: counting them exempted the Dynamic
+                            // Island pill + screen bezel ring from the blackout, leaving them light-reflective gray.
+                            const hasTexture =
+                                m.map || m.emissiveMap || m.normalMap;
+                            if (m.name === APPLE_LOGO_INLAY) {
+                                // THE Apple logo. Render it FLAT: pure emissive dark, unlit (toneMapped off, no
+                                // diffuse/spec/env) so nothing can band or streak — a plain opaque logo.
+                                m.color = new THREE.Color(0x000000);
+                                m.emissive = new THREE.Color(0x1c1c20); // flat dark logo tint
+                                m.emissiveIntensity = 1;
+                                m.metalness = 0;
+                                m.roughness = 1;
+                                m.envMapIntensity = 0;
+                                m.toneMapped = false;
+                                m.flatShading = false;
+                                m.transparent = false;
+                                m.opacity = 1;
+                                if ("clearcoat" in m) {
+                                    m.clearcoat = 0;
+                                    m.clearcoatRoughness = 1;
+                                }
+                                if ("specularIntensity" in m)
+                                    m.specularIntensity = 0;
+                                m.needsUpdate = true;
+                                logoMeshes.push(o);
+                                continue;
+                            }
+                            // The blackout + reflection-taming passes are tuned for the 15 Pro glb — on other models
+                            // they would turn legitimate glass (screen cover, camera sapphire) into opaque black plates.
+                            if (
+                                currentModel.fixes15 &&
+                                m.roughness !== undefined &&
+                                m.roughness <= 0.1 &&
+                                m.metalness !== undefined &&
+                                !hasTexture
+                            ) {
+                                m.metalness = 0;
+                                m.roughness = 1;
+                                m.metalnessMap = null;
+                                m.roughnessMap = null; // maps would re-add specular sheen from the light rig
+                                m.envMapIntensity = 0; // no environment reflection
+                                m.color = new THREE.Color(0x000000); // no diffuse contribution from lights
+                                m.emissive = new THREE.Color(0x0d0d0f); // flat deep black, matches the bezel
+                                m.emissiveIntensity = 1;
+                                m.toneMapped = false; // keep it exactly this dark regardless of exposure
+                                if ("clearcoat" in m) {
+                                    m.clearcoat = 0;
+                                    m.clearcoatRoughness = 1;
+                                }
+                                if ("specularIntensity" in m)
+                                    m.specularIntensity = 0;
+                                if ("reflectivity" in m) m.reflectivity = 0;
+                                if ("transmission" in m) m.transmission = 0;
+                                m.transparent = false;
+                                m.opacity = 1;
+                                m.needsUpdate = true;
+                                continue; // don't also treat it as a body material to brighten
+                            }
+                            // Other textured glossy parts: keep texture, tame harsh reflection.
+                            if (
+                                currentModel.fixes15 &&
+                                m.roughness !== undefined &&
+                                m.roughness <= 0.1 &&
+                                hasTexture
+                            ) {
+                                m.roughness = Math.max(m.roughness, 0.4);
+                                m.envMapIntensity = 0.2;
+                                m.needsUpdate = true;
+                            }
+                            // Remember original base color of every non-screen material so we can lift the dark ones
+                            bodyMats.push({ mat: m, base: m.color.clone() });
+                        }
+                    }
+                });
+                // The logo shares the exact depth of the back shell + another panel → 3-way z-fighting.
+                // polygonOffset alone weakens when zoomed out, so ALSO physically lift the mesh off the shell
+                // along its own surface normal (a real geometric gap that never z-fights at any distance).
+                const rigBox = new THREE.Box3().setFromObject(rig);
+                const rigCenter = rigBox.getCenter(new THREE.Vector3());
+                for (const mesh of logoMeshes) {
+                    mesh.renderOrder = 3;
+                    const mm = Array.isArray(mesh.material)
+                        ? mesh.material[0]
+                        : mesh.material;
+                    if (mm) {
+                        mm.polygonOffset = true;
+                        mm.polygonOffsetFactor = -12;
+                        mm.polygonOffsetUnits = -12;
+                        mm.needsUpdate = true;
+                    }
+                    // Lift along the flat mesh's face normal. NOT origin-to-center: the node origin sits at the
+                    // phone origin, so that direction is numerical noise and can push the logo INTO the shell.
+                    mesh.updateWorldMatrix(true, false);
+                    const nAttr = mesh.geometry.attributes.normal;
+                    const outward = new THREE.Vector3(
+                        nAttr.getX(0),
+                        nAttr.getY(0),
+                        nAttr.getZ(0),
+                    )
+                        .applyNormalMatrix(
+                            new THREE.Matrix3().getNormalMatrix(
+                                mesh.matrixWorld,
+                            ),
+                        )
+                        .normalize();
+                    // Sign-check against phone-center → logo-surface so we always lift OUT of the shell
+                    mesh.geometry.computeBoundingBox();
+                    const surf = mesh.localToWorld(
+                        mesh.geometry.boundingBox.getCenter(
+                            new THREE.Vector3(),
+                        ),
+                    );
+                    if (outward.dot(surf.sub(rigCenter)) < 0) outward.negate();
+                    const worldPos = mesh.getWorldPosition(new THREE.Vector3());
+                    const targetWorld = worldPos.addScaledVector(
+                        outward,
+                        0.016,
+                    ); // small lift: clears z-fight, stays flush
+                    mesh.position.copy(mesh.parent.worldToLocal(targetWorld));
+                }
+                applyBodyBrightness(bodyBrightness);
+                return screenMaterial;
+            }
+
+            // 1 = original. >1 lifts dark body colors toward a lighter, ad-friendly finish.
+            let bodyBrightness = 1.6;
+            function applyBodyBrightness(k) {
+                bodyBrightness = k;
+                for (const { mat, base } of bodyMats) {
+                    const lum =
+                        0.2126 * base.r + 0.7152 * base.g + 0.0722 * base.b;
+                    // Only lift genuinely dark materials (the body/frame); leave light or colored ones alone
+                    const t = lum < 0.5 ? 1 - lum / 0.5 : 0; // 0..1, strongest on near-black
+                    const f = 1 + (k - 1) * t;
+                    mat.color.setRGB(
+                        Math.min(1, base.r * f + 0.04 * (k - 1) * t),
+                        Math.min(1, base.g * f + 0.04 * (k - 1) * t),
+                        Math.min(1, base.b * f + 0.05 * (k - 1) * t),
+                    );
+                    mat.needsUpdate = true;
+                }
+            }
+
+            function setScreenTexture(tex) {
+                if (screenTexture && screenTexture !== originalEmissiveMap)
+                    screenTexture.dispose();
+                screenTexture = tex;
+                if (!screenMaterial) return;
+                if (tex) {
+                    tex.colorSpace = THREE.SRGBColorSpace;
+                    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                    // Inherit the exact UV transform of the original wallpaper so alignment + orientation match
+                    const o = originalEmissiveMap;
+                    if (o) {
+                        tex.flipY = o.flipY;
+                        tex.wrapS = o.wrapS;
+                        tex.wrapT = o.wrapT;
+                        tex.center.copy(o.center);
+                        tex.offset.copy(o.offset);
+                        tex.repeat.copy(o.repeat);
+                        tex.rotation = o.rotation;
+                    } else {
+                        tex.flipY = false;
+                        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+                    }
+                    // Correct this model's screen UV orientation (each glb maps its screen differently)
+                    const uv = currentModel.uv || {};
+                    tex.center.set(0.5, 0.5);
+                    if (uv.rot) tex.rotation += uv.rot;
+                    if (uv.mirrorX) tex.repeat.x = -Math.abs(tex.repeat.x || 1);
+                    if (uv.flipY !== undefined) tex.flipY = uv.flipY;
+                    // Exact affine remap for meshes whose front face doesn't span UV 0..1 (17 Pro Max):
+                    // maps the measured UV window onto the full canvas (negative scale = builtin 180°).
+                    // center must be (0,0): setUvTransform folds a non-zero center into the affine even at rot 0.
+                    if (uv.repeat) {
+                        tex.center.set(0, 0);
+                        tex.rotation = 0;
+                        tex.repeat.set(uv.repeat[0], uv.repeat[1]);
+                    }
+                    if (uv.offset) tex.offset.set(uv.offset[0], uv.offset[1]);
+                    // Meshes with UVs outside 0..1 (17 Pro Max) must clamp so overshoot samples the bezel border,
+                    // not a wrapped copy of the screenshot interior
+                    if (uv.clamp) {
+                        tex.wrapS = THREE.ClampToEdgeWrapping;
+                        tex.wrapT = THREE.ClampToEdgeWrapping;
+                    }
+                    tex.needsUpdate = true;
+                    screenMaterial.emissiveMap = tex;
+                } else {
+                    // Restore the model's original wallpaper
+                    screenMaterial.emissiveMap = originalEmissiveMap;
+                }
+                screenMaterial.needsUpdate = true;
+            }
+
+            function loadModelCfg(cfg) {
+                currentModel = cfg;
+                loaderEl.style.display = "block";
+                const onLoaded = (gltf) => {
+                    clearModel();
+                    modelGroup = gltf.scene;
+                    fitModel(modelGroup);
+                    rig.add(modelGroup);
+                    const found = findScreenMaterial(modelGroup);
+                    // Recompose from the raw image: per-model framing (bezel inset) differs between models
+                    if (lastShotImg)
+                        setScreenTexture(
+                            new THREE.CanvasTexture(
+                                composeScreenCanvas(lastShotImg),
+                            ),
+                        );
+                    else if (screenTexture) setScreenTexture(screenTexture);
+                    loaderEl.style.display = "none";
+                    statusEl.textContent = found
+                        ? t("statusModelLoaded", { name: cfg.label })
+                        : t("statusScreenNotFound");
+                    lastPreset = presets[0];
+                    lastMirror = false;
+                    applyPreset(presets[0]);
+                    highlightActivePreset();
+                };
+                const onError = (err) => {
+                    loaderEl.innerHTML =
+                        t("loadErrorTitle") +
+                        "<br><small style='color:#9a9aa8'>" +
+                        t("loadErrorHint") +
+                        "</small>";
+                    console.error(err);
+                };
+                if (EMBEDDED_MODELS && EMBEDDED_MODELS[cfg.id]) {
+                    const bin = Uint8Array.from(
+                        atob(EMBEDDED_MODELS[cfg.id]),
+                        (c) => c.charCodeAt(0),
+                    );
+                    gltfLoader.parse(bin.buffer, "", onLoaded, onError);
+                } else {
+                    gltfLoader.load(cfg.url, onLoaded, undefined, onError);
+                }
+            }
+
+            function loadModelFromFile(file) {
+                const url = URL.createObjectURL(file);
+                gltfLoader.load(
+                    url,
+                    (gltf) => {
+                        clearModel();
+                        modelGroup = gltf.scene;
+                        fitModel(modelGroup);
+                        rig.add(modelGroup);
+                        findScreenMaterial(modelGroup);
+                        if (screenTexture) setScreenTexture(screenTexture);
+                        loaderEl.style.display = "none";
+                        statusEl.textContent = t("statusModelLoadedFile", {
+                            name: file.name,
+                        });
+                        URL.revokeObjectURL(url);
+                    },
+                    undefined,
+                    (err) => {
+                        console.error(err);
+                        statusEl.textContent = t("statusLoadFailed");
+                    },
+                );
+            }
+
+            // --- Ad-style presets ---
+            // az/el = camera orbit (deg); dist = zoom; ry/rz = model tilt & roll (rad, ad-style lean)
+            // nameKey = i18n key (translated label rendered into the button at build/refresh time)
+            const presets = [
+                { nameKey: "presetHero", az: 20, el: 6, dist: 6.0, ry: 0.0, rz: 0.0 },
+                { nameKey: "presetStraight", az: 0, el: 0, dist: 5.4, ry: 0.0, rz: 0.0 },
+                {
+                    nameKey: "presetFloating",
+                    az: 24,
+                    el: 12,
+                    dist: 6.4,
+                    ry: 0.3,
+                    rz: -0.12,
+                },
+                {
+                    nameKey: "presetTilt",
+                    az: 34,
+                    el: 6,
+                    dist: 6.1,
+                    ry: 0.45,
+                    rz: 0.14,
+                },
+                { nameKey: "presetBack", az: 180, el: 6, dist: 6.2, ry: 0.0, rz: 0.0 },
+                {
+                    nameKey: "presetLowAngle",
+                    az: 16,
+                    el: -24,
+                    dist: 6.2,
+                    ry: 0.15,
+                    rz: 0.06,
+                },
+                {
+                    nameKey: "presetTopDown",
+                    az: 0,
+                    el: 46,
+                    dist: 6.6,
+                    ry: 0.0,
+                    rz: 0.0,
+                },
+                {
+                    nameKey: "presetBackAngle",
+                    az: 205,
+                    el: 10,
+                    dist: 6.3,
+                    ry: -0.3,
+                    rz: 0.1,
+                },
+                {
+                    nameKey: "presetProfile",
+                    az: 90,
+                    el: 0,
+                    dist: 5.8,
+                    ry: 0.0,
+                    rz: 0.0,
+                },
+                {
+                    nameKey: "presetDramatic",
+                    az: -22,
+                    el: -30,
+                    dist: 6.4,
+                    ry: -0.35,
+                    rz: -0.1,
+                },
+                {
+                    nameKey: "presetIsometric",
+                    az: 30,
+                    el: 30,
+                    dist: 6.6,
+                    ry: 0.2,
+                    rz: 0.0,
+                },
+                {
+                    nameKey: "presetOverhead",
+                    az: -18,
+                    el: 38,
+                    dist: 6.7,
+                    ry: -0.22,
+                    rz: -0.08,
+                },
+            ];
+
+            // Turn a preset's camera orbit (az/el) + model lean (ry/rz) into a single arcball quaternion.
+            // The camera is locked, so instead of orbiting the camera we rotate the phone by the INVERSE of
+            // where the camera used to sit, then apply the ad-style model lean on top.
+            // The phone's default (identity) orientation shows its BACK to the locked camera; every preset's
+            // az is measured from the FRONT, so a fixed 180° yaw brings the screen to face the camera first.
+            const Q_FRONT = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0));
+            const _presetEye = new THREE.Object3D();
+            function presetQuaternion(p) {
+                const azr = THREE.MathUtils.degToRad(p.az);
+                const polar = THREE.MathUtils.degToRad(90 - p.el);
+                const sinP = Math.sin(polar);
+                // Reconstruct the old orbit camera orientation, then invert it: rotating the model by the
+                // inverse reproduces the exact same on-screen view with a fixed camera.
+                _presetEye.position.set(sinP * Math.sin(azr), Math.cos(polar), sinP * Math.cos(azr));
+                _presetEye.up.set(0, 1, 0);
+                _presetEye.lookAt(0, 0, 0);
+                _presetEye.updateMatrixWorld(true);
+                const q = _presetEye.quaternion.clone().invert();
+                q.multiply(Q_FRONT);
+                // Model lean (ry about Y, rz about Z) was applied inside the rig; fold it into the target.
+                q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, p.ry, p.rz, "YXZ")));
+                return q;
+            }
+
+            // Clicking a preset the first time applies it; clicking the SAME preset again applies the
+            // left-right mirror of that angle (and toggles back on a third press). Mirroring flips the pose
+            // horizontally: negate the azimuth and the model lean.
+            let lastPreset = null;
+            let lastMirror = false;
+            function mirrorPreset(p) {
+                return { ...p, az: -p.az, ry: -p.ry, rz: -p.rz };
+            }
+
+            let anim = null;
+            function applyPreset(p, mirror) {
+                setAutoSpin(false);
+                const src = mirror ? mirrorPreset(p) : p;
+                const qFrom = qArcTarget.clone();
+                const qTo = presetQuaternion(src);
+                const startDist = camera.position.distanceTo(controls.target);
+                const t0 = performance.now(),
+                    dur = 700;
+                cancelAnimationFrame(anim);
+                function tween(now) {
+                    const k = Math.min(1, (now - t0) / dur);
+                    const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+                    // Slerp the target orientation; the render loop eases qArc toward it.
+                    qArcTarget.copy(qFrom).slerp(qTo, e);
+                    // Dolly the locked camera in/out for the preset's framing.
+                    const dist = startDist + (src.dist - startDist) * e;
+                    camera.position.normalize().multiplyScalar(dist);
+                    controls.update();
+                    if (k < 1) anim = requestAnimationFrame(tween);
+                    else syncSlidersFromArc(); // reflect the preset's final angle in the sliders
+                }
+                anim = requestAnimationFrame(tween);
+            }
+
+            // --- Device orientation (portrait / landscape) ---
+            // A physical roll of orientRig only; independent of applyPreset's rig.y/rig.z ad-angle tween.
+            // Landscape rolls the phone so the Dynamic Island (top edge in portrait) swings to the left.
+            let deviceOrientation = "portrait";
+            const LANDSCAPE_ROLL = Math.PI / 2;
+            let orientAnim = null;
+            function setDeviceOrientation(mode, opts) {
+                opts = opts || {};
+                if (deviceOrientation === mode && !opts.force) return;
+                deviceOrientation = mode;
+                document
+                    .querySelectorAll("#orientation-switch button")
+                    .forEach((b) => {
+                        b.classList.toggle("active", b.dataset.orient === mode);
+                    });
+                const targetZ = mode === "landscape" ? LANDSCAPE_ROLL : 0;
+                const startZ = orientRig.rotation.z;
+                const t0 = performance.now(),
+                    dur = 500;
+                cancelAnimationFrame(orientAnim);
+                function tween(now) {
+                    const k = Math.min(1, (now - t0) / dur);
+                    const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+                    orientRig.rotation.z = startZ + (targetZ - startZ) * e;
+                    if (k < 1) orientAnim = requestAnimationFrame(tween);
+                }
+                orientAnim = requestAnimationFrame(tween);
+            }
+
+            // Build preset buttons (rebuildable so a language switch re-renders their labels)
+            const presetWrap = document.getElementById("presets");
+            const presetButtons = new Map(); // preset object -> its <button>, for highlighting the active one
+
+            // The highlight is driven ONLY by explicit preset clicks (via lastPreset) — never by comparing
+            // the current orientation to preset angles. So rotating the phone manually to an angle that
+            // happens to match a preset does NOT light up that button.
+            function highlightActivePreset() {
+                presetButtons.forEach((btn, preset) => {
+                    const on = preset === lastPreset;
+                    btn.classList.toggle("active", on);
+                    // Dot side reflects mirror state: left = normal, right = mirrored.
+                    btn.classList.toggle("mirror", on && lastMirror);
+                });
+            }
+
+            function buildPresetButtons() {
+                presetWrap.innerHTML = "";
+                presetButtons.clear();
+                presets.forEach((p) => {
+                    const b = document.createElement("button");
+                    b.textContent = t(p.nameKey);
+                    b.onclick = () => {
+                        // Same button again → mirror (and toggle back on the next press); a different
+                        // button → fresh, un-mirrored.
+                        lastMirror = lastPreset === p ? !lastMirror : false;
+                        lastPreset = p;
+                        applyPreset(p, lastMirror);
+                        highlightActivePreset();
+                    };
+                    presetButtons.set(p, b);
+                    presetWrap.appendChild(b);
+                });
+                highlightActivePreset(); // preserve highlight across language rebuilds
+            }
+            buildPresetButtons();
+
+            // --- UI wiring ---
+            let autoSpin = false;
+            let spinY = 0; // fractional Y-slider position (%) while auto-spinning, for smooth 0->100 looping
+            const btnSpinEl = document.getElementById("btn-spin");
+            function setAutoSpin(v) {
+                if (v && !autoSpin) {
+                    spinY = +rotEls.y.value; // resume the ramp from the current Y position
+                    lastPreset = null; // spinning away from a preset clears its highlight
+                    highlightActivePreset();
+                }
+                autoSpin = v;
+                btnSpinEl.classList.toggle("active", v);
+            }
+            btnSpinEl.onclick = () => setAutoSpin(!autoSpin);
+
+            document
+                .querySelectorAll("#orientation-switch button")
+                .forEach((b) => {
+                    b.onclick = () => setDeviceOrientation(b.dataset.orient);
+                });
+
+            const fileShot = document.getElementById("file-shot");
+            let lastShotImg = null; // raw imported image, kept so model switches can recompose per-model framing
+            // Live color filters applied to the imported screenshot.
+            const screenFilters = { bri: 100, con: 100, sat: 100 };
+            const FILTER_DEFAULTS = { bri: 100, con: 100, sat: 100 };
+            function filterString() {
+                const f = screenFilters;
+                return (
+                    "brightness(" +
+                    f.bri / 100 +
+                    ") contrast(" +
+                    f.con / 100 +
+                    ") saturate(" +
+                    f.sat / 100 +
+                    ")"
+                );
+            }
+            // Landscape sources (width > height) cover-fit into the portrait screen canvas so aggressively that
+            // almost all content gets cropped out. Rotate them 90° into portrait first so the full frame survives.
+            function toPortraitSource(img) {
+                const w = img.width,
+                    h = img.height;
+                if (w <= h) return img;
+                const c = document.createElement("canvas");
+                c.width = h;
+                c.height = w;
+                const g = c.getContext("2d");
+                g.translate(h / 2, w / 2);
+                g.rotate(Math.PI / 2);
+                g.drawImage(img, -w / 2, -h / 2);
+                return c;
+            }
+            // Draw the imported screenshot onto a canvas. Models whose glb lacks a bezel (screenInset) get a
+            // black border with rounded inner corners composited around the screenshot.
+            function composeScreenCanvas(img) {
+                const W = 1179,
+                    H = 2556; // iPhone screen resolution (portrait)
+                const c = document.createElement("canvas");
+                c.width = W;
+                c.height = H;
+                const g = c.getContext("2d");
+                const inset = currentModel.screenInset;
+                const b = inset ? inset.border : 0;
+                if (b) {
+                    g.fillStyle = "#000000";
+                    g.fillRect(0, 0, W, H);
+                    g.save();
+                    g.beginPath();
+                    g.roundRect(b, b, W - 2 * b, H - 2 * b, inset.radius || 0);
+                    g.clip();
+                }
+                // Cover-fit the screenshot into the (possibly inset) display area
+                const iw = W - 2 * b,
+                    ih = H - 2 * b;
+                const s = Math.max(iw / img.width, ih / img.height);
+                const dw = img.width * s,
+                    dh = img.height * s;
+                g.filter = filterString(); // live brightness/contrast/saturation/warmth
+                g.drawImage(img, b + (iw - dw) / 2, b + (ih - dh) / 2, dw, dh);
+                g.filter = "none";
+                if (b) g.restore();
+                return c;
+            }
+            // Re-render the screen texture from the raw image with current filters (no-op if none loaded)
+            function refreshScreenFromShot() {
+                if (!lastShotImg) return;
+                setScreenTexture(
+                    new THREE.CanvasTexture(
+                        composeScreenCanvas(lastShotImg),
+                    ),
+                );
+            }
+            document.getElementById("btn-import").onclick = () =>
+                fileShot.click();
+            fileShot.onchange = (e) => {
+                const f = e.target.files[0];
+                if (!f) return;
+                const url = URL.createObjectURL(f);
+                const img = new Image();
+                img.onload = () => {
+                    // Match the device orientation to the source's own shape, so the phone itself matches
+                    // what's on its screen: landscape source -> landscape device, portrait source -> portrait.
+                    if (img.width > img.height && deviceOrientation === "portrait") {
+                        setDeviceOrientation("landscape");
+                    } else if (
+                        img.width <= img.height &&
+                        deviceOrientation === "landscape"
+                    ) {
+                        setDeviceOrientation("portrait");
+                    }
+                    lastShotImg = toPortraitSource(img);
+                    const canvas = composeScreenCanvas(lastShotImg);
+                    const tex = new THREE.CanvasTexture(canvas);
+                    setScreenTexture(tex);
+                    URL.revokeObjectURL(url);
+                    statusEl.textContent = t("statusScreenshot", {
+                        name: f.name,
+                    });
+                };
+                img.onerror = () => {
+                    statusEl.textContent = t("statusImageFailed");
+                    URL.revokeObjectURL(url);
+                };
+                img.src = url;
+            };
+
+            // --- Live screen filters ---
+            const filterCtl = [
+                { id: "f-bri", key: "bri", label: "v-f-bri", unit: "%" },
+                { id: "f-con", key: "con", label: "v-f-con", unit: "%" },
+                { id: "f-sat", key: "sat", label: "v-f-sat", unit: "%" },
+            ];
+            const syncFilterLabels = () => {
+                filterCtl.forEach((c) => {
+                    document.getElementById(c.label).textContent =
+                        screenFilters[c.key] + c.unit;
+                });
+            };
+            syncFilterLabelsIfReady = syncFilterLabels; // wire the early forward-declared stub
+            filterCtl.forEach((c) => {
+                const el = document.getElementById(c.id);
+                el.oninput = () => {
+                    screenFilters[c.key] = +el.value;
+                    document.getElementById(c.label).textContent =
+                        el.value + c.unit;
+                    refreshScreenFromShot();
+                };
+            });
+            document.getElementById("btn-filters-reset").onclick = () => {
+                Object.assign(screenFilters, FILTER_DEFAULTS);
+                filterCtl.forEach((c) => {
+                    document.getElementById(c.id).value = FILTER_DEFAULTS[c.key];
+                });
+                syncFilterLabels();
+                refreshScreenFromShot();
+            };
+
+            // Export the current view as a transparent PNG, auto-cropped to the phone with padding
+            const EXPORT_PADDING = 0.02; // fraction of the phone's size added as margin on each side
+            // On touch devices with the Web Share API (iOS Safari), label the button "Save image".
+            const wantsSaveImageLabel = !!(
+                matchMedia("(pointer: coarse)").matches &&
+                navigator.canShare &&
+                navigator.canShare({
+                    files: [
+                        new File([new Blob()], "x.png", { type: "image/png" }),
+                    ],
+                })
+            );
+            updateDownloadButtonLabel = () => {
+                document.getElementById("btn-download-label").textContent = t(
+                    wantsSaveImageLabel ? "btnSaveImage" : "btnDownload",
+                );
+            };
+            updateDownloadButtonLabel();
+            document.getElementById("btn-download").onclick = () => {
+                // Render into a FIXED tall frame with the camera framed to fit the whole phone, independent of
+                // the live window size/aspect (so a narrow phone viewport can't clip it). Then crop to the phone.
+                const liveW = wrap.clientWidth,
+                    liveH = wrap.clientHeight;
+                const W = 2800,
+                    H = 4000; // fixed portrait export frame (2x for higher-res PNG export)
+                const prevBg = scene.background;
+                const prevAspect = camera.aspect;
+                const prevZoom = camera.zoom;
+                const wasSpin = autoSpin;
+                setAutoSpin(false);
+                scene.background = null; // transparent
+
+                // Re-aim the camera at the model's true center along the current view direction, so the phone is
+                // centered in the export frame (the live controls.target may not sit on the model center).
+                const box = new THREE.Box3().setFromObject(rig);
+                const modelCenter = box.getCenter(new THREE.Vector3());
+                const prevCamPos = camera.position.clone();
+                const viewDir = new THREE.Vector3();
+                camera.getWorldDirection(viewDir);
+                const dist = prevCamPos.distanceTo(controls.target);
+                camera.position
+                    .copy(modelCenter)
+                    .addScaledVector(viewDir, -dist); // same distance, aimed at center
+                camera.up.set(0, 1, 0);
+                camera.lookAt(modelCenter);
+                camera.aspect = W / H;
+                camera.zoom = 1;
+                camera.updateProjectionMatrix();
+                camera.updateMatrixWorld(true);
+
+                // Measure the model's projected extent (now centered) and zoom so it fills ~82% of the frame.
+                const corners = [
+                    new THREE.Vector3(box.min.x, box.min.y, box.min.z),
+                    new THREE.Vector3(box.min.x, box.min.y, box.max.z),
+                    new THREE.Vector3(box.min.x, box.max.y, box.min.z),
+                    new THREE.Vector3(box.min.x, box.max.y, box.max.z),
+                    new THREE.Vector3(box.max.x, box.min.y, box.min.z),
+                    new THREE.Vector3(box.max.x, box.min.y, box.max.z),
+                    new THREE.Vector3(box.max.x, box.max.y, box.min.z),
+                    new THREE.Vector3(box.max.x, box.max.y, box.max.z),
+                ];
+                let maxNx = 0,
+                    maxNy = 0;
+                for (const c of corners) {
+                    const p = c.clone().project(camera); // NDC in [-1,1]
+                    maxNx = Math.max(maxNx, Math.abs(p.x));
+                    maxNy = Math.max(maxNy, Math.abs(p.y));
+                }
+                camera.zoom = 0.82 / Math.max(maxNx, maxNy);
+                camera.updateProjectionMatrix();
+
+                // Force pixelRatio 1 for export so the drawing buffer is exactly W×H (otherwise the retina
+                // pixelRatio doubles the buffer and we'd read only a corner of it).
+                const prevPR = renderer.getPixelRatio();
+                renderer.setPixelRatio(1);
+                renderer.setSize(W, H, false);
+                renderer.setClearColor(0x000000, 0);
+                renderer.render(scene, camera);
+
+                // Read the rendered pixels straight from the GL buffer (origin is bottom-left)
+                const gl = renderer.getContext();
+                const pixels = new Uint8Array(W * H * 4);
+                gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+                scene.background = prevBg; // restore live view
+                renderer.setPixelRatio(prevPR);
+                camera.position.copy(prevCamPos);
+                camera.lookAt(controls.target);
+                camera.aspect = prevAspect;
+                camera.zoom = prevZoom;
+                camera.updateProjectionMatrix();
+                controls.update();
+                renderer.setSize(liveW, liveH, false);
+                lastW = lastH = 0; // force onResize to re-sync canvas CSS next tick
+                setAutoSpin(wasSpin);
+
+                // Alpha bounding box (flip Y because GL rows run bottom-to-top)
+                let minX = W,
+                    minY = H,
+                    maxX = -1,
+                    maxY = -1;
+                for (let y = 0; y < H; y++) {
+                    const row = (H - 1 - y) * W;
+                    for (let x = 0; x < W; x++) {
+                        if (pixels[(row + x) * 4 + 3] > 8) {
+                            if (x < minX) minX = x;
+                            if (x > maxX) maxX = x;
+                            if (y < minY) minY = y;
+                            if (y > maxY) maxY = y;
+                        }
+                    }
+                }
+                if (maxX < minX) {
+                    statusEl.textContent = t("statusNothingToExport");
+                    return;
+                }
+
+                const bw = maxX - minX + 1,
+                    bh = maxY - minY + 1;
+                const pad = Math.round(Math.max(bw, bh) * EXPORT_PADDING);
+
+                // Draw the full rendered frame into a 2D canvas (flip Y from GL bottom-up)
+                const full = document.createElement("canvas");
+                full.width = W;
+                full.height = H;
+                const fctx = full.getContext("2d");
+                const imgData = fctx.createImageData(W, H);
+                for (let y = 0; y < H; y++) {
+                    const src = (H - 1 - y) * W * 4,
+                        dst = y * W * 4;
+                    imgData.data.set(pixels.subarray(src, src + W * 4), dst);
+                }
+                fctx.putImageData(imgData, 0, 0);
+
+                // Output = tight phone bbox + uniform padding on ALL sides (added as transparent space,
+                // so padding is always even even if the phone touched a frame edge in the render).
+                const cw = bw + pad * 2,
+                    ch = bh + pad * 2;
+                const out = document.createElement("canvas");
+                out.width = cw;
+                out.height = ch;
+                out.getContext("2d").drawImage(
+                    full,
+                    minX,
+                    minY,
+                    bw,
+                    bh,
+                    pad,
+                    pad,
+                    bw,
+                    bh,
+                );
+
+                // Build the PNG blob SYNCHRONOUSLY (toDataURL, not async toBlob) so navigator.share is still
+                // inside the user-gesture on iOS Safari — otherwise iOS drops the gesture and ignores share().
+                const dataURL = out.toDataURL("image/png");
+                const bstr = atob(dataURL.split(",")[1]);
+                const bytes = new Uint8Array(bstr.length);
+                for (let i = 0; i < bstr.length; i++)
+                    bytes[i] = bstr.charCodeAt(i);
+                const blob = new Blob([bytes], { type: "image/png" });
+
+                const doDownload = () => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "iphone-15-pro-mockup.png";
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 4000);
+                    statusEl.textContent = t("statusDownloaded", {
+                        w: cw,
+                        h: ch,
+                        kb: Math.round(blob.size / 1024),
+                    });
+                };
+
+                const isTouch = matchMedia("(pointer: coarse)").matches;
+                const file = new File([blob], "iPhone mockup.png", {
+                    type: "image/png",
+                });
+                // On touch (iOS/mobile): open the native share sheet (→ "Save Image" to Photos).
+                if (isTouch && navigator.share) {
+                    navigator
+                        .share({ files: [file] })
+                        .then(() => {
+                            statusEl.textContent = t("statusSaved", {
+                                w: cw,
+                                h: ch,
+                            });
+                        })
+                        .catch((err) => {
+                            if (err && err.name === "AbortError") {
+                                statusEl.textContent = t("statusReady", {
+                                    w: cw,
+                                    h: ch,
+                                });
+                            } else {
+                                doDownload();
+                            }
+                        });
+                } else {
+                    doDownload();
+                }
+            };
+
+            document.getElementById("env").oninput = (e) => {
+                const v = e.target.value; // 100% = baseline
+                const k = v / 100;
+                scene.environmentIntensity = 2.4 * k; // reflections / metal sheen
+                renderer.toneMappingExposure = 1.35 * (0.7 + 0.3 * k);
+                surroundLights.forEach((l) => {
+                    l.intensity = 1.15 * k;
+                }); // scale every-side lights
+                hemi.intensity = 0.9 * k;
+                applyBodyBrightness(1 + (1.6 - 1) * k); // lift the dark body base color in step
+                document.getElementById("v-env").textContent = v + "%";
+            };
+
+            // --- Manual rotation sliders (Scene section): each axis 0..100% maps to 0..360° ---
+            // They write the arcball target directly; conversely, dragging the phone / picking a preset
+            // syncs the slider positions back so the two input methods always agree.
+            const rotEls = {
+                x: document.getElementById("rot-x"),
+                y: document.getElementById("rot-y"),
+                z: document.getElementById("rot-z")
+            };
+            const rotVals = {
+                x: document.getElementById("v-rot-x"),
+                y: document.getElementById("v-rot-y"),
+                z: document.getElementById("v-rot-z")
+            };
+            const _rotEuler = new THREE.Euler(0, 0, 0, "XYZ");
+            let editingRotSlider = false; // true while the user drags a slider, to suppress sync-back
+
+            // Write a slider's value + label without re-firing its oninput (so programmatic updates from
+            // drag/auto-spin don't recurse back through applyRotationFromSliders).
+            function setRotSlider(axis, pct) {
+                const v = ((Math.round(pct) % 100) + 100) % 100; // wrap into [0,100)
+                if (+rotEls[axis].value !== v) {
+                    rotEls[axis].value = v;
+                    rotVals[axis].textContent = v + "%";
+                }
+            }
+
+            // The sliders are the source of truth for orientation: rebuild the arcball target from all three.
+            function applyRotationFromSliders() {
+                const rx = (rotEls.x.value / 100) * Math.PI * 2;
+                const ry = (rotEls.y.value / 100) * Math.PI * 2;
+                const rz = (rotEls.z.value / 100) * Math.PI * 2;
+                _rotEuler.set(rx, ry, rz, "XYZ");
+                qArcTarget.setFromEuler(_rotEuler);
+            }
+
+            // After a free-tumble drag (or a preset), decompose the resulting orientation back to X/Y/Z % so
+            // the sliders reflect it. Only meaningful as a one-shot at rest — Euler decomposition of a moving
+            // free rotation is not monotonic, so it must NOT be called every frame during auto-spin.
+            function syncSlidersFromArc() {
+                if (editingRotSlider) return;
+                _rotEuler.setFromQuaternion(qArcTarget, "XYZ");
+                const pct = (rad) => (((rad / (Math.PI * 2)) % 1) + 1) % 1;
+                setRotSlider("x", pct(_rotEuler.x) * 100);
+                setRotSlider("y", pct(_rotEuler.y) * 100);
+                setRotSlider("z", pct(_rotEuler.z) * 100);
+            }
+
+            ["x", "y", "z"].forEach((axis) => {
+                const el = rotEls[axis];
+                el.addEventListener("pointerdown", () => (editingRotSlider = true));
+                window.addEventListener("pointerup", () => (editingRotSlider = false));
+                el.oninput = (e) => {
+                    setAutoSpin(false);
+                    cancelAnimationFrame(anim); // a manual rotation overrides any running preset tween
+                    lastPreset = null; // manual slider edit breaks the preset mirror-toggle chain
+                    highlightActivePreset(); // and clears the active-angle highlight
+                    rotVals[axis].textContent = e.target.value + "%";
+                    applyRotationFromSliders();
+                };
+            });
+
+            // Drag & drop model
+            const stage = document.getElementById("stage");
+            const dropNote = document.getElementById("drop-note");
+            ["dragenter", "dragover"].forEach((ev) =>
+                stage.addEventListener(ev, (e) => {
+                    e.preventDefault();
+                    dropNote.style.display = "flex";
+                }),
+            );
+            ["dragleave", "drop"].forEach((ev) =>
+                stage.addEventListener(ev, (e) => {
+                    e.preventDefault();
+                    if (ev === "drop") {
+                        const f = e.dataTransfer.files[0];
+                        if (f) loadModelFromFile(f);
+                    }
+                    dropNote.style.display = "none";
+                }),
+            );
+
+            // Resize
+            function onResize() {
+                // Read the canvas container's real size after layout has settled
+                const w = wrap.clientWidth,
+                    h = wrap.clientHeight;
+                if (w === 0 || h === 0) return; // mid-reflow — skip
+                if (w === lastW && h === lastH) return; // no change
+                lastW = w;
+                lastH = h;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h); // update BOTH the drawing buffer and the canvas CSS size
+            }
+            // Re-fit on the next animation frame so we read post-layout sizes, not mid-rotation ones
+            function scheduleResize() {
+                requestAnimationFrame(() => requestAnimationFrame(onResize));
+            }
+            window.addEventListener("resize", scheduleResize);
+            window.addEventListener("orientationchange", () => {
+                scheduleResize();
+                setTimeout(scheduleResize, 250);
+                setTimeout(scheduleResize, 600);
+            });
+            // visualViewport fires when iOS Safari's viewport truly settles after a rotation — most reliable signal
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener(
+                    "resize",
+                    scheduleResize,
+                );
+            }
+            // Safety net: if the container size ever drifts from the renderer, correct it in the render loop
+            setInterval(onResize, 500);
+
+            // --- Mobile bottom-sheet drag ---
+            (function initSheet() {
+                const panel = document.getElementById("panel");
+                const handle = document.getElementById("sheet-handle");
+                if (!handle) return;
+
+                // Bottom-sheet behavior only applies in portrait; landscape uses a static side panel
+                const isMobile = () =>
+                    matchMedia("(orientation: portrait)").matches &&
+                    matchMedia("(max-width: 760px), (pointer: coarse)").matches;
+                let dragging = false,
+                    startY = 0,
+                    startT = 0,
+                    lastY = 0,
+                    lastT = 0,
+                    collapsedT = 0;
+
+                const peekPx = () =>
+                    parseInt(
+                        getComputedStyle(panel).getPropertyValue("--peek"),
+                    ) || 128;
+                const collapsedTranslate = () =>
+                    panel.getBoundingClientRect().height - peekPx(); // matches CSS --peek
+                const currentTranslate = () => {
+                    const m = new DOMMatrixReadOnly(
+                        getComputedStyle(panel).transform,
+                    );
+                    return m.m42 || 0;
+                };
+                const setExpanded = (on) => {
+                    panel.classList.toggle("expanded", on);
+                    panel.style.transform = ""; // let CSS class drive it
+                };
+
+                // On orientation/size change, clear sheet state so each layout (portrait sheet vs landscape panel) is clean
+                const resetSheet = () => {
+                    panel.classList.remove("expanded", "dragging");
+                    panel.style.transform = "";
+                };
+                window.addEventListener("orientationchange", resetSheet);
+                matchMedia("(orientation: portrait)").addEventListener?.(
+                    "change",
+                    resetSheet,
+                );
+
+                const expanded = () => panel.classList.contains("expanded");
+                let active = false,
+                    moved = false,
+                    onHandle = false,
+                    suppressClick = false;
+
+                const onDown = (e) => {
+                    if (!isMobile()) return;
+                    onHandle = !!(
+                        e.target.closest && e.target.closest("#sheet-handle")
+                    );
+                    // When collapsed, a touch ANYWHERE on the panel can drag it open.
+                    // When expanded, only the handle drags (the body scrolls / buttons work).
+                    if (!expanded() || onHandle) {
+                        active = true;
+                        moved = false;
+                        collapsedT = collapsedTranslate();
+                        startT = currentTranslate();
+                        startY = e.touches ? e.touches[0].clientY : e.clientY;
+                    }
+                };
+                const onMove = (e) => {
+                    if (!active) return;
+                    const y = e.touches ? e.touches[0].clientY : e.clientY;
+                    const dy = y - startY;
+                    if (!moved && Math.abs(dy) > 4) {
+                        moved = true;
+                        panel.classList.add("dragging");
+                    }
+                    if (!moved) return;
+                    let t = Math.max(0, Math.min(collapsedT, startT + dy));
+                    panel.style.transform = "translateY(" + t + "px)";
+                    e.preventDefault(); // we're dragging the sheet; block scroll/click
+                };
+                const armSuppress = () => {
+                    suppressClick = true;
+                    setTimeout(() => {
+                        suppressClick = false;
+                    }, 400); // auto-clear so it never lingers
+                };
+                const onUp = () => {
+                    if (!active) return;
+                    active = false;
+                    if (!moved) {
+                        // Tap without drag: if collapsed, open it (swallow the button click that would follow)
+                        if (!expanded()) {
+                            setExpanded(true);
+                            armSuppress();
+                        }
+                        return;
+                    }
+                    panel.classList.remove("dragging");
+                    const t = currentTranslate();
+                    setExpanded(t < collapsedT * 0.5);
+                    armSuppress(); // a drag just ended — don't let it click a button
+                };
+
+                panel.addEventListener("touchstart", onDown, { passive: true });
+                window.addEventListener("touchmove", onMove, {
+                    passive: false,
+                });
+                window.addEventListener("touchend", onUp);
+                panel.addEventListener("mousedown", onDown);
+                window.addEventListener("mousemove", onMove);
+                window.addEventListener("mouseup", onUp);
+
+                // Swallow the click that immediately follows an open-drag / open-tap
+                panel.addEventListener(
+                    "click",
+                    (e) => {
+                        if (suppressClick) {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            suppressClick = false;
+                        }
+                    },
+                    true,
+                );
+
+                // Auto-collapse after picking an action so the phone stays visible. Delegated on the panel
+                // (rather than bound per-button) so it still works after #presets is rebuilt (language switch).
+                panel.addEventListener("click", (e) => {
+                    if (
+                        e.target.closest(
+                            "#presets button, #btn-spin, #btn-download",
+                        ) &&
+                        isMobile()
+                    ) {
+                        setExpanded(false);
+                    }
+                });
+
+                // Tap the phone area (above the sheet) to close the menu — but not while rotating the model
+                const stageEl = document.getElementById("stage");
+                let sTapX = 0,
+                    sTapY = 0,
+                    sTapT = 0;
+                const sStart = (e) => {
+                    const p = e.touches ? e.touches[0] : e;
+                    sTapX = p.clientX;
+                    sTapY = p.clientY;
+                    sTapT = Date.now();
+                };
+                const sEnd = (e) => {
+                    if (!isMobile() || !expanded()) return;
+                    const p = e.changedTouches ? e.changedTouches[0] : e;
+                    const moved =
+                        Math.abs(p.clientX - sTapX) +
+                        Math.abs(p.clientY - sTapY);
+                    if (moved < 12 && Date.now() - sTapT < 300)
+                        setExpanded(false); // a clean tap, not a rotate
+                };
+                stageEl.addEventListener("touchstart", sStart, {
+                    passive: true,
+                });
+                stageEl.addEventListener("touchend", sEnd, { passive: true });
+                stageEl.addEventListener("mousedown", sStart);
+                stageEl.addEventListener("mouseup", sEnd);
+            })();
+
+            // --- Arcball drag: tumble the phone in the drag direction, any angle, no poles ---
+            // Screen-space trackball: map the pointer onto a virtual sphere, then rotate qArcTarget by the
+            // shortest arc between successive projected points. The rotation axis is derived in CAMERA space
+            // and converted to world, so "drag right" always yaws about the screen-up axis and "drag up"
+            // always pitches about the screen-right axis, regardless of the phone's current orientation.
+            const TRACKBALL_RADIUS = 1.1; // >1 keeps the mapping on the ball's near hemisphere (no hyperbola seam)
+            const DRAG_GAIN = 2.2; // multiplies the per-drag rotation so a small swipe turns the phone a lot
+            const dragState = { active: false, x: 0, y: 0 };
+            const _camRight = new THREE.Vector3();
+            const _camUp = new THREE.Vector3();
+            const _axis = new THREE.Vector3();
+            const _dq = new THREE.Quaternion();
+
+            function projectTrackball(nx, ny) {
+                // nx,ny in [-1,1]. z on the sphere (or hyperbolic sheet far out) — classic Holroyd/Bell ball.
+                const d2 = nx * nx + ny * ny;
+                const r2 = TRACKBALL_RADIUS * TRACKBALL_RADIUS;
+                const z = d2 <= r2 * 0.5 ? Math.sqrt(r2 - d2) : (r2 * 0.5) / Math.sqrt(d2);
+                return new THREE.Vector3(nx, ny, z).normalize();
+            }
+
+            function ndcFromEvent(e) {
+                const r = renderer.domElement.getBoundingClientRect();
+                const p = e.touches ? e.touches[0] : e;
+                return [
+                    ((p.clientX - r.left) / r.width) * 2 - 1,
+                    -(((p.clientY - r.top) / r.height) * 2 - 1)
+                ];
+            }
+
+            function applyDrag(nxPrev, nyPrev, nx, ny) {
+                const a = projectTrackball(nxPrev, nyPrev);
+                const b = projectTrackball(nx, ny);
+                // Rotation in camera space: axis = a × b, angle = angle(a,b).
+                _axis.crossVectors(a, b);
+                const len = _axis.length();
+                if (len < 1e-6) return;
+                _axis.divideScalar(len);
+                const angle = Math.acos(Math.min(1, a.dot(b))) * DRAG_GAIN;
+                // Convert the camera-space axis to world space using the camera's basis vectors.
+                camera.matrixWorld.extractBasis(_camRight, _camUp, new THREE.Vector3());
+                const worldAxis = _camRight
+                    .clone()
+                    .multiplyScalar(_axis.x)
+                    .addScaledVector(_camUp, _axis.y)
+                    .addScaledVector(camera.getWorldDirection(new THREE.Vector3()), -_axis.z)
+                    .normalize();
+                _dq.setFromAxisAngle(worldAxis, angle);
+                // Pre-multiply so the drag is applied in world/view space on top of the current orientation.
+                qArcTarget.premultiply(_dq);
+            }
+
+            const canvasEl = renderer.domElement;
+            const onDragStart = (e) => {
+                if (e.button !== undefined && e.button !== 0) return;
+                setAutoSpin(false);
+                cancelAnimationFrame(anim); // stop any preset tween; the drag now owns qArcTarget
+                lastPreset = null; // a manual drag breaks the preset mirror-toggle chain
+                highlightActivePreset(); // and clears the active-angle highlight
+                const [nx, ny] = ndcFromEvent(e);
+                dragState.active = true;
+                dragState.x = nx;
+                dragState.y = ny;
+            };
+            const onDragMove = (e) => {
+                if (!dragState.active) return;
+                const [nx, ny] = ndcFromEvent(e);
+                applyDrag(dragState.x, dragState.y, nx, ny);
+                dragState.x = nx;
+                dragState.y = ny;
+            };
+            const onDragEnd = () => {
+                if (!dragState.active) return;
+                dragState.active = false;
+                syncSlidersFromArc(); // one-shot: reflect the new resting orientation in the sliders
+            };
+            canvasEl.addEventListener("pointerdown", onDragStart);
+            window.addEventListener("pointermove", onDragMove);
+            window.addEventListener("pointerup", onDragEnd);
+            canvasEl.addEventListener("pointercancel", onDragEnd);
+
+            // Render loop
+            function tick() {
+                requestAnimationFrame(tick);
+                if (autoSpin) {
+                    // Auto-spin advances the Y slider itself (looping 0->100), and the orientation is rebuilt
+                    // from the sliders — so the Y slider visibly ramps 0%->100% instead of the Euler readback
+                    // jumping around. X and Z hold whatever they were set to. The orientation uses the
+                    // fractional spinY (not the rounded slider) so the motion stays smooth between whole %.
+                    spinY = (spinY + 0.18) % 100;
+                    setRotSlider("y", spinY);
+                    _rotEuler.set(
+                        (rotEls.x.value / 100) * Math.PI * 2,
+                        (spinY / 100) * Math.PI * 2,
+                        (rotEls.z.value / 100) * Math.PI * 2,
+                        "XYZ"
+                    );
+                    qArcTarget.setFromEuler(_rotEuler);
+                }
+                // Ease the live orientation toward the target for consistent damping on both drag and presets.
+                qArc.slerp(qArcTarget, dragState.active || autoSpin ? 1 : 0.18);
+                arcball.quaternion.copy(qArc);
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            tick();
+
+            // Model picker
+            const modelSelect = document.getElementById("model-select");
+            MODELS.forEach((m, i) => {
+                const opt = document.createElement("option");
+                opt.value = i;
+                opt.textContent = m.label;
+                modelSelect.appendChild(opt);
+            });
+            modelSelect.onchange = () =>
+                loadModelCfg(MODELS[+modelSelect.value]);
+
+            // Language picker: auto-detected from the browser (or a saved choice), switchable at any time.
+            const langSelect = document.getElementById("lang-select");
+            Object.keys(TRANSLATIONS).forEach((code) => {
+                const opt = document.createElement("option");
+                opt.value = code;
+                opt.textContent = TRANSLATIONS[code].name;
+                langSelect.appendChild(opt);
+            });
+            langSelect.value = currentLang;
+            langSelect.onchange = () => {
+                currentLang = langSelect.value;
+                localStorage.setItem(LANG_STORAGE_KEY, currentLang);
+                applyTranslations();
+                buildPresetButtons();
+                statusEl.textContent = currentModel
+                    ? t("statusModelLoaded", { name: currentModel.label })
+                    : "";
+            };
+            applyTranslations(); // translate static markup before the first model finishes loading
+
+            // Boot: preload the default screenshot into lastShotImg so the first model (and every switch)
+            // composites it automatically via the existing recompose path.
+            const DEFAULT_SHOT_URL = "default-screenshot.jpg";
+            const bootImg = new Image();
+            bootImg.crossOrigin = "anonymous";
+            bootImg.onload = () => {
+                lastShotImg = toPortraitSource(bootImg);
+                loadModelCfg(MODELS[0]);
+            };
+            bootImg.onerror = () => loadModelCfg(MODELS[0]); // missing default → boot with model wallpaper
+            bootImg.src = DEFAULT_SHOT_URL;
+
+            // PWA service worker: enables install + offline. Only over http(s) (skips the file:// standalone).
+            if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+                window.addEventListener("load", () => {
+                    navigator.serviceWorker.register("sw.js").catch(() => {});
+                });
+            }
+        </script>
+    </body>
+</html>

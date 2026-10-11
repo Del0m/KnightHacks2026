@@ -14,7 +14,7 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   // Comma-separated origins allowed to call the API from a browser (Expo web build).
-  CORS_ORIGINS: optional,
+  CORS_ORIGINS: optional.transform((v) => v ?? "https://steadyforum.fit,https://www.steadyforum.fit,http://localhost:4173,http://127.0.0.1:4173"),
 
   // DB-01: the pooled connection string for your own Neon branch (dev-<name>, demo or main).
   DATABASE_URL: z.string().url(),

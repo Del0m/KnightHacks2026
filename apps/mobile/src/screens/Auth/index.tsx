@@ -5,6 +5,7 @@ import { AppPage, Action, ui } from '@/components/AppPage';
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { colors as c, typography as t } from '@/theme/tokens';
 import { useAuth } from './session';
+import { WebSection } from '@/components/WebSection';
 import { validateCredentials, type AuthMode } from './validation';
 
 export default function AuthScreen({ mode = 'login' }: { mode?: AuthMode }) {
@@ -46,8 +47,9 @@ export default function AuthScreen({ mode = 'login' }: { mode?: AuthMode }) {
       <View style={styles.field}><View style={styles.passwordLabel}><Text style={ui.label} nativeID="password-label">Password</Text><PolishedPressable accessibilityRole="button" accessibilityLabel={visible ? 'Hide password' : 'Show password'} disabled={busy} onPress={() => setVisible(!visible)} hitSlop={8}><Text style={styles.link}>{visible ? 'Hide' : 'Show'}</Text></PolishedPressable></View><TextInput ref={passwordInput} accessibilityLabel="Password" aria-labelledby="password-label" value={password} onChangeText={setPassword} secureTextEntry={!visible} autoCapitalize="none" autoCorrect={false} autoComplete={signup ? 'new-password' : 'current-password'} textContentType={signup ? 'newPassword' : 'password'} editable={!busy} returnKeyType="go" onSubmitEditing={auth.configured ? submit : undefined} style={ui.input} />{signup && <Text style={ui.muted}>At least 8 characters.</Text>}</View>
       {(error || auth.error) && <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>{error || auth.error}</Text>}
       {notice && <Text accessibilityLiveRegion="polite" style={ui.text}>{notice}</Text>}
-      <Action disabled={!auth.configured || busy} onPress={submit}>{busy ? 'Please wait…' : signup ? 'Create account' : 'Log in'}</Action>
+      <WebSection name="auth-actions"><Action disabled={!auth.configured || busy} onPress={submit}>{busy ? 'Please wait…' : signup ? 'Create account' : 'Log in'}</Action>
       {auth.googleEnabled && <Action secondary disabled={busy} onPress={google}>Continue with Google</Action>}
+      </WebSection>
       {busy && <ActivityIndicator color={c.primary} accessibilityLabel="Signing in" />}
       {verification && auth.configured && <Action secondary disabled={busy} onPress={() => { if (!validateCredentials('login', { name, email, password: 'present' })) void run(async () => { await auth.resendVerification(email); setNotice('If your account needs verification, check your email.'); }); }}>Resend verification email</Action>}
       {auth.error && auth.configured && <Action secondary disabled={busy} onPress={() => { void run(auth.refresh); }}>Retry session</Action>}
