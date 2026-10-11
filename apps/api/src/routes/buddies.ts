@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { badRequest, conflict, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
-import { isBlockedEitherWay } from "../services/blocks.js";
+import { isBlockedEitherWay, notBlocked } from "../services/blocks.js";
 import { scoreForPair, suggestBuddies } from "../services/matching.js";
 
 const { buddyMatches, users } = schema;
@@ -40,6 +40,7 @@ export function buddiesRouter(db: Db): Router {
         and(
           or(eq(buddyMatches.aId, me), eq(buddyMatches.bId, me)),
           sql`${buddyMatches.status} <> 'declined'`,
+          notBlocked(me, otherUser),
         ),
       )
       .orderBy(desc(buddyMatches.updatedAt));
@@ -69,6 +70,7 @@ export function buddiesRouter(db: Db): Router {
     router.post(`/buddies/:id/${action}`, async (req, res) => {
       const me = userId(req);
       const requester = parse(otherId, req.params.id);
+      if (await isBlockedEitherWay(db, me, requester)) throw notFound("Buddy request");
       const [row] = await db
         .update(buddyMatches)
         .set({ status: action === "accept" ? "accepted" : "declined", updatedAt: new Date() })

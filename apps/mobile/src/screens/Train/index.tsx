@@ -1,7 +1,9 @@
+import { useWeeklyPlan } from '@/screens/Planner/useWeeklyPlan';
+import { modelExercise, routineForDay } from '@/screens/Planner/plan';
 import { readActiveWorkout } from '@/services/workoutQueue';
 import { useAuth } from '@/screens/Auth/session';
 import { PolishedPressable } from '@/components/PolishedPressable';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { AppPage, Action, ui } from '@/components/AppPage';
@@ -17,12 +19,15 @@ import { cameraSpec } from '@/screens/LiveSet/exercises';
 import { colors as c, typography as t } from '@/theme/tokens';
 export default function TrainScreen() {
   const { user } = useAuth(), account = user?.id ?? null;
+  const weekly = useWeeklyPlan();
+  const routine = useMemo(() => weekly.plan ? routineForDay(weekly.plan, weekly.selectedDate).map(e => ({ ...e, muscles: e.tracked ? 'Camera tracking' : 'Manual logging' })) : exercises, [weekly.plan, weekly.selectedDate]);
+  const firstModel = useMemo(() => routine.length ? modelExercise(routine[0].id) : null, [routine]);
   const [activeWorkout, setActiveWorkout] = useState(() => readActiveWorkout(account));
   const { workouts } = useTraining(), reduced = useReducedMotion();
   const [selected, setSelected] = useState<ExerciseId | null>(exercises[0].id), [playing, setPlaying] = useState(false);
   const [expanded, setExpanded] = useState<ExerciseId | null>(null), [rotation, setRotation] = useState(0), [section, setSection] = useState<ExerciseTab>('workout');
   const navigation = useNavigation<{ addListener(event: 'tabPress', listener: () => void): () => void }>();
-  const resetPreview = useCallback(() => { setActiveWorkout(readActiveWorkout(account)); setSelected(exercises[0].id); setRotation(0); setExpanded(null); setPlaying(reduced === false); }, [reduced, account]);
+  const resetPreview = useCallback(() => { setActiveWorkout(readActiveWorkout(account)); setSelected(firstModel); setRotation(0); setExpanded(null); setPlaying(reduced === false); }, [reduced, account, firstModel]);
   useFocusEffect(resetPreview);
   useEffect(() => navigation.addListener('tabPress', resetPreview), [navigation, resetPreview]);
   function select(id: ExerciseId) { setExpanded(current => current === id ? null : id); if (selected === id) return; setSelected(id); setRotation(0); setPlaying(reduced === false); }
@@ -41,17 +46,18 @@ export default function TrainScreen() {
     <View style={styles.separator} />
     <ExerciseTabs value={section} onChange={setSection} />
     {section === 'workout' ? <>
-    <Text accessibilityRole="header" style={styles.agenda}>Full body</Text>
-    <View>{exercises.map((e, i) => <View key={e.id}><PolishedPressable testID={`exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ selected: selected === e.id, expanded: expanded === e.id }} accessibilityHint="Show demonstration and practice options." onPress={() => select(e.id)} style={({ pressed }) => [styles.row, { backgroundColor: selected === e.id || pressed ? 'rgba(255,255,255,0.65)' : 'transparent' }]}>
-      <Text style={[styles.number, selected === e.id && { color: c.primary }]}>{orderLabel(i + 1)}</Text>
-      <Text style={[styles.name, selected === e.id && { color: c.primary }]}>{e.name}</Text>
-      <View style={styles.details}><Text style={styles.reps}>{e.sets} × {e.reps} reps</Text><Text style={styles.detail}>{e.muscles}</Text></View><View style={styles.completion}>{(completedToday(workouts, cameraSpec(e.id).id, e.sets) || (activeWorkout && calendarDay(new Date(activeWorkout.startedAt)) === calendarDay() && activeWorkout.sets.filter(s => s.exercise_id === cameraSpec(e.id).id).length >= e.sets)) && <Text accessibilityLabel={`${e.name} completed`} style={{ color: c.primary, fontSize: 20 }}>✓</Text>}</View>
-    </PolishedPressable>{menu(e.id)}</View>)}</View>
-    <Action onPress={() => activeWorkout ? router.push('/workout') : router.push({ pathname: '/camera-setup', params: { exercise: exercises[0].id } })}>{activeWorkout ? 'Resume Workout' : 'Begin Workout'}</Action>
+    <Text accessibilityRole="header" style={styles.agenda}>{weekly.plan ? weekly.selectedDate === weekly.today ? "Today’s workout" : `Workout · ${weekly.selectedDate}` : "Full body"}</Text>
+    <View>{routine.map((e, i) => <View key={e.id}><PolishedPressable testID={`exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ selected: selected === modelExercise(e.id) && modelExercise(e.id) !== null, expanded: expanded === modelExercise(e.id) && modelExercise(e.id) !== null }} accessibilityHint="Show demonstration and practice options." onPress={() => { const id = modelExercise(e.id); if (id) select(id); }} style={({ pressed }) => [styles.row, { backgroundColor: selected === modelExercise(e.id) && modelExercise(e.id) !== null || pressed ? 'rgba(255,255,255,0.65)' : 'transparent' }]}>
+      <Text style={[styles.number, selected === modelExercise(e.id) && modelExercise(e.id) !== null && { color: c.primary }]}>{orderLabel(i + 1)}</Text>
+      <Text style={[styles.name, selected === modelExercise(e.id) && modelExercise(e.id) !== null && { color: c.primary }]}>{e.name}</Text>
+      <View style={styles.details}><Text style={styles.reps}>{e.sets} × {e.reps} reps</Text><Text style={styles.detail}>{e.muscles}</Text></View><View style={styles.completion}>{(completedToday(workouts, modelExercise(e.id) ? cameraSpec(e.id).id : e.id, e.sets, weekly.plan ? weekly.selectedDate : calendarDay()) || (activeWorkout && (activeWorkout.planDate ?? calendarDay(new Date(activeWorkout.startedAt))) === (weekly.plan ? weekly.selectedDate : calendarDay()) && activeWorkout.sets.filter(s => s.exercise_id === (modelExercise(e.id) ? cameraSpec(e.id).id : e.id)).length >= e.sets)) && <Text accessibilityLabel={`${e.name} completed`} style={{ color: c.primary, fontSize: 20 }}>✓</Text>}</View>
+    </PolishedPressable>{modelExercise(e.id) && menu(modelExercise(e.id)! )}</View>)}</View>
+    {!routine.length && <Text style={ui.muted}>Rest day. Practice is available above.</Text>}
+    {(routine.length > 0 || activeWorkout) && <Action onPress={() => activeWorkout ? router.push('/workout') : firstModel ? router.push({ pathname: '/camera-setup', params: { exercise: firstModel } }) : router.push({ pathname: '/workout', params: { setup: 'done', mode: 'manual' } })}>{activeWorkout ? 'Resume Workout' : 'Begin Workout'}</Action>}
     </> : <>
-    <View>{practiceExercises.map(e => <View key={e.id}><PolishedPressable testID={`practice-exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ selected: selected === e.id, expanded: expanded === e.id }} onPress={() => select(e.id)} style={[styles.row, selected === e.id && { backgroundColor: 'rgba(255,255,255,.65)' }]}><Text style={styles.name}>{e.name}</Text><Text style={styles.detail}>{e.muscles}</Text></PolishedPressable>{menu(e.id)}</View>)}</View></>}
+    <View>{practiceExercises.map(e => <View key={e.id}><PolishedPressable testID={`practice-exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ selected: selected === modelExercise(e.id) && modelExercise(e.id) !== null, expanded: expanded === modelExercise(e.id) && modelExercise(e.id) !== null }} onPress={() => select(e.id)} style={[styles.row, selected === modelExercise(e.id) && modelExercise(e.id) !== null && { backgroundColor: 'rgba(255,255,255,.65)' }]}><Text style={styles.name}>{e.name}</Text><Text style={styles.detail}>{e.muscles}</Text></PolishedPressable>{menu(e.id)}</View>)}</View></>}
     <PolishedPressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={ui.muted}>Set goals & workout days</Text></PolishedPressable>
-    <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>Sample full-body routine</Text>
+    <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>{weekly.plan ? "Your selected plan day" : "Sample full-body routine"}</Text>
   </AppPage>;
 }
 const styles = StyleSheet.create({

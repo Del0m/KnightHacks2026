@@ -1,3 +1,4 @@
+import { readPrescription } from '@/screens/Planner/plan';
 import type { SetFeedback } from '@/screens/LiveSet/setRecord';
 import type { ServerRestResult } from '@/screens/LiveSet/restCardContent';
 import type { SessionStart } from '../../../../specs/set-record/types';
@@ -31,7 +32,7 @@ export function queueWorkout(account: string, pending: Pending, wait?: Promise<u
   write(account, existing);
   if (wait) void wait.finally(() => { queueWorkout(account, pending); blocked.delete(job); }).catch(() => {});
 }
-export type ActiveWorkout = Pending & { feedbacks: (SetFeedback | null)[]; exercise: string; mode: 'camera' | 'manual'; cameraPosition?: 'front' | 'back'; restUntil: number };
+export type ActiveWorkout = Pending & { feedbacks: (SetFeedback | null)[]; exercise: string; mode: 'camera' | 'manual'; cameraPosition?: 'front' | 'back'; restUntil: number; routine?: import('@/screens/Planner/plan').Prescription[]; planDate?: string; planId?: string };
 const activeKey = (account: string | null) => `workout-active:${account ? `account:${encodeURIComponent(account)}` : 'guest'}`;
 function storeActive(account: string | null, value: ActiveWorkout | null) {
   const data = JSON.stringify(value), k = activeKey(account);
@@ -40,7 +41,8 @@ function storeActive(account: string | null, value: ActiveWorkout | null) {
 export function readActiveWorkout(account: string | null): ActiveWorkout | null {
   try {
     const k = activeKey(account), raw = Platform.OS === 'web' ? localStorage.getItem(k) : native().getString(k), v = JSON.parse(raw ?? 'null');
-    return v && typeof v.id === 'string' && typeof v.startedAt === 'string' && Number.isFinite(Date.parse(v.startedAt)) && Array.isArray(v.sets) && v.sets.length > 0 && v.sets.every((s: WorkoutSet) => s && typeof s.exercise_id === 'string' && Array.isArray(s.reps)) && Array.isArray(v.feedbacks) && v.feedbacks.length === v.sets.length && v.checkpoint && typeof v.exercise === 'string' && ['camera', 'manual'].includes(v.mode) && Number.isFinite(v.restUntil) ? v : null;
+    if (v?.routine !== undefined && !readPrescription(v.routine)) return null;
+    return v && typeof v.id === 'string' && typeof v.startedAt === 'string' && Number.isFinite(Date.parse(v.startedAt)) && Array.isArray(v.sets) && v.sets.every((s: WorkoutSet) => s && typeof s.exercise_id === 'string' && Array.isArray(s.reps)) && Array.isArray(v.feedbacks) && v.feedbacks.length === v.sets.length && v.checkpoint && typeof v.exercise === 'string' && ['camera', 'manual'].includes(v.mode) && Number.isFinite(v.restUntil) ? v : null;
   } catch { return null; }
 }
 export function saveActiveWorkout(account: string | null, workout: ActiveWorkout) {
