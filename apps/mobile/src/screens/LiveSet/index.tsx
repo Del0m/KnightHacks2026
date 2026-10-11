@@ -17,8 +17,8 @@ export default function CameraSetupScreen() {
   const params = useLocalSearchParams<{ exercise?: string; returnTo?: string }>();
   const [step, setStep] = useState(0), [exercise, setExercise] = useState(cameraSpec(params.exercise).id);
   const sideOn = cameraSpec(exercise).recommended_view === 'side';
-  function returnToWorkout() { if (params.returnTo === 'workout' && router.canGoBack()) router.back(); else router.replace({ pathname: '/workout', params: { setup: 'done' } }); }
-  return <SetupPage compact={step === 2} step={step} total={3} {...copy[step]} action={step === 0 ? 'I’ve chosen my spot' : step === 1 ? 'Check my framing' : 'Start manual workout'} onAction={() => step < 2 ? setStep(step + 1) : returnToWorkout()} onBack={() => step ? setStep(step - 1) : router.canGoBack() ? router.back() : router.replace('/')} secondary={step < 2 ? 'Continue without camera' : undefined} onSecondary={returnToWorkout}>
+  function returnToWorkout(mode: 'camera' | 'manual' = 'camera', cameraPosition?: 'front' | 'back') { if (params.returnTo === 'workout' && router.canGoBack()) router.back(); else router.replace({ pathname: '/workout', params: { setup: 'done', mode, exercise, ...(cameraPosition ? { cameraPosition } : {}) } }); }
+  return <SetupPage hideAction={step === 2} compact={step === 2} step={step} total={3} {...copy[step]} action={step === 0 ? 'I’ve chosen my spot' : step === 1 ? 'Check my framing' : 'Start workout'} onAction={() => step < 2 ? setStep(step + 1) : returnToWorkout()} onBack={() => step ? setStep(step - 1) : router.canGoBack() ? router.back() : router.replace('/')} secondary={step < 2 ? 'Continue without camera' : undefined} onSecondary={() => returnToWorkout('manual')}>
     {step === 0 && <>
       <View style={s.group}><Text style={s.section}>What are you training?</Text><View style={s.wrap}>{exerciseOptions.map(option => <GlassChoice key={option.id} label={option.label} radio selected={exercise === option.id} onPress={() => setExercise(option.id)} />)}</View></View>
       <Text style={s.text}>Use a floor seam or landmark to mark your spot.</Text>

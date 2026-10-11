@@ -327,3 +327,14 @@ describe("finish when the export step fails", () => {
     }
   });
 });
+
+it("recovers a finished summary without awarding again and keeps it private", async () => {
+  const { api, id } = await startSession("summary-recovery");
+  expect((await api.get(`/sessions/${id}/summary`)).status).toBe(409);
+  await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep(), rep()] });
+  const finished = await api.post(`/sessions/${id}/finish`);
+  const recovered = await api.get(`/sessions/${id}/summary`);
+  expect(recovered.status).toBe(200);
+  expect(recovered.body).toEqual(finished.body);
+  expect((await (await t.as("summary-stranger")).get(`/sessions/${id}/summary`)).status).toBe(404);
+});

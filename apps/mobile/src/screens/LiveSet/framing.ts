@@ -23,5 +23,5 @@ export function assessFraming(result: PoseResult | undefined, image: Size, view:
 export function updateStability(since: number | null, inFrame: boolean, now: number) {
   if (!inFrame) return { since: null, ready: false };
   const start = since ?? now;
-  return { since: start, ready: now - start >= 800 };
+  return { since: start, ready: now - start >= 1000 };
 }

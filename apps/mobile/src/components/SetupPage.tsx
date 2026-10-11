@@ -6,11 +6,12 @@ import Head from 'expo-router/head';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { colors as c, typography as t } from '@/theme/tokens';
 import { GlassChoice } from './GlassChoice';
+import { Action } from './AppPage';
 
-export function SetupPage({ children, step, total, eyebrow, title, intro, action, onAction, disabled, onBack, secondary, onSecondary, compact = false }: {
+export function SetupPage({ children, step, total, eyebrow, title, intro, action, onAction, disabled, onBack, secondary, onSecondary, compact = false, hideAction = false }: {
   children: ReactNode; step: number; total: number; eyebrow: string; title: string; intro: string;
   action: string; onAction: () => void; disabled?: boolean; onBack: () => void;
-  secondary?: string; onSecondary?: () => void; compact?: boolean;
+  secondary?: string; onSecondary?: () => void; compact?: boolean; hideAction?: boolean;
 }) {
   const reduced = useReducedMotion();
   const [entrance] = useState(() => new Animated.Value(1));
@@ -26,10 +27,10 @@ export function SetupPage({ children, step, total, eyebrow, title, intro, action
     animation.start(); return () => animation.stop();
   }, [step, reduced, entrance]);
   return <LinearGradient colors={['#FFFFFF', '#F4FAFE', '#DFEFF9']} style={s.fill}>
-    <Head><title>{title} · Steady forum</title></Head>
+    {Platform.OS === 'web' && <Head><title>{title} · SteadyForum</title></Head>}
     <SafeAreaView style={s.fill} edges={['top', 'bottom', 'left', 'right']}>
       <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={s.header}><Text style={s.brand}>Steady forum</Text><GlassChoice label="Back" onPress={onBack} compact /></View>
+        <View style={s.header}><Text style={s.brand}>SteadyForum</Text><GlassChoice label="Back" onPress={onBack} compact /></View>
         <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={s.scroll}>
           <View style={[s.progress, compact && { marginBottom: 12 }]} accessibilityLabel={`Step ${step + 1} of ${total}`}>
             {Array.from({ length: total }, (_, i) => <View key={i} style={[s.progressPart, i <= step && { backgroundColor: c.primary }]} />)}
@@ -38,10 +39,10 @@ export function SetupPage({ children, step, total, eyebrow, title, intro, action
           <Text accessibilityRole="header" accessibilityLiveRegion="polite" style={[s.title, compact && { fontSize: 32, lineHeight: 36 }]}>{title}</Text><Text style={[s.intro, compact && { fontSize: 15, lineHeight: 21 }]}>{intro}</Text>
           <Animated.View style={{ gap: 28, marginTop: compact ? 16 : 26, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>{children}</Animated.View>
         </ScrollView>
-        <View style={s.footer}>
-          <GlassChoice label={action} onPress={onAction} selected disabled={disabled} primary />
+        {!hideAction && <View style={s.footer}>
+          <Action onPress={onAction} disabled={disabled}>{action}</Action>
           {secondary && onSecondary && <GlassChoice label={secondary} onPress={onSecondary} disabled={disabled && action.includes('Saving')} compact />}
-        </View>
+        </View>}
       </KeyboardAvoidingView>
     </SafeAreaView>
   </LinearGradient>;
