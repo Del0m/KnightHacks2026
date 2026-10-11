@@ -14,7 +14,7 @@ Share to feed starts off. Selecting it reveals an explicit Share workout button.
 
 The account-gated Feed uses a FlatList with the same glass page frame, cursor pagination from `GET /feed`, pull-to-refresh, deduplication, loading/empty/end/error states, and retry without discarding loaded posts. It renders session, PR, medal, goal, and advice posts using backend author, body, date, kudos and comment counts. Gold workout cards have a gold glass tint, rim, and explicit label.
 
-Kudos uses the existing POST/DELETE endpoints, prevents duplicate taps, and only updates after success. A refresh that already contains the mutation does not double-adjust its count. Requests are canceled on blur, account changes remount the feed, and late account responses are discarded. Comment counts are displayed; composing/browsing comments belongs to FE-11.
+Kudos uses the existing POST/DELETE endpoints, prevents duplicate taps, and only updates after success. A refresh that already contains the mutation does not double-adjust its count. Requests are canceled on blur, account changes remount the feed, and late account responses are discarded. Comment counts are displayed; the Feed follow-up below adds composing and browsing comments.
 
 ## Deployment and checks
 
@@ -43,3 +43,70 @@ Train offers Resume Workout when a draft exists. Back to Train leaves that worko
 Verification: 69 mobile suites / 739 tests and 28 API files / 536 tests passed; both TypeScript checks passed; web export passed; mobile lint has zero errors and eight existing warnings. Added recovery, before-pulse persistence, account isolation, lost-response retry, upload/Finish races, authentication refresh and manual Undo/remount coverage. The two review regressions failed when their fixes were temporarily removed, then passed with the fixes restored. API replay goldens now reflect four seconds of stillness, and the sharing test creates a session using main's required inference mode. Independent review found no remaining blocking durability issues.
 
 Credential comparison against supplied private environment values found no matches in outgoing changes/history and no tracked private env files. The local FE-01 iPhone note remains untracked. Physical interruption/offline recovery and signed-in syncing against the deployed updated API still need an iPhone check; automated tests do not publish real workouts.
+
+## Public Feed discovery and local connection diagnosis
+
+The iPhone's configured temporary API endpoint was unavailable, and no API/tunnel was running on the Mac. Starting the existing API with the ignored Neon environment returned database readiness `ok`. A read-only aggregate query found three posts from one author, zero shared session posts, and one completed session; unshared session history is not automatically published.
+
+The app now requests `GET /feed?scope=public`, which retrieves persisted shared posts across authors without requiring follows or a matching gym. Default `scope=following` preserves the existing curated API contract. Both modes keep newest-first cursor pagination and mutual blocking. Public-post kudos/comments use the same public visibility rule. No private/raw workout sessions are exposed and no demo posts are inserted into the real database. Network TypeErrors now explain that the workout server could not be reached instead of displaying raw fetch errors.
+
+Public-discovery regression tests cover historical pagination, an unfollowed advanced author at another gym, existing shared workout data and author names, exclusion of an unshared session, kudos/comments, and blocking in both directions. API tests passed 28 files / 537 tests; Feed tests passed 2 suites / 9 tests; mobile/API TypeScript passed; mobile lint has zero errors and eight existing warnings; changed API files pass lint/formatting.
+
+The owner approved temporary Cloudflare testing after reviewing token transit and alternatives. Both HTTP/2 TCP and QUIC outbound connections on port 7844 failed in the execution environment; no tunnel registered, and the mobile API URL was deliberately left unchanged. The local API remains running on port 3000. The owner was asked to start the downloaded official `/private/tmp/cloudflared` utility in Terminal and provide its registered HTTPS URL before the app is reconfigured.
+
+
+## Feed cards, composing, and example preview
+
+The Feed now distinguishes custom posts (light purple glass), workout medals (bronze, silver, or gold glass with a medal on the right), and personal records (clear glass with softened rainbow reflections confined to the rim). Public workout cards render shared exercises and positive highlights. The UI calls kudos “Rep”; existing database and endpoint names are preserved.
+
+The circular filter beside Feed selects Recent, Custom posts, Medals, or Personal records. The API filters before cursor pagination, so older records remain discoverable even beyond a page of custom posts. Comments include profile display names. New Post opens an animated bottom sheet at 55% of the screen height, with an expanding text field that fills the sheet, a 500-character limit and counter; comments use a taller sheet and retain their existing 1,000-character contract. Submission is explicit, guarded against duplicate taps, and preserves rejected drafts. A delayed comments read cannot erase a just-submitted comment.
+
+Filter → Preview 10 examples shows three fictional custom posts, four medals (including all three tiers), and three records. Preview reactions, comments, and posts remain local and never write fake identities or workouts to Neon. `/feed-examples` offers the same fictional preview for layout checking. Live Feed still requires a confirmed account.
+
+The owner's temporary tunnel stopped returning API responses after the Mac changed networks. Cloudflare returned HTTP 530, while the local API remained available. Returning to the iPhone hotspot restored a new approved HTTPS tunnel, whose database readiness returned `ok`. Only the ignored local mobile environment was updated; no tunnel URL or private credentials are committed. The refreshed iPhone requested `/me/profile` and `/feed?scope=public`, both HTTP 200.
+
+Verification: API 28 files / 538 tests passed. Both TypeScript checks passed; mobile lint has zero errors and eight existing warnings, and changed API files pass lint. Feed regression coverage includes server-side type pagination, local-only examples, explicit posting, moderation drafts, comment races, and the 500-character limit. The owner confirmed posts load again on the connected iPhone. Follow-up softened the rim and filled the composer with the text field. Both GET and POST comment results deduplicate by ID, and sheets can shrink when the keyboard opens. Native keyboard appearance remains a manual check. Final mobile suite: 71 suites / 749 tests; latest Feed checks: four suites / 18 tests. Web export passes.
+
+
+## Feed glass, titles, and comment moderation
+
+Editor backdrops are transparent. The new-post sheet retains its 55% height and expanded body field, adds an optional 100-character title, and keeps the 500-character body limit. Titles persist in the existing post JSON data, render above custom-post bodies, and pass moderation with the body. The API always stores the canonical validated title, including explicit empty titles, preventing a conflicting metadata title from bypassing moderation.
+
+The filter panel expands with a 220ms vertical layout animation. Medal cards keep bronze/silver/gold tinted regular glass and custom cards retain purple glass. Only personal-record cards use clear glass, a soft rainbow rim, and a stronger shadow for depth. Glass falls back to gradients on older platforms; Reduce Transparency retains its opaque accessibility fallback. PR rainbow colors are confined to a thinner, softer rim.
+
+The supplied Hugging Face token is configured only in the ignored local API environment. A direct check with fictional text accepted a friendly comment and rejected harassment with S16, both checked=true and no warnings. New comments pass existing Llama Guard plus harassment/threat moderation before database insertion. If the configured remote service is unavailable, comments return 503 and the app retains the draft instead of publishing unchecked text. Deterministic rules block obvious profanity, targeted insults, slurs and threats even without the remote service. Reading a comment thread also removes legacy comments matching these narrow rules from storage and hides mutually blocked authors. Context-dependent content relies on the configured AI checks; the local rules are not a substitute for those checks.
+
+Verification: 71 mobile suites / 750 tests and 28 API files / 540 tests passed. Both typechecks and changed API lint passed; mobile lint has zero errors and eight existing warnings. Additional title regressions cover conflicting JSON metadata and empty canonical titles. No real posts or comments were published during verification. Physical sheet/keyboard and filter-animation checks remain on the iPhone.
+
+
+## FE-11 follow-up
+
+Issue #36 covers post details/comments and reactions. This branch supplies comment threads, composing and titles, server moderation, Rep counts, a pale native flexed-arm emoji that becomes full color when liked, the three glass post finishes, server filters and preview examples. AI-suggested comments carry a visible label based on the API's `ai_suggested` flag. Reactions now use Expo selection haptics on successful native likes rather than React Native's fixed-duration iOS vibration; failures and unlikes do not trigger the tap. The native build must include ExpoHaptics.
+
+Report and block write routes are absent in the current API. The existing Feed respects persisted mutual blocks, but this PR does not invent working report/block buttons. Those FE-11 acceptance criteria remain open; link the issue without closing it. The account-scoped feed and comments remain authenticated and previews never publish.
+
+## Main integration — October 11
+
+The approved merge retains main's moderation status and background rechecks alongside title moderation and rejection of unchecked new comments. Background post checks include the title. Tests retain legacy unchecked-comment recovery without allowing new unchecked comments. The two push-up replay snapshots now match main's reduced lowering threshold; no exercise rule was changed here.
+
+Verification after integration: 77 mobile suites / 804 tests; 29 API files / 544 tests; both TypeScript checks; mobile lint with zero errors and nine warnings; web and iOS exports. The additive moderation-status migration was applied to the local testing database. Main also adds labelling tools and cloud-pose support; its new shared labelling directory requires restarting an already-running Metro server.
+
+## FE-11 review corrections
+
+Comment GET requests now filter obvious abuse only from their response without changing stored comments. Logged moderation and background rechecks remain responsible for removing rejected content. Local patterns no longer reject generic profanity, fitness language involving fat/ugly, or friendly “shut up” banter; these reach contextual moderation. Direct severe insults, slurs and explicit threats retain local protection.
+
+Refocusing Feed retains the mounted list, loaded pages and pagination cursor during its background refresh. Fresh first-page values update existing cards while older loaded pages remain. Selecting a different filter or source resets the query; pull-to-refresh explicitly reloads from the beginning. Account changes still remount account-scoped state and aborted requests cannot update the new screen.
+
+Regression tests reproduced all three original failures before implementation. The corrected social/moderation tests pass (28 tests), as do all four Feed suites (21 tests), both typechecks and lint checks. Mobile lint retains nine warnings and zero errors.
+
+A refocus regression also covers multiple pages of new posts. Background refresh follows fresh cursors until cached posts overlap or the new feed ends before preserving the previous tail cursor, so newly arrived posts cannot fall into a pagination gap.
+
+Main subsequently added BE-11 advice and BE-16/BE-17 recovery routes. The approved second merge preserves exported advice moderation (`checkAs: advice`) and all FE-11 protections. Comment responses retain main's source citations and normalize absent AI authors to null. The additive 0012 migration was applied before restarting the local testing API.
+
+Final second-merge validation: 32 API files / 573 tests pass, 4 Feed suites / 21 tests pass, both TypeScript checks and changed API lint pass; mobile lint has zero errors and nine warnings. Local API health is live after restart; private environment values remain absent from outgoing changes/history.
+
+## FE-11 cache and lockfile follow-up
+
+A completed refresh replaces the cached portion it covers instead of concatenating every old entry. Only entries after the last refreshed cached ID are retained, and reaching the server’s end discards all unmatched cached entries. If no older cached tail remains, pagination adopts the fresh server cursor. Regression tests cover removal on refocus, preservation of the untouched older tail, and the existing new-post pagination gap.
+
+The pnpm 11.25.0 lockfile now includes Expo Haptics 57.0.3 and correct Expo peer snapshot references for crypto/sharing. A clean temporary checkout completed `pnpm install --frozen-lockfile --ignore-scripts`, keeping the live node_modules unchanged. All four Feed suites / 23 tests, mobile typecheck and lint pass (zero errors, nine existing warnings).
