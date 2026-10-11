@@ -1,8 +1,8 @@
-# Spotter website design
+# SteadyForum website design
 
 ## Implemented
 
-The website follows the approved simple front page: firm Barlow typography, white/light-blue atmosphere, Spotter title, real workout-day streak, approved silver humanoid, divider-separated exercise list, Begin Workout, and compact five-tab navigation with curved upper corners. No generated artwork was added.
+The website follows the approved simple front page: firm Barlow typography, white/light-blue atmosphere, SteadyForum title, real workout-day streak, approved silver humanoid, divider-separated exercise list, Begin Workout, and compact five-tab navigation with curved upper corners. No generated artwork was added.
 
 - **Train:** local rigged model with camera tweening, bilateral shimmering target glow, curl/squat/press demonstrations, pause/resume, and repeat-selection reset. The approved model and controlled squat depth are retained.
 - **Plan:** selectable training days and focus, saved locally. The three-exercise routine is explicitly labelled a sample; these preferences do not yet generate workouts.

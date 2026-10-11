@@ -4,10 +4,12 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@better-auth/expo": "^1.7.7",
+    "@react-native-community/slider": "5.2.0",
     "better-auth": "^1.7.7",
     "expo": "~57.0.27",
     "expo-build-properties": "~57.0.22",
     "expo-constants": "~57.0.21",
+    "expo-crypto": "~57.0.3",
     "expo-dev-client": "~57.0.19",
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
@@ -17,6 +19,7 @@
     "expo-linking": "~57.0.12",
     "expo-router": "~57.0.25",
     "expo-secure-store": "~57.0.4",
+    "expo-sharing": "~57.0.22",
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
@@ -33,6 +36,7 @@
     "react-native-vision-camera": "^5.2.3",
     "react-native-vision-camera-worklets": "^5.2.3",
     "react-native-web": "~0.21.0",
+    "react-native-webview": "13.16.1",
     "react-native-worklets": "0.10.1",
     "spotter-pose": "file:./modules/spotter-pose"
   },
@@ -61,7 +65,10 @@
   },
   "private": true,
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "modulePaths": [
+      "<rootDir>/node_modules"
+    ]
   },
   "packageManager": "pnpm@11.25.0"
 }

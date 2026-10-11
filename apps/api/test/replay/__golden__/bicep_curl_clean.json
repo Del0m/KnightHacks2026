@@ -101,110 +101,145 @@
     ]
   },
   "set_payload": {
+    "schema_version": 1,
+    "set_index": 0,
     "exercise_id": "bicep_curl",
     "weight_kg": null,
+    "end_reason": "manual",
+    "partial_reps": 0,
     "fps": 15,
     "frames": {
-      "count": 321,
-      "sha256": "30be01fc5b612c8f"
+      "count": 309,
+      "sha256": "bb03c3def663fd15"
     },
     "reps": [
       {
+        "rep_index": 0,
+        "start_ms": 1000,
+        "end_ms": 2600,
         "tempo_ms": 1600,
-        "range_deg": 120.2,
+        "range_deg": 105.5,
         "quality": null,
-        "start_ms": 1800,
-        "end_ms": 3800,
+        "lowering_ms": 667,
+        "rising_ms": 933,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 0
           }
         ]
       },
       {
+        "rep_index": 1,
+        "start_ms": 3400,
+        "end_ms": 5000,
         "tempo_ms": 1600,
-        "range_deg": 116.8,
+        "range_deg": 103.4,
         "quality": null,
-        "start_ms": 4200,
-        "end_ms": 6200,
+        "lowering_ms": 733,
+        "rising_ms": 867,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 1
           }
         ]
       },
       {
+        "rep_index": 2,
+        "start_ms": 5800,
+        "end_ms": 7400,
         "tempo_ms": 1600,
-        "range_deg": 123.5,
+        "range_deg": 108.1,
         "quality": null,
-        "start_ms": 6600,
-        "end_ms": 8733,
+        "lowering_ms": 733,
+        "rising_ms": 867,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 2
           }
         ]
       },
       {
+        "rep_index": 3,
+        "start_ms": 8200,
+        "end_ms": 9800,
         "tempo_ms": 1600,
-        "range_deg": 114.6,
+        "range_deg": 100.9,
         "quality": null,
-        "start_ms": 9000,
-        "end_ms": 11200,
+        "lowering_ms": 733,
+        "rising_ms": 867,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 3
           }
         ]
       },
       {
+        "rep_index": 4,
+        "start_ms": 10600,
+        "end_ms": 12200,
         "tempo_ms": 1600,
-        "range_deg": 119.2,
+        "range_deg": 103.9,
         "quality": null,
-        "start_ms": 11400,
-        "end_ms": 13400,
+        "lowering_ms": 667,
+        "rising_ms": 933,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 4
           }
         ]
       },
       {
+        "rep_index": 5,
+        "start_ms": 13000,
+        "end_ms": 14667,
         "tempo_ms": 1667,
-        "range_deg": 121.6,
+        "range_deg": 112.8,
         "quality": null,
-        "start_ms": 13800,
-        "end_ms": 15933,
+        "lowering_ms": 733,
+        "rising_ms": 934,
         "flags": []
       },
       {
+        "rep_index": 6,
+        "start_ms": 15400,
+        "end_ms": 17000,
         "tempo_ms": 1600,
-        "range_deg": 112.8,
+        "range_deg": 98.9,
         "quality": null,
-        "start_ms": 16200,
-        "end_ms": 18400,
+        "lowering_ms": 667,
+        "rising_ms": 933,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 6
           }
         ]
       },
       {
+        "rep_index": 7,
+        "start_ms": 17800,
+        "end_ms": 19400,
         "tempo_ms": 1600,
-        "range_deg": 118.4,
+        "range_deg": 104,
         "quality": null,
-        "start_ms": 18600,
-        "end_ms": 20600,
+        "lowering_ms": 733,
+        "rising_ms": 867,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 7
           }
         ]
       }
@@ -218,6 +253,8 @@
       "exercise_id": "bicep_curl",
       "reps": 8,
       "weight_kg": null,
+      "end_reason": "manual",
+      "partial_reps": 0,
       "medal": "bronze",
       "clean_share": 0.125,
       "score_source": "databricks",
@@ -269,7 +306,7 @@
         ]
       },
       "rest_note": {
-        "text": "1 of 8 reps were clean. Your reps took about 1.6 s on the way down. Around 2 s gives you more control.",
+        "text": "1 of 8 reps were clean. Your reps took about 0.7 s on the way down. Around 2 s gives you more control.",
         "source": "fixed",
         "rule_id": "tempo"
       },
@@ -303,7 +340,7 @@
         "startedAt": "2026-10-10T15:00:00.000Z",
         "finishedAt": "2026-10-10T15:05:00.000Z",
         "device": "replay",
-        "inferenceMode": "on_device",
+        "inferenceMode": "coreml",
         "medal": "bronze",
         "formScore": 0.125,
         "exportStatus": "exported",
@@ -320,6 +357,8 @@
           "exerciseId": "bicep_curl",
           "reps": 8,
           "weightKg": null,
+          "endReason": "manual",
+          "partialReps": 0,
           "medal": "bronze",
           "cleanShare": 0.125,
           "scoreSource": "databricks",
@@ -371,7 +410,7 @@
             "clean_share": 0.125
           },
           "restNote": {
-            "text": "1 of 8 reps were clean. Your reps took about 1.6 s on the way down. Around 2 s gives you more control.",
+            "text": "1 of 8 reps were clean. Your reps took about 0.7 s on the way down. Around 2 s gives you more control.",
             "source": "fixed",
             "rule_id": "tempo"
           },
@@ -383,10 +422,12 @@
           "id": "<id 3>",
           "setId": "<id 1>",
           "position": 0,
-          "startMs": 1800,
-          "endMs": 3800,
+          "startMs": 1000,
+          "endMs": 2600,
+          "loweringMs": 667,
+          "risingMs": 933,
           "tempoMs": 1600,
-          "rangeDeg": 120.2,
+          "rangeDeg": 105.5,
           "quality": null,
           "clean": false
         },
@@ -394,10 +435,12 @@
           "id": "<id 4>",
           "setId": "<id 1>",
           "position": 1,
-          "startMs": 4200,
-          "endMs": 6200,
+          "startMs": 3400,
+          "endMs": 5000,
+          "loweringMs": 733,
+          "risingMs": 867,
           "tempoMs": 1600,
-          "rangeDeg": 116.8,
+          "rangeDeg": 103.4,
           "quality": null,
           "clean": false
         },
@@ -405,10 +448,12 @@
           "id": "<id 5>",
           "setId": "<id 1>",
           "position": 2,
-          "startMs": 6600,
-          "endMs": 8733,
+          "startMs": 5800,
+          "endMs": 7400,
+          "loweringMs": 733,
+          "risingMs": 867,
           "tempoMs": 1600,
-          "rangeDeg": 123.5,
+          "rangeDeg": 108.1,
           "quality": null,
           "clean": false
         },
@@ -416,10 +461,12 @@
           "id": "<id 6>",
           "setId": "<id 1>",
           "position": 3,
-          "startMs": 9000,
-          "endMs": 11200,
+          "startMs": 8200,
+          "endMs": 9800,
+          "loweringMs": 733,
+          "risingMs": 867,
           "tempoMs": 1600,
-          "rangeDeg": 114.6,
+          "rangeDeg": 100.9,
           "quality": null,
           "clean": false
         },
@@ -427,10 +474,12 @@
           "id": "<id 7>",
           "setId": "<id 1>",
           "position": 4,
-          "startMs": 11400,
-          "endMs": 13400,
+          "startMs": 10600,
+          "endMs": 12200,
+          "loweringMs": 667,
+          "risingMs": 933,
           "tempoMs": 1600,
-          "rangeDeg": 119.2,
+          "rangeDeg": 103.9,
           "quality": null,
           "clean": false
         },
@@ -438,10 +487,12 @@
           "id": "<id 8>",
           "setId": "<id 1>",
           "position": 5,
-          "startMs": 13800,
-          "endMs": 15933,
+          "startMs": 13000,
+          "endMs": 14667,
+          "loweringMs": 733,
+          "risingMs": 934,
           "tempoMs": 1667,
-          "rangeDeg": 121.6,
+          "rangeDeg": 112.8,
           "quality": null,
           "clean": true
         },
@@ -449,10 +500,12 @@
           "id": "<id 9>",
           "setId": "<id 1>",
           "position": 6,
-          "startMs": 16200,
-          "endMs": 18400,
+          "startMs": 15400,
+          "endMs": 17000,
+          "loweringMs": 667,
+          "risingMs": 933,
           "tempoMs": 1600,
-          "rangeDeg": 112.8,
+          "rangeDeg": 98.9,
           "quality": null,
           "clean": false
         },
@@ -460,10 +513,12 @@
           "id": "<id 10>",
           "setId": "<id 1>",
           "position": 7,
-          "startMs": 18600,
-          "endMs": 20600,
+          "startMs": 17800,
+          "endMs": 19400,
+          "loweringMs": 733,
+          "risingMs": 867,
           "tempoMs": 1600,
-          "rangeDeg": 118.4,
+          "rangeDeg": 104,
           "quality": null,
           "clean": false
         }
@@ -535,10 +590,10 @@
             "set_index": 0,
             "exercise_id": "bicep_curl",
             "fps": 15,
-            "frame_count": 321,
+            "frame_count": 309,
             "first_t_ms": 0,
-            "last_t_ms": 21333,
-            "frames_sha256": "30be01fc5b612c8f"
+            "last_t_ms": 20533,
+            "frames_sha256": "bb03c3def663fd15"
           }
         ]
       },
@@ -551,7 +606,7 @@
           "started_at": "2026-10-10T15:00:00.000Z",
           "finished_at": "2026-10-10T15:05:00.000Z",
           "device": "replay",
-          "inference_mode": "on_device",
+          "inference_mode": "coreml",
           "medal": "bronze",
           "form_score": 0.125,
           "experience_level": "beginner",
@@ -565,112 +620,137 @@
               "exercise_id": "bicep_curl",
               "weight_kg": null,
               "medal": "bronze",
-              "frame_count": 321,
+              "end_reason": "manual",
+              "partial_reps": 0,
+              "frame_count": 309,
               "reps": [
                 {
                   "rep_index": 0,
-                  "start_ms": 1800,
-                  "end_ms": 3800,
+                  "start_ms": 1000,
+                  "end_ms": 2600,
                   "tempo_ms": 1600,
-                  "range_deg": 120.2,
-                  "quality": 0,
+                  "range_deg": 105.5,
+                  "quality": null,
+                  "lowering_ms": 667,
+                  "rising_ms": 933,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 0
                     }
                   ]
                 },
                 {
                   "rep_index": 1,
-                  "start_ms": 4200,
-                  "end_ms": 6200,
+                  "start_ms": 3400,
+                  "end_ms": 5000,
                   "tempo_ms": 1600,
-                  "range_deg": 116.8,
-                  "quality": 0,
+                  "range_deg": 103.4,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 867,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 1
                     }
                   ]
                 },
                 {
                   "rep_index": 2,
-                  "start_ms": 6600,
-                  "end_ms": 8733,
+                  "start_ms": 5800,
+                  "end_ms": 7400,
                   "tempo_ms": 1600,
-                  "range_deg": 123.5,
-                  "quality": 0,
+                  "range_deg": 108.1,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 867,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 2
                     }
                   ]
                 },
                 {
                   "rep_index": 3,
-                  "start_ms": 9000,
-                  "end_ms": 11200,
+                  "start_ms": 8200,
+                  "end_ms": 9800,
                   "tempo_ms": 1600,
-                  "range_deg": 114.6,
-                  "quality": 0,
+                  "range_deg": 100.9,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 867,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 3
                     }
                   ]
                 },
                 {
                   "rep_index": 4,
-                  "start_ms": 11400,
-                  "end_ms": 13400,
+                  "start_ms": 10600,
+                  "end_ms": 12200,
                   "tempo_ms": 1600,
-                  "range_deg": 119.2,
-                  "quality": 0,
+                  "range_deg": 103.9,
+                  "quality": null,
+                  "lowering_ms": 667,
+                  "rising_ms": 933,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 4
                     }
                   ]
                 },
                 {
                   "rep_index": 5,
-                  "start_ms": 13800,
-                  "end_ms": 15933,
+                  "start_ms": 13000,
+                  "end_ms": 14667,
                   "tempo_ms": 1667,
-                  "range_deg": 121.6,
-                  "quality": 1,
+                  "range_deg": 112.8,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 934,
                   "flags": []
                 },
                 {
                   "rep_index": 6,
-                  "start_ms": 16200,
-                  "end_ms": 18400,
+                  "start_ms": 15400,
+                  "end_ms": 17000,
                   "tempo_ms": 1600,
-                  "range_deg": 112.8,
-                  "quality": 0,
+                  "range_deg": 98.9,
+                  "quality": null,
+                  "lowering_ms": 667,
+                  "rising_ms": 933,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 6
                     }
                   ]
                 },
                 {
                   "rep_index": 7,
-                  "start_ms": 18600,
-                  "end_ms": 20600,
+                  "start_ms": 17800,
+                  "end_ms": 19400,
                   "tempo_ms": 1600,
-                  "range_deg": 118.4,
-                  "quality": 0,
+                  "range_deg": 104,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 867,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 7
                     }
                   ]
                 }

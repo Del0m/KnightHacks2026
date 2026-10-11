@@ -19,6 +19,7 @@ import { setsRouter } from "./routes/sets.js";
 import { socialRouter } from "./routes/social.js";
 import { disabledExportQueue, JointsBuffer, type ExportQueue } from "./services/exportQueue.js";
 import { allowAllModerator, type Moderator } from "./services/moderation.js";
+import type { IntegrationStatus } from "./services/integrationStatus.js";
 import type { PlannerDeps } from "./services/planner.js";
 import type { ProfileEmbeddings } from "./services/profileEmbeddings.js";
 import type { RestTimeDeps } from "./services/restTime.js";
@@ -36,6 +37,7 @@ export interface AppDeps {
   rest?: RestTimeDeps; // INT-05: set scoring + rest notes; defaults to phone score + fixed notes
   planner?: PlannerDeps; // AI-12: gpt-oss and the query embedder; defaults to the rules planner
   profileEmbeddings?: ProfileEmbeddings; // CONN-08: buddy-matching embeddings; off without HF_TOKEN
+  integrations?: IntegrationStatus; // INT-04: per-integration state for GET /health
 }
 
 function cors(origins: string[]): RequestHandler {
@@ -77,7 +79,7 @@ export function createApp(deps: AppDeps): express.Express {
   app.use(express.json({ limit: "5mb" }));
 
   // Public
-  app.use(healthRouter(deps.db));
+  app.use(healthRouter(deps.db, deps.integrations));
   app.use(exercisesRouter(deps.db));
 
   // Everything below needs a Neon Auth token.

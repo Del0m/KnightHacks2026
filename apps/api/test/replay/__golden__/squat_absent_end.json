@@ -46,41 +46,55 @@
     ]
   },
   "set_payload": {
+    "schema_version": 1,
+    "set_index": 0,
     "exercise_id": "squat",
     "weight_kg": null,
+    "end_reason": "absent",
+    "partial_reps": 0,
     "fps": 15,
     "frames": {
-      "count": 147,
-      "sha256": "e5ddc7d26acfa1a5"
+      "count": 141,
+      "sha256": "9b85f134f7c343f7"
     },
     "reps": [
       {
+        "rep_index": 0,
+        "start_ms": 1000,
+        "end_ms": 2733,
         "tempo_ms": 1733,
-        "range_deg": 81.9,
+        "range_deg": 76.2,
         "quality": null,
-        "start_ms": 1400,
-        "end_ms": 3600,
+        "lowering_ms": 733,
+        "rising_ms": 1000,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 0
           }
         ]
       },
       {
+        "rep_index": 1,
+        "start_ms": 3600,
+        "end_ms": 5400,
         "tempo_ms": 1800,
-        "range_deg": 80.4,
+        "range_deg": 75.2,
         "quality": null,
-        "start_ms": 4000,
-        "end_ms": 6133,
+        "lowering_ms": 800,
+        "rising_ms": 1000,
         "flags": []
       },
       {
+        "rep_index": 2,
+        "start_ms": 6267,
+        "end_ms": 8067,
         "tempo_ms": 1800,
-        "range_deg": 84.3,
+        "range_deg": 80,
         "quality": null,
-        "start_ms": 6667,
-        "end_ms": 8800,
+        "lowering_ms": 800,
+        "rising_ms": 1000,
         "flags": []
       }
     ]
@@ -93,6 +107,8 @@
       "exercise_id": "squat",
       "reps": 3,
       "weight_kg": null,
+      "end_reason": "absent",
+      "partial_reps": 0,
       "medal": "bronze",
       "clean_share": 0.6666666666666666,
       "score_source": "databricks",
@@ -119,7 +135,7 @@
         ]
       },
       "rest_note": {
-        "text": "2 of 3 reps were clean. Your reps took about 1.7 s on the way down. Around 2 s gives you more control.",
+        "text": "2 of 3 reps were clean. Your reps took about 0.7 s on the way down. Around 2 s gives you more control.",
         "source": "fixed",
         "rule_id": "tempo"
       },
@@ -153,7 +169,7 @@
         "startedAt": "2026-10-10T15:00:00.000Z",
         "finishedAt": "2026-10-10T15:05:00.000Z",
         "device": "replay",
-        "inferenceMode": "on_device",
+        "inferenceMode": "coreml",
         "medal": "bronze",
         "formScore": 0.6666667,
         "exportStatus": "exported",
@@ -170,6 +186,8 @@
           "exerciseId": "squat",
           "reps": 3,
           "weightKg": null,
+          "endReason": "absent",
+          "partialReps": 0,
           "medal": "bronze",
           "cleanShare": 0.6666667,
           "scoreSource": "databricks",
@@ -196,7 +214,7 @@
             "clean_share": 0.6666666666666666
           },
           "restNote": {
-            "text": "2 of 3 reps were clean. Your reps took about 1.7 s on the way down. Around 2 s gives you more control.",
+            "text": "2 of 3 reps were clean. Your reps took about 0.7 s on the way down. Around 2 s gives you more control.",
             "source": "fixed",
             "rule_id": "tempo"
           },
@@ -208,10 +226,12 @@
           "id": "<id 3>",
           "setId": "<id 1>",
           "position": 0,
-          "startMs": 1400,
-          "endMs": 3600,
+          "startMs": 1000,
+          "endMs": 2733,
+          "loweringMs": 733,
+          "risingMs": 1000,
           "tempoMs": 1733,
-          "rangeDeg": 81.9,
+          "rangeDeg": 76.2,
           "quality": null,
           "clean": false
         },
@@ -219,10 +239,12 @@
           "id": "<id 4>",
           "setId": "<id 1>",
           "position": 1,
-          "startMs": 4000,
-          "endMs": 6133,
+          "startMs": 3600,
+          "endMs": 5400,
+          "loweringMs": 800,
+          "risingMs": 1000,
           "tempoMs": 1800,
-          "rangeDeg": 80.4,
+          "rangeDeg": 75.2,
           "quality": null,
           "clean": true
         },
@@ -230,10 +252,12 @@
           "id": "<id 5>",
           "setId": "<id 1>",
           "position": 2,
-          "startMs": 6667,
-          "endMs": 8800,
+          "startMs": 6267,
+          "endMs": 8067,
+          "loweringMs": 800,
+          "risingMs": 1000,
           "tempoMs": 1800,
-          "rangeDeg": 84.3,
+          "rangeDeg": 80,
           "quality": null,
           "clean": true
         }
@@ -269,10 +293,10 @@
             "set_index": 0,
             "exercise_id": "squat",
             "fps": 15,
-            "frame_count": 147,
+            "frame_count": 141,
             "first_t_ms": 0,
-            "last_t_ms": 9733,
-            "frames_sha256": "e5ddc7d26acfa1a5"
+            "last_t_ms": 9333,
+            "frames_sha256": "9b85f134f7c343f7"
           }
         ]
       },
@@ -285,7 +309,7 @@
           "started_at": "2026-10-10T15:00:00.000Z",
           "finished_at": "2026-10-10T15:05:00.000Z",
           "device": "replay",
-          "inference_mode": "on_device",
+          "inference_mode": "coreml",
           "medal": "bronze",
           "form_score": 0.6666667,
           "experience_level": "beginner",
@@ -299,38 +323,47 @@
               "exercise_id": "squat",
               "weight_kg": null,
               "medal": "bronze",
-              "frame_count": 147,
+              "end_reason": "absent",
+              "partial_reps": 0,
+              "frame_count": 141,
               "reps": [
                 {
                   "rep_index": 0,
-                  "start_ms": 1400,
-                  "end_ms": 3600,
+                  "start_ms": 1000,
+                  "end_ms": 2733,
                   "tempo_ms": 1733,
-                  "range_deg": 81.9,
-                  "quality": 0,
+                  "range_deg": 76.2,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 1000,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 0
                     }
                   ]
                 },
                 {
                   "rep_index": 1,
-                  "start_ms": 4000,
-                  "end_ms": 6133,
+                  "start_ms": 3600,
+                  "end_ms": 5400,
                   "tempo_ms": 1800,
-                  "range_deg": 80.4,
-                  "quality": 1,
+                  "range_deg": 75.2,
+                  "quality": null,
+                  "lowering_ms": 800,
+                  "rising_ms": 1000,
                   "flags": []
                 },
                 {
                   "rep_index": 2,
-                  "start_ms": 6667,
-                  "end_ms": 8800,
+                  "start_ms": 6267,
+                  "end_ms": 8067,
                   "tempo_ms": 1800,
-                  "range_deg": 84.3,
-                  "quality": 1,
+                  "range_deg": 80,
+                  "quality": null,
+                  "lowering_ms": 800,
+                  "rising_ms": 1000,
                   "flags": []
                 }
               ]

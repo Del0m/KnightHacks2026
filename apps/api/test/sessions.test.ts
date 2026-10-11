@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { schema } from "../src/db.js";
 import { JointsBuffer } from "../src/services/exportQueue.js";
-import { frames, rep, setup } from "./helpers.js";
+import { frames, rep, setup, setRecord } from "./helpers.js";
 
 let t: Awaited<ReturnType<typeof setup>>;
 beforeAll(async () => {
@@ -13,7 +13,7 @@ afterAll(() => t.close());
 
 async function startSession(user: string, body: object = {}) {
   const api = await t.as(user);
-  const res = await api.post("/sessions", { device: "iPhone 17 Pro", ...body });
+  const res = await api.post("/sessions", { inference_mode: "coreml", device: "iPhone 17 Pro", ...body });
   expect(res.status).toBe(201);
   return { api, id: res.body.id as string };
 }
@@ -29,20 +29,27 @@ describe("session lifecycle", () => {
   it("stores per-rep aggregates and flags, keeps joints out of Neon, and finishes with a medal", async () => {
     const { api, id } = await startSession("lifter-2");
 
-    const set1 = await api.post(`/sessions/${id}/sets`, {
-      exercise_id: "squat",
-      weight_kg: 60,
-      fps: 30,
-      frames: frames(10),
-      reps: [rep(), rep(), rep(["knee_tracking"]), rep()],
-    });
+    const set1 = await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({
+        exercise_id: "squat",
+        weight_kg: 60,
+        fps: 30,
+        frames: frames(10),
+        reps: [rep(), rep(), rep(["knee_tracking"]), rep()],
+      }),
+    );
     expect(set1.status).toBe(201);
     expect(set1.body).toMatchObject({ position: 0, reps: 4, clean_reps: 3, clean_share: 0.75 });
 
-    const set2 = await api.post(`/sessions/${id}/sets`, {
-      exercise_id: "push_up",
-      reps: [rep(), rep(), rep(), rep(), rep(), rep()],
-    });
+    const set2 = await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({
+        set_index: 1,
+        exercise_id: "push_up",
+        reps: [rep(), rep(), rep(), rep(), rep(), rep()],
+      }),
+    );
     expect(set2.body.position).toBe(1);
 
     const flags = await t.db.select().from(schema.formFlags);
@@ -73,9 +80,33 @@ describe("session lifecycle", () => {
     expect(exported.sets).toHaveLength(2);
     expect(exported.sets[0]!.frames).toHaveLength(10);
     expect(exported.sets[0]!.fps).toBe(30);
-    expect(exported.sets[0]!.reps[2]!.flags).toEqual([{ rule_id: "knee_tracking", severity: "warn" }]);
+    expect(exported.sets[0]!.reps[2]!.flags).toEqual([
+      { rule_id: "knee_tracking", severity: "form", rep_index: 2 },
+    ]);
     expect(exported.sets[1]!.frames).toEqual([]);
     expect(exported.medal).toBe("silver");
+  });
+
+  it("finishes and exports a legacy flag severity as form", async () => {
+    // Before AI-08 the API stored any severity string; those rows must not block finishing.
+    const { api, id } = await startSession("legacy-severity");
+    const set = await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({ exercise_id: "squat", reps: [rep(["knee_tracking"])] }),
+    );
+    expect(set.status).toBe(201);
+    const [repRow] = await t.db.select().from(schema.reps).where(eq(schema.reps.setId, set.body.id));
+    await t.db
+      .update(schema.formFlags)
+      .set({ severity: "high" })
+      .where(eq(schema.formFlags.repId, repRow!.id));
+
+    const finish = await api.post(`/sessions/${id}/finish`);
+    expect(finish.status).toBe(200);
+    const exported = t.queue.sessions.find((s) => s.id === id)!;
+    expect(exported.sets[0]!.reps[0]!.flags).toEqual([
+      { rule_id: "knee_tracking", severity: "form", rep_index: 0 },
+    ]);
   });
 
   it("compares later workouts with the lifter's own 4-week average", async () => {
@@ -84,31 +115,40 @@ describe("session lifecycle", () => {
 
     // Week 1: 8/10 clean -> silver vs 70%.
     let s = await startSession(user, { started_at: day(1) });
-    await s.api.post(`/sessions/${s.id}/sets`, {
-      exercise_id: "squat",
-      weight_kg: 50,
-      reps: [...Array(8)].map(() => rep()).concat([rep(["depth"]), rep(["depth"])]),
-    });
+    await s.api.post(
+      `/sessions/${s.id}/sets`,
+      setRecord({
+        exercise_id: "squat",
+        weight_kg: 50,
+        reps: [...Array(8)].map(() => rep()).concat([rep(["depth"]), rep(["depth"])]),
+      }),
+    );
     expect((await s.api.post(`/sessions/${s.id}/finish`, { finished_at: day(1) })).body.medal).toBe("silver");
 
     // 7/10 clean is now below the lifter's 80% average -> bronze, even though it beats 70%.
     s = await startSession(user, { started_at: day(3) });
-    await s.api.post(`/sessions/${s.id}/sets`, {
-      exercise_id: "squat",
-      weight_kg: 45,
-      reps: [...Array(7)].map(() => rep()).concat([rep(["depth"]), rep(["depth"]), rep(["depth"])]),
-    });
+    await s.api.post(
+      `/sessions/${s.id}/sets`,
+      setRecord({
+        exercise_id: "squat",
+        weight_kg: 45,
+        reps: [...Array(7)].map(() => rep()).concat([rep(["depth"]), rep(["depth"]), rep(["depth"])]),
+      }),
+    );
     const second = await s.api.post(`/sessions/${s.id}/finish`, { finished_at: day(3) });
     expect(second.body).toMatchObject({ medal: "bronze", baseline_share: 0.8 });
     expect(second.body.personal_records).toEqual([]); // 45 kg doesn't beat 50 kg
 
     // Every rep clean -> gold.
     s = await startSession(user, { started_at: day(5) });
-    await s.api.post(`/sessions/${s.id}/sets`, {
-      exercise_id: "squat",
-      weight_kg: 55,
-      reps: [rep(), rep(), rep()],
-    });
+    await s.api.post(
+      `/sessions/${s.id}/sets`,
+      setRecord({
+        exercise_id: "squat",
+        weight_kg: 55,
+        reps: [rep(), rep(), rep()],
+      }),
+    );
     const third = await s.api.post(`/sessions/${s.id}/finish`, { finished_at: day(5) });
     expect(third.body.medal).toBe("gold");
     expect(
@@ -121,16 +161,22 @@ describe("session lifecycle", () => {
 
   it("auto-posts medals and PRs only when the user opted in", async () => {
     const quiet = await startSession("lifter-quiet");
-    await quiet.api.post(`/sessions/${quiet.id}/sets`, {
-      exercise_id: "squat",
-      weight_kg: 40,
-      reps: [rep()],
-    });
+    await quiet.api.post(
+      `/sessions/${quiet.id}/sets`,
+      setRecord({
+        exercise_id: "squat",
+        weight_kg: 40,
+        reps: [rep()],
+      }),
+    );
     expect((await quiet.api.post(`/sessions/${quiet.id}/finish`)).body.posts).toEqual([]);
 
     const loud = await startSession("lifter-loud");
     await loud.api.put("/me/profile", { auto_post_medals: true, auto_post_prs: true });
-    await loud.api.post(`/sessions/${loud.id}/sets`, { exercise_id: "squat", weight_kg: 40, reps: [rep()] });
+    await loud.api.post(
+      `/sessions/${loud.id}/sets`,
+      setRecord({ exercise_id: "squat", weight_kg: 40, reps: [rep()] }),
+    );
     const res = await loud.api.post(`/sessions/${loud.id}/finish`);
     expect(res.body.posts.map((p: { kind: string }) => p.kind).sort()).toEqual(["medal", "pr"]);
     const posts = await t.db.select().from(schema.posts).where(eq(schema.posts.authorId, "lifter-loud"));
@@ -140,52 +186,62 @@ describe("session lifecycle", () => {
 
   it("rejects bad input, other people's sessions and double finishes", async () => {
     const { api, id } = await startSession("lifter-4");
-    const bad = await api.post(`/sessions/${id}/sets`, { exercise_id: "Squat!", reps: [] });
+    const bad = await api.post(`/sessions/${id}/sets`, setRecord({ exercise_id: "Squat!", reps: [] }));
     expect(bad.status).toBe(400);
     expect(bad.body.error).toBe("validation_failed");
 
-    const badFrame = await api.post(`/sessions/${id}/sets`, {
-      exercise_id: "squat",
-      reps: [rep()],
-      frames: [{ t_ms: 0, kp: [1, 2, 3] }],
-    });
+    const badFrame = await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({
+        exercise_id: "squat",
+        reps: [rep()],
+        frames: [{ t_ms: 0, kp: [1, 2, 3] }],
+      }),
+    );
     expect(badFrame.status).toBe(400);
 
     const stranger = await t.as("lifter-5");
     expect(
-      (await stranger.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] })).status,
+      (await stranger.post(`/sessions/${id}/sets`, setRecord({ exercise_id: "squat", reps: [rep()] })))
+        .status,
     ).toBe(404);
     expect((await stranger.post(`/sessions/${id}/finish`)).status).toBe(404);
 
-    await api.post(`/sessions/${id}/sets`, { set_index: 0, exercise_id: "squat", reps: [rep()] });
-    const dupe = await api.post(`/sessions/${id}/sets`, {
-      set_index: 0,
-      exercise_id: "squat",
-      reps: [rep()],
-    });
+    await api.post(`/sessions/${id}/sets`, setRecord({ set_index: 0, exercise_id: "squat", reps: [rep()] }));
+    const dupe = await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({
+        set_index: 0,
+        exercise_id: "squat",
+        reps: [rep()],
+      }),
+    );
     expect(dupe.status).toBe(409);
     expect(dupe.body.message).toBe("Set 0 was already recorded for this session");
 
     expect((await api.post(`/sessions/${id}/finish`)).status).toBe(200);
     expect((await api.post(`/sessions/${id}/finish`)).status).toBe(409);
-    expect((await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] })).status).toBe(
-      409,
-    );
+    expect(
+      (await api.post(`/sessions/${id}/sets`, setRecord({ exercise_id: "squat", reps: [rep()] }))).status,
+    ).toBe(409);
   });
 
   it("requires a token", async () => {
     const { default: request } = await import("supertest");
-    expect((await request(t.app).post("/sessions").send({})).status).toBe(401);
+    expect((await request(t.app).post("/sessions").send({ inference_mode: "coreml" })).status).toBe(401);
   });
 });
 
 // PR #105 review notes.
 describe("set positions", () => {
-  it("continues after the highest position when set_index leaves gaps", async () => {
+  it("preserves explicit positions when set_index leaves gaps", async () => {
     const { api, id } = await startSession("pos-gaps");
-    await api.post(`/sessions/${id}/sets`, { set_index: 0, exercise_id: "squat", reps: [rep()] });
-    await api.post(`/sessions/${id}/sets`, { set_index: 2, exercise_id: "squat", reps: [rep()] });
-    const next = await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] });
+    await api.post(`/sessions/${id}/sets`, setRecord({ set_index: 0, exercise_id: "squat", reps: [rep()] }));
+    await api.post(`/sessions/${id}/sets`, setRecord({ set_index: 2, exercise_id: "squat", reps: [rep()] }));
+    const next = await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({ set_index: 3, exercise_id: "squat", reps: [rep()] }),
+    );
     expect(next.status).toBe(201);
     expect(next.body.position).toBe(3); // count(*) would have picked 2 and collided
   });
@@ -195,8 +251,8 @@ describe("set positions", () => {
   it("gives concurrent sets distinct positions", async () => {
     const { api, id } = await startSession("pos-concurrent");
     const results = await Promise.all(
-      Array.from({ length: 6 }, () =>
-        api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] }),
+      Array.from({ length: 6 }, (_, set_index) =>
+        api.post(`/sessions/${id}/sets`, setRecord({ set_index, exercise_id: "squat", reps: [rep()] })),
       ),
     );
     expect(results.map((r) => r.status)).toEqual(Array(6).fill(201));
@@ -222,13 +278,16 @@ describe("finish when the export step fails", () => {
     const f = await setup({ joints });
     try {
       const api = await f.as("flaky-export");
-      const { id } = (await api.post("/sessions")).body;
-      await api.post(`/sessions/${id}/sets`, {
-        exercise_id: "squat",
-        fps: 30,
-        frames: frames(4),
-        reps: [rep()],
-      });
+      const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
+      await api.post(
+        `/sessions/${id}/sets`,
+        setRecord({
+          exercise_id: "squat",
+          fps: 30,
+          frames: frames(4),
+          reps: [rep()],
+        }),
+      );
 
       expect((await api.post(`/sessions/${id}/finish`)).status).toBe(500);
       const [afterFailure] = await f.db.select().from(schema.sessions).where(eq(schema.sessions.id, id));
@@ -256,8 +315,8 @@ describe("finish when the export step fails", () => {
     });
     try {
       const api = await f.as("queue-down");
-      const { id } = (await api.post("/sessions")).body;
-      await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] });
+      const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
+      await api.post(`/sessions/${id}/sets`, setRecord({ exercise_id: "squat", reps: [rep()] }));
       const res = await api.post(`/sessions/${id}/finish`);
       expect(res.status).toBe(200);
       expect(res.body.medal).toBe("gold");
@@ -267,4 +326,15 @@ describe("finish when the export step fails", () => {
       await f.close();
     }
   });
+});
+
+it("recovers a finished summary without awarding again and keeps it private", async () => {
+  const { api, id } = await startSession("summary-recovery");
+  expect((await api.get(`/sessions/${id}/summary`)).status).toBe(409);
+  await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep(), rep()] });
+  const finished = await api.post(`/sessions/${id}/finish`);
+  const recovered = await api.get(`/sessions/${id}/summary`);
+  expect(recovered.status).toBe(200);
+  expect(recovered.body).toEqual(finished.body);
+  expect((await (await t.as("summary-stranger")).get(`/sessions/${id}/summary`)).status).toBe(404);
 });

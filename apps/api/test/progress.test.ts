@@ -6,7 +6,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { schema } from "../src/db.js";
 import { loadSpecs, readSpecs } from "../src/services/exerciseSpecs.js";
-import { rep, setup } from "./helpers.js";
+import { rep, setup, setRecord } from "./helpers.js";
 
 let t: Awaited<ReturnType<typeof setup>>;
 beforeAll(async () => {
@@ -33,12 +33,15 @@ describe("progress", () => {
       [1, 55, 0],
     ] as const) {
       const at = new Date(now - daysAgo * 86_400_000).toISOString();
-      const { id } = (await api.post("/sessions", { started_at: at })).body;
-      await api.post(`/sessions/${id}/sets`, {
-        exercise_id: "squat",
-        weight_kg: weight,
-        reps: [rep(), rep(), rep(), rep(flags ? ["depth"] : [])],
-      });
+      const { id } = (await api.post("/sessions", { inference_mode: "coreml", started_at: at })).body;
+      await api.post(
+        `/sessions/${id}/sets`,
+        setRecord({
+          exercise_id: "squat",
+          weight_kg: weight,
+          reps: [rep(), rep(), rep(), rep(flags ? ["depth"] : [])],
+        }),
+      );
       await api.post(`/sessions/${id}/finish`, { finished_at: at });
     }
 

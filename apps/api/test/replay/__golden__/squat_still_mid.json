@@ -46,45 +46,60 @@
     ]
   },
   "set_payload": {
+    "schema_version": 1,
+    "set_index": 0,
     "exercise_id": "squat",
     "weight_kg": null,
+    "end_reason": "still",
+    "partial_reps": 1,
     "fps": 15,
     "frames": {
-      "count": 295,
-      "sha256": "54bc0775c5765251"
+      "count": 200,
+      "sha256": "acd21673fe95371a"
     },
     "reps": [
       {
+        "rep_index": 0,
+        "start_ms": 1000,
+        "end_ms": 2800,
         "tempo_ms": 1800,
-        "range_deg": 82.7,
+        "range_deg": 78.3,
         "quality": null,
-        "start_ms": 1867,
-        "end_ms": 4000,
+        "lowering_ms": 800,
+        "rising_ms": 1000,
         "flags": []
       },
       {
+        "rep_index": 1,
+        "start_ms": 3666,
+        "end_ms": 5400,
         "tempo_ms": 1734,
-        "range_deg": 79.4,
+        "range_deg": 72.8,
         "quality": null,
-        "start_ms": 4533,
-        "end_ms": 6733,
+        "lowering_ms": 734,
+        "rising_ms": 1000,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 1
           }
         ]
       },
       {
+        "rep_index": 2,
+        "start_ms": 6333,
+        "end_ms": 8066,
         "tempo_ms": 1733,
-        "range_deg": 83.2,
+        "range_deg": 77.6,
         "quality": null,
-        "start_ms": 7200,
-        "end_ms": 9267,
+        "lowering_ms": 733,
+        "rising_ms": 1000,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 2
           }
         ]
       }
@@ -98,6 +113,8 @@
       "exercise_id": "squat",
       "reps": 3,
       "weight_kg": null,
+      "end_reason": "still",
+      "partial_reps": 1,
       "medal": "bronze",
       "clean_share": 0.3333333333333333,
       "score_source": "databricks",
@@ -124,7 +141,7 @@
         ]
       },
       "rest_note": {
-        "text": "1 of 3 reps were clean. Your reps took about 1.7 s on the way down. Around 2 s gives you more control.",
+        "text": "1 of 3 reps were clean. Your reps took about 0.7 s on the way down. Around 2 s gives you more control.",
         "source": "fixed",
         "rule_id": "tempo"
       },
@@ -158,7 +175,7 @@
         "startedAt": "2026-10-10T15:00:00.000Z",
         "finishedAt": "2026-10-10T15:05:00.000Z",
         "device": "replay",
-        "inferenceMode": "on_device",
+        "inferenceMode": "coreml",
         "medal": "bronze",
         "formScore": 0.33333334,
         "exportStatus": "exported",
@@ -175,6 +192,8 @@
           "exerciseId": "squat",
           "reps": 3,
           "weightKg": null,
+          "endReason": "still",
+          "partialReps": 1,
           "medal": "bronze",
           "cleanShare": 0.33333334,
           "scoreSource": "databricks",
@@ -201,7 +220,7 @@
             "clean_share": 0.3333333333333333
           },
           "restNote": {
-            "text": "1 of 3 reps were clean. Your reps took about 1.7 s on the way down. Around 2 s gives you more control.",
+            "text": "1 of 3 reps were clean. Your reps took about 0.7 s on the way down. Around 2 s gives you more control.",
             "source": "fixed",
             "rule_id": "tempo"
           },
@@ -213,10 +232,12 @@
           "id": "<id 3>",
           "setId": "<id 1>",
           "position": 0,
-          "startMs": 1867,
-          "endMs": 4000,
+          "startMs": 1000,
+          "endMs": 2800,
+          "loweringMs": 800,
+          "risingMs": 1000,
           "tempoMs": 1800,
-          "rangeDeg": 82.7,
+          "rangeDeg": 78.3,
           "quality": null,
           "clean": true
         },
@@ -224,10 +245,12 @@
           "id": "<id 4>",
           "setId": "<id 1>",
           "position": 1,
-          "startMs": 4533,
-          "endMs": 6733,
+          "startMs": 3666,
+          "endMs": 5400,
+          "loweringMs": 734,
+          "risingMs": 1000,
           "tempoMs": 1734,
-          "rangeDeg": 79.4,
+          "rangeDeg": 72.8,
           "quality": null,
           "clean": false
         },
@@ -235,10 +258,12 @@
           "id": "<id 5>",
           "setId": "<id 1>",
           "position": 2,
-          "startMs": 7200,
-          "endMs": 9267,
+          "startMs": 6333,
+          "endMs": 8066,
+          "loweringMs": 733,
+          "risingMs": 1000,
           "tempoMs": 1733,
-          "rangeDeg": 83.2,
+          "rangeDeg": 77.6,
           "quality": null,
           "clean": false
         }
@@ -280,10 +305,10 @@
             "set_index": 0,
             "exercise_id": "squat",
             "fps": 15,
-            "frame_count": 295,
+            "frame_count": 200,
             "first_t_ms": 0,
-            "last_t_ms": 19600,
-            "frames_sha256": "54bc0775c5765251"
+            "last_t_ms": 13266,
+            "frames_sha256": "acd21673fe95371a"
           }
         ]
       },
@@ -296,7 +321,7 @@
           "started_at": "2026-10-10T15:00:00.000Z",
           "finished_at": "2026-10-10T15:05:00.000Z",
           "device": "replay",
-          "inference_mode": "on_device",
+          "inference_mode": "coreml",
           "medal": "bronze",
           "form_score": 0.33333334,
           "experience_level": "beginner",
@@ -310,42 +335,52 @@
               "exercise_id": "squat",
               "weight_kg": null,
               "medal": "bronze",
-              "frame_count": 295,
+              "end_reason": "still",
+              "partial_reps": 1,
+              "frame_count": 200,
               "reps": [
                 {
                   "rep_index": 0,
-                  "start_ms": 1867,
-                  "end_ms": 4000,
+                  "start_ms": 1000,
+                  "end_ms": 2800,
                   "tempo_ms": 1800,
-                  "range_deg": 82.7,
-                  "quality": 1,
+                  "range_deg": 78.3,
+                  "quality": null,
+                  "lowering_ms": 800,
+                  "rising_ms": 1000,
                   "flags": []
                 },
                 {
                   "rep_index": 1,
-                  "start_ms": 4533,
-                  "end_ms": 6733,
+                  "start_ms": 3666,
+                  "end_ms": 5400,
                   "tempo_ms": 1734,
-                  "range_deg": 79.4,
-                  "quality": 0,
+                  "range_deg": 72.8,
+                  "quality": null,
+                  "lowering_ms": 734,
+                  "rising_ms": 1000,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 1
                     }
                   ]
                 },
                 {
                   "rep_index": 2,
-                  "start_ms": 7200,
-                  "end_ms": 9267,
+                  "start_ms": 6333,
+                  "end_ms": 8066,
                   "tempo_ms": 1733,
-                  "range_deg": 83.2,
-                  "quality": 0,
+                  "range_deg": 77.6,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 1000,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 2
                     }
                   ]
                 }

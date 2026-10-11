@@ -11,3 +11,9 @@ node_modules/
 # Sync conflict copies (iCloud / Finder "name 2.ext")
 * 2
 * 2.*
+
+# AI-09 private recordings, consent evidence and dataset exports
+ml/labelling/data/
+
+# CONN-12: generated dataset export (ml/space/publish_dataset.py)
+ml/space/dataset/

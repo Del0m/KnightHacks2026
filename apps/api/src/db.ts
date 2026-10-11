@@ -16,9 +16,19 @@ export type Db = PgDatabase<PgQueryResultHKT, Schema, ExtractTablesWithRelations
 // Columns are camelCase in TypeScript and snake_case in Postgres. Every drizzle() call must pass this.
 export const CASING = "snake_case" as const;
 
-export function createNeonDb(connectionString: string): { db: Db; close: () => Promise<void> } {
+// `query` runs raw SQL on the same pool, for jobs that don't use Drizzle (the insight sync), so
+// the API has one Neon client.
+export function createNeonDb(connectionString: string): {
+  db: Db;
+  query: (text: string, params?: unknown[]) => Promise<unknown>;
+  close: () => Promise<void>;
+} {
   neonConfig.webSocketConstructor = ws;
   const pool = new Pool({ connectionString });
   const db = drizzle({ client: pool, schema, casing: CASING });
-  return { db: db as unknown as Db, close: () => pool.end() };
+  return {
+    db: db as unknown as Db,
+    query: (text, params) => pool.query(text, params as unknown[]),
+    close: () => pool.end(),
+  };
 }

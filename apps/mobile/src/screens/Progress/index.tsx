@@ -6,7 +6,8 @@ import { AppPage, Action, pageStyles } from '@/components/AppPage';
 import { GlassChoice } from '@/components/GlassChoice';
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { Streak } from '@/components/Streak';
-import { calendarDay, streak } from '@/data/workout';
+import { WorkoutHistory } from '@/components/WorkoutHistory';
+import { calendarDay, streak, workoutsOnDay } from '@/data/workout';
 import { useTraining } from '@/state/Training';
 import { useAuth } from '@/screens/Auth/session';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -98,12 +99,14 @@ export default function ProgressScreen() {
     </View>
   </AppPage>;
 }
-function WorkoutCalendar() {
+export function WorkoutCalendar() {
   const { workouts } = useTraining();
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const selectedWorkouts = selectedDay ? workoutsOnDay(workouts, selectedDay) : [];
   const cells = monthCells(month.getFullYear(), month.getMonth()), completed = new Set(workouts.map(workout => workout.day)), today = calendarDay();
   const count = cells.filter(day => day && completed.has(day.key)).length;
-  function move(offset: number) { setMonth(current => new Date(current.getFullYear(), current.getMonth() + offset, 1)); }
+  function move(offset: number) { setSelectedDay(null); setMonth(current => new Date(current.getFullYear(), current.getMonth() + offset, 1)); }
   return <View style={styles.calendar}>
     <View style={styles.monthRow}>
       <PolishedPressable accessibilityRole="button" accessibilityLabel="Previous month" onPress={() => move(-1)} style={styles.arrow}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} tintColor={c.muted} size={20} /></PolishedPressable>
@@ -112,8 +115,12 @@ function WorkoutCalendar() {
     </View>
     <View style={styles.grid}>
       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <View key={day} style={styles.cell}><Text style={styles.weekday}>{day[0]}</Text></View>)}
-      {cells.map((day, index) => <View key={day?.key ?? `blank-${index}`} style={styles.cell}>{day && <View accessibilityLabel={`${day.key}${completed.has(day.key) ? ', workout completed' : ''}${today === day.key ? ', today' : ''}`} style={[styles.day, today === day.key && styles.today, completed.has(day.key) && styles.completed]}><Text style={[styles.dayText, completed.has(day.key) && styles.completedText]}>{day.number}</Text></View>}</View>)}
+      {cells.map((day, index) => <View key={day?.key ?? `blank-${index}`} style={styles.cell}>{day && <PolishedPressable accessibilityRole="button" hitSlop={6} disabled={!completed.has(day.key)} accessibilityState={{ selected: selectedDay === day.key, disabled: !completed.has(day.key) }} accessibilityHint={completed.has(day.key) ? "View all workouts completed on this day" : undefined} onPress={() => setSelectedDay(day.key)} accessibilityLabel={`${day.key}${completed.has(day.key) ? ', workout completed' : ''}${today === day.key ? ', today' : ''}`} style={[styles.day, today === day.key && styles.today, completed.has(day.key) && styles.completed, selectedDay === day.key && { borderWidth: 2, borderColor: c.text }]}><Text style={[styles.dayText, completed.has(day.key) && styles.completedText]}>{day.number}</Text></PolishedPressable>}</View>)}
     </View>
+    {selectedDay && <View style={{ gap: 12 }}>
+      <View style={styles.monthRow}><Text accessibilityRole="header" style={ui.heading}>{new Date(`${selectedDay}T12:00:00`).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} · {selectedWorkouts.length} {selectedWorkouts.length === 1 ? 'workout' : 'workouts'}</Text><GlassChoice compact label="Close" onPress={() => setSelectedDay(null)} /></View>
+      <WorkoutHistory workouts={selectedWorkouts} />
+    </View>}
     <View style={styles.legend}><View style={styles.dot} /><Text style={ui.muted}>Workout completed · {count} {count === 1 ? 'day' : 'days'} this month</Text></View>
   </View>;
 }

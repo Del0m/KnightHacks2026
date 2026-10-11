@@ -16,7 +16,7 @@ import {
   REHAB_DISCLAIMER,
   todaysSession,
 } from "../src/services/rehab.js";
-import { setup } from "./helpers.js";
+import { rep, setRecord, setup } from "./helpers.js";
 
 const SPECS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../specs/exercises");
 
@@ -101,11 +101,11 @@ describe("DB-12 in the Databricks export (CONN-14 hooks)", () => {
     await api.post("/me/injuries", { body_part: "knee", side: "left", notes: "private: torn ACL" });
     await api.post("/me/injuries", { body_part: "lower_back" }); // no side -> bare tag
     await api.post("/me/rehab-plans", kneePlan);
-    const { id } = (await api.post("/sessions")).body;
-    await api.post(`/sessions/${id}/sets`, {
-      exercise_id: "squat",
-      reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
-    });
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
+    await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({ exercise_id: "squat", reps: [rep([], { range_deg: 70, quality: null })] }),
+    );
     expect((await api.post(`/sessions/${id}/finish`)).status).toBe(200);
 
     const exported = t.queue.sessions.find((s) => s.id === id)!;
@@ -424,11 +424,11 @@ describe("BE-15 start dates and time zones (PR #113 review)", () => {
     const api = await t.as("export-future");
     await api.post("/me/injuries", { body_part: "knee", side: "right" });
     await api.post("/me/rehab-plans", { ...kneePlan, start_on: "2099-01-05", review_on: null });
-    const { id } = (await api.post("/sessions")).body;
-    await api.post(`/sessions/${id}/sets`, {
-      exercise_id: "squat",
-      reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
-    });
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
+    await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({ exercise_id: "squat", reps: [rep([], { range_deg: 70, quality: null })] }),
+    );
     await api.post(`/sessions/${id}/finish`);
     const exported = t.queue.sessions.find((s) => s.id === id)!;
     expect(exported.injury_groups).toEqual(["knee:right"]);
@@ -472,12 +472,12 @@ describe("time zones (PR #113 second review)", () => {
   it("counts a set on the user's day east of UTC (the reviewer's +01:00 case, via an IANA zone)", async () => {
     const api = await t.as("tz-east");
     await api.post("/me/rehab-plans", kneePlan);
-    const { id } = (await api.post("/sessions")).body;
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
     const set = (
-      await api.post(`/sessions/${id}/sets`, {
-        exercise_id: "squat",
-        reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
-      })
+      await api.post(
+        `/sessions/${id}/sets`,
+        setRecord({ exercise_id: "squat", reps: [rep([], { range_deg: 70, quality: null })] }),
+      )
     ).body;
     // 23:30 UTC on the 10th is 00:30 on the 11th at UTC+1.
     await t.db
@@ -526,11 +526,11 @@ describe("BE-15 today's rehab session", () => {
         },
       ],
     });
-    const { id } = (await api.post("/sessions")).body;
-    await api.post(`/sessions/${id}/sets`, {
-      exercise_id: "squat",
-      reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
-    });
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
+    await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({ exercise_id: "squat", reps: [rep([], { range_deg: 70, quality: null })] }),
+    );
 
     const res = await api.get("/me/rehab-plans/active/today");
     expect(res.status).toBe(200);
@@ -552,13 +552,20 @@ describe("BE-15 today's rehab session", () => {
     const api = await t.as("today-tz");
     await api.post("/me/rehab-plans", kneePlan);
     // A session that starts at 23:50 in New York and runs past midnight.
-    const { id } = (await api.post("/sessions", { started_at: "2026-10-11T03:50:00Z" })).body;
+    const { id } = (
+      await api.post("/sessions", { inference_mode: "coreml", started_at: "2026-10-11T03:50:00Z" })
+    ).body;
+    let nextSetIndex = 0;
     const addSquat = async (at: string) => {
       const set = (
-        await api.post(`/sessions/${id}/sets`, {
-          exercise_id: "squat",
-          reps: [{ tempo_ms: 2000, range_deg: 70, flags: [] }],
-        })
+        await api.post(
+          `/sessions/${id}/sets`,
+          setRecord({
+            set_index: nextSetIndex++,
+            exercise_id: "squat",
+            reps: [rep([], { range_deg: 70, quality: null })],
+          }),
+        )
       ).body;
       await t.db
         .update(schema.sets)

@@ -2,7 +2,8 @@
 #   meta/<date>/<session_id>.json           -> bronze_sessions   (one row per session)
 #   joints/<date>/<session_id>.ndjson.gz    -> bronze_set_joints (one row per set)
 # Schemas are explicit so a malformed upload lands in _rescued_data instead of
-# changing the table. Keep them in sync with apps/api/src/integrations/databricks/upload.ts.
+# changing the table. They mirror specs/set-record/schema.json (ExportMeta, MetaSet, Rep, Flag,
+# ExportJointsLine); specs/set-record.test.mjs fails when they drift.
 
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
@@ -14,7 +15,8 @@ VOLUME = spark.conf.get("spotter.volume_path", "/Volumes/spotter/raw/sessions")
 
 FLAG = StructType([
     StructField("rule_id", StringType()),
-    StructField("severity", StringType()),
+    StructField("severity", StringType()),  # form | safety
+    StructField("rep_index", IntegerType()),  # 0-based, same as the rep's
 ])
 
 REP = StructType([
@@ -23,7 +25,10 @@ REP = StructType([
     StructField("end_ms", LongType()),
     StructField("tempo_ms", LongType()),
     StructField("range_deg", DoubleType()),
-    StructField("quality", DoubleType()),
+    StructField("quality", DoubleType()),  # advisory model score; null from the phone (INT-06)
+    # Start to the smallest primary angle, and the rest of the rep, measured on the phone.
+    StructField("lowering_ms", LongType()),
+    StructField("rising_ms", LongType()),
     StructField("flags", ArrayType(FLAG)),
 ])
 
@@ -32,6 +37,8 @@ SET = StructType([
     StructField("exercise_id", StringType()),
     StructField("weight_kg", DoubleType()),
     StructField("medal", StringType()),
+    StructField("end_reason", StringType()),  # still | absent | lost | manual
+    StructField("partial_reps", IntegerType()),
     StructField("frame_count", IntegerType()),
     StructField("reps", ArrayType(REP)),
 ])
@@ -43,7 +50,7 @@ META_SCHEMA = StructType([
     StructField("started_at", StringType()),
     StructField("finished_at", StringType()),
     StructField("device", StringType()),
-    StructField("inference_mode", StringType()),
+    StructField("inference_mode", StringType()),  # coreml | vision | cloud
     StructField("medal", StringType()),
     StructField("form_score", DoubleType()),
     StructField("experience_level", StringType()),

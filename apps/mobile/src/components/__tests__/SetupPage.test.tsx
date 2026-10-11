@@ -7,6 +7,7 @@ jest.mock('../GlassChoice', () => ({ GlassChoice: (props: unknown) => require('r
 jest.mock('@/hooks/useReducedMotion', () => ({ useReducedMotion: () => true }));
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: require('react-native').View }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: require('react-native').View }));
+jest.mock('expo-router/head', () => ({ __esModule: true, default: () => { throw new Error('Native page titles must not request Apple Handoff'); } }));
 
 test('step changes announce the new prompt for VoiceOver', () => {
   const announcement = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});

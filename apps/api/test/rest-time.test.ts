@@ -8,7 +8,7 @@ import { HfLlm } from "../src/integrations/huggingface/llm.js";
 import { loadSpecs } from "../src/services/exerciseSpecs.js";
 import { RestNoteWriter, suggestionProblems } from "../src/services/restNote.js";
 import type { RestTimeDeps } from "../src/services/restTime.js";
-import { createTestDb, rep, setup } from "./helpers.js";
+import { createTestDb, rep, setup, setRecord } from "./helpers.js";
 
 const SPECS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../specs/exercises");
 
@@ -16,6 +16,7 @@ const SPECS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 
 type Mode = "ok" | "hang" | "503";
 const net = { databricks: "ok" as Mode, labels: "clean" as string, llm: "ok" as Mode, suggestion: "" };
+let scoredRecords: unknown[] = [];
 
 const fakeFetch = (async (url: string, init?: RequestInit) => {
   if (url.endsWith("/oidc/v1/token"))
@@ -27,6 +28,7 @@ const fakeFetch = (async (url: string, init?: RequestInit) => {
     );
   }
   const records = JSON.parse(init!.body as string).dataframe_records as unknown[];
+  scoredRecords = records;
   return new Response(
     JSON.stringify({ predictions: records.map(() => ({ quality: 0.42, label: net.labels })) }),
   );
@@ -76,9 +78,12 @@ afterAll(() => t.close());
 
 async function postSet(reps: object[]) {
   const api = await t.as("rest-user");
-  const { id } = (await api.post("/sessions", { device: "iPhone" })).body;
+  const { id } = (await api.post("/sessions", { inference_mode: "coreml", device: "iPhone" })).body;
   const started = Date.now();
-  const res = await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", weight_kg: 50, reps });
+  const res = await api.post(
+    `/sessions/${id}/sets`,
+    setRecord({ exercise_id: "squat", weight_kg: 50, reps }),
+  );
   return { res, ms: Date.now() - started, api };
 }
 
@@ -86,6 +91,41 @@ const eight = (flagged: Record<number, string[]>, tempo = 2000) =>
   Array.from({ length: 8 }, (_, i) => rep(flagged[i] ?? [], { tempo_ms: tempo }));
 
 describe("rest-time loop", () => {
+  // The model was trained on silver's frame-derived split (features.ts), so the phone's
+  // turn-based lowering_ms / rising_ms are stored but never sent for scoring.
+  it("takes model timing features from the set's joints, not the phone's split", async () => {
+    Object.assign(net, { databricks: "ok", labels: "clean", llm: "ok" });
+    const { res } = await postSet([
+      rep([], { quality: null, lowering_ms: 800, rising_ms: 1200 }),
+      rep([], { quality: null, lowering_ms: null, rising_ms: null }),
+    ]);
+    expect(res.status).toBe(201);
+    expect(scoredRecords).toEqual([
+      {
+        exercise_id: "squat",
+        weight_kg: 50,
+        range_deg: 95,
+        tempo_ms: 2000,
+        lowering_ms: null,
+        rising_ms: null,
+        asymmetry: null,
+        max_trunk_angle: null,
+        min_knee_ankle_ratio: null,
+      },
+      {
+        exercise_id: "squat",
+        weight_kg: 50,
+        range_deg: 95,
+        tempo_ms: 2000,
+        lowering_ms: null,
+        rising_ms: null,
+        asymmetry: null,
+        max_trunk_angle: null,
+        min_knee_ankle_ratio: null,
+      },
+    ]);
+  });
+
   it("returns a Databricks score and an LLM note in one response, good news first", async () => {
     Object.assign(net, { databricks: "ok", labels: "clean", llm: "ok" });
     net.suggestion = "Knees drifted inward on 2 reps. Tracking over the toes tends to feel steadier.";
@@ -185,11 +225,21 @@ describe("rest-time loop", () => {
     ).toContain("adds numbers the original doesn't have (3)");
   });
 
-  it("fills {t} for duration rules from the flagged reps' time", async () => {
+  it("fills {t} for the tempo rule from the flagged reps' lowering time, not the whole rep", async () => {
     Object.assign(net, { databricks: "ok", llm: "hang" });
-    const { res } = await postSet(eight({ 0: ["tempo"], 1: ["tempo"] }, 700));
+    // Lowered in 0.7 s, back up in 0.9 s: the note is about the 0.7 s "on the way down".
+    const fast = { tempo_ms: 1600, lowering_ms: 700, rising_ms: 900 };
+    const reps = Array.from({ length: 8 }, (_, i) => rep(i < 2 ? ["tempo"] : [], i < 2 ? fast : {}));
+    const { res } = await postSet(reps);
     expect(res.body.rest_note).toMatchObject({ source: "fixed", rule_id: "tempo" });
-    expect(res.body.rest_note.text).toContain("0.7 s");
+    expect(res.body.rest_note.text).toContain("about 0.7 s on the way down");
+    expect(res.body.rest_note.text).not.toContain("1.6");
+  });
+
+  it("drops the tempo tip when the lowering time wasn't measured", async () => {
+    Object.assign(net, { databricks: "ok", llm: "hang" });
+    const { res } = await postSet(eight({ 0: ["tempo"], 1: ["tempo"] }, 1600));
+    expect(res.body.rest_note).toMatchObject({ source: "fixed", rule_id: null, text: "6 of 8 reps were clean." });
   });
 
   it("saves the score and note so GET /sets/:id/rest-note returns the same", async () => {
@@ -214,9 +264,9 @@ describe("rest-time loop", () => {
     });
     await loadSpecs(stuck.db, SPECS_DIR);
     const api = await stuck.as("stuck-user");
-    const { id } = (await api.post("/sessions")).body;
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
     const started = Date.now();
-    const res = await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: eight({}) });
+    const res = await api.post(`/sessions/${id}/sets`, setRecord({ exercise_id: "squat", reps: eight({}) }));
     expect(Date.now() - started).toBeLessThan(2800);
     expect(res.body.score).toMatchObject({ source: "phone", fallback_reason: "rest-time budget exceeded" });
     await stuck.close();
@@ -226,11 +276,14 @@ describe("rest-time loop", () => {
     const plain = await setup();
     await loadSpecs(plain.db, SPECS_DIR);
     const api = await plain.as("plain-user");
-    const { id } = (await api.post("/sessions")).body;
-    const res = await api.post(`/sessions/${id}/sets`, {
-      exercise_id: "squat",
-      reps: eight({ 0: ["depth"] }),
-    });
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
+    const res = await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({
+        exercise_id: "squat",
+        reps: eight({ 0: ["depth"] }),
+      }),
+    );
     expect(res.body.score.source).toBe("phone");
     expect(res.body.rest_note).toMatchObject({ source: "fixed", rule_id: "depth" });
     await plain.close();

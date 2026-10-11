@@ -22,7 +22,7 @@
     "start_enter": 95,
     "reverse_deg": 5,
     "min_state_ms": 150,
-    "set_end_still_ms": 8000
+    "set_end_still_ms": 4000
   },
   "rules": [
     {

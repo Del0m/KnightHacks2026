@@ -83,18 +83,66 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 | `POST /plans/generate?tz=`, `GET /plans/current?tz=`, `GET /me/exercise-preferences`, `PUT /me/exercise-preferences/:exerciseId`                                                                                | BE-08        |
 | `GET/POST /me/rehab-plans`, `GET/PUT/DELETE /me/rehab-plans/:id`, `POST /me/rehab-plans/:id/limits`, `PUT/DELETE /me/rehab-plans/:id/limits/:limitId`, `GET /me/rehab-plans/active/today?tz=`, `GET /me/limits` | BE-15        |
 
-## How the CONN pieces are wired
+## Environment (INT-04)
 
-Each one switches on when its env vars are set; without them the API still runs.
+`src/env.ts` validates every variable once at boot; a missing required one stops the API with a readable list. Each integration takes its config from that validated env. Only `DATABASE_URL` and `NEON_AUTH_JWKS_URL` are required: everything else switches a feature on, and without it that feature uses the fallback below while the API still runs.
 
-| Piece                      | Turns on with                                                                 | What happens                                                                                                                       |
-| -------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| CONN-02 upload             | `DATABRICKS_HOST`, `_CLIENT_ID`, `_CLIENT_SECRET`, `SPOTTER_PSEUDONYM_SECRET` | Finished sessions upload to the Volume; `sessions.export_status` tracks it                                                         |
-| CONN-06 insight sync       | The above plus `DATABRICKS_WAREHOUSE_ID`                                      | Every 15 min, gold tables are upserted into `progress_daily` and `risk_insights` (`/me/insights`). Run it on one API instance only |
-| CONN-09 moderation         | `HF_TOKEN`                                                                    | Llama Guard checks posts and comments; blocked content returns 422 with a friendly message                                         |
-| CONN-08 RAG ingest         | `HF_TOKEN` (run `npm run rag:ingest` in `rag/`)                               | Writes `doc_chunks`; needs migration `0001` on the branch first                                                                    |
-| AI-12 planner              | `HF_TOKEN`                                                                    | gpt-oss drafts plans and bge-small embeds the search; without it, plans come from the rules planner                                |
-| CONN-05 set scoring        | Not wired yet (BE-07)                                                         | The phone can send `medal`, `clean_share`, `score_source` and per-rep `clean` on each set                                          |
-| CONN-08 profile embeddings | Not written yet                                                               | When `profiles.embedding` is set, buddy matching ranks by it automatically                                                         |
+| Variable | Powers | Without it |
+| --- | --- | --- |
+| `DATABASE_URL` | **Required.** Neon (one pool for routes, export status and the insight sync) | API won't start |
+| `NEON_AUTH_JWKS_URL` | **Required.** Verifying sign-in tokens (BE-02) | API won't start |
+| `NEON_AUTH_ISSUER`, `NEON_AUTH_AUDIENCE` | Extra `iss` / `aud` checks on tokens | Those claims aren't checked |
+| `NODE_ENV`, `PORT`, `LOG_LEVEL` | Server basics | `development`, `3000`, `info` |
+| `CORS_ORIGINS` | Browser calls from the Expo web build | No CORS headers (native apps don't need them) |
+| `DATABRICKS_HOST`, `_CLIENT_ID`, `_CLIENT_SECRET` | Service principal for every Databricks call | No uploads, scoring or sync |
+| `SPOTTER_PSEUDONYM_SECRET` | Pseudonymous user ids for Databricks (CONN-02, CONN-06, CONN-13). Never rotate it | No uploads or sync; account deletion can't queue the Databricks delete |
+| `DATABRICKS_OAUTH_SCOPES` | Scopes requested for the service principal | `all-apis`, which `spotter-api` doesn't have: set `files model-serving sql` |
+| `DATABRICKS_VOLUME_PATH` | Where finished sessions upload (CONN-02) | `/Volumes/spotter/raw/sessions` |
+| `DATABRICKS_SERVING_ENDPOINT`, `DATABRICKS_SCORE_TIMEOUT_MS` | Set scoring during rest (CONN-05) | The phone's rule score; 1200 ms budget. The endpoint scales to zero, so warm it before a demo |
+| `DATABRICKS_WAREHOUSE_ID` | Insight sync reads (CONN-06). The id is in the warehouse URL (`/sql/warehouses/<id>`), not the `?o=` workspace id | No sync |
+| `INSIGHT_SYNC_ENABLED` | Starts the 15-minute gold → Neon sync on this instance. Set `true` on **exactly one** deployed instance | Sync doesn't run here |
+| `SYNC_LOOKBACK_DAYS` | Days of progress/risk each sync re-reads | 49 |
+| `HF_TOKEN` | gpt-oss (rest notes, plans), Llama Guard and the threats/harassment check, bge-small embeddings, cloud pose | Fixed rest notes, rules planner, no moderation (everything allowed), tag-overlap buddy matching |
+| `HF_LLM_CHAIN`, `HF_LLM_ATTEMPTS`, `HF_LLM_TIMEOUT_MS` | gpt-oss model:provider chain and budgets | Tested defaults in `llm.ts` |
+| `HF_GUARD_MODEL`, `HF_GUARD_PROVIDER`, `HF_GUARD_TIMEOUT_MS` | Llama Guard model, provider and budget | Llama Guard 4 on DeepInfra, 5 s |
+| `POSE_ENDPOINT_URL`, `POSE_ENDPOINT_TIMEOUT_MS` | Cloud pose mode, `/pose/stream` (CONN-11) | Cloud mode off; phones use on-device pose |
+| `DEMO_DATABASE_URL`, `DEMO_PRESENTER_USER_ID` | Script-only: `npm run db:seed:demo` | Seeding refuses to run |
+| `HF_WRITE_TOKEN` | Script-only: publishing models (CONN-10) and the dataset (CONN-12) | Can't publish |
+
+### GET /health
+
+Always 200 with `status: "ok"` for the host's liveness check, plus each integration's state. `live` means configured and its latest real call worked (or none has happened yet), `disabled` means its env isn't set, and `error` means its latest call failed, with a coarse `reason` (`timeout`, `http_403`, `partial`, `unreachable`, …) and times. It never includes env values or raw error messages.
+
+```json
+{
+  "status": "ok",
+  "uptime_s": 42,
+  "integrations": {
+    "neon": { "status": "live" },
+    "databricks_export": { "status": "live", "last_ok_at": "2026-10-11T01:02:03.000Z" },
+    "insight_sync": { "status": "error", "reason": "http_403", "last_error_at": "2026-10-11T01:00:00.000Z" },
+    "set_scoring": { "status": "error", "reason": "timeout", "last_error_at": "2026-10-11T01:01:00.000Z" },
+    "llm": { "status": "live" },
+    "moderation": { "status": "live" },
+    "embeddings": { "status": "live" },
+    "cloud_pose": { "status": "disabled" }
+  }
+}
+```
+
+`GET /health/ready` only checks Neon and returns 503 when it's unreachable.
+
+### Where each piece runs
+
+| Piece | Called from | What happens |
+| --- | --- | --- |
+| CONN-02 upload | `POST /sessions/:id/finish`, after the response; retried every 10 min | Session uploads to the Volume; `sessions.export_status` tracks it |
+| CONN-05 set scoring | `POST /sessions/:id/sets` (INT-05 rest-time result) | Databricks scores the set; on timeout or error, the phone's score |
+| CONN-06 insight sync | Boot, then every 15 min, where `INSIGHT_SYNC_ENABLED=true` | Gold tables upserted into `progress_daily`, `risk_insights` and `rom_trend`; a table that can't be read is left as it was |
+| CONN-07 LLM | Rest notes (INT-05), planner (AI-12), threats/harassment check | Falls back to the fixed note or the rules planner |
+| CONN-08 RAG ingest | `npm run rag:ingest` in `rag/` | Writes `doc_chunks` for the planner and advice |
+| CONN-08 profile embeddings | `PUT /me/profile` when goals or bio change; `npm run db:embed-profiles` backfills | Buddy matching ranks by goal similarity |
+| CONN-09 moderation | `POST /posts`, `POST /posts/:id/comments` | Blocks with a friendly 422; self-harm returns `details.support`; blocks are logged to `moderation_blocks` |
+| INT-04 moderation re-check | Boot, then every 5 min, when `HF_TOKEN` is set | Posts and comments saved while moderation was unreachable (`moderation_checked = false`) are re-checked: kept if allowed, removed and logged to `moderation_blocks` if blocked |
 
 `test/conn-compat.test.ts` runs the merged CONN-06/08/09 and AI-05 code against this schema.

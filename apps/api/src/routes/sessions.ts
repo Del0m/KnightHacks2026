@@ -1,66 +1,91 @@
 // BE-04: POST /sessions, POST /sessions/:id/sets, POST /sessions/:id/finish.
 //
-// The set payload is the phone's set record (AI-08), the same shape the Databricks uploader
-// sends (FinishedSet in integrations/databricks/upload.ts): per-rep aggregates and flags, plus
-// optional per-frame joints. Aggregates go to Neon; joints only go to Databricks.
+// The set payload is the shared phone set record (AI-08): per-rep aggregates and flags,
+// plus per-frame joints. Aggregates go to Neon; joints only go to Databricks.
 import { Router } from "express";
 import { z } from "zod";
+import type { SessionStart, SetRecord } from "../../../../specs/set-record/types.js";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { parse, send, userId } from "../http.js";
 import { JOINT_COUNT, VALUES_PER_JOINT } from "../integrations/databricks/upload.js";
 import { RestNoteWriter } from "../services/restNote.js";
 import { restTimeResult } from "../services/restTime.js";
-import { addSet, finishSession, type FinishDeps } from "../services/sessions.js";
+import { addSet, finishSession, sessionSummary, type FinishDeps } from "../services/sessions.js";
 
 const noLlmNotes = new RestNoteWriter(null); // fixed notes when no LLM is configured
 
 const MAX_FRAMES_PER_SET = 30 * 60 * 3; // 3 minutes at 30 fps
 
-export const createSessionInput = z
-  .object({
-    started_at: z.string().datetime({ offset: true }).optional(),
-    device: z.string().max(120).optional(),
-    inference_mode: z.enum(["on_device", "cloud"]).default("on_device"),
-  })
-  .strict();
+export const createSessionInput: z.ZodType<SessionStart, z.ZodTypeDef, unknown> = z.object({
+  started_at: z.string().datetime({ offset: true }).optional(),
+  device: z.string().max(120).optional(),
+  inference_mode: z.enum(["coreml", "vision", "cloud"]),
+});
 
-const flag = z.object({ rule_id: z.string().min(1).max(60), severity: z.string().max(20).optional() });
+const flag = z.object({
+  rule_id: z.string().regex(/^[a-z0-9_]{1,60}$/),
+  severity: z.enum(["form", "safety"]),
+  rep_index: z.number().int().nonnegative(),
+});
 
 const rep = z.object({
-  tempo_ms: z.number().nonnegative().max(120_000),
-  range_deg: z.number().min(0).max(360),
-  quality: z.number().min(0).max(1).nullable().optional(),
-  // Accepted for older clients but ignored (INT-06): a rep is clean when it has no rule flags.
-  clean: z.boolean().optional(),
-  start_ms: z.number().int().nonnegative().nullable().optional(),
-  end_ms: z.number().int().nonnegative().nullable().optional(),
-  flags: z.array(flag).max(20).default([]),
+  rep_index: z.number().int().nonnegative(),
+  tempo_ms: z.number().int().nonnegative().max(120_000),
+  range_deg: z.number().finite().min(0).max(180),
+  quality: z.number().min(0).max(1).nullable(),
+  start_ms: z.number().int().nonnegative().nullable(),
+  end_ms: z.number().int().nonnegative().nullable(),
+  lowering_ms: z.number().int().nonnegative().nullable(),
+  rising_ms: z.number().int().nonnegative().nullable(),
+  flags: z.array(flag).max(20),
 });
 
 const frame = z.object({
-  t_ms: z.number().nonnegative(),
+  t_ms: z.number().int().nonnegative(),
   kp: z
     .array(z.number().finite())
     .length(JOINT_COUNT * VALUES_PER_JOINT, `kp must hold ${JOINT_COUNT} joints x (x, y, c)`),
 });
 
-export const setInput = z.object({
-  set_index: z.number().int().min(0).max(200).optional(),
-  exercise_id: z
-    .string()
-    .regex(/^[a-z0-9_]{2,60}$/)
-    .max(60),
-  weight_kg: z.number().min(0).max(1000).nullable().default(null),
-  medal: z.enum(["bronze", "silver", "gold"]).nullable().optional(),
-  // Accepted for older clients but ignored (INT-06): the server derives the set's clean share
-  // from the rule flags, and its medal from that (INT-05 rest-time result).
-  clean_share: z.number().min(0).max(1).nullable().optional(),
-  score_source: z.enum(["databricks", "phone"]).nullable().optional(),
-  fps: z.number().positive().max(240).optional(),
-  frames: z.array(frame).max(MAX_FRAMES_PER_SET).optional(),
-  reps: z.array(rep).max(200),
-});
+export const setInput: z.ZodType<SetRecord, z.ZodTypeDef, unknown> = z
+  .object({
+    schema_version: z.literal(1),
+    set_index: z.number().int().min(0).max(200),
+    exercise_id: z
+      .string()
+      .regex(/^[a-z0-9_]{2,60}$/)
+      .max(60),
+    weight_kg: z.number().min(0).max(1000).nullable(),
+    end_reason: z.enum(["still", "absent", "lost", "manual"]),
+    partial_reps: z.number().int().nonnegative(),
+    fps: z.number().positive().max(240).nullable(),
+    frames: z.array(frame).max(MAX_FRAMES_PER_SET),
+    reps: z.array(rep).max(200),
+  })
+  .superRefine((set, context) => {
+    const problem = (path: (string | number)[], message: string) =>
+      context.addIssue({ code: z.ZodIssueCode.custom, path, message });
+    set.reps.forEach((rep, index) => {
+      if (rep.rep_index !== index) problem(["reps", index, "rep_index"], "Must equal the rep array index");
+      rep.flags.forEach((flag, flagIndex) => {
+        if (flag.rep_index !== rep.rep_index)
+          problem(["reps", index, "flags", flagIndex, "rep_index"], "Must equal the containing rep index");
+      });
+      if (rep.start_ms !== null && rep.end_ms !== null && rep.end_ms - rep.start_ms !== rep.tempo_ms)
+        problem(["reps", index, "end_ms"], "end_ms - start_ms must equal tempo_ms");
+      if (rep.lowering_ms !== null && rep.lowering_ms > rep.tempo_ms)
+        problem(["reps", index, "lowering_ms"], "Cannot exceed tempo_ms");
+      if (rep.rising_ms !== null && rep.rising_ms > rep.tempo_ms)
+        problem(["reps", index, "rising_ms"], "Cannot exceed tempo_ms");
+      if (
+        rep.lowering_ms !== null &&
+        rep.rising_ms !== null &&
+        rep.lowering_ms + rep.rising_ms !== rep.tempo_ms
+      )
+        problem(["reps", index, "rising_ms"], "lowering_ms + rising_ms must equal tempo_ms");
+    });
+  });
 
 export const finishInput = z
   .object({ finished_at: z.string().datetime({ offset: true }).optional() })
@@ -94,18 +119,18 @@ export function sessionsRouter(db: Db, deps: FinishDeps): Router {
       setIndex: input.set_index,
       exerciseId: input.exercise_id,
       weightKg: input.weight_kg,
-      medal: input.medal,
-      cleanShare: input.clean_share,
-      scoreSource: input.score_source,
+      endReason: input.end_reason,
+      partialReps: input.partial_reps,
       fps: input.fps,
       frames: input.frames,
       reps: input.reps.map((r) => ({
         tempoMs: r.tempo_ms,
         rangeDeg: r.range_deg,
         quality: r.quality,
-        clean: r.clean,
         startMs: r.start_ms,
         endMs: r.end_ms,
+        loweringMs: r.lowering_ms,
+        risingMs: r.rising_ms,
         flags: r.flags.map((f) => ({ ruleId: f.rule_id, severity: f.severity })),
       })),
     });
@@ -118,6 +143,7 @@ export function sessionsRouter(db: Db, deps: FinishDeps): Router {
       reps: input.reps.map((r) => ({
         rangeDeg: r.range_deg,
         tempoMs: r.tempo_ms,
+        loweringMs: r.lowering_ms,
         quality: r.quality,
         startMs: r.start_ms,
         endMs: r.end_ms,
@@ -146,6 +172,11 @@ export function sessionsRouter(db: Db, deps: FinishDeps): Router {
       },
       201,
     );
+  });
+
+  router.get("/sessions/:id/summary", async (req, res) => {
+    const sessionId = parse(z.string().uuid(), req.params.id);
+    send(res, await sessionSummary(db, userId(req), sessionId));
   });
 
   router.post("/sessions/:id/finish", async (req, res) => {

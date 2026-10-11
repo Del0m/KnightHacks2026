@@ -13,12 +13,9 @@ import type {
   DatabricksUploader,
   ExportStatus,
   ExportStatusStore,
-  FinishedSession,
-  JointFrame,
 } from "../integrations/databricks/upload.js";
-
-// The session as the uploader takes it (CONN-02).
-export type ExportSession = FinishedSession;
+import type { ExportSession, JointFrame } from "../../../../specs/set-record/types.js";
+export type { ExportSession } from "../../../../specs/set-record/types.js";
 
 export interface ExportQueue {
   enqueue(session: ExportSession): void;
@@ -29,7 +26,10 @@ export interface ExportQueue {
 // Joints are never persisted in Neon. Bounded retention preserves them for retries.
 const RETAIN_MAX = 500;
 const RETAIN_MS = 24 * 60 * 60 * 1000;
-export function databricksExportQueue(uploader: DatabricksUploader, log: Logger): Required<ExportQueue> {
+export function databricksExportQueue(
+  uploader: Pick<DatabricksUploader, "exportSession">,
+  log: Logger,
+): Required<ExportQueue> {
   const retained = new Map<string, { session: ExportSession; at: number }>();
   const exportNow = async (session: ExportSession): Promise<ExportStatus> => {
     for (const [id, entry] of retained) if (entry.at < Date.now() - RETAIN_MS) retained.delete(id);
@@ -120,7 +120,7 @@ export function drizzleExportStatusStore(db: Db): ExportStatusStore {
 // ---- Joints waiting for their session to finish ----
 
 export interface BufferedSetJoints {
-  fps: number;
+  fps: number | null;
   frames: JointFrame[];
 }
 

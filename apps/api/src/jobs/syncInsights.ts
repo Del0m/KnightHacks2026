@@ -18,6 +18,8 @@
 // Started from src/index.ts when insightSyncConfigured(env); run it on one API instance only.
 
 import { DBSQLClient } from "@databricks/sql";
+import type { Env } from "../env.js";
+import { reasonOf, type IntegrationStatus } from "../services/integrationStatus.js";
 import { pseudonymize } from "../integrations/databricks/upload";
 
 export const SYNC_INTERVAL_MS = 15 * 60 * 1000;
@@ -37,7 +39,19 @@ export interface SyncConfig {
   lookbackDays: number;
 }
 
-export function syncConfigFromEnv(env = process.env): SyncConfig {
+type SyncEnv = Pick<
+  Env,
+  | "DATABRICKS_HOST"
+  | "DATABRICKS_CLIENT_ID"
+  | "DATABRICKS_CLIENT_SECRET"
+  | "DATABRICKS_OAUTH_SCOPES"
+  | "DATABRICKS_WAREHOUSE_ID"
+  | "SPOTTER_PSEUDONYM_SECRET"
+  | "SYNC_LOOKBACK_DAYS"
+>;
+
+/** From the validated env (src/env.ts); scripts can pass process.env. */
+export function syncConfigFromEnv(env: SyncEnv = process.env): SyncConfig {
   const required = [
     "DATABRICKS_HOST",
     "DATABRICKS_CLIENT_ID",
@@ -376,6 +390,7 @@ export interface SyncDeps {
   config: SyncConfig;
   read?: (cfg: SyncConfig, log: LogLike) => Promise<GoldSnapshot>; // injectable for tests
   log?: LogLike;
+  status?: IntegrationStatus; // INT-04: /health shows the last run's outcome
 }
 
 export interface SyncResult {
@@ -439,12 +454,15 @@ export function startInsightSync(deps: SyncDeps, intervalMs = SYNC_INTERVAL_MS):
     try {
       const r = await runInsightSync(deps);
       for (const f of r.failed) log.error(`[insights] couldn't read ${f.table}, left as it was: ${f.error}`);
+      if (r.failed.length) deps.status?.fail("insight_sync", "partial");
+      else deps.status?.ok("insight_sync");
       log.info(
         `[insights] synced ${r.progress} progress, ${r.risk} risk, ${r.rom} range-of-motion rows` +
           ` (${r.skipped_unknown_users} rows for unknown users) in ${r.ms} ms`,
       );
     } catch (err) {
       // Leave Neon as it was; the next tick retries.
+      deps.status?.fail("insight_sync", reasonOf(err));
       log.error(`[insights] sync failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       running = false;

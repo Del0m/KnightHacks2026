@@ -145,14 +145,16 @@ def gold_training_features():
         label = F.when(F.array_contains("flags", rule_id), name).otherwise(label)
     label = F.when(F.size("flags") == 0, "clean").otherwise(label)
 
+    # `device` is the session's provenance ("synthetic" from the generator, the phone's model
+    # otherwise), so a publisher can release synthetic reps without real people's (CONN-12).
     reps = spark.read.table("silver_reps").select(
         "rep_id", "user_id", "session_date", "exercise_id", "experience_level",
-        "frame_count", "quality", "flags",
+        "frame_count", "quality", "flags", "device",
     )
     return reps.join(frames, "rep_id").select(
         "rep_id", "user_id", "session_date", "exercise_id", "experience_level", "frame_count",
         window.alias("window"),
-        "quality", "flags", label.alias("label"),
+        "quality", "flags", label.alias("label"), "device",
     )
 
 
