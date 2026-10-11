@@ -136,6 +136,31 @@ it('fills the gap between new pages and cached posts on refocus', async () => {
  const list = screen.root.findByType(FlatList);
  expect(list.props.data.map((p: { id: string }) => p.id)).toEqual(['newest', 'newer', 'old']);
  await act(async () => { list.props.onEndReached(); });
- expect(apiFetch.mock.calls[3][0]).toBe('/feed?scope=public&cursor=old-tail');
+ expect(apiFetch.mock.calls[3][0]).toBe('/feed?scope=public&cursor=overlap-tail');
  act(() => screen.unmount());
+});
+
+it.each([
+ { initial: ['removed', 'kept'], next: null, freshNext: null, expected: ['kept'], expectedCursor: null },
+ { initial: ['removed', 'kept', 'older'], next: 'old-tail', freshNext: 'fresh-tail', expected: ['kept', 'older'], expectedCursor: 'old-tail' },
+])('replaces the refreshed cache prefix and preserves only untouched older entries: $initial', async ({ initial, next, freshNext, expected, expectedCursor }) => {
+ const response = (ids: string[], cursor: string | null) => ({ ok: true, json: async () => ({ posts: ids.map(post), next_cursor: cursor }) });
+ const apiFetch = jest.fn()
+  .mockResolvedValueOnce(response(initial, next))
+  .mockResolvedValueOnce(response(['kept'], freshNext))
+  .mockResolvedValueOnce(response(['last'], null));
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<FeedScreen />); });
+ mockFocused = false;
+ await act(async () => { screen.update(<FeedScreen />); });
+ mockFocused = true;
+ await act(async () => { screen.update(<FeedScreen />); });
+ const list = screen.root.findByType(FlatList);
+ try {
+  expect(list.props.data.map((p: { id: string }) => p.id)).toEqual(expected);
+  await act(async () => { list.props.onEndReached(); });
+  if (expectedCursor) expect(apiFetch.mock.calls[2][0]).toBe(`/feed?scope=public&cursor=${expectedCursor}`);
+  else expect(apiFetch).toHaveBeenCalledTimes(2);
+ } finally { act(() => screen.unmount()); }
 });

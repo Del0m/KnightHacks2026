@@ -42,10 +42,15 @@ function FeedSession({ initialExamples = false }: { initialExamples?: boolean })
     overlaps = page.posts.some(p => cachedIds.has(p.id));
    }
    if (signal.aborted) return;
-   const keepTail = keepLoaded && overlaps;
+   const cached = cachedPosts.current;
+   const refreshedIds = new Set(refreshedPosts.map(p => p.id));
+   const coveredEnd = cached.reduce((end, p, index) => refreshedIds.has(p.id) ? index : end, -1);
+   const keepTail = keepLoaded && overlaps && page.next_cursor !== null && coveredEnd < cached.length - 1;
    if (!keepTail) { cursor.current = page.next_cursor; setHasMore(page.next_cursor !== null); }
    setPosts(previous => {
-    const combined = keepTail ? [...refreshedPosts, ...previous] : refresh ? refreshedPosts : [...previous, ...refreshedPosts];
+    // The server replaces the refreshed prefix, including entries it removed.
+    const tail = keepTail ? previous.slice(coveredEnd + 1) : [];
+    const combined = keepTail ? [...refreshedPosts, ...tail] : refresh ? refreshedPosts : [...previous, ...refreshedPosts];
     const ids = new Set<string>();
     return combined.filter(p => { if (ids.has(p.id)) return false; ids.add(p.id); return true; });
    });

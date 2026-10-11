@@ -104,3 +104,9 @@ A refocus regression also covers multiple pages of new posts. Background refresh
 Main subsequently added BE-11 advice and BE-16/BE-17 recovery routes. The approved second merge preserves exported advice moderation (`checkAs: advice`) and all FE-11 protections. Comment responses retain main's source citations and normalize absent AI authors to null. The additive 0012 migration was applied before restarting the local testing API.
 
 Final second-merge validation: 32 API files / 573 tests pass, 4 Feed suites / 21 tests pass, both TypeScript checks and changed API lint pass; mobile lint has zero errors and nine warnings. Local API health is live after restart; private environment values remain absent from outgoing changes/history.
+
+## FE-11 cache and lockfile follow-up
+
+A completed refresh replaces the cached portion it covers instead of concatenating every old entry. Only entries after the last refreshed cached ID are retained, and reaching the server’s end discards all unmatched cached entries. If no older cached tail remains, pagination adopts the fresh server cursor. Regression tests cover removal on refocus, preservation of the untouched older tail, and the existing new-post pagination gap.
+
+The pnpm 11.25.0 lockfile now includes Expo Haptics 57.0.3 and correct Expo peer snapshot references for crypto/sharing. A clean temporary checkout completed `pnpm install --frozen-lockfile --ignore-scripts`, keeping the live node_modules unchanged. All four Feed suites / 23 tests, mobile typecheck and lint pass (zero errors, nine existing warnings).
