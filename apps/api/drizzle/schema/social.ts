@@ -36,6 +36,8 @@ export const posts = pgTable(
     data: jsonb(), // card payload: medal tier, PR value, goal progress
     // BE-11: advice questions only, the bge-small query embedding used to find similar questions.
     embedding: vector({ dimensions: EMBEDDING_DIMENSIONS }),
+    // INT-04: false when moderation was unreachable at posting; jobs/recheckModeration.ts re-checks.
+    moderationChecked: boolean().notNull().default(true),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -60,6 +62,8 @@ export const comments = pgTable(
     // BE-11: what an AI-suggested answer cites, shown under it: [{ id, kind, title, url, post_id }].
     // A comment with no author is posted by Spotter itself (the AI answer or the fixed pain reply).
     sources: jsonb(),
+    // INT-04: false when moderation was unreachable at posting; jobs/recheckModeration.ts re-checks.
+    moderationChecked: boolean().notNull().default(true),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("comments_post_created_idx").on(t.postId, t.createdAt)],

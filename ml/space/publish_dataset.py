@@ -33,10 +33,13 @@ import requests
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).resolve().parent / "dataset"
 CARD = Path(__file__).resolve().parent / "dataset_card.md"
-REPO = os.environ.get("SPOTTER_DATASET_REPO", "bubblesmal/spotter-form-reps")
+DEFAULT_REPO = "bubblesmal/spotter-form-reps"
 TEST_SHARE = 0.2
+# This release is synthetic only. Real recordings (phone sessions, AI-09 clips) belong in the
+# separately consented `recorded` config, never here.
+SYNTHETIC_DEVICE = "synthetic"
 
-QUERY = """
+QUERY = f"""
 SELECT
   f.rep_id,
   f.user_id                AS lifter_id,
@@ -48,7 +51,10 @@ SELECT
   f.flags,
   f.label
 FROM spotter.gold.gold_training_features f
+WHERE f.device = '{SYNTHETIC_DEVICE}'
 """
+# Checked before anything is written or pushed: the devices the selection actually returns.
+DEVICE_CHECK = f"SELECT DISTINCT device FROM spotter.gold.gold_training_features f WHERE f.device = '{SYNTHETIC_DEVICE}'"
 
 
 def load_env() -> None:
@@ -74,6 +80,19 @@ def databricks_token() -> str:
     )
     res.raise_for_status()
     return res.json()["access_token"]
+
+
+def fetch_link(url: str, attempts: int = 3) -> bytes:
+    """One result chunk from its presigned link (no auth header). Retries an error or an empty
+    body, which cloud storage occasionally returns."""
+    for attempt in range(1, attempts + 1):
+        res = requests.get(url, timeout=120)
+        if res.ok and res.content:
+            return res.content
+        if attempt == attempts:
+            raise SystemExit(f"result chunk download failed: HTTP {res.status_code}, {len(res.content)} bytes")
+        time.sleep(attempt)
+    raise AssertionError("unreachable")
 
 
 def query_arrow(sql: str) -> pa.Table:
@@ -107,8 +126,7 @@ def query_arrow(sql: str) -> pa.Table:
             f"{host}/api/2.0/sql/statements/{statement_id}/result/chunks/{index}", headers=headers, timeout=60
         ).json()
         for link in chunk.get("external_links", []):
-            data = requests.get(link["external_link"], timeout=120).content  # presigned: no auth header
-            tables.append(ipc.open_stream(io.BytesIO(data)).read_all())
+            tables.append(ipc.open_stream(io.BytesIO(fetch_link(link["external_link"]))).read_all())
     return pa.concat_tables(tables)
 
 
@@ -123,8 +141,12 @@ def main() -> None:
     args = parser.parse_args()
     load_env()
 
+    repo = os.environ.get("SPOTTER_DATASET_REPO", DEFAULT_REPO)  # after load_env(), so .env can set it
+    devices = set(query_arrow(DEVICE_CHECK).column("device").to_pylist())
+    if devices - {SYNTHETIC_DEVICE}:
+        raise SystemExit(f"refusing to publish: non-synthetic devices in the selection: {sorted(devices)}")
     table = query_arrow(QUERY)
-    print(f"read {table.num_rows} reps from gold_training_features")
+    print(f"read {table.num_rows} synthetic reps from gold_training_features")
     splits = pa.array([split_of(x) for x in table.column("lifter_id").to_pylist()])
     OUT.mkdir(parents=True, exist_ok=True)
     for name in ("train", "test"):
@@ -144,12 +166,12 @@ def main() -> None:
     if not token:
         raise SystemExit("set HF_WRITE_TOKEN (write access) in apps/api/.env")
     api = HfApi(token=token)
-    api.create_repo(REPO, repo_type="dataset", private=True, exist_ok=True)
-    api.upload_folder(repo_id=REPO, repo_type="dataset", folder_path=str(OUT), path_in_repo="data",
+    api.create_repo(repo, repo_type="dataset", private=True, exist_ok=True)
+    api.upload_folder(repo_id=repo, repo_type="dataset", folder_path=str(OUT), path_in_repo="data",
                       allow_patterns=["*.parquet"], commit_message="Rep windows from gold_training_features")
-    api.upload_file(repo_id=REPO, repo_type="dataset", path_or_fileobj=str(CARD), path_in_repo="README.md",
+    api.upload_file(repo_id=repo, repo_type="dataset", path_or_fileobj=str(CARD), path_in_repo="README.md",
                     commit_message="Dataset card")
-    print(f"pushed https://huggingface.co/datasets/{REPO} (private; make it public in its settings)")
+    print(f"pushed https://huggingface.co/datasets/{repo} (private; make it public in its settings)")
 
 
 if __name__ == "__main__":

@@ -151,7 +151,14 @@ export type AdviceOutcome =
   | { outcome: "none"; reason: AdviceNoneReason | "embedding_failed"; reply: null };
 
 /** Saves the question and its first answer. Never throws after the post is saved. */
-export async function askAdvice(db: Db, deps: AdviceDeps, me: string, question: string) {
+/** `moderationChecked` is false when moderation was unreachable (INT-04 re-checks the post later). */
+export async function askAdvice(
+  db: Db,
+  deps: AdviceDeps,
+  me: string,
+  question: string,
+  moderationChecked = true,
+) {
   const log = deps.log ?? silent;
   let embedding: number[] | null = null;
   if (deps.embed) {
@@ -164,7 +171,7 @@ export async function askAdvice(db: Db, deps: AdviceDeps, me: string, question: 
 
   const [post] = await db
     .insert(posts)
-    .values({ authorId: me, kind: "advice", body: question, embedding })
+    .values({ authorId: me, kind: "advice", body: question, embedding, moderationChecked })
     .returning({
       id: posts.id,
       authorId: posts.authorId,

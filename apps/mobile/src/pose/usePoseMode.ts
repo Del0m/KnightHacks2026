@@ -1,9 +1,10 @@
 // Pose mode hook (AI-04, Architecture §4.1): the cached benchmark plus the user's preference and
 // cloud consent, fed through `selectPoseMode`. One module-level store, shared by every caller.
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 import { getPoseModelId } from 'spotter-pose';
 import { runPoseBenchmark, type BenchmarkResult, type BenchmarkSize } from './benchmark';
+import { probeCloud, type CreateSocket } from './cloud';
 import { selectPoseMode, type PoseMode, type PosePreference } from './mode';
 import {
   loadBenchmark,
@@ -14,8 +15,8 @@ import {
   savePreference,
 } from './modeStore';
 
-/** Cloud reachability is unknown until the cloud client exists (CONN-11). */
-export const CLOUD_REACHABLE_STUB = false;
+/** While the relay is unreachable, check again this often. */
+export const CLOUD_RECHECK_MS = 30_000;
 
 interface State {
   platform: string;
@@ -23,6 +24,8 @@ interface State {
   benchmarking: boolean;
   preference: PosePreference;
   cloudConsent: boolean;
+  /** The relay answered `ready` (or warming) for this user; false until checked. */
+  cloudReachable: boolean;
 }
 
 let state: State | undefined;
@@ -36,6 +39,7 @@ function getState(): State {
     benchmarking: false,
     preference: loadPreference(),
     cloudConsent: loadCloudConsent(),
+    cloudReachable: false,
   });
 }
 
@@ -100,6 +104,27 @@ export async function rerunBenchmark(platform: string = getState().platform): Pr
   return run(platform);
 }
 
+/** Where to check the cloud relay from; a screen with a signed-in session passes it to `usePoseMode`. */
+export interface CloudCheck {
+  /** The relay's WebSocket URL, from `poseStreamUrl(apiUrl)`. */
+  url: string;
+  getToken: () => Promise<string | null>;
+  createSocket?: CreateSocket; // tests
+}
+
+/** Probes the relay and records the answer, so `selectPoseMode` can return cloud or paused. */
+export async function checkCloudReachable(check: CloudCheck): Promise<boolean> {
+  let reachable = false;
+  try {
+    const token = await check.getToken();
+    reachable = token != null && (await probeCloud(check.url, token, 5000, check.createSocket));
+  } catch {
+    reachable = false;
+  }
+  if (getState().cloudReachable !== reachable) update({ cloudReachable: reachable });
+  return reachable;
+}
+
 export interface PoseModeState {
   /** 'pending' while there is no benchmark result yet, unless the user picked Apple Vision. */
   mode: PoseMode | 'pending';
@@ -128,7 +153,12 @@ function setCloudConsent(cloudConsent: boolean) {
 
 const rerun = () => rerunBenchmark();
 
-export function usePoseMode(): PoseModeState {
+/**
+ * `cloud`: pass it where there's a signed-in session, so a phone that wants cloud mode (and has
+ * consented) checks the relay now and every 30 s while it's unreachable. Without it, cloud mode
+ * reads as unreachable and the phone falls back to on-device or `paused`.
+ */
+export function usePoseMode(cloud?: CloudCheck): PoseModeState {
   const s = useSyncExternalStore(subscribe, getState);
   const { benchmark, preference, cloudConsent } = s;
   const inputs = {
@@ -136,10 +166,26 @@ export function usePoseMode(): PoseModeState {
     coremlFps: benchmark?.fps ?? null,
     preference,
     cloudConsent,
-    cloudReachable: CLOUD_REACHABLE_STUB,
+    cloudReachable: s.cloudReachable,
   };
   // Would this phone use cloud if the user consented and the endpoint answered?
   const wantsCloud = benchmark != null && selectPoseMode({ ...inputs, cloudConsent: true, cloudReachable: true }) === 'cloud';
+  const checkUrl = cloud?.url;
+  const shouldCheck = Boolean(checkUrl) && cloudConsent && wantsCloud;
+  const cloudRef = cloud;
+  useEffect(() => {
+    if (!shouldCheck || !cloudRef) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const check = async () => {
+      const ok = await checkCloudReachable(cloudRef);
+      if (!stopped && !ok) timer = setTimeout(check, CLOUD_RECHECK_MS);
+    };
+    void check();
+    return () => { stopped = true; if (timer) clearTimeout(timer); };
+    // Re-run when the URL changes, not on every render's new getToken closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldCheck, checkUrl]);
   return {
     // Apple Vision does not depend on the YOLOv8 benchmark, so it never waits for one.
     mode: benchmark || selectPoseMode(inputs) === 'vision' ? selectPoseMode(inputs) : 'pending',

@@ -225,11 +225,21 @@ describe("rest-time loop", () => {
     ).toContain("adds numbers the original doesn't have (3)");
   });
 
-  it("fills {t} for duration rules from the flagged reps' time", async () => {
+  it("fills {t} for the tempo rule from the flagged reps' lowering time, not the whole rep", async () => {
     Object.assign(net, { databricks: "ok", llm: "hang" });
-    const { res } = await postSet(eight({ 0: ["tempo"], 1: ["tempo"] }, 700));
+    // Lowered in 0.7 s, back up in 0.9 s: the note is about the 0.7 s "on the way down".
+    const fast = { tempo_ms: 1600, lowering_ms: 700, rising_ms: 900 };
+    const reps = Array.from({ length: 8 }, (_, i) => rep(i < 2 ? ["tempo"] : [], i < 2 ? fast : {}));
+    const { res } = await postSet(reps);
     expect(res.body.rest_note).toMatchObject({ source: "fixed", rule_id: "tempo" });
-    expect(res.body.rest_note.text).toContain("0.7 s");
+    expect(res.body.rest_note.text).toContain("about 0.7 s on the way down");
+    expect(res.body.rest_note.text).not.toContain("1.6");
+  });
+
+  it("drops the tempo tip when the lowering time wasn't measured", async () => {
+    Object.assign(net, { databricks: "ok", llm: "hang" });
+    const { res } = await postSet(eight({ 0: ["tempo"], 1: ["tempo"] }, 1600));
+    expect(res.body.rest_note).toMatchObject({ source: "fixed", rule_id: null, text: "6 of 8 reps were clean." });
   });
 
   it("saves the score and note so GET /sets/:id/rest-note returns the same", async () => {

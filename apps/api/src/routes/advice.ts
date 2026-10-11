@@ -25,8 +25,8 @@ export function adviceRouter(db: Db, moderator: Moderator, deps: AdviceDeps): Ro
   router.post("/advice", async (req, res) => {
     const me = userId(req);
     const { body } = parse(adviceInput, req.body);
-    await moderate(db, moderator, req, body, { kind: "post", checkAs: "advice" });
-    send(res, await askAdvice(db, deps, me, body), 201);
+    const { checked } = await moderate(db, moderator, req, body, { kind: "post", checkAs: "advice" });
+    send(res, await askAdvice(db, deps, me, body, checked), 201);
   });
 
   return router;

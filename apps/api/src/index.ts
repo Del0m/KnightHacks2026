@@ -5,6 +5,7 @@ import { databricksConfigured, insightSyncConfigured, insightSyncEnabled, loadEn
 import { DatabricksUploader, uploadConfigFromEnv } from "./integrations/databricks/upload.js";
 import { Moderator as LlamaGuard, moderationConfigFromEnv } from "./integrations/huggingface/moderation.js";
 import { startExportRetry } from "./jobs/retryExports.js";
+import { startModerationRecheck } from "./jobs/recheckModeration.js";
 import { startInsightSync, syncConfigFromEnv } from "./jobs/syncInsights.js";
 import { neonAuthVerifier } from "./middleware/auth.js";
 import { PoseEndpointClient, poseEndpointConfigFromEnv } from "./integrations/huggingface/poseEndpoint.js";
@@ -94,6 +95,8 @@ const moderator = guard
     })
   : allowAllModerator;
 if (!env.HF_TOKEN) logger.warn("HF_TOKEN is not set; posts and comments are not moderated");
+// INT-04: re-check what was saved while moderation was unreachable.
+const stopModerationRecheck = guard ? startModerationRecheck({ db, moderator, log: logger }) : () => {};
 
 // CONN-06: copy gold tables into Neon every 15 minutes, on the one instance with
 // INSIGHT_SYNC_ENABLED=true.
@@ -213,6 +216,7 @@ const stopPoseStream = poseEndpoint
 function shutdown(signal: string) {
   logger.info({ signal }, "shutting down");
   stopInsightSync();
+  stopModerationRecheck();
   stopExportRetry();
   stopPoseStream();
   server.close(() => {

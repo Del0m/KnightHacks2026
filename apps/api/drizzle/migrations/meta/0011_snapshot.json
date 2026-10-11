@@ -1,5 +1,5 @@
 {
-  "id": "71a893c9-0016-4d39-a4a7-0c1fb2c0123e",
+  "id": "8a0990e6-7bb9-40c0-9f0e-7ccd5a715df4",
   "prevId": "cac125ff-9b2b-4301-8d83-6f883ab82650",
   "version": "7",
   "dialect": "postgresql",
@@ -1458,11 +1458,12 @@
           "notNull": true,
           "default": false
         },
-        "sources": {
-          "name": "sources",
-          "type": "jsonb",
+        "moderation_checked": {
+          "name": "moderation_checked",
+          "type": "boolean",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": true
         },
         "created_at": {
           "name": "created_at",
@@ -1848,11 +1849,12 @@
           "primaryKey": false,
           "notNull": false
         },
-        "embedding": {
-          "name": "embedding",
-          "type": "vector(384)",
+        "moderation_checked": {
+          "name": "moderation_checked",
+          "type": "boolean",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": true
         },
         "created_at": {
           "name": "created_at",
@@ -1909,22 +1911,6 @@
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
-          "with": {}
-        },
-        "posts_embedding_idx": {
-          "name": "posts_embedding_idx",
-          "columns": [
-            {
-              "expression": "embedding",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last",
-              "opclass": "vector_cosine_ops"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "hnsw",
           "with": {}
         }
       },
@@ -3103,258 +3089,6 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.milestones": {
-      "name": "milestones",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rehab_plan_id": {
-          "name": "rehab_plan_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "milestone_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "reasons": {
-          "name": "reasons",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "hidden_until": {
-          "name": "hidden_until",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "milestones_user_idx": {
-          "name": "milestones_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "milestones_user_id_users_id_fk": {
-          "name": "milestones_user_id_users_id_fk",
-          "tableFrom": "milestones",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "milestones_rehab_plan_id_rehab_plans_id_fk": {
-          "name": "milestones_rehab_plan_id_rehab_plans_id_fk",
-          "tableFrom": "milestones",
-          "tableTo": "rehab_plans",
-          "columnsFrom": [
-            "rehab_plan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.report_shares": {
-      "name": "report_shares",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "token_hash": {
-          "name": "token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rehab_plan_id": {
-          "name": "rehab_plan_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "from_date": {
-          "name": "from_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "to_date": {
-          "name": "to_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "time_zone": {
-          "name": "time_zone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "revoked_at": {
-          "name": "revoked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "report_shares_user_idx": {
-          "name": "report_shares_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "report_shares_user_id_users_id_fk": {
-          "name": "report_shares_user_id_users_id_fk",
-          "tableFrom": "report_shares",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "report_shares_rehab_plan_id_rehab_plans_id_fk": {
-          "name": "report_shares_rehab_plan_id_rehab_plans_id_fk",
-          "tableFrom": "report_shares",
-          "tableTo": "rehab_plans",
-          "columnsFrom": [
-            "rehab_plan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "report_shares_tokenHash_unique": {
-          "name": "report_shares_tokenHash_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "report_shares_range": {
-          "name": "report_shares_range",
-          "value": "\"report_shares\".\"to_date\" >= \"report_shares\".\"from_date\""
-        }
-      },
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -3515,15 +3249,6 @@
         "active",
         "paused",
         "done"
-      ]
-    },
-    "public.milestone_status": {
-      "name": "milestone_status",
-      "schema": "public",
-      "values": [
-        "pending",
-        "accepted",
-        "dismissed"
       ]
     }
   },

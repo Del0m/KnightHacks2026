@@ -629,7 +629,7 @@ export const CLIP_DEFS: readonly ClipDef[] = [
     facing: -1,
     startAngle: PUSH_UP_TOP,
     script: [hold(1500), ...[85, 88, 84, 90, 86].flatMap(pushUpRep), hold(700)],
-    expected: { reps: 5, partials: 0, set_end: null, flags: flagged({ depth: [1, 3], tempo: [0, 1, 2, 3, 4] }) },
+    expected: { reps: 5, partials: 0, set_end: null, flags: flagged({ depth: [1, 3] }) },
   },
   {
     ...DEFAULTS,
@@ -648,7 +648,7 @@ export const CLIP_DEFS: readonly ClipDef[] = [
       ...pushUpRep(84),
       hold(700),
     ],
-    expected: { reps: 5, partials: 0, set_end: null, flags: flagged({ hip_sag: [1, 3], tempo: [0, 1, 2, 3, 4] }) },
+    expected: { reps: 5, partials: 0, set_end: null, flags: flagged({ hip_sag: [1, 3] }) },
   },
   {
     ...DEFAULTS,

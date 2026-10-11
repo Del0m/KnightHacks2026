@@ -31,6 +31,7 @@ export interface SpecRule {
 export interface NoteRep {
   flags: { rule_id: string }[];
   tempo_ms?: number | null;
+  lowering_ms?: number | null; // AI-08: start of the rep to its turn; what the tempo rules measure
 }
 
 export interface NoteInput {
@@ -69,11 +70,15 @@ export function goodNews(facts: NoteFacts): string {
   return `${facts.clean} of ${facts.total} reps were clean.`;
 }
 
-// Seconds for duration rules ({t}): the average rep time of the flagged reps, one decimal.
+// Seconds for duration rules ({t}): the flagged reps' average lowering time, one decimal. Every
+// spec's tempo rule measures the lowering phase and its note says "on the way down", so the
+// whole rep's tempo_ms would overstate it ("1.6 s on the way down" for a rep lowered in 0.7 s).
+// Reps without lowering_ms (unmeasured) are left out; with none, the note can't be filled and
+// the fixed "n of m clean" line is used instead.
 function flaggedSeconds(input: NoteInput, ruleId: string): string | null {
   const times = input.reps
-    .filter((r) => r.flags.some((f) => f.rule_id === ruleId) && typeof r.tempo_ms === "number")
-    .map((r) => r.tempo_ms!);
+    .filter((r) => r.flags.some((f) => f.rule_id === ruleId) && typeof r.lowering_ms === "number")
+    .map((r) => r.lowering_ms!);
   if (!times.length) return null;
   return (times.reduce((a, b) => a + b, 0) / times.length / 1000).toFixed(1).replace(/\.0$/, "");
 }

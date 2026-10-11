@@ -35,12 +35,14 @@ export async function moderate(
   req: Request,
   text: string,
   target: { kind: "post"; checkAs?: "advice" } | { kind: "comment"; postId: string },
-) {
+): Promise<{ checked: boolean }> {
   const verdict = await moderator.check(
     text,
     target.kind === "post" ? (target.checkAs ?? "post") : "comment",
   );
-  if (verdict.allowed) return;
+  // checked: false means moderation was unreachable; the content is saved and re-checked later
+  // (jobs/recheckModeration.ts, INT-04).
+  if (verdict.allowed) return { checked: verdict.checked !== false };
   if (verdict.support) {
     throw new HttpError(422, "moderation_blocked", verdict.message || BLOCKED_MESSAGE, { support: true });
   }
@@ -77,7 +79,7 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
     const me = userId(req),
       sessionId = parse(z.string().uuid(), req.params.id);
     const input = parse(postInput.pick({ body: true, data: true }), req.body);
-    await moderate(db, moderator, req, input.body, { kind: "post" });
+    const { checked } = await moderate(db, moderator, req, input.body, { kind: "post" });
     const post = await db.transaction(async (tx) => {
       const [session] = await tx
         .select()
@@ -95,11 +97,19 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
       if (existing) return existing;
       const [created] = await tx
         .insert(posts)
-        .values({ authorId: me, kind: "session", sessionId, body: input.body, data: input.data ?? null })
+        .values({
+          authorId: me,
+          kind: "session",
+          sessionId,
+          body: input.body,
+          data: input.data ?? null,
+          moderationChecked: checked,
+        })
         .returning();
       return created;
     });
-    send(res, post);
+    const { embedding: _embedding, ...shared } = post!; // advice-only column
+    send(res, shared);
   });
 
   router.post("/posts", async (req, res) => {
@@ -112,7 +122,7 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         .where(and(eq(sessions.id, input.session_id), eq(sessions.userId, me)));
       if (!own) throw notFound("Session");
     }
-    await moderate(db, moderator, req, input.body, { kind: "post" });
+    const { checked } = await moderate(db, moderator, req, input.body, { kind: "post" });
     const [row] = await db
       .insert(posts)
       .values({
@@ -121,6 +131,7 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         body: input.body,
         sessionId: input.session_id ?? null,
         data: input.data ?? null,
+        moderationChecked: checked,
       })
       .returning();
     const { embedding: _embedding, ...post } = row!; // advice-only column
@@ -152,8 +163,11 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
     const postId = parse(z.string().uuid(), req.params.id);
     const input = parse(commentInput, req.body);
     await visiblePost(db, me, postId);
-    await moderate(db, moderator, req, input.body, { kind: "comment", postId });
-    const [row] = await db.insert(comments).values({ postId, authorId: me, body: input.body }).returning();
+    const { checked } = await moderate(db, moderator, req, input.body, { kind: "comment", postId });
+    const [row] = await db
+      .insert(comments)
+      .values({ postId, authorId: me, body: input.body, moderationChecked: checked })
+      .returning();
     send(res, row, 201);
   });
 

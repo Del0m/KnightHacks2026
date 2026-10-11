@@ -1,4 +1,6 @@
 -- Spotter AI/BI dashboard (Architecture §11): one dataset per query below, all on spotter.gold.
+-- Genie space instructions: "experience_level 'unknown' marks older synthetic sessions recorded
+-- without a level; leave it out when comparing levels."
 -- In Databricks: New -> Dashboard -> Data -> Create from SQL, paste one query per dataset, then
 -- add the visualization named in its header on the Canvas tab.
 
@@ -40,6 +42,19 @@ SELECT
 FROM spotter.gold.gold_form_summary
 GROUP BY 1, 2, 3
 ORDER BY flag_rate_pct DESC;
+
+-- @dataset form_flags_by_level  (Grouped bar: x = experience_level, y = flag_rate_pct, color = rule_id)
+-- Older synthetic sessions have no experience level ('unknown'); they'd swamp the comparison.
+SELECT
+  experience_level,
+  rule_id,
+  sum(flagged_reps)                              AS flagged_reps,
+  sum(reps)                                      AS reps,
+  round(100 * sum(flagged_reps) / sum(reps), 1)  AS flag_rate_pct
+FROM spotter.gold.gold_form_summary
+WHERE experience_level <> 'unknown'
+GROUP BY 1, 2
+ORDER BY experience_level, flag_rate_pct DESC;
 
 -- @dataset recovery_rom  (Line chart: x = week, y = range_deg, color = series; filter on lifter)
 -- The recovery story: the injured side's weekly peak range against its baseline and the healthy side.
