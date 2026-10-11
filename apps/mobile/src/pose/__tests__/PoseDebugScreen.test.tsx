@@ -4,6 +4,7 @@ import { useCameraPermission } from 'react-native-vision-camera';
 import { PoseDebugScreen } from '../PoseDebugScreen';
 import { usePoseOutput } from '../usePoseOutput';
 import { benchmarkPoseModel } from 'steadyforum-pose';
+import clip from '../../engine/__fixtures__/bicep_curl_clean.json';
 import { __clearPoseStoreForTests, loadCloudConsent, saveBenchmark, saveCloudConsent } from '../modeStore';
 import { __resetPoseModeForTests, startPoseBenchmark } from '../usePoseMode';
 
@@ -208,14 +209,13 @@ describe('PoseDebugScreen cloud eligibility (AI-17)', () => {
 describe('PoseDebugScreen cloud readout and form resets (AI-17)', () => {
   let renderer: ReturnType<typeof create>;
   let status: string;
-  const clip = require('../../engine/__fixtures__/bicep_curl_clean.json');
   const last = () => jest.mocked(usePoseOutput).mock.calls.at(-1)![0];
   const text = () => renderer.root.findAllByType(Text)
     .map((t: { props: { children: unknown } }) => [t.props.children].flat().join('')).join('\n');
   const rerender = () => act(() => renderer.update(React.createElement(PoseDebugScreen)));
   const reps = () => [renderer.root.findByProps({ testID: 'pose-form-readout' }).props.children].flat().join('');
   function feed(from: number, to: number) {
-    for (let i = from; i < to; i++) act(() => last().onPose({ result: clip.frames[i], latencyMs: 8 }));
+    for (let i = from; i < to; i++) act(() => last().onPose({ result: clip.frames[i] as never, latencyMs: 8 }));
   }
   function setStatus(next: string) { status = next; rerender(); }
 
@@ -240,7 +240,7 @@ describe('PoseDebugScreen cloud readout and form resets (AI-17)', () => {
 
   it('shows the source, cloud status, fps, drops and capture-to-result latency', () => {
     const now = Date.now();
-    act(() => last().onPose({ latencyMs: 40, timestampMs: now - 120, result: { ...clip.frames[0], source: 'cloud', timestamp_ms: now - 120 } }));
+    act(() => last().onPose({ latencyMs: 40, timestampMs: now - 120, result: { ...clip.frames[0], source: 'cloud', timestamp_ms: now - 120 } as never }));
     expect(text()).toContain('source cloud · tracking');
     expect(text()).toContain('fps 9');
     expect(text()).toContain('dropped 3');
@@ -250,7 +250,7 @@ describe('PoseDebugScreen cloud readout and form resets (AI-17)', () => {
   });
 
   it('clears the skeleton and result when cloud tracking stops', () => {
-    act(() => last().onPose({ latencyMs: 40, timestampMs: Date.now(), result: { ...clip.frames[0], source: 'cloud', timestamp_ms: Date.now() } }));
+    act(() => last().onPose({ latencyMs: 40, timestampMs: Date.now(), result: { ...clip.frames[0], source: 'cloud', timestamp_ms: Date.now() } as never }));
     expect(renderer.root.findByType('PoseSkeleton').props.result).toBeDefined();
     setStatus('reconnecting');
     expect(renderer.root.findByType('PoseSkeleton').props.result).toBeUndefined();
@@ -260,14 +260,14 @@ describe('PoseDebugScreen cloud readout and form resets (AI-17)', () => {
     for (let i = 0; i < 2; i++) act(() => renderer.root.findByProps({ testID: 'pose-exercise-next' }).props.onPress());
     expect(reps()).toContain('Bicep curl');
     // Control: the same frames without a gap count one rep.
-    feed(0, 60);
+    feed(0, 62);
     expect(reps()).toContain('reps 1');
     act(() => renderer.root.findByProps({ testID: 'pose-set-reset' }).props.onPress());
 
-    feed(0, 40); // past the peak
+    feed(0, 47); // on the way back down
     setStatus('reconnecting');
     setStatus('tracking');
-    feed(40, 60);
+    feed(47, 62);
     expect(reps()).toContain('reps 0');
   });
 
@@ -280,10 +280,10 @@ describe('PoseDebugScreen cloud readout and form resets (AI-17)', () => {
     act(() => renderer.root.findByType('Camera').props.onConfigured());
     expect(last().engine).toBe('coreml');
     for (let i = 0; i < 2; i++) act(() => renderer.root.findByProps({ testID: 'pose-exercise-next' }).props.onPress());
-    feed(0, 40);
+    feed(0, 47);
     act(() => renderer.root.findByProps({ testID: 'pose-engine-toggle' }).props.onPress());
     expect(last().engine).toBe('vision');
-    feed(40, 60);
+    feed(47, 62);
     expect(reps()).toContain('reps 0');
   });
 });
