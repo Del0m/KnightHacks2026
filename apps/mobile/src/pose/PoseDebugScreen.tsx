@@ -187,6 +187,12 @@ function LiveCamera({ poseMode, cloud, position, setPosition }: {
     setPreference(preference === 'vision' ? 'auto' : 'vision');
   }, [preference, setPreference]);
 
+  // A phone that passes the benchmark only runs cloud when the user picks it.
+  const toggleCloud = useCallback(() => {
+    setDetection(null);
+    setPreference(preference === 'cloud' ? 'auto' : 'cloud');
+  }, [preference, setPreference]);
+
   const nextExercise = useCallback(() => {
     setExerciseIndex((i) => (i + 1) % EXERCISE_SPECS.length);
   }, []);
@@ -315,6 +321,10 @@ function LiveCamera({ poseMode, cloud, position, setPosition }: {
         <Text style={styles.buttonText}>Re-run benchmark</Text>
       </Pressable>
 
+      <Pressable testID="pose-cloud-toggle" style={[styles.button, styles.cloud]} onPress={toggleCloud}>
+        <Text style={styles.buttonText}>{preference === 'cloud' ? 'Use automatic' : 'Use cloud'}</Text>
+      </Pressable>
+
       <Pressable
         testID="pose-consent-toggle"
         style={[styles.button, styles.consent]}
@@ -370,7 +380,8 @@ const styles = StyleSheet.create({
   flip: { position: 'absolute', bottom: 48, alignSelf: 'center' },
   engine: { position: 'absolute', bottom: 108, alignSelf: 'center' },
   rerun: { position: 'absolute', bottom: 168, alignSelf: 'center' },
-  consent: { position: 'absolute', bottom: 228, alignSelf: 'center' },
+  consent: { position: 'absolute', bottom: 228, right: 16 },
+  cloud: { position: 'absolute', bottom: 228, left: 16 },
   exercise: { position: 'absolute', bottom: 288, alignSelf: 'center' },
   record: { position: 'absolute', bottom: 348, alignSelf: 'center' },
   newSet: { position: 'absolute', bottom: 408, alignSelf: 'center' },
