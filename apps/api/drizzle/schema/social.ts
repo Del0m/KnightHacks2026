@@ -14,8 +14,9 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  vector,
 } from "drizzle-orm/pg-core";
-import { users } from "./users.js";
+import { EMBEDDING_DIMENSIONS, users } from "./users.js";
 import { sessions } from "./workouts.js";
 
 export const postKind = pgEnum("post_kind", ["session", "pr", "medal", "goal", "advice"]);
@@ -33,6 +34,8 @@ export const posts = pgTable(
     body: text().notNull(),
     sessionId: uuid().references(() => sessions.id, { onDelete: "set null" }),
     data: jsonb(), // card payload: medal tier, PR value, goal progress
+    // BE-11: advice questions only, the bge-small query embedding used to find similar questions.
+    embedding: vector({ dimensions: EMBEDDING_DIMENSIONS }),
     // INT-04: false when moderation was unreachable at posting; jobs/recheckModeration.ts re-checks.
     moderationChecked: boolean().notNull().default(true),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -41,6 +44,7 @@ export const posts = pgTable(
     // Keyset pagination: ORDER BY created_at DESC, id DESC.
     index("posts_created_idx").on(t.createdAt.desc(), t.id.desc()),
     index("posts_author_created_idx").on(t.authorId, t.createdAt.desc(), t.id.desc()),
+    index("posts_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops")),
   ],
 );
 
@@ -55,6 +59,9 @@ export const comments = pgTable(
     authorId: text().references(() => users.id, { onDelete: "cascade" }),
     body: text().notNull(),
     aiSuggested: boolean().notNull().default(false),
+    // BE-11: what an AI-suggested answer cites, shown under it: [{ id, kind, title, url, post_id }].
+    // A comment with no author is posted by Spotter itself (the AI answer or the fixed pain reply).
+    sources: jsonb(),
     // INT-04: false when moderation was unreachable at posting; jobs/recheckModeration.ts re-checks.
     moderationChecked: boolean().notNull().default(true),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
