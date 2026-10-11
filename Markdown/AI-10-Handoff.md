@@ -51,13 +51,45 @@ The pilot's `manifest.json` records the remaining deficit: 35 squat, and 40 each
 - Report the agreement between the model's `clean` and the phone's rule `clean` on the pilot. This is the number the demo will rely on.
 - Log to MLflow (CONN-04) with the data sources, label provenance counts and licence status as params or tags.
 
-## First baseline (cumulative export, 35 reps)
+## Baseline with bias diagnostics (cumulative export, 35 reps)
 
-`ml/form_classifier/train.py`, standardised logistic regression on summary features, 4 clip-grouped folds:
+The evaluator now leaves one clip out and scores it only if training contains another clip of the same exercise. All other clips remain in training. Only the **two squat clips (10 reps)** are scored. Push-up (20 reps) and shoulder press (5 reps) are listed as unscored: **"only clip for this exercise"**. The logistic models keep `class_weight="balanced"`; no parameters were tuned on this bundle. The baseline still trains on `fast_lowering`.
 
-- Out-of-fold accuracy **0.20**, macro-F1 **0.11**, against a majority-class baseline of **0.49** (always `clean`).
-- The baseline is worse than predicting `clean` every time. With 35 reps, 4 clips, one participant and classes of 1 and 2 examples, this is what the data supports. It is not a model result to show anyone.
-- The next steps are data (more labelled reps, more clips, a second participant, and the landmark set once checked), not model tuning on these folds.
+| On the 10 scored reps | Accuracy | Macro-F1 |
+|---|---|---|
+| Summary-feature logistic regression | 0.40 | 0.22 |
+| Position-only logistic regression, same folds | 0.40 | 0.24 |
+| Always `clean` (majority of scored labels) | 0.70 | — |
+| Stratified random, scored label proportions | 0.54 expected | 0.33 population expectation |
+
+The scored labels are 7 `clean`, 2 `fast_lowering`, 1 `forward_lean`. Random accuracy is Σp² = 0.7² + 0.2² + 0.1² = 0.54; random macro-F1 is 1/K = 1/3, a population comparison rather than an exact finite-sample expectation. Majority and random baselines describe the scored label distribution; they are not classifiers fitted separately in each fold. Macro-F1 uses the scored truth labels (K=3 overall). The prior pooled result (0.20 accuracy, 0.11 macro-F1, 0.49 majority on 35 reps) is superseded and has a different denominator; this change does not establish an improvement.
+
+| Scored class | Pose recall | Position-only recall | Label in training | Label in same-exercise training |
+|---|---|---|---|---|
+| `clean` | 4/7 | 4/7 | Yes | Yes |
+| `fast_lowering` | 0/2 | 0/2 | Yes, from push-up | No |
+| `forward_lean` | 0/1 | 0/1 | No | No |
+
+The report includes per-clip recall counts and coverage flags. `in_training` means the label was available in training for every scored occurrence. `in_training_same_exercise` applies the same check within the exercise; counts record partial coverage if it differs between folds.
+
+## Bias and limitations
+
+- **One participant, self-reviewed:** every rep was labelled by the person performing it. There is no independent reviewer or participant holdout, so these numbers do not measure generalisation to another person.
+- **One view per exercise:** squat is side view; push-up and shoulder press are front view. Camera-view robustness cannot be evaluated.
+- **Clip/label confound:** among squat recordings, `forward_lean` appears only in `80b5ec1e` and `fast_lowering` only in `aa3ebcf8`. Holding out either removes that error label from same-exercise training. `fast_lowering` is still present globally through push-up, which is why the report distinguishes global and same-exercise label coverage. `forward_lean` is absent from training entirely in its scored fold.
+- **Position confound:** labels may track recording order. Non-clean primary labels occupy push-up reps 1–13, squat `aa3ebcf8` reps 1–2, and press reps 1–2. The exception is squat `80b5ec1e`: its `forward_lean` is rep 3/5, not at the start. Position alone matches the pose model's 0.40 accuracy on the scored reps. This does not show that the pose model learns form rather than recording structure.
+- **Imbalance:** the full bundle has 17 `clean`, 15 `fast_lowering`, 2 `wrists_off_stack`, 1 `forward_lean`; scored reps have 7/2/1. Balanced class weights cannot create missing examples. Both learned baselines are below the scored majority and stratified-random accuracy comparisons. `wrists_off_stack` has no scored examples, so it has no reported recall.
+
+Position is the chronological rank by `start_frame`, divided by n−1 within each clip (singleton: 0). It is computed over exported labelled reps, not all detected repetitions. The first half uses position < 0.5, the second ≥ 0.5; with five reps, the middle rep belongs to the second half. The position-only model uses this one feature, with its scaler fitted only on training clips. The pose model does not receive position.
+
+| Clip (exercise) | Non-clean / first half | Non-clean / second half |
+|---|---|---|
+| `6596070d` (push-up) | 10/10 (100%) | 3/10 (30%) |
+| `aa3ebcf8` (squat) | 2/2 (100%) | 0/3 (0%) |
+| `80b5ec1e` (squat) | 0/2 (0%) | 1/3 (33%) |
+| `12f3520a` (shoulder press) | 2/2 (100%) | 0/3 (0%) |
+
+These diagnostics expose the limitations of this data; they do not remove them. The next steps are more independently reviewed reps, more clips and another participant, plus the public landmark set once its licence and labels are checked. The owner's rule-check decision to disregard `fast_lowering` does not relabel or drop it from baseline training.
 
 ## Rules against the human labels (same export)
 
@@ -71,7 +103,7 @@ Keep the report outside the repo.
 
 **Decisions from the owner (2026-10-10):**
 
-- **The `fast_lowering` labels in this export are disregarded.** The other labels on those reps still count. In the push-up clip, lowering time did not separate the reps labelled `fast_lowering` (334–534 ms) from those labelled `clean` (333–401 ms).
+- **The `fast_lowering` labels in this export are disregarded for the rule check.** The other labels on those reps still count. In the push-up clip, lowering time did not separate the reps labelled `fast_lowering` (334–534 ms) from those labelled `clean` (333–401 ms).
 - **A push-up of about one second is the owner's normal pace.** At that pace the push-up `tempo` rule (lowering from 150° to the bottom) measured 333–534 ms against an 800 ms threshold, so it flagged every rep. The threshold is now **250 ms**. At about 15 fps lowering times come in ~67 ms steps, and a clean one-second push-up can measure 267 ms, so 250 is the step below that. A drop to the floor (133–200 ms) still flags. The rest note no longer gives a 2 s target, and the shoulder override stays at 1200 ms.
 
 **Results with those decisions:**
