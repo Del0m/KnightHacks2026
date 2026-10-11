@@ -1,0 +1,488 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:spotter:joint-dataset:v1",
+  "title": "Joint-only private dataset clip",
+  "description": "Structural schema. validate.ts additionally enforces consent registry, monotonic timestamps, interval bounds/nonoverlap, exercise/view labels, accepted motion and missing-data quality. Coordinates are upright unmirrored COCO-17; frame times are relative milliseconds; intervals are start-inclusive/end-exclusive. Clean refers only to visible applicable errors.",
+  "$ref": "#/$defs/DatasetClip",
+  "$defs": {
+    "ConsentRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+        },
+        "participant_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+        },
+        "version": {
+          "const": "joint-capture-v1"
+        },
+        "granted_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "purpose": {
+          "const": "private_model_development"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "withdrawn"
+          ]
+        },
+        "publication_allowed": {
+          "const": false
+        }
+      },
+      "required": [
+        "reference",
+        "participant_id",
+        "version",
+        "granted_at",
+        "purpose",
+        "status",
+        "publication_allowed"
+      ]
+    },
+    "DatasetJoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "c": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "c"
+      ]
+    },
+    "DatasetFrame": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "timestamp_ms": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 60000
+            },
+            "absent": {
+              "const": true
+            }
+          },
+          "required": [
+            "timestamp_ms",
+            "absent"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "timestamp_ms": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 60000
+            },
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "joints": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DatasetJoint"
+              },
+              "minItems": 17,
+              "maxItems": 17
+            }
+          },
+          "required": [
+            "timestamp_ms",
+            "score",
+            "joints"
+          ]
+        }
+      ]
+    },
+    "RepAnnotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rep_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+        },
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state": {
+          "enum": [
+            "accepted",
+            "uncertain",
+            "discard"
+          ]
+        },
+        "human_labels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "partial_range",
+              "knees_in",
+              "forward_lean",
+              "fast_lowering",
+              "hip_sag",
+              "incomplete_lockout",
+              "elbow_drift",
+              "torso_swing",
+              "back_arch",
+              "wrists_off_stack"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "primary_label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reviewer_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+        },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "boundary_provenance": {
+          "enum": [
+            "manual",
+            "engine",
+            "engine_adjusted"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "rep_id",
+        "start_frame",
+        "end_frame",
+        "state",
+        "human_labels",
+        "primary_label",
+        "reviewer_id",
+        "reviewed_at",
+        "boundary_provenance",
+        "revision"
+      ]
+    },
+    "RepSuggestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rule_flags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+          }
+        }
+      },
+      "required": [
+        "start_frame",
+        "end_frame",
+        "rule_flags"
+      ]
+    },
+    "DatasetClip": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "clip_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+        },
+        "participant_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+        },
+        "exercise_id": {
+          "enum": [
+            "squat",
+            "push_up",
+            "bicep_curl",
+            "shoulder_press",
+            "lunge"
+          ]
+        },
+        "view": {
+          "enum": [
+            "front",
+            "side"
+          ]
+        },
+        "camera_position": {
+          "enum": [
+            "front",
+            "back"
+          ]
+        },
+        "side": {
+          "enum": [
+            "left",
+            "right",
+            "bilateral"
+          ]
+        },
+        "context": {
+          "enum": [
+            "standard",
+            "modified",
+            "prescribed"
+          ]
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ]
+        },
+        "source": {
+          "enum": [
+            "coreml",
+            "vision"
+          ]
+        },
+        "model": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+        },
+        "origin": {
+          "enum": [
+            "recorded",
+            "synthetic"
+          ]
+        },
+        "consent": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reference": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$"
+            },
+            "version": {
+              "const": "joint-capture-v1"
+            },
+            "allowed_use": {
+              "const": true
+            },
+            "purpose": {
+              "const": "private_model_development"
+            }
+          },
+          "required": [
+            "reference",
+            "version",
+            "allowed_use",
+            "purpose"
+          ]
+        },
+        "status": {
+          "enum": [
+            "recording",
+            "complete",
+            "incomplete"
+          ]
+        },
+        "stop_reason": {
+          "enum": [
+            "manual",
+            "limit",
+            "background",
+            "camera_error",
+            "mode_change",
+            "recovered",
+            null
+          ]
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DatasetFrame"
+          },
+          "maxItems": 14400
+        },
+        "annotations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepAnnotation"
+          }
+        },
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepSuggestion"
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "clip_id",
+        "session_id",
+        "participant_id",
+        "exercise_id",
+        "view",
+        "camera_position",
+        "side",
+        "context",
+        "image",
+        "source",
+        "model",
+        "origin",
+        "consent",
+        "status",
+        "stop_reason",
+        "frames",
+        "annotations",
+        "suggestions"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "recording"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "stop_reason": {
+                "const": null
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "stop_reason": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "recording"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "annotations": {
+                "items": {
+                  "properties": {
+                    "state": {
+                      "enum": [
+                        "uncertain",
+                        "discard"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "context": {
+                "const": "prescribed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "annotations": {
+                "items": {
+                  "properties": {
+                    "state": {
+                      "enum": [
+                        "uncertain",
+                        "discard"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

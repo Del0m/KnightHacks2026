@@ -76,7 +76,7 @@ AI rep counters are a common hackathon project. Leading with injury recovery mak
 
 | Challenge | How Spotter delivers it | Owner |
 |---|---|---|
-| **Hugging Face: Best Use of Open Source AI** | Our YOLOv8 pose and form models live on the Hub and are downloaded by every phone. gpt-oss on Inference Providers writes rest notes and plans. RAG uses BGE embeddings, Llama Guard moderates the feed, an HF GPU endpoint can re-check flagged sets, and we publish **our own labelled form dataset** with a Gradio Space. | AI eng B |
+| **Hugging Face: Best Use of Open Source AI** | Our YOLOv8 pose and form models live on the Hub and are downloaded by every phone. gpt-oss on Inference Providers writes rest notes and plans. RAG uses BGE embeddings, Llama Guard moderates the feed, an HF GPU endpoint can re-check flagged sets, and, if the data checks pass, we publish our form-quality model with a model card and a Gradio Space. | AI eng B |
 | **Databricks: Best Use of Databricks** | Medallion pipeline (bronze, silver, gold) over session data. An MLflow form-quality model on Model Serving scores each set during rest. A risk model, AI/BI dashboard and Genie. Retrained models are published back to the Hub for the app. | AI eng A |
 | **Neon: Best Use of Neon** | Neon is the system of record: Neon Auth, the social graph, pgvector for RAG and buddy matching, branches per developer and for the demo, and the serving store for Databricks insights. | Back-end |
 | **Best AI Hack** | On-device pose estimation, a learned form scorer, an LLM with RAG and a risk model. Qualifies automatically. | Everyone |
@@ -373,11 +373,12 @@ Each rule has a `rest_note` that the LLM may rephrase. Notes describe the moveme
 
 - **Input:** one rep's joints, normalised and resampled to 32 frames × 17 joints × 2.
 - **Model:** a small GRU, or gradient-boosted trees on rep features (range, tempo, symmetry, knee tracking). Output: quality 0–1 plus a label: `clean`, or one of the rule labels in the specs (`partial_range`, `knees_in`, `forward_lean`, `fast_lowering`, `hip_sag`, `incomplete_lockout`, `elbow_drift`, `torso_swing`, `back_arch`, `wrists_off_stack`).
-- **Data:**
-  1. Bootstrap with public landmark data such as `Cuong2004/gym-exercise-landmarks` (check its license; convert MediaPipe 33-point data to the 17 COCO joints).
-  2. **Record and label our own clips at the hackathon**: teammates doing deliberate clean and off-form reps, filmed on a phone.
-  3. Keep only joints, then publish to the Hub as a dataset with a card. No clean public dataset of form-error labels exists on the Hub today, which makes this a genuine contribution.
-- **Train and serve in Databricks** (MLflow tracking, Unity Catalog registry, Model Serving). **Publish to the Hub** (ONNX plus model card) with a **Gradio Space** where judges upload a clip and see per-rep scores.
+- **Data (no new capture at the hackathon):**
+  1. **Public landmark data** such as `Cuong2004/gym-exercise-landmarks`. Check its license first, and whether it has any form-error labels (see the note below). Convert MediaPipe 33-point data to the 17 COCO joints.
+  2. **The AI-09 pilot** (`Downloads/ai09-pilot-2026-10-10/`): owner-consented, joint-only reps with boundaries and human labels. The cumulative export has 35 reps (squat, push-up and shoulder press), so it is the first labelled set, but still too small to be the main training source. Checked against the rules (`apps/mobile/scripts/check-rule-labels.ts`), the labels mostly disagree with the flags. The owner disregarded the export's `fast_lowering` labels for the rule check; baseline training retains them. Leave-one-clip-out evaluation scores only the two squat clips (10 reps): pose accuracy 0.40, macro-F1 0.22, majority accuracy 0.70, and position-only accuracy 0.40. Push-up and press are unscored because each has only one clip. Label coverage, imbalance and clip/position confounds are documented in `Markdown/AI-10-Handoff.md`. The owner set a one-second push-up as normal pace, so the push-up `tempo` threshold is now 250 ms (see `Markdown/AI-10-Handoff.md`).
+  3. **Labels.** Where a rep has no human label, the target is the phone's rule flags (`clean`, or the first failing rule). A model trained this way learns to reproduce the rules from joint data. That is still useful as an advisory second opinion, but it is not an independent judgement of form, and the docs and demo must not describe it as one.
+- **Scope:** the model is trained only on joint data that is already on disk or public. Video is not used for training (see [§13](#13-privacy-and-video-lifecycle)). Exercises without enough labelled reps are reported as such in the model card, not padded with rule-derived labels.
+- **Train and serve in Databricks** (MLflow tracking, Unity Catalog registry, Model Serving). **Publish to the Hub** (ONNX plus model card) only if the license and labelled-data check passes. The Gradio Space lets judges upload joints (or a pilot clip) and see per-rep scores.
 
 ---
 
@@ -845,7 +846,7 @@ About 4 minutes, adjusted per judging room. Lead with that room's challenge.
 4. **On-device proof (20 s):** show the live fps and latency readout from the phone's neural processor.
 5. **Recovery (30 s):** open a demo user's physio plan and range-of-motion chart: "knee range up 18° in three weeks, now within 5° of the healthy side". Show the one-page physio report and a recovery-buddy match. The same squat set, judged against the physio's limits, earns gold.
 6. **Plan (30 s):** generate a week. Show "why this exercise" sources and the lunge swapped for a glute bridge.
-   - *Hugging Face:* "gpt-oss on Inference Providers, RAG with BGE embeddings, Llama Guard, and our own labelled form dataset and model on the Hub." Show the Space.
+   - *Hugging Face:* "gpt-oss on Inference Providers, RAG with BGE embeddings, Llama Guard, and our form-quality model on the Hub." Show the Space. Only say "trained on our own labelled data" if the AI-09 pilot has grown past the validation stage.
 7. **Social (30 s):** "Finished a gold-level workout" posts to the feed; a buddy suggestion appears ("same gym, both beginners, both train mornings").
    - *Neon:* "Auth, the social graph, vectors and the serving layer for Databricks insights all live in Neon. We develop on branches and demo off a seeded branch."
 8. **Close (10 s):** "Spotter: a quiet coach for every rep, and a community for every beginner."
@@ -863,7 +864,7 @@ About 4 minutes, adjusted per judging room. Lead with that room's challenge.
 | Databricks quota or cold warehouse during the demo | Medium | The app reads synced Neon tables only. Pre-run jobs before judging. |
 | HF custom model hosting costs | Medium | Scale the endpoint to zero between workouts. Cloud mode is required on Android, so keep a Gradio Space API as a slower backup |
 | LLM rest note uses a banned phrase or a commanding tone | Medium | Banned-phrase check, then fall back to the rule's fixed `rest_note` |
-| Not enough labelled form data | High | Rules carry the demo. Present the model as a prototype trained on our own clips plus a public landmark set. |
+| Not enough labelled form data (no hackathon capture) | High | Rules carry the demo. Present the model as a prototype trained on public landmark joints, with rule-derived labels where no human label exists. Say so on the card and the slide. |
 | AGPL-3.0 on YOLOv8 | Known | Keep the repo public; note MediaPipe or MoveNet as the commercial path |
 | Expo iOS build issues | Medium | Browser demo with ONNX Runtime Web on a laptop webcam |
 | Dataset licenses (Fitness-AQA, QEVD research-only) | Medium | Use only for internal evaluation, or skip. Publish only our own clips' joints. |
