@@ -1010,13 +1010,7 @@
       "quality": null,
       "lowering_ms": 800,
       "rising_ms": 1067,
-      "flags": [
-        {
-          "rule_id": "tempo",
-          "severity": "form",
-          "rep_index": 0
-        }
-      ]
+      "flags": []
     },
     {
       "rep_index": 1,
@@ -1032,11 +1026,6 @@
           "rule_id": "hip_sag",
           "severity": "form",
           "rep_index": 1
-        },
-        {
-          "rule_id": "tempo",
-          "severity": "form",
-          "rep_index": 1
         }
       ]
     },
@@ -1049,13 +1038,7 @@
       "quality": null,
       "lowering_ms": 733,
       "rising_ms": 1133,
-      "flags": [
-        {
-          "rule_id": "tempo",
-          "severity": "form",
-          "rep_index": 2
-        }
-      ]
+      "flags": []
     },
     {
       "rep_index": 3,
@@ -1071,11 +1054,6 @@
           "rule_id": "hip_sag",
           "severity": "form",
           "rep_index": 3
-        },
-        {
-          "rule_id": "tempo",
-          "severity": "form",
-          "rep_index": 3
         }
       ]
     },
@@ -1088,13 +1066,7 @@
       "quality": null,
       "lowering_ms": 734,
       "rising_ms": 1200,
-      "flags": [
-        {
-          "rule_id": "tempo",
-          "severity": "form",
-          "rep_index": 4
-        }
-      ]
+      "flags": []
     }
   ]
 }
