@@ -4,6 +4,7 @@ import { Text } from 'react-native';
 import { dailyWorkout } from '@/data/workout';
 import TrainScreen from '../index';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+jest.mock('@/screens/Onboarding/state', () => ({ useOnboarding: () => ({ profile: null }) }));
 const { act, create } = require('react-test-renderer');
 jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: null }) }));
 jest.mock('@/hooks/useReducedMotion', () => ({ useReducedMotion: jest.fn() }));

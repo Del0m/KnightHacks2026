@@ -4,6 +4,7 @@ import Train from '../index';
 import { useWeeklyPlan } from '@/screens/Planner/useWeeklyPlan';
 import { calendarDay, type Workout } from '@/data/workout';
 import { addPlanDays, parsePlan, weekStart } from '@/screens/Planner/plan';
+jest.mock('@/screens/Onboarding/state', () => ({ useOnboarding: () => ({ profile: null }) }));
 const { act, create } = require('react-test-renderer');
 let mockHistory: Workout[] = [];
 jest.mock('@/screens/Planner/useWeeklyPlan', () => ({ useWeeklyPlan: jest.fn() }));

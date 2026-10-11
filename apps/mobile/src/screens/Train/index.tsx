@@ -1,3 +1,4 @@
+import { useOnboarding } from '@/screens/Onboarding/state';
 import { useWeeklyPlan } from '@/screens/Planner/useWeeklyPlan';
 import { modelExercise, routineForDay } from '@/screens/Planner/plan';
 import { readActiveWorkout } from '@/services/workoutQueue';
@@ -12,7 +13,7 @@ import { ExerciseMenu } from '@/components/ExerciseMenu';
 import { ExerciseTabs, type ExerciseTab } from '@/components/ExerciseTabs';
 import { RotationSlider } from '@/components/RotationSlider';
 import { Streak } from '@/components/Streak';
-import { dailyWorkout, practiceExercises, streak, completedToday, calendarDay, type ExerciseId } from '@/data/workout';
+import { dailyWorkout, initialProfile, practiceExercises, streak, completedToday, calendarDay, type ExerciseId } from '@/data/workout';
 import { useTraining } from '@/state/Training';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { cameraSpec } from '@/screens/LiveSet/exercises';
@@ -23,7 +24,7 @@ export default function TrainScreen() {
   const routine = useMemo(() => weekly.plan ? routineForDay(weekly.plan, weekly.selectedDate).map(e => ({ ...e, muscles: e.tracked ? 'Camera tracking' : 'Manual logging' })) : dailyWorkout(weekly.today), [weekly.plan, weekly.selectedDate, weekly.today]);
   const firstModel = useMemo(() => routine.length ? modelExercise(routine[0].id) : null, [routine]);
   const [activeWorkout, setActiveWorkout] = useState(() => readActiveWorkout(account));
-  const { workouts } = useTraining(), reduced = useReducedMotion();
+  const { workouts, profile } = useTraining(), setup = useOnboarding(), reduced = useReducedMotion();
   const [selected, setSelected] = useState<ExerciseId | null>(firstModel), [playing, setPlaying] = useState(false);
   const [expanded, setExpanded] = useState<ExerciseId | null>(null), [rotation, setRotation] = useState(0), [section, setSection] = useState<ExerciseTab>('workout');
   const navigation = useNavigation<{ addListener(event: 'tabPress', listener: () => void): () => void }>();
@@ -33,7 +34,7 @@ export default function TrainScreen() {
   function select(id: ExerciseId) { setExpanded(current => current === id ? null : id); if (selected === id) return; setSelected(id); setRotation(0); setPlaying(reduced === false); }
   const practice = (id: ExerciseId) => router.push({ pathname: '/practice', params: { exercise: id } });
   const menu = (id: ExerciseId) => <ExerciseMenu open={expanded === id} onPractice={() => practice(id)} />;
-  return <AppPage compact><Streak days={streak(workouts)} />
+  return <AppPage compact><Streak days={streak(workouts, new Date(), setup.profile?.schedule ?? { kind: 'weekly', days: profile?.days ?? initialProfile.days })} />
     <View style={styles.separator} />
     <View style={{ position: 'relative' }}>
       <BodyPreview selected={selected} playing={playing} height={320} rotation={rotation} />

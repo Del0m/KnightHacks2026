@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
-import type { ExerciseId } from '@/data/workout';
+import { dailyWorkout, isWorkoutDay, type ExerciseId, type Workout } from '@/data/workout';
+import type { Schedule } from '@/screens/Onboarding/model';
 import type { ApiRequest } from '@/services/workoutApi';
 export type Prescription = { id: string; name: string; sets: number; reps: number; tracked: boolean };
 export type PlanItem = Prescription & { itemId: string; position: number; reason: string | null; swapNote: string | null; safetyNote: string | null; sources: { id: string; title: string }[] };
@@ -64,3 +65,24 @@ export function savePlan(account: string, plan: WeeklyPlan, selectedDate: string
 export function selectPlanDate(account: string, week: string, date: string) { const saved = readPlan(account, week); if (saved && date >= week && date <= addPlanDays(week, 6)) savePlan(account, saved.plan, date); }
 
 export function clearPlan(account: string, week: string) { const k = key(account, week); if (Platform.OS === 'web') localStorage.removeItem(k); else native().remove(k); listeners.forEach(listener => listener()); }
+
+/** Generated days are authoritative in their week; later dates use the local daily routine. */
+export function upcomingWorkouts(today: string, schedule: Schedule, plan: WeeklyPlan | null, workouts: Workout[] = []) {
+ const completed = new Set(workouts.map(w => w.day));
+ const result: { date: string; items: PlanItem[]; generated: boolean }[] = [];
+ const startDelay = schedule.kind === 'interval' ? Math.max(0, Math.round((Date.parse(schedule.start_date) - Date.parse(today)) / 86400000)) : 0;
+ const horizon = startDelay + (schedule.kind === 'interval' ? Math.max(1, schedule.every_days) * 3 : 21) + 7;
+ for (let offset = 0; offset <= horizon && result.length < 3; offset++) {
+  const date = addPlanDays(today, offset);
+  if (completed.has(date)) continue;
+  const generated = !!plan && date >= plan.weekOf && date <= addPlanDays(plan.weekOf, 6);
+  if (generated) {
+   const items = plan!.days.find(day => day.date === date)?.items ?? [];
+   if (items.length) result.push({ date, items, generated: true });
+  } else if (isWorkoutDay(date, schedule)) {
+   const items = dailyWorkout(date).map((e, position) => ({ ...e, position, itemId: `${date}:${e.id}`, reason: null, swapNote: null, safetyNote: null, sources: [] }));
+   result.push({ date, items, generated: false });
+  }
+ }
+ return result;
+}

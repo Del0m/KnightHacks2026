@@ -3,6 +3,7 @@ import React from 'react';
 import { dailyWorkout } from '@/data/workout';
 import { router } from 'expo-router';
 import TrainScreen from '../index';
+jest.mock('@/screens/Onboarding/state', () => ({ useOnboarding: () => ({ profile: null }) }));
 const { act, create } = require('react-test-renderer');
 jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: null }) }));
 jest.mock('expo-router', () => ({ router: { push: jest.fn() }, useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]), useNavigation: () => ({ addListener: () => () => {} }) }));
