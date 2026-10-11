@@ -115,7 +115,12 @@
         "quality": null,
         "start_ms": 1800,
         "end_ms": 3800,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       },
       {
         "tempo_ms": 1600,
@@ -123,7 +128,12 @@
         "quality": null,
         "start_ms": 4200,
         "end_ms": 6200,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       },
       {
         "tempo_ms": 1600,
@@ -131,7 +141,12 @@
         "quality": null,
         "start_ms": 6600,
         "end_ms": 8733,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       },
       {
         "tempo_ms": 1600,
@@ -139,7 +154,12 @@
         "quality": null,
         "start_ms": 9000,
         "end_ms": 11200,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       },
       {
         "tempo_ms": 1600,
@@ -147,7 +167,12 @@
         "quality": null,
         "start_ms": 11400,
         "end_ms": 13400,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       },
       {
         "tempo_ms": 1667,
@@ -163,7 +188,12 @@
         "quality": null,
         "start_ms": 16200,
         "end_ms": 18400,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       },
       {
         "tempo_ms": 1600,
@@ -171,7 +201,12 @@
         "quality": null,
         "start_ms": 18600,
         "end_ms": 20600,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       }
     ]
   },
@@ -183,18 +218,38 @@
       "exercise_id": "bicep_curl",
       "reps": 8,
       "weight_kg": null,
-      "medal": "gold",
-      "clean_share": 1,
+      "medal": "bronze",
+      "clean_share": 0.125,
       "score_source": "databricks",
       "score": {
         "source": "databricks",
-        "medal": "gold",
-        "clean_share": 1,
+        "medal": "bronze",
+        "clean_share": 0.125,
         "reps": [
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
           },
           {
             "quality": 0.8,
@@ -204,52 +259,32 @@
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           },
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
-          },
-          {
-            "quality": 0.8,
-            "label": "clean",
-            "clean": true
-          },
-          {
-            "quality": 0.8,
-            "label": "clean",
-            "clean": true
-          },
-          {
-            "quality": 0.8,
-            "label": "clean",
-            "clean": true
-          },
-          {
-            "quality": 0.8,
-            "label": "clean",
-            "clean": true
+            "clean": false
           }
         ]
       },
       "rest_note": {
-        "text": "8 of 8 reps were clean.",
+        "text": "1 of 8 reps were clean. Your reps took about 1.6 s on the way down. Around 2 s gives you more control.",
         "source": "fixed",
-        "rule_id": null
+        "rule_id": "tempo"
       },
       "created_at": "<time>",
-      "clean_reps": 8,
+      "clean_reps": 1,
       "set_id": "<id 1>"
     },
     "finish_response": {
       "session_id": "<id 2>",
       "finished_at": "2026-10-10T15:05:00.000Z",
-      "medal": "gold",
-      "form_score": 1,
+      "medal": "bronze",
+      "form_score": 0.125,
       "baseline_share": 0.7,
       "total_reps": 8,
-      "clean_reps": 8,
+      "clean_reps": 1,
       "personal_records": [
         {
           "exercise_id": "bicep_curl",
@@ -260,7 +295,7 @@
       ],
       "posts": []
     },
-    "llm_called": false,
+    "llm_called": true,
     "rows": {
       "session": {
         "id": "<id 2>",
@@ -269,8 +304,8 @@
         "finishedAt": "2026-10-10T15:05:00.000Z",
         "device": "replay",
         "inferenceMode": "on_device",
-        "medal": "gold",
-        "formScore": 1,
+        "medal": "bronze",
+        "formScore": 0.125,
         "exportStatus": "exported",
         "exportError": null,
         "exportAttempts": 1,
@@ -285,13 +320,33 @@
           "exerciseId": "bicep_curl",
           "reps": 8,
           "weightKg": null,
-          "medal": "gold",
-          "cleanShare": 1,
+          "medal": "bronze",
+          "cleanShare": 0.125,
           "scoreSource": "databricks",
           "score": {
             "reps": [
               {
-                "clean": true,
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
@@ -301,44 +356,24 @@
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
               {
-                "clean": true,
-                "label": "clean",
-                "quality": 0.8
-              },
-              {
-                "clean": true,
-                "label": "clean",
-                "quality": 0.8
-              },
-              {
-                "clean": true,
-                "label": "clean",
-                "quality": 0.8
-              },
-              {
-                "clean": true,
-                "label": "clean",
-                "quality": 0.8
-              },
-              {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               }
             ],
-            "medal": "gold",
+            "medal": "bronze",
             "source": "databricks",
-            "clean_share": 1
+            "clean_share": 0.125
           },
           "restNote": {
-            "text": "8 of 8 reps were clean.",
+            "text": "1 of 8 reps were clean. Your reps took about 1.6 s on the way down. Around 2 s gives you more control.",
             "source": "fixed",
-            "rule_id": null
+            "rule_id": "tempo"
           },
           "createdAt": "<time>"
         }
@@ -353,7 +388,7 @@
           "tempoMs": 1600,
           "rangeDeg": 120.2,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 4>",
@@ -364,7 +399,7 @@
           "tempoMs": 1600,
           "rangeDeg": 116.8,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 5>",
@@ -375,7 +410,7 @@
           "tempoMs": 1600,
           "rangeDeg": 123.5,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 6>",
@@ -386,7 +421,7 @@
           "tempoMs": 1600,
           "rangeDeg": 114.6,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 7>",
@@ -397,7 +432,7 @@
           "tempoMs": 1600,
           "rangeDeg": 119.2,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 8>",
@@ -419,7 +454,7 @@
           "tempoMs": 1600,
           "rangeDeg": 112.8,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 10>",
@@ -430,17 +465,60 @@
           "tempoMs": 1600,
           "rangeDeg": 118.4,
           "quality": null,
-          "clean": true
+          "clean": false
         }
       ],
-      "form_flags": [],
-      "medals": [
+      "form_flags": [
         {
           "id": "<id 11>",
+          "repId": "<id 3>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 12>",
+          "repId": "<id 4>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 13>",
+          "repId": "<id 5>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 14>",
+          "repId": "<id 6>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 15>",
+          "repId": "<id 7>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 16>",
+          "repId": "<id 9>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 17>",
+          "repId": "<id 10>",
+          "ruleId": "tempo",
+          "severity": "form"
+        }
+      ],
+      "medals": [
+        {
+          "id": "<id 18>",
           "userId": "replay-bicep_curl_clean",
           "sessionId": "<id 2>",
-          "tier": "gold",
-          "formScore": 1,
+          "tier": "bronze",
+          "formScore": 0.125,
           "baselineShare": 0.7,
           "awardedAt": "2026-10-10T15:05:00.000Z"
         }
@@ -474,8 +552,8 @@
           "finished_at": "2026-10-10T15:05:00.000Z",
           "device": "replay",
           "inference_mode": "on_device",
-          "medal": "gold",
-          "form_score": 1,
+          "medal": "bronze",
+          "form_score": 0.125,
           "experience_level": "beginner",
           "injury_groups": [],
           "rehab_start_on": null,
@@ -486,7 +564,7 @@
               "set_index": 0,
               "exercise_id": "bicep_curl",
               "weight_kg": null,
-              "medal": "gold",
+              "medal": "bronze",
               "frame_count": 321,
               "reps": [
                 {
@@ -495,8 +573,13 @@
                   "end_ms": 3800,
                   "tempo_ms": 1600,
                   "range_deg": 120.2,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 },
                 {
                   "rep_index": 1,
@@ -504,8 +587,13 @@
                   "end_ms": 6200,
                   "tempo_ms": 1600,
                   "range_deg": 116.8,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 },
                 {
                   "rep_index": 2,
@@ -513,8 +601,13 @@
                   "end_ms": 8733,
                   "tempo_ms": 1600,
                   "range_deg": 123.5,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 },
                 {
                   "rep_index": 3,
@@ -522,8 +615,13 @@
                   "end_ms": 11200,
                   "tempo_ms": 1600,
                   "range_deg": 114.6,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 },
                 {
                   "rep_index": 4,
@@ -531,8 +629,13 @@
                   "end_ms": 13400,
                   "tempo_ms": 1600,
                   "range_deg": 119.2,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 },
                 {
                   "rep_index": 5,
@@ -549,8 +652,13 @@
                   "end_ms": 18400,
                   "tempo_ms": 1600,
                   "range_deg": 112.8,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 },
                 {
                   "rep_index": 7,
@@ -558,8 +666,13 @@
                   "end_ms": 20600,
                   "tempo_ms": 1600,
                   "range_deg": 118.4,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 }
               ]
             }

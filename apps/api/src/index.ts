@@ -12,6 +12,9 @@ import { PoseEndpointClient, poseEndpointConfigFromEnv } from "./integrations/hu
 import { attachPoseStream } from "./routes/poseStream.js";
 import { DatabricksScorer, scoreConfigFromEnv } from "./integrations/databricks/score.js";
 import { HfLlm, llmConfigFromEnv } from "./integrations/huggingface/llm.js";
+import { hfQueryEmbedder } from "./integrations/huggingface/embed.js";
+import { hfEmbedder } from "./integrations/huggingface/embeddings.js";
+import { profileEmbeddings } from "./services/profileEmbeddings.js";
 import { RestNoteWriter } from "./services/restNote.js";
 import {
   databricksExportQueue,
@@ -34,7 +37,7 @@ const { db, close } = createNeonDb(env.DATABASE_URL);
 
 const databricksQueue = databricksConfigured(env)
   ? databricksExportQueue(
-      new DatabricksUploader(uploadConfigFromEnv(), drizzleExportStatusStore(db), fetch, logger),
+      new DatabricksUploader(uploadConfigFromEnv(env), drizzleExportStatusStore(db), fetch, logger),
       logger,
     )
   : null;
@@ -44,11 +47,11 @@ const stopExportRetry = databricksQueue
   : () => {};
 
 // CONN-07: gpt-oss chain, shared by rest notes and the threats/harassment check.
-const llm = env.HF_TOKEN ? new HfLlm(llmConfigFromEnv()) : null;
+const llm = env.HF_TOKEN ? new HfLlm(llmConfigFromEnv(env)) : null;
 
 // CONN-09: Llama Guard plus the threats/harassment check on posts and comments.
 const moderator = env.HF_TOKEN
-  ? llamaGuardModerator(new LlamaGuard(moderationConfigFromEnv(), undefined, logger, llm))
+  ? llamaGuardModerator(new LlamaGuard(moderationConfigFromEnv(env), undefined, logger, llm))
   : allowAllModerator;
 if (!env.HF_TOKEN) logger.warn("HF_TOKEN is not set; posts and comments are not moderated");
 
@@ -67,6 +70,13 @@ const rest = {
   notes: new RestNoteWriter(llm, logger),
 };
 
+// AI-12: gpt-oss drafts plans and bge-small embeds the search; without HF_TOKEN the rules planner runs.
+const planner = {
+  llm,
+  embed: env.HF_TOKEN ? hfQueryEmbedder(env.HF_TOKEN) : null,
+  log: logger,
+};
+
 const verifyToken = neonAuthVerifier(env.NEON_AUTH_JWKS_URL, {
   issuer: env.NEON_AUTH_ISSUER,
   audience: env.NEON_AUTH_AUDIENCE,
@@ -79,6 +89,9 @@ const app = createApp({
   moderator,
   verifyToken,
   rest,
+  planner,
+  // CONN-08: buddy-matching embeddings, refreshed when goals or bio change.
+  profileEmbeddings: env.HF_TOKEN ? profileEmbeddings(db, hfEmbedder(env.HF_TOKEN)) : undefined,
   pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET,
   corsOrigins: env.CORS_ORIGINS?.split(",").map((s) => s.trim()),
 });
@@ -92,9 +105,11 @@ const server = app.listen(env.PORT, () => {
       databricksExport: databricksConfigured(env),
       insightSync: insightSyncConfigured(env),
       moderation: Boolean(env.HF_TOKEN),
+      profileEmbeddings: Boolean(env.HF_TOKEN),
       cloudPose: Boolean(poseEndpoint),
       setScoring: scoringConfigured,
       llmRestNotes: Boolean(env.HF_TOKEN),
+      llmPlans: Boolean(env.HF_TOKEN),
     },
     "spotter api listening",
   );

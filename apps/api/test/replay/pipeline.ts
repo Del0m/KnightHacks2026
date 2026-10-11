@@ -1,7 +1,7 @@
 // INT-09: replays a recorded or synthetic clip through the whole set path and returns a
 // deterministic summary for the golden files:
 //   1. engine (AI-06)       mobile form engine, imported straight from apps/mobile
-//   2. rules (AI-07)        not on main yet, see toSetPayload
+//   2. rules (AI-07)        mobile form rules on the engine's events, flags per rep
 //   3. set record (AI-08)   not on main yet, see toSetPayload
 //   4. API                  the real Express app on PGlite with the real migrations
 // Databricks (scoring, file upload) and Hugging Face (rest notes) run their real clients with
@@ -16,6 +16,7 @@ import { eq, inArray } from "drizzle-orm";
 import { pino } from "pino";
 import { runClip, type ClipRun } from "../../../mobile/src/engine/__fixtures__/run.js";
 import { isAbsentFrame, type Clip } from "../../../mobile/src/engine/recording.js";
+import { createSetRules } from "../../../mobile/src/engine/rules.js";
 import { getSpec } from "../../../mobile/src/engine/specs.js";
 import type { RepRecord } from "../../../mobile/src/engine/types.js";
 import type { PoseResult } from "../../../mobile/src/pose/types.js";
@@ -69,16 +70,32 @@ function rangeDeg(rep: RepRecord, primary: string): number {
   return angles.length ? r1(Math.max(...angles) - Math.min(...angles)) : 0;
 }
 
+/** AI-07's flags for each closed rep, keyed by 0-based rep index, from the engine's events. */
+export function ruleFlags(clip: Clip, run: ClipRun): Map<number, Flag[]> {
+  const rules = createSetRules(getSpec(clip.exercise)!);
+  const flags = new Map<number, Flag[]>();
+  for (const e of run.events) {
+    const out = rules.handle(e);
+    if (out?.type === "rep_evaluated") {
+      flags.set(
+        out.result.rep_index,
+        out.result.flags.map((f) => ({ rule_id: f.rule_id, severity: f.severity })),
+      );
+    }
+  }
+  return flags;
+}
+
 /**
- * Engine output -> the set payload POST /sessions/:id/sets takes.
+ * Engine output + AI-07 rules -> the set payload POST /sessions/:id/sets takes.
  *
- * PLACEHOLDER until AI-07 (rules.ts) and AI-08 (setRecord.ts) land from origin/ai-08-set-record:
- * every rep goes out with no rule flags and no quality. When they land, replace this with
- * AI-07's evaluation and AI-08's set record and regenerate the golden files; flags per rep
- * will appear in them.
+ * PLACEHOLDER for AI-08 (setRecord.ts, on origin/ai-08-set-record): quality is null and the
+ * payload is built here. When AI-08 lands, build it with AI-08's set record instead and
+ * regenerate the golden files.
  */
 export function toSetPayload(clip: Clip, run: ClipRun): SetPayload {
   const spec = getSpec(clip.exercise)!;
+  const flags = ruleFlags(clip, run);
   const poses = clip.frames.filter((f): f is PoseResult => !isAbsentFrame(f));
   const t0 = clip.frames[0]?.timestamp_ms ?? 0;
   const frames = poses.map((p) => ({
@@ -97,7 +114,7 @@ export function toSetPayload(clip: Clip, run: ClipRun): SetPayload {
       quality: null,
       start_ms: Math.round(rep.startedAt - t0),
       end_ms: Math.round(rep.closedAt - t0),
-      flags: [],
+      flags: flags.get(rep.index - 1) ?? [],
     })),
   };
 }

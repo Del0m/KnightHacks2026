@@ -109,7 +109,12 @@
         "quality": null,
         "start_ms": 7200,
         "end_ms": 9400,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       },
       {
         "tempo_ms": 1800,
@@ -125,7 +130,12 @@
         "quality": null,
         "start_ms": 12467,
         "end_ms": 14667,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       },
       {
         "tempo_ms": 1800,
@@ -133,7 +143,12 @@
         "quality": null,
         "start_ms": 15133,
         "end_ms": 17267,
-        "flags": []
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form"
+          }
+        ]
       }
     ]
   },
@@ -145,13 +160,13 @@
       "exercise_id": "squat",
       "reps": 6,
       "weight_kg": null,
-      "medal": "gold",
-      "clean_share": 1,
+      "medal": "bronze",
+      "clean_share": 0.5,
       "score_source": "databricks",
       "score": {
         "source": "databricks",
-        "medal": "gold",
-        "clean_share": 1,
+        "medal": "bronze",
+        "clean_share": 0.5,
         "reps": [
           {
             "quality": 0.8,
@@ -166,7 +181,7 @@
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           },
           {
             "quality": 0.8,
@@ -176,32 +191,32 @@
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           },
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           }
         ]
       },
       "rest_note": {
-        "text": "6 of 6 reps were clean.",
+        "text": "3 of 6 reps were clean. Your reps took about 1.8 s on the way down. Around 2 s gives you more control.",
         "source": "fixed",
-        "rule_id": null
+        "rule_id": "tempo"
       },
       "created_at": "<time>",
-      "clean_reps": 6,
+      "clean_reps": 3,
       "set_id": "<id 1>"
     },
     "finish_response": {
       "session_id": "<id 2>",
       "finished_at": "2026-10-10T15:05:00.000Z",
-      "medal": "gold",
-      "form_score": 1,
+      "medal": "bronze",
+      "form_score": 0.5,
       "baseline_share": 0.7,
       "total_reps": 6,
-      "clean_reps": 6,
+      "clean_reps": 3,
       "personal_records": [
         {
           "exercise_id": "squat",
@@ -212,7 +227,7 @@
       ],
       "posts": []
     },
-    "llm_called": false,
+    "llm_called": true,
     "rows": {
       "session": {
         "id": "<id 2>",
@@ -221,8 +236,8 @@
         "finishedAt": "2026-10-10T15:05:00.000Z",
         "device": "replay",
         "inferenceMode": "on_device",
-        "medal": "gold",
-        "formScore": 1,
+        "medal": "bronze",
+        "formScore": 0.5,
         "exportStatus": "exported",
         "exportError": null,
         "exportAttempts": 1,
@@ -237,8 +252,8 @@
           "exerciseId": "squat",
           "reps": 6,
           "weightKg": null,
-          "medal": "gold",
-          "cleanShare": 1,
+          "medal": "bronze",
+          "cleanShare": 0.5,
           "scoreSource": "databricks",
           "score": {
             "reps": [
@@ -253,7 +268,7 @@
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
@@ -263,24 +278,24 @@
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               }
             ],
-            "medal": "gold",
+            "medal": "bronze",
             "source": "databricks",
-            "clean_share": 1
+            "clean_share": 0.5
           },
           "restNote": {
-            "text": "6 of 6 reps were clean.",
+            "text": "3 of 6 reps were clean. Your reps took about 1.8 s on the way down. Around 2 s gives you more control.",
             "source": "fixed",
-            "rule_id": null
+            "rule_id": "tempo"
           },
           "createdAt": "<time>"
         }
@@ -317,7 +332,7 @@
           "tempoMs": 1733,
           "rangeDeg": 86.6,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 6>",
@@ -339,7 +354,7 @@
           "tempoMs": 1800,
           "rangeDeg": 77,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 8>",
@@ -350,17 +365,36 @@
           "tempoMs": 1800,
           "rangeDeg": 84.2,
           "quality": null,
-          "clean": true
+          "clean": false
         }
       ],
-      "form_flags": [],
-      "medals": [
+      "form_flags": [
         {
           "id": "<id 9>",
+          "repId": "<id 5>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 10>",
+          "repId": "<id 7>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 11>",
+          "repId": "<id 8>",
+          "ruleId": "tempo",
+          "severity": "form"
+        }
+      ],
+      "medals": [
+        {
+          "id": "<id 12>",
           "userId": "replay-squat_clean",
           "sessionId": "<id 2>",
-          "tier": "gold",
-          "formScore": 1,
+          "tier": "bronze",
+          "formScore": 0.5,
           "baselineShare": 0.7,
           "awardedAt": "2026-10-10T15:05:00.000Z"
         }
@@ -394,8 +428,8 @@
           "finished_at": "2026-10-10T15:05:00.000Z",
           "device": "replay",
           "inference_mode": "on_device",
-          "medal": "gold",
-          "form_score": 1,
+          "medal": "bronze",
+          "form_score": 0.5,
           "experience_level": "beginner",
           "injury_groups": [],
           "rehab_start_on": null,
@@ -406,7 +440,7 @@
               "set_index": 0,
               "exercise_id": "squat",
               "weight_kg": null,
-              "medal": "gold",
+              "medal": "bronze",
               "frame_count": 398,
               "reps": [
                 {
@@ -433,8 +467,13 @@
                   "end_ms": 9400,
                   "tempo_ms": 1733,
                   "range_deg": 86.6,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 },
                 {
                   "rep_index": 3,
@@ -451,8 +490,13 @@
                   "end_ms": 14667,
                   "tempo_ms": 1800,
                   "range_deg": 77,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 },
                 {
                   "rep_index": 5,
@@ -460,8 +504,13 @@
                   "end_ms": 17267,
                   "tempo_ms": 1800,
                   "range_deg": 84.2,
-                  "quality": 1,
-                  "flags": []
+                  "quality": 0,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form"
+                    }
+                  ]
                 }
               ]
             }

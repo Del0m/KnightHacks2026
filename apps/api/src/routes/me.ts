@@ -6,6 +6,7 @@ import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { conflict, isoDate, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
 import { deleteAccount } from "../services/accountDeletion.js";
+import type { ProfileEmbeddings } from "../services/profileEmbeddings.js";
 
 const { users, profiles, injuries } = schema;
 const onboardingGoals = new Set([
@@ -158,6 +159,8 @@ export async function getProfile(db: Db, id: string) {
 export interface MeRouterOptions {
   pseudonymSecret?: string;
   onAccountDeleted?: (userId: string) => void;
+  // CONN-08: re-embeds the profile for buddy matching when goals or bio change.
+  profileEmbeddings?: ProfileEmbeddings;
 }
 
 export function meRouter(db: Db, options: MeRouterOptions = {}): Router {
@@ -239,6 +242,12 @@ export function meRouter(db: Db, options: MeRouterOptions = {}): Router {
       throw err;
     }
     send(res, await getProfile(db, id));
+    // After the response: a slow or failed embedding never holds up the edit.
+    if (options.profileEmbeddings && (rest.goals !== undefined || rest.bio !== undefined)) {
+      options.profileEmbeddings
+        .refresh(id)
+        .catch((err) => req.log?.warn({ err }, "couldn't refresh profile embedding"));
+    }
   });
 
   router.get("/me/injuries", async (req, res) => {

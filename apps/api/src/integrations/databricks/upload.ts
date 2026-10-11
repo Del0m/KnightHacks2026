@@ -10,13 +10,11 @@
 // nothing else on the input (video, frames, email, handle) can leak through, and the user id
 // is replaced with an HMAC pseudonym.
 //
-// Stubs until dependencies land:
-//   - FinishedSession mirrors the AI-08 set record; swap for the shared type once it exists.
-//   - ExportStatusStore is the Neon write; BE-04 should pass neonExportStatusStore(sql).
-//   - Env is read directly; move to the Zod env from BE-01.
+// FinishedSession mirrors the AI-08 set record; swap for the shared type once AI-08 lands.
 
 import { createHmac } from "node:crypto";
 import { gzipSync } from "node:zlib";
+import type { Env } from "../../env.js";
 
 // ---- Session record (stub of AI-08) ----
 
@@ -69,27 +67,10 @@ export interface FinishedSession {
 
 export type ExportStatus = "pending" | "uploading" | "exported" | "failed";
 
+// Implemented by drizzleExportStatusStore (services/exportQueue.ts).
 export interface ExportStatusStore {
   claim?(sessionId: string): Promise<boolean>;
   set(sessionId: string, status: ExportStatus, error?: string): Promise<void>;
-}
-
-// Works with the tagged template from @neondatabase/serverless: neonExportStatusStore(neon(url)).
-// Expects these columns on sessions (DB-04):
-//   export_status text not null default 'pending', export_error text, exported_at timestamptz
-type SqlTag = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
-
-export function neonExportStatusStore(sql: SqlTag): ExportStatusStore {
-  return {
-    async set(sessionId, status, error) {
-      await sql`
-        UPDATE sessions
-        SET export_status = ${status},
-            export_error  = ${error ?? null},
-            exported_at   = CASE WHEN ${status} = 'exported' THEN now() ELSE exported_at END
-        WHERE id = ${sessionId}`;
-    },
-  };
 }
 
 // ---- Config ----
@@ -105,7 +86,18 @@ export interface UploadConfig {
   baseDelayMs: number;
 }
 
-export function uploadConfigFromEnv(env = process.env): UploadConfig {
+type UploadEnv = Pick<
+  Env,
+  | "DATABRICKS_HOST"
+  | "DATABRICKS_CLIENT_ID"
+  | "DATABRICKS_CLIENT_SECRET"
+  | "DATABRICKS_OAUTH_SCOPES"
+  | "DATABRICKS_VOLUME_PATH"
+  | "SPOTTER_PSEUDONYM_SECRET"
+>;
+
+/** From the validated env (src/env.ts); scripts can pass process.env. */
+export function uploadConfigFromEnv(env: UploadEnv = process.env): UploadConfig {
   const required = [
     "DATABRICKS_HOST",
     "DATABRICKS_CLIENT_ID",
