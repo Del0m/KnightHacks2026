@@ -157,16 +157,29 @@ def gold_training_features():
 
 
 @dp.materialized_view(name=f"{GOLD}.gold_injury_risk_scores",
-                      comment="Heuristic training-load and form-trend score per lifter and body part. Not a diagnosis.")
+                      comment="Heuristic training-load and form-trend score per lifter and body part. "
+                              "Range is the injured side when known (range_side = injured), else the smaller side (min). "
+                              "Not a diagnosis.")
 def gold_injury_risk_scores():
     reps = spark.read.table("silver_reps").filter(~F.array_contains(F.col("flags"), "manual_unscored")).withColumn("body_part", body_part(F.col("exercise_id")))
+    # Range on the injured side when silver_reps knows it ("left"/"right"), else the smaller side,
+    # so the heuristic and the AI-14 model share one definition.
+    injured_known = F.col("injured_side").isin("left", "right")
+    reps = reps.withColumn(
+        "rep_range",
+        F.when(F.col("injured_side") == "left", F.col("left_range_deg"))
+        .when(F.col("injured_side") == "right", F.col("right_range_deg"))
+        .otherwise(F.least("left_range_deg", "right_range_deg")),
+    )
     daily = reps.groupBy("user_id", "body_part", "session_date").agg(
         F.count("*").alias("reps"),
         F.sum(F.when(F.size("flags") > 0, 1).otherwise(0)).alias("flagged_reps"),
         # Bodyweight sets count each rep as 1 kg so they still add load.
         F.sum(F.coalesce("weight_kg", F.lit(1.0))).alias("volume"),
-        F.sum(F.least("left_range_deg", "right_range_deg")).alias("sum_min_range"),
-        F.count(F.least("left_range_deg", "right_range_deg")).alias("n_range"),
+        F.sum("rep_range").alias("sum_range"),
+        F.count("rep_range").alias("n_range"),
+        # A day mixing both kinds of rep is 'injured' if any rep used the injured side.
+        F.when(F.max(injured_known.cast("int")) == 1, "injured").otherwise("min").alias("range_side"),
         F.sum("asymmetry").alias("sum_asym"),
         F.count("asymmetry").alias("n_asym"),
         F.sum("lowering_ms").alias("sum_lowering"),
@@ -184,8 +197,9 @@ def gold_injury_risk_scores():
         "user_id", "body_part", "day", F.col("session_date").alias("date"),
         ratio("flagged_reps", "reps", w7).alias("flag_rate_7d"),
         ratio("flagged_reps", "reps", w28).alias("flag_rate_28d"),
-        ratio("sum_min_range", "n_range", w7).alias("range_7d"),
-        ratio("sum_min_range", "n_range", w28).alias("range_28d"),
+        ratio("sum_range", "n_range", w7).alias("range_7d"),
+        ratio("sum_range", "n_range", w28).alias("range_28d"),
+        "range_side",  # that day's side: 'injured' or 'min' (the windows may span both)
         ratio("sum_asym", "n_asym", w7).alias("asymmetry_7d"),
         F.sum("volume").over(w7).alias("volume_7d"),
         F.sum("volume").over(w28).alias("volume_28d"),
