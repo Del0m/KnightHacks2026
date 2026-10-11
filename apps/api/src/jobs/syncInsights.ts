@@ -3,6 +3,7 @@
 //
 //   spotter.gold.gold_user_progress_daily -> progress_daily   key (user_id, date, exercise_id)
 //   spotter.gold.gold_injury_risk_scores  -> risk_insights    key (user_id, body_part, as_of)
+//     (AI-14: gold_injury_risk_model_scores is read first; see readRiskRows)
 //   spotter.gold.gold_rom_trend           -> rom_trend        key (user_id, angle, side, week)
 //
 // Databricks only knows pseudonymous ids (CONN-02), so we map them back by computing the
@@ -22,6 +23,7 @@ import { pseudonymize } from "../integrations/databricks/upload";
 export const SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const BATCH_SIZE = 500;
 const ROM_LOOKBACK_DAYS = 120;
+const DEFAULT_LOOKBACK_DAYS = 49;
 
 // ---- Config ----
 
@@ -53,7 +55,7 @@ export function syncConfigFromEnv(env = process.env): SyncConfig {
     scopes: env.DATABRICKS_OAUTH_SCOPES || "all-apis",
     warehouseId: env.DATABRICKS_WAREHOUSE_ID!,
     pseudonymSecret: env.SPOTTER_PSEUDONYM_SECRET!,
-    lookbackDays: Number(env.SYNC_LOOKBACK_DAYS) || 49,
+    lookbackDays: Number(env.SYNC_LOOKBACK_DAYS) || DEFAULT_LOOKBACK_DAYS,
   };
 }
 
@@ -134,6 +136,42 @@ export function explainRisk(bodyPart: string, features: string[]): string {
 
 // ---- Databricks ----
 
+// AI-14: the trained model's scores (risk_model.py) win when they exist; until then, or if that
+// table is empty or unreadable, the heuristic scores are used as before. Both tables have the
+// same columns and the same top_features family names, so the upsert and explainRisk() don't care.
+export type RiskSource = "model" | "heuristic";
+const RISK_TABLES: Record<RiskSource, string> = {
+  model: "spotter.gold.gold_injury_risk_model_scores",
+  heuristic: "spotter.gold.gold_injury_risk_scores",
+};
+
+const riskStatement = (table: string, days: number) => `
+      SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features
+      FROM ${table}
+      WHERE date >= date_sub(current_date(), ${days}) AND score IS NOT NULL`;
+
+// If the heuristic read throws too, the error propagates so the caller can leave Neon as it was.
+export async function readRiskRows(
+  query: (sql: string) => Promise<RiskRow[]>,
+  log: LogLike = console,
+  days = DEFAULT_LOOKBACK_DAYS,
+): Promise<{ rows: RiskRow[]; source: RiskSource }> {
+  let why: string;
+  try {
+    const rows = await query(riskStatement(RISK_TABLES.model, days));
+    if (rows.length > 0) {
+      log.info(`[insights] risk scores from ${RISK_TABLES.model} (${rows.length} rows)`);
+      return { rows, source: "model" };
+    }
+    why = "no rows";
+  } catch (err) {
+    why = err instanceof Error ? err.message.split("\n")[0]! : String(err);
+  }
+  const rows = await query(riskStatement(RISK_TABLES.heuristic, days));
+  log.info(`[insights] risk scores from ${RISK_TABLES.heuristic} (model table: ${why})`);
+  return { rows, source: "heuristic" };
+}
+
 async function getToken(cfg: SyncConfig): Promise<string> {
   // Our own OAuth M2M call so we can request the service principal's scopes; the driver's
   // built-in OAuth asks for "all-apis", which spotter-api doesn't have.
@@ -185,10 +223,14 @@ export async function readGold(cfg: SyncConfig, log: LogLike = console): Promise
              avg_range_deg, avg_quality, est_1rm_kg, is_pr
       FROM spotter.gold.gold_user_progress_daily
       WHERE session_date >= date_sub(current_date(), ${days})`);
-    const risk = await read<RiskRow>("gold_injury_risk_scores", `
-      SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features
-      FROM spotter.gold.gold_injury_risk_scores
-      WHERE date >= date_sub(current_date(), ${days}) AND score IS NOT NULL`);
+    // Model first, heuristic fallback; only a failed heuristic read counts as a failed table.
+    let risk: RiskRow[] | null = null;
+    try {
+      risk = (await readRiskRows((sql) => run<RiskRow>(sql), log, days)).rows;
+    } catch (err) {
+      const error = err instanceof Error ? err.message.split("\n")[0]! : String(err);
+      failed.push({ table: "gold_injury_risk_scores", error });
+    }
     // Range of motion is charted from the start of a rehab plan, so it looks further back.
     const rom = await read<RomRow>("gold_rom_trend", `
       SELECT user_id, angle, side, CAST(week AS STRING) AS week, peak_range_deg,
