@@ -121,7 +121,7 @@ describe("CONN-06 insight sync", () => {
         DATABRICKS_CLIENT_ID: "id",
         DATABRICKS_CLIENT_SECRET: "secret",
         DATABRICKS_WAREHOUSE_ID: "wh",
-        SPOTTER_PSEUDONYM_SECRET: "test-secret",
+        STEADYFORUM_PSEUDONYM_SECRET: "test-secret",
       }).lookbackDays,
     ).toBe(49);
   });

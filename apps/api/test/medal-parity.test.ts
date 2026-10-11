@@ -1,6 +1,6 @@
 // INT-06: the shared medal fixtures (specs/set-record/fixtures/medals/*.json) give the expected set
 // and workout medals through the real API: rule flags decide clean, the model only advises. The
-// same fixtures run through the pipeline in databricks/pipelines/spotter_sessions/tests/.
+// same fixtures run through the pipeline in databricks/pipelines/steadyforum_sessions/tests/.
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

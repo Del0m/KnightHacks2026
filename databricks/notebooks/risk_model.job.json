@@ -1,6 +1,6 @@
 {
-  "name": "spotter-injury-risk-model",
-  "description": "AI-14: daily on serverless. Refreshes the spotter_sessions pipeline, then trains the injury-risk model on spotter.gold.gold_injury_risk_scores (heuristic labels; a training-load and form-trend score, not a diagnosis), logs it as an MLflow run artifact, moves the champion run tag only if test PR-AUC is at least the champion's (Unity Catalog registration is opt-in via register_uc), and overwrites gold_injury_risk_model_scores, gold_risk_feature_importance and gold_risk_model_metrics. train_and_score has no retries, so a failure never logs a duplicate run. Replace <workspace-folder> with the workspace folder holding the risk_model notebook.",
+  "name": "steadyforum-injury-risk-model",
+  "description": "AI-14: daily on serverless. Refreshes the steadyforum_sessions pipeline, then trains the injury-risk model on steadyforum.gold.gold_injury_risk_scores (heuristic labels; a training-load and form-trend score, not a diagnosis), logs it as an MLflow run artifact, moves the champion run tag only if test PR-AUC is at least the champion's (Unity Catalog registration is opt-in via register_uc), and overwrites gold_injury_risk_model_scores, gold_risk_feature_importance and gold_risk_model_metrics. train_and_score has no retries, so a failure never logs a duplicate run. Replace <workspace-folder> with the workspace folder holding the risk_model notebook.",
   "max_concurrent_runs": 1,
   "schedule": {
     "quartz_cron_expression": "0 0 5 * * ?",

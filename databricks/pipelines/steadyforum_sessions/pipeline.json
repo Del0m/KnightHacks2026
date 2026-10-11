@@ -1,0 +1,17 @@
+{
+  "name": "steadyforum_sessions",
+  "catalog": "steadyforum",
+  "schema": "raw",
+  "serverless": true,
+  "continuous": false,
+  "development": true,
+  "channel": "CURRENT",
+  "configuration": {
+    "steadyforum.volume_path": "/Volumes/steadyforum/raw/sessions"
+  },
+  "libraries": [
+    { "file": { "path": "<repo-path>/databricks/pipelines/steadyforum_sessions/bronze.py" } },
+    { "file": { "path": "<repo-path>/databricks/pipelines/steadyforum_sessions/silver.py" } },
+    { "file": { "path": "<repo-path>/databricks/pipelines/steadyforum_sessions/gold.py" } }
+  ]
+}

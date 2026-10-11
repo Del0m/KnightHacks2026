@@ -287,7 +287,7 @@
     "export_status": "exported",
     "files": [
       {
-        "path": "/Volumes/spotter/raw/sessions/joints/2026-10-10/<id 2>.ndjson.gz",
+        "path": "/Volumes/steadyforum/raw/sessions/joints/2026-10-10/<id 2>.ndjson.gz",
         "sets": [
           {
             "set_index": 0,
@@ -301,7 +301,7 @@
         ]
       },
       {
-        "path": "/Volumes/spotter/raw/sessions/meta/2026-10-10/<id 2>.json",
+        "path": "/Volumes/steadyforum/raw/sessions/meta/2026-10-10/<id 2>.json",
         "metadata": {
           "schema_version": 1,
           "session_id": "<id 2>",
@@ -315,7 +315,7 @@
           "experience_level": "beginner",
           "injury_groups": [],
           "rehab_start_on": null,
-          "joints_path": "/Volumes/spotter/raw/sessions/joints/2026-10-10/<id 2>.ndjson.gz",
+          "joints_path": "/Volumes/steadyforum/raw/sessions/joints/2026-10-10/<id 2>.ndjson.gz",
           "exported_at": "<time>",
           "sets": [
             {

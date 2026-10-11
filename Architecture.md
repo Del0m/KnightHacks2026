@@ -1,6 +1,6 @@
-# Architecture: Spotter (working name)
+# Architecture: SteadyForum (working name)
 
-**Spotter helps you get back to the gym after an injury, then keeps you there.** It's a quiet AI spotter for people returning from injury and for new gym-goers. The user's phone films the set and runs the pose AI on its own neural processor, and the user gets a short, kind note between sets instead of being talked at mid-rep. Spotter tracks the plan a physio gave you, shows your range of motion coming back week by week, plans workouts around the injury, and connects you with people recovering from something similar.
+**SteadyForum helps you get back to the gym after an injury, then keeps you there.** It's a quiet AI coach for people returning from injury and for new gym-goers. The user's phone films the set and runs the pose AI on its own neural processor, and the user gets a short, kind note between sets instead of being talked at mid-rep. SteadyForum tracks the plan a physio gave you, shows your range of motion coming back week by week, plans workouts around the injury, and connects you with people recovering from something similar.
 
 > **Visual overview for non-engineers:** https://claude.ai/artifact/GEo4ve7Br3rcUVVMibxYwY (hand-drawn diagrams of everything below).
 >
@@ -46,15 +46,15 @@
 
 ### 1.1 Positioning: back to the gym after injury
 
-AI rep counters are a common hackathon project. Leading with injury recovery makes Spotter stand out, gives judges a reason to care, and gives Databricks a clear, measurable result. Rehab exercises are also slow and bodyweight-based, which is easier for pose detection than fast lifts. Spotter stays a fitness app, not a medical one: it tracks what a physio prescribed and never prescribes treatment itself.
+AI rep counters are a common hackathon project. Leading with injury recovery makes SteadyForum stand out, gives judges a reason to care, and gives Databricks a clear, measurable result. Rehab exercises are also slow and bodyweight-based, which is easier for pose detection than fast lifts. SteadyForum stays a fitness app, not a medical one: it tracks what a physio prescribed and never prescribes treatment itself.
 
 | Feature | What the user gets | How it's built |
 |---|---|---|
-| **Plan from my physio** | Enter the exercises, sets, reps and range limits your physio gave you. Spotter guides and tracks those sessions at home with the same silent feedback. | `rehab_plans` and `rehab_limits` tables in Neon. Limits feed the form engine's injury overrides, so "clean" means "within what my physio allowed". |
+| **Plan from my physio** | Enter the exercises, sets, reps and range limits your physio gave you. SteadyForum guides and tracks those sessions at home with the same silent feedback. | `rehab_plans` and `rehab_limits` tables in Neon. Limits feed the form engine's injury overrides, so "clean" means "within what my physio allowed". |
 | **Range-of-motion tracking** | See the injured joint's range improve over time, e.g. "knee range up 18° in three weeks", next to the healthy side. | The phone records peak joint angles per rep. Databricks builds `gold_rom_trend` (per user, joint and side) and syncs it to Neon. |
 | **Physio report** | A one-page summary to show your physio: sessions done, range-of-motion trend, left/right comparison, any reps outside the prescribed limits. | API renders a shareable page or PDF from Neon data. The user chooses to share it; nothing is sent automatically. |
 | **Recovery buddies** | Get matched with people coming back from a similar injury, at a similar stage. | Buddy matching adds injury type and weeks-since-injury to the score, only for users who opt in to share their injury. |
-| **Back-to-gym milestone** | When your range of motion and form are steady at your physio's targets, Spotter suggests moving from the rehab plan to a regular gym plan. | Rule on `gold_rom_trend` plus medal history; the user confirms, and the note always says to check with your physio first. |
+| **Back-to-gym milestone** | When your range of motion and form are steady at your physio's targets, SteadyForum suggests moving from the rehab plan to a regular gym plan. | Rule on `gold_rom_trend` plus medal history; the user confirms, and the note always says to check with your physio first. |
 
 **Safety lines we hold:** no diagnosis, no treatment advice, no changing a physio's limits. Pain mentioned anywhere routes to "please check with your physio or a doctor". Every recovery screen carries that note.
 
@@ -74,7 +74,7 @@ AI rep counters are a common hackathon project. Leading with injury recovery mak
 
 ## 2. Challenge strategy
 
-| Challenge | How Spotter delivers it | Owner |
+| Challenge | How SteadyForum delivers it | Owner |
 |---|---|---|
 | **Hugging Face: Best Use of Open Source AI** | Our YOLOv8 pose and form models live on the Hub and are downloaded by every phone. gpt-oss on Inference Providers writes rest notes and plans. RAG uses BGE embeddings, Llama Guard moderates the feed, an HF GPU endpoint can re-check flagged sets, and, if the data checks pass, we publish our form-quality model with a model card and a Gradio Space. | AI eng B |
 | **Databricks: Best Use of Databricks** | Medallion pipeline (bronze, silver, gold) over session data. An MLflow form-quality model on Model Serving scores each set during rest. A risk model, AI/BI dashboard and Genie. Retrained models are published back to the Hub for the app. | AI eng A |
@@ -85,7 +85,7 @@ AI rep counters are a common hackathon project. Leading with injury recovery mak
 
 **Skipped:** NVIDIA Jetson, Full Sail, BNY, NextEra, OneEthos, Adobe and AMD, which are off-topic.
 
-**Story for judges:** *"Most people coming back from an injury do their physio exercises alone at home, with nobody checking their form, and many quit before they get back to the gym. Spotter turns the phone you already own into a quiet coach: it tracks the plan your physio gave you, shows your range of motion coming back week by week, and connects you with people recovering from the same thing. Then it keeps you going once you're back in the gym."*
+**Story for judges:** *"Most people coming back from an injury do their physio exercises alone at home, with nobody checking their form, and many quit before they get back to the gym. SteadyForum turns the phone you already own into a quiet coach: it tracks the plan your physio gave you, shows your range of motion coming back week by week, and connects you with people recovering from the same thing. Then it keeps you going once you're back in the gym."*
 
 ---
 
@@ -98,7 +98,7 @@ flowchart LR
     Phone["📱 Your phone<br/>camera + Neural Engine<br/>runs the pose AI"]
     DBX["Databricks<br/>scores sets, trends"]
     HF["Hugging Face<br/>models + planning AI"]
-    Cloud["Spotter cloud<br/>accounts, feed, Neon"]
+    Cloud["SteadyForum cloud<br/>accounts, feed, Neon"]
 
     Phone -- "finished set (joints only)" --> DBX
     DBX -- "scores, medal" --> Phone
@@ -120,7 +120,7 @@ flowchart LR
 | Part | What it does | Built with |
 |---|---|---|
 | Phone app | Films the set, runs pose AI on the neural processor, counts reps, shows the skeleton, rest notes, plans and feed | React Native + Expo dev build, `react-native-vision-camera`, YOLOv8n-pose (Core ML on iPhone) |
-| Spotter cloud | Accounts, sessions, social, planner, sync | Node + Express + TypeScript, Neon Postgres |
+| SteadyForum cloud | Accounts, sessions, social, planner, sync | Node + Express + TypeScript, Neon Postgres |
 | Databricks | Set scoring, medallion pipeline, risk model, dashboards, retraining | Free Edition: Lakeflow, MLflow, Model Serving, AI/BI, Genie |
 | Hugging Face | Model hosting, LLM, embeddings, moderation, GPU re-check | Hub, Inference Providers, Inference Endpoint or Space |
 
@@ -191,7 +191,7 @@ flowchart LR
 - **Privacy:** this is the only mode where video leaves the phone, so it needs the explicit consent above. Frames are processed in memory on the endpoint and never stored.
 - **Cost:** endpoints are billed while running, from the team's HF credits. Set scale-to-zero so it only costs money while someone is mid-workout. A Gradio Space is not a good fit here, because it queues requests instead of streaming.
 - **Basic mode (iPhone, manual only):** Apple Vision body pose (`VNDetectHumanBodyPoseRequest`, source `vision`) runs fully on-device. The user picks it in settings, e.g. "Basic, on-device"; it is never chosen automatically. It maps Vision's 19 points to the same 17 COCO joints (neck and root dropped). It's less accurate but enough for rep counting and the main form rules.
-- **Code:** the selection logic is a pure function, `selectPoseMode` in `apps/mobile/src/pose/mode.ts`, returning `'coreml' | 'vision' | 'cloud' | 'paused' | 'unavailable'`. The benchmark is `benchmark.ts`, and `usePoseMode.ts` caches its result with the user's preference and cloud consent and feeds them to `selectPoseMode`. It also exposes `needsCloudConsent` for the consent prompt (FE-15) and `rerunBenchmark` for settings. The native side is `benchmarkPoseModel` in `modules/spotter-pose`. The Apple Vision detector is `apps/mobile/src/pose/basic.ts` plus the native `HybridBasicPoseDetector` in `modules/spotter-pose`; the joint mapping is `VisionPoseMapper.swift` in PoseCore.
+- **Code:** the selection logic is a pure function, `selectPoseMode` in `apps/mobile/src/pose/mode.ts`, returning `'coreml' | 'vision' | 'cloud' | 'paused' | 'unavailable'`. The benchmark is `benchmark.ts`, and `usePoseMode.ts` caches its result with the user's preference and cloud consent and feeds them to `selectPoseMode`. It also exposes `needsCloudConsent` for the consent prompt (FE-15) and `rerunBenchmark` for settings. The native side is `benchmarkPoseModel` in `modules/steadyforum-pose`. The Apple Vision detector is `apps/mobile/src/pose/basic.ts` plus the native `HybridBasicPoseDetector` in `modules/steadyforum-pose`; the joint mapping is `VisionPoseMapper.swift` in PoseCore.
 
 ---
 
@@ -384,7 +384,7 @@ Each rule has a `rest_note` that the LLM may rephrase. Notes describe the moveme
 
 ## 7. Quiet coaching
 
-Beginners and people coming back from injury are often self-conscious in the gym. A voice correcting them while they lift would push them out the door. **Spotter never speaks or pops up during a rep.**
+Beginners and people coming back from injury are often self-conscious in the gym. A voice correcting them while they lift would push them out the door. **SteadyForum never speaks or pops up during a rep.**
 
 | When | What the lifter sees | What the system does |
 |---|---|---|
@@ -413,7 +413,7 @@ sequenceDiagram
 
 **How messages are phrased**
 
-| What happened | Spotter says, during rest | Why it's phrased this way |
+| What happened | SteadyForum says, during rest | Why it's phrased this way |
 |---|---|---|
 | Reps stopped short of full range | "Next set, try lowering until your hips are level with your knees." | Describes the movement, not the person |
 | Knees drifted inward | "Your knees drifted inward on the last 2 reps. Pointing them over your toes keeps them comfortable." | Facts and a reason, no commands |
@@ -452,7 +452,7 @@ Every workout gets a **form score**: the share of reps that were clean, judged a
 
 ### 9.1 How we use Neon
 
-| Neon feature | Use in Spotter |
+| Neon feature | Use in SteadyForum |
 |---|---|
 | **Neon Auth** | Sign-up and login. The API verifies JWTs. Free for up to 60k monthly active users. |
 | **Postgres** | Users, injuries, plans, sessions, sets, reps, medals, PRs, goals, the social graph, advice threads |
@@ -594,7 +594,7 @@ flowchart LR
 4. Questions mentioning pain get a fixed "please see a medical professional" reply instead of an LLM answer.
 
 **Answer writer (AI-13):** `apps/api/src/services/advice.ts`, called by BE-11 with the question and the sources it retrieved:
-- **Pain:** following §1.1, a check in code returns the fixed reply for any pain word that isn't negated, and for acute signs (a pop or tear, swelling, numbness, can't bear weight, chest pain or dizziness, a fresh injury). The model never sees the question. Soreness, stiffness and tightness still get an answer, and so does a past or recovering injury with no pain or acute sign: training again after an injury is what Spotter is for.
+- **Pain:** following §1.1, a check in code returns the fixed reply for any pain word that isn't negated, and for acute signs (a pop or tear, swelling, numbness, can't bear weight, chest pain or dizziness, a fresh injury). The model never sees the question. Soreness, stiffness and tightness still get an answer, and so does a past or recovering injury with no pain or acute sign: training again after an injury is what SteadyForum is for.
 - **Sources:** the question and up to 6 sources go to gpt-oss as data. The answer is at most 3 sentences and cites 1 to 3 of them by id.
 - **Reputable sources only:** library sources reach the model only from the allow-listed sites above, plus free-exercise-db for technique. Team-guidance sections are never cited. Community answers can be cited and are labelled as community.
 - **Guard:** the answer is shown only when every cited id was given, every number in it comes from a cited source, it passes the §7 tone check (no commands or banned phrases), and it names no condition, cause, medication or guaranteed outcome, and carries no links or promotions.
@@ -605,7 +605,7 @@ flowchart LR
 **Endpoint (BE-11):** `POST /advice` in `apps/api/src/routes/advice.ts`, with retrieval in `services/adviceThread.ts`:
 - **Moderation:** the question is moderated like a post, including the threats and harassment check, because it appears in the feed and other members answer it.
 - **Retrieval:** the question's bge-small embedding (stored on the post) finds the nearest injury-note sections and exercises in `doc_chunks`. It also finds similar advice questions the asker can see in the feed (cosine 0.75 or more), and uses their community answers. Earlier AI answers and blocked users' comments are never used.
-- **Storage:** the AI answer is the first comment, with `ai_suggested: true` and the sources it cites. The fixed pain reply is a comment with `ai_suggested: false`. Neither has an author: Spotter posts them.
+- **Storage:** the AI answer is the first comment, with `ai_suggested: true` and the sources it cites. The fixed pain reply is a comment with `ai_suggested: false`. Neither has an author: SteadyForum posts them.
 - **Failures:** if embedding, retrieval or the model fails, the question still posts.
 
 ---
@@ -625,7 +625,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    API["Spotter cloud<br/>finished session"] -- "upload file" --> VOL[/"Databricks Volume"/]
+    API["SteadyForum cloud<br/>finished session"] -- "upload file" --> VOL[/"Databricks Volume"/]
     VOL --> BR["🥉 Bronze<br/>raw sets as they arrive"]
     BR -- "clean" --> SV["🥈 Silver<br/>one row per rep:<br/>angles, tempo, range"]
     SV -- "summarise" --> GD["🥇 Gold<br/>progress, form trends,<br/>risk flags, medals"]
@@ -687,8 +687,8 @@ This is a **training-load and form-trend score, not a diagnosis.** Example featu
 - **Features:** the 7- and 28-day columns plus their changes, grouped into the same five families the app explains, and a one-hot body part. Missing values stay missing (XGBoost handles them).
 - **Training:** XGBoost with `scale_pos_weight` for the class imbalance. Train and test are split by lifter, so no lifter is in both. Scores are corrected back to the real class prior, so they read as probabilities.
 - **Evaluation:** ROC-AUC, PR-AUC and Brier on the held-out lifters, for the model **and for the heuristic's own score used as next week's predictor**, so the model's value over the rule is measured, not assumed. If either split has only one class, training is skipped, the existing champion still scores, and the job fails so it shows up.
-- **MLflow:** each run logs params, both sets of metrics, the class balance, the importance tables and the input dataset to the experiment `/Users/<owner>/spotter_injury_risk`. The model is a run artifact (`runs:/<run_id>/model`). The **champion** is the run tagged `champion=true`; a new run takes the tag only if its test PR-AUC is at least the champion's.
-- **Unity Catalog:** registering `spotter.ml.injury_risk` is opt-in (`register_uc` widget, off by default). On Free Edition the artifact upload to the catalog's default storage is denied, so a failed attempt tags the run `uc_registration=skipped` and deletes the half-made version. When registration works, the `champion` alias follows the champion run.
+- **MLflow:** each run logs params, both sets of metrics, the class balance, the importance tables and the input dataset to the experiment `/Users/<owner>/steadyforum_injury_risk`. The model is a run artifact (`runs:/<run_id>/model`). The **champion** is the run tagged `champion=true`; a new run takes the tag only if its test PR-AUC is at least the champion's.
+- **Unity Catalog:** registering `steadyforum.ml.injury_risk` is opt-in (`register_uc` widget, off by default). On Free Edition the artifact upload to the catalog's default storage is denied, so a failed attempt tags the run `uc_registration=skipped` and deletes the half-made version. When registration works, the `champion` alias follows the champion run.
 - **Outputs**, overwritten each run from the champion:
   - `gold_injury_risk_model_scores`: each lifter and body part's latest day, with `top_features` = up to 3 families whose XGBoost contribution is at least 0.01, largest first.
   - `gold_risk_feature_importance`: gain per feature and family.
@@ -696,7 +696,7 @@ This is a **training-load and form-trend score, not a diagnosis.** Example featu
 
 **In the app:** the Neon sync reads the model scores first. It falls back to the heuristic table when the model table is missing, empty, unreadable or more than 36 hours old ([§11.3](#113-getting-insights-back-to-the-app)). Both tables have the same columns and family names, so `explainRisk()` and the "not a diagnosis" disclaimer work for either. Neon doesn't record which source a score came from.
 
-**Dashboard:** the AI/BI dashboard "Spotter: injury-risk trends" (`databricks/dashboards/injury_risk.lvdash.json`) shows:
+**Dashboard:** the AI/BI dashboard "SteadyForum: injury-risk trends" (`databricks/dashboards/injury_risk.lvdash.json`) shows:
 - feature importance by family
 - held-out model vs heuristic metrics
 - the model score distribution by body part (latest day)
@@ -751,7 +751,7 @@ flowchart LR
     P --> X["Frame discarded"]
     P --> K["Joints, reps, scores<br/>and medals"]
     K -- "after each set" --> U["Uploaded to the cloud"]
-    C -. "only if the user opts in<br/>to help train Spotter" .-> O["Clip uploaded, joints<br/>extracted, clip deleted"]
+    C -. "only if the user opts in<br/>to help train SteadyForum" .-> O["Clip uploaded, joints<br/>extracted, clip deleted"]
 ```
 
 - **Pseudonymous IDs** in Databricks, never email or handle.
@@ -769,7 +769,7 @@ flowchart LR
         PH["Phone<br/>Expo app + on-device AI"]
     end
     subgraph Hosted["Hosted"]
-        API["Spotter cloud<br/>Render / Railway / Fly.io"]
+        API["SteadyForum cloud<br/>Render / Railway / Fly.io"]
         WEB["Web build<br/>Vercel / Netlify"]
         NEON[("Neon<br/>main, dev, demo")]
         HF["Hugging Face<br/>Hub, Providers, Endpoint"]
@@ -790,7 +790,7 @@ flowchart LR
 ## 15. Repository layout
 
 ```
-spotter/
+steadyforum/
 ├── apps/
 │   ├── mobile/                # React Native + Expo (web + iOS)
 │   │   ├── src/screens/       # LiveSet, Planner, Feed, Buddies, Progress
@@ -833,7 +833,7 @@ The schedule assumes about 36 hours; shift the blocks if yours differs.
 
 ```mermaid
 gantt
-    title Spotter hackathon plan (about 36 h)
+    title SteadyForum hackathon plan (about 36 h)
     dateFormat YYYY-MM-DD HH:mm
     axisFormat D%d %H:%M
     section Setup (all)
@@ -880,7 +880,7 @@ gantt
 
 About 4 minutes, adjusted per judging room. Lead with that room's challenge.
 
-1. **Hook (20 s):** "After an injury, you do your physio exercises alone at home with nobody checking your form, and it's easy to give up before you ever get back to the gym. Spotter is a quiet coach on the phone you already own."
+1. **Hook (20 s):** "After an injury, you do your physio exercises alone at home with nobody checking your form, and it's easy to give up before you ever get back to the gym. SteadyForum is a quiet coach on the phone you already own."
 2. **Live set (60 s):** a teammate squats with the phone propped up beside them. The rep counter climbs silently. One deliberate knees-in rep tints the knees amber, with no sound.
    - Turn on airplane mode mid-set to show the AI runs entirely on the phone. "17 joints per frame on the phone's own chip. Video never leaves the device."
 3. **Rest (30 s):** the rest note appears: *"7 of 8 reps were clean. Your knees drifted inward on one rep; pointing them over your toes keeps them comfortable."* Show the set medal.
@@ -891,7 +891,7 @@ About 4 minutes, adjusted per judging room. Lead with that room's challenge.
    - *Hugging Face:* "gpt-oss on Inference Providers, RAG with BGE embeddings, Llama Guard, and our form-quality model on the Hub." Show the Space. Only say "trained on our own labelled data" if the AI-09 pilot has grown past the validation stage.
 7. **Social (30 s):** "Finished a gold-level workout" posts to the feed; a buddy suggestion appears ("same gym, both beginners, both train mornings").
    - *Neon:* "Auth, the social graph, vectors and the serving layer for Databricks insights all live in Neon. We develop on branches and demo off a seeded branch."
-8. **Close (10 s):** "Spotter: a quiet coach for every rep, and a community for every beginner."
+8. **Close (10 s):** "SteadyForum: a quiet coach for every rep, and a community for every beginner."
 
 ---
 

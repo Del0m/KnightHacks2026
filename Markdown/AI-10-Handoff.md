@@ -19,7 +19,7 @@ Train the per-rep form-quality model (AI-10) without any new data collection at 
 |---|---|---|---|
 | AI-09 cumulative export | `~/Downloads/labelling-export-all-bundle_a620b7b2-….json` (2026-10-10 22:14). It supersedes the earlier `ai09-pilot-2026-10-10/` folder (5 reps) and the 17:43 bundle, whose 5 reps are a subset of it. | **35 reps, 4 clips, one participant**: squat 10, push-up 20, shoulder press 5. Labels: 17 `clean`, 15 `fast_lowering`, 2 `wrists_off_stack`, 1 `forward_lean`. Bicep curl and lunge: none. | Human-labelled, with boundaries. Checksums are verified by `ml/form_classifier/dataset.py`. Too small to train a good model on; it is the first real labelled set, so use it for training experiments and cross-validation, not for claims. |
 | Public landmark set | `Cuong2004/gym-exercise-landmarks` on Hugging Face | Unknown | **Not yet checked.** The licence, the exercises covered, the joint format (MediaPipe 33-point) and whether it has any form-error labels are all unknown. See open checks. |
-| Rule flags on the phone | Produced by the rule engine (`specs/exercises/`), stored in `spotter.raw.silver_reps` | Any sessions in the app's Databricks tables | Used as labels only where no human label exists. |
+| Rule flags on the phone | Produced by the rule engine (`specs/exercises/`), stored in `steadyforum.raw.silver_reps` | Any sessions in the app's Databricks tables | Used as labels only where no human label exists. |
 
 The pilot's `manifest.json` records the remaining deficit: 35 squat, and 40 each for push-up, bicep curl, shoulder press and lunge. That collection is no longer planned for the hackathon.
 
@@ -121,7 +121,7 @@ Keep the report outside the repo.
 
 ## What to deliver
 
-1. A training run in MLflow with the metrics above, registered as `spotter.ml.form_quality`.
+1. A training run in MLflow with the metrics above, registered as `steadyforum.ml.form_quality`.
 2. A dataset card (even if internal) stating: sources, licences, the label provenance split, exercises covered, the preprocessing version, and the consent reference for the pilot.
 3. An updated `form_model.py` `train_models` (the stub comment at the top is already updated).
 4. A short note on the held-out numbers, written plainly. If an exercise has no real labels, say so.

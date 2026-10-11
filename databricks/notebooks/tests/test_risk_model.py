@@ -19,17 +19,17 @@ first `# COMMAND ----------`) must say "not a diagnosis" and mention heuristic l
 
 Input frame
 -----------
-`df` is a pandas DataFrame shaped like spotter.gold.gold_injury_risk_scores (one row per
+`df` is a pandas DataFrame shaped like steadyforum.gold.gold_injury_risk_scores (one row per
 user_id x body_part x date): user_id, body_part, date (datetime.date or datetime64), flag_rate_7d,
 flag_rate_28d, range_7d, range_28d, asymmetry_7d, volume_7d, volume_28d, lowering_ms_7d,
 lowering_ms_28d, acwr, score, top_features, weak_label. Any numeric value may be NaN/None.
 
 Module constants (above the marker)
 -----------------------------------
-MODEL_NAME = "spotter.ml.injury_risk"
-SOURCE_TABLE = "spotter.gold.gold_injury_risk_scores"
-MODEL_SCORES_TABLE = "spotter.gold.gold_injury_risk_model_scores"
-IMPORTANCE_TABLE = "spotter.gold.gold_risk_feature_importance"
+MODEL_NAME = "steadyforum.ml.injury_risk"
+SOURCE_TABLE = "steadyforum.gold.gold_injury_risk_scores"
+MODEL_SCORES_TABLE = "steadyforum.gold.gold_injury_risk_model_scores"
+IMPORTANCE_TABLE = "steadyforum.gold.gold_risk_feature_importance"
 MODEL_TABLE_COMMENT = ("Training-load and form-trend score from a model trained on heuristic labels. "
                        "Not a diagnosis.")
 IMPORTANCE_TABLE_COMMENT: str containing "Not a diagnosis"
@@ -164,10 +164,10 @@ def synthetic_frame(users=12, days=40, seed=3) -> pd.DataFrame:
 
 class Constants(unittest.TestCase):
     def test_tables_and_not_a_diagnosis_comments(self):
-        self.assertEqual(ns["MODEL_NAME"], "spotter.ml.injury_risk")
-        self.assertEqual(ns["SOURCE_TABLE"], "spotter.gold.gold_injury_risk_scores")
-        self.assertEqual(ns["MODEL_SCORES_TABLE"], "spotter.gold.gold_injury_risk_model_scores")
-        self.assertEqual(ns["IMPORTANCE_TABLE"], "spotter.gold.gold_risk_feature_importance")
+        self.assertEqual(ns["MODEL_NAME"], "steadyforum.ml.injury_risk")
+        self.assertEqual(ns["SOURCE_TABLE"], "steadyforum.gold.gold_injury_risk_scores")
+        self.assertEqual(ns["MODEL_SCORES_TABLE"], "steadyforum.gold.gold_injury_risk_model_scores")
+        self.assertEqual(ns["IMPORTANCE_TABLE"], "steadyforum.gold.gold_risk_feature_importance")
         self.assertEqual(ns["MODEL_TABLE_COMMENT"],
                          "Training-load and form-trend score from a model trained on heuristic labels. "
                          "Not a diagnosis.")
@@ -428,8 +428,8 @@ class ReviewFixes(unittest.TestCase):
         cls.spw = float(cls.model.get_params()["scale_pos_weight"])
 
     def test_comment_sql_escapes_quotes(self):
-        stmt = ns["comment_sql"]("spotter.gold.t", "The model's score. Not a diagnosis.")
-        self.assertEqual(stmt, "COMMENT ON TABLE spotter.gold.t IS 'The model\\'s score. Not a diagnosis.'")
+        stmt = ns["comment_sql"]("steadyforum.gold.t", "The model's score. Not a diagnosis.")
+        self.assertEqual(stmt, "COMMENT ON TABLE steadyforum.gold.t IS 'The model\\'s score. Not a diagnosis.'")
         self.assertEqual(ns["comment_sql"]("a.b.c", "back\\slash"), "COMMENT ON TABLE a.b.c IS 'back\\\\slash'")
         for table, comment in [(ns["MODEL_SCORES_TABLE"], ns["MODEL_TABLE_COMMENT"]),
                                (ns["IMPORTANCE_TABLE"], ns["IMPORTANCE_TABLE_COMMENT"])]:
@@ -564,5 +564,5 @@ class MetricsTable(unittest.TestCase):
                              ("run-1", "t", 11, 1375))
 
     def test_metrics_table_constants(self):
-        self.assertEqual(self.ns["METRICS_TABLE"], "spotter.gold.gold_risk_model_metrics")
+        self.assertEqual(self.ns["METRICS_TABLE"], "steadyforum.gold.gold_risk_model_metrics")
         self.assertIn("Not a diagnosis", self.ns["METRICS_TABLE_COMMENT"])

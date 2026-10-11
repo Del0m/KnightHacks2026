@@ -28,11 +28,11 @@ const {
 } = schema;
 
 export const REPORT_DISCLAIMER =
-  "Spotter is a fitness app, not a medical one. It records what your physio prescribed and does not give treatment advice.";
+  "SteadyForum is a fitness app, not a medical one. It records what your physio prescribed and does not give treatment advice.";
 export const MEASURED_HOW =
   "Range of motion comes from the phone camera's pose tracking; no video is stored. Each week's figure is " +
   "the peak range of that week's reps (90th percentile), in degrees of bend from straight. Sessions and " +
-  "reps past the prescribed limits come from the workouts recorded in Spotter.";
+  "reps past the prescribed limits come from the workouts recorded in SteadyForum.";
 export const PHYSIO_LIMIT_RULE = "physio_limit";
 export const SHARE_DAYS_DEFAULT = 14;
 export const MAX_REPORT_DAYS = 26 * 7;

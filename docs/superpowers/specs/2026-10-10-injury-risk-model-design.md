@@ -4,7 +4,7 @@ AI-14 (#54) trains an XGBoost model that forecasts the heuristic injury-risk fla
 
 ## What exists (CONN-03, CONN-06, BE-13)
 
-- **Features and weak label:** `gold_injury_risk_scores` (`databricks/pipelines/spotter_sessions/gold.py`) has, per lifter × body part × day, 7- and 28-day windows of:
+- **Features and weak label:** `gold_injury_risk_scores` (`databricks/pipelines/steadyforum_sessions/gold.py`) has, per lifter × body part × day, 7- and 28-day windows of:
   - flag rate
   - range, using the smaller of left and right
   - asymmetry
@@ -13,13 +13,13 @@ AI-14 (#54) trains an XGBoost model that forecasts the heuristic injury-risk fla
 
   It also has a weighted score (`RISK_WEIGHTS`), `top_features` (the up-to-3 largest contributions) and `weak_label = score >= 0.5`.
 - **Path to the app:** `apps/api/src/jobs/syncInsights.ts` copies `score` and `top_features` into Neon `risk_insights`. `explainRisk()` turns the feature names (`flag_rate_rising`, `range_shrinking`, `asymmetry`, `acute_chronic_load`, `tempo_speeding_up`) into text. `GET /me/insights` (`routes/progress.ts`) adds `INSIGHTS_DISCLAIMER` ("not a diagnosis").
-- **Pattern to follow:** `databricks/notebooks/form_model.py` (CONN-04): MLflow with Unity Catalog registry, a `champion` alias moved only when held-out metrics are at least as good, and `spotter.ml` for models.
+- **Pattern to follow:** `databricks/notebooks/form_model.py` (CONN-04): MLflow with Unity Catalog registry, a `champion` alias moved only when held-out metrics are at least as good, and `steadyforum.ml` for models.
 - **Missing:** the model, the scores it produces, a feature-importance table and any dashboard.
 
 ## Decisions (agreed)
 
 1. **Label = a forecast.** For each lifter, body part and day D, the label is whether the heuristic flag (`weak_label`) is raised on any tracked day in (D, D+7]. Rows without 7 days of future data are scored but not trained on. Same-day labels would let the model relearn the rule it's computed from.
-2. **The app shows the model score, with the heuristic as fallback.** The notebook writes `spotter.gold.gold_injury_risk_model_scores` with the heuristic table's columns. The Neon sync reads it first and falls back to `gold_injury_risk_scores` when it's missing or failing.
+2. **The app shows the model score, with the heuristic as fallback.** The notebook writes `steadyforum.gold.gold_injury_risk_model_scores` with the heuristic table's columns. The Neon sync reads it first and falls back to `gold_injury_risk_scores` when it's missing or failing.
 3. **Injured-side range lives in `gold.py`.** Range uses the injured side when `silver_reps.injured_side` knows it, and the smaller side otherwise, so the heuristic and the model share one definition.
 4. **Verified for real.** The user adds Databricks workspace credentials to `apps/api/.env`. The notebook runs on serverless through the Jobs API, and the model, tables and dashboard are checked in the workspace.
 
@@ -29,7 +29,7 @@ AI-14 (#54) trains an XGBoost model that forecasts the heuristic injury-risk fla
 
 - In `gold_injury_risk_scores`, the daily aggregate's range uses `left_range_deg` or `right_range_deg` per `injured_side`, and the smaller of the two when `injured_side` is null. `range_7d` and `range_28d` keep their names; new column `range_side` is `injured` or `min`.
 - `range_shrinking` and the score follow automatically.
-- **Tests:** a local Spark test (`spotter_sessions/tests/test_risk_features.py`, needs Java 17 or 21: `brew install openjdk@21`) checks:
+- **Tests:** a local Spark test (`steadyforum_sessions/tests/test_risk_features.py`, needs Java 17 or 21: `brew install openjdk@21`) checks:
   - a lifter with `knee:left` whose left range shrinks gets `range_shrinking`, while the other side's range doesn't move it
   - a lifter with no injury uses the smaller side
 
@@ -57,18 +57,18 @@ Its sections:
   - `contributions(model, X)` → per-row XGBoost `pred_contribs`, summed per family; `top_features` = up to 3 families with positive contribution ≥ 0.01, largest first.
   - `importance(model)` → gain importance per feature and per family.
 - **Run:**
-  1. Read `spotter.gold.gold_injury_risk_scores`.
+  1. Read `steadyforum.gold.gold_injury_risk_scores`.
   2. Label, split, train and evaluate.
-  3. Log to the MLflow experiment `/Users/<me>/spotter_injury_risk`: params, metrics (model and heuristic baseline), class balance, row counts, the importance table as an artifact, and the input dataset.
-  4. Register `spotter.ml.injury_risk` with a signature, and move `champion` only if test PR-AUC is at least the current champion's.
+  3. Log to the MLflow experiment `/Users/<me>/steadyforum_injury_risk`: params, metrics (model and heuristic baseline), class balance, row counts, the importance table as an artifact, and the input dataset.
+  4. Register `steadyforum.ml.injury_risk` with a signature, and move `champion` only if test PR-AUC is at least the current champion's.
 - **Score:** with `champion`, score every row's latest state and write:
-  - `spotter.gold.gold_injury_risk_model_scores` (overwrite): `user_id`, `body_part`, `date`, `score` (0–1 probability), `top_features`, `model_version`, `scored_at`. Table comment: "Training-load and form-trend score from a model trained on heuristic labels. Not a diagnosis."
-  - `spotter.gold.gold_risk_feature_importance` (overwrite): `model_version`, `feature`, `family`, `gain`, `rank`, `trained_at`.
+  - `steadyforum.gold.gold_injury_risk_model_scores` (overwrite): `user_id`, `body_part`, `date`, `score` (0–1 probability), `top_features`, `model_version`, `scored_at`. Table comment: "Training-load and form-trend score from a model trained on heuristic labels. Not a diagnosis."
+  - `steadyforum.gold.gold_risk_feature_importance` (overwrite): `model_version`, `feature`, `family`, `gain`, `rank`, `trained_at`.
 - **`databricks/notebooks/risk_model.job.json`:** a serverless daily job after the pipeline, like `delete_user.job.json`.
 
 ### 3. Dashboard: `databricks/dashboards/injury_risk.lvdash.json`
 
-An AI/BI dashboard, "Spotter: injury-risk trends", built in the workspace through the Lakeview API and exported to the repo.
+An AI/BI dashboard, "SteadyForum: injury-risk trends", built in the workspace through the Lakeview API and exported to the repo.
 - **Contents:**
   - feature importance by family (bar)
   - model vs heuristic test metrics

@@ -13,7 +13,7 @@ npm install --global --prefix /opt/homebrew pnpm@11.25.0
 
 On Apple Silicon, ensure `/opt/homebrew/opt/node@24/bin` and `/opt/homebrew/bin` are in your terminal PATH. Open a new terminal after updating shell configuration, then verify with `node --version` and `pnpm --version`.
 
-The front-end development Mac has Node 24.21.0 and pnpm 11.25.0 installed. Its shell configuration was backed up to `~/.zprofile.before-spotter` before adding the PATH entry.
+The front-end development Mac has Node 24.21.0 and pnpm 11.25.0 installed. Its shell configuration was backed up to `~/.zprofile.before-steadyforum` before adding the PATH entry.
 
 ## Run
 
@@ -29,7 +29,7 @@ For an installed native development build, run `pnpm start`. This starts Metro f
 
 ## iPhone development build
 
-The project includes `expo-dev-client`, the `spotter` URL scheme, and EAS development profiles. The current bundle identifier is `com.del0m.spotter`; change it in `app.json` if the team uses another identifier.
+The project includes `expo-dev-client`, the `steadyforum` URL scheme, and EAS development profiles. The current bundle identifier is `com.del0m.steadyforum`; change it in `app.json` if the team uses another identifier.
 
 For a cloud build, sign into the team's Expo account and register the test iPhone. EAS ad hoc distribution requires an Apple Developer Program membership:
 

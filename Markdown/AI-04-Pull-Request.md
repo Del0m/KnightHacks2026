@@ -26,7 +26,7 @@ Branched from AI-03 (`ai-03-basic-mode-vision`), which should merge first.
 ## Changes
 
 - **PoseCore:** `TimedBenchmark` is a pure timing loop with an injected clock. It discards the warm-up results and returns the measured latencies, with at least one sample. The stats come from the existing `BenchmarkMath`.
-- **Native module (`spotter-pose`):**
+- **Native module (`steadyforum-pose`):**
   - **`PoseModelRunner`:** model loading, the Vision request and decoding moved here out of `HybridPoseDetector`. The live detector and the benchmark now time exactly the same path, and the detector's behaviour is unchanged.
   - **`benchmarkPoseModel(size, warmUpMs, measureMs)`:** returns a promise and runs on a serial background queue.
     - It uses a mid-gray 1080×1920 `420f` frame, the camera's own format.

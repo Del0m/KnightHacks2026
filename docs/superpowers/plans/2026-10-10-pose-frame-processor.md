@@ -4,7 +4,7 @@
 
 **Goal:** Run YOLOv8n-pose (Core ML) on every Vision Camera v5 frame in a minimal Expo 57 dev build and deliver contract-shaped joints to JavaScript at 15+ fps.
 
-**Architecture:** A local Nitro package (`apps/mobile/modules/spotter-pose`) exposes `PoseDetector.detect(frame)`, implemented in Swift on top of AI-01's `PoseCore` (consumed as a local CocoaPod). A `usePoseOutput` hook in `apps/mobile/src/pose/` wires it into a Vision Camera frame output, throttles to 15 fps and hops results to the JS thread. A debug screen draws the skeleton.
+**Architecture:** A local Nitro package (`apps/mobile/modules/steadyforum-pose`) exposes `PoseDetector.detect(frame)`, implemented in Swift on top of AI-01's `PoseCore` (consumed as a local CocoaPod). A `usePoseOutput` hook in `apps/mobile/src/pose/` wires it into a Vision Camera frame output, throttles to 15 fps and hops results to the JS thread. A debug screen draws the skeleton.
 
 **Tech Stack:** Expo SDK 57 (React Native 0.86), react-native-vision-camera 5.2.x, react-native-vision-camera-worklets, react-native-worklets, react-native-nitro-modules, react-native-nitro-image, nitrogen, react-native-svg, expo-build-properties, Swift / Vision / Core ML, Jest, XCTest via `swift test`.
 
@@ -91,7 +91,7 @@ Tasks 1–6 and Task 7's documentation are implemented. The completion review fi
   ```
 
 - [ ] **Step 1: Scaffold.** Run create-expo-app, then `npx expo install expo-dev-client expo-build-properties react-native-vision-camera react-native-vision-camera-worklets react-native-worklets react-native-nitro-modules react-native-nitro-image react-native-svg` and `npm i -D jest jest-expo @types/jest nitrogen`. Add scripts `"test": "jest"`, `"typecheck": "tsc --noEmit"`, jest preset `jest-expo`.
-- [ ] **Step 2: app.json.** `name` "Spotter", `slug` "spotter", `ios.bundleIdentifier` "com.knighthacks.spotter", `ios.infoPlist.NSCameraUsageDescription` "Spotter uses the camera to see your form. Video never leaves your phone.", plugins: `expo-dev-client`, `["expo-build-properties", { "ios": { "deploymentTarget": "17.0" } }]` (extraPods added in Task 4). `.gitignore` includes `/ios`, `/android`.
+- [ ] **Step 2: app.json.** `name` "SteadyForum", `slug` "steadyforum", `ios.bundleIdentifier` "com.knighthacks.steadyforum", `ios.infoPlist.NSCameraUsageDescription` "SteadyForum uses the camera to see your form. Video never leaves your phone.", plugins: `expo-dev-client`, `["expo-build-properties", { "ios": { "deploymentTarget": "17.0" } }]` (extraPods added in Task 4). `.gitignore` includes `/ios`, `/android`.
 - [ ] **Step 3: Failing tests** in `types.test.ts`: `JOINT_NAMES.length === 17`, `JOINT_NAMES[9] === 'left_wrist'`, `JOINT_NAMES[16] === 'right_ankle'`; `BONES.length === 16` and every index in 0..16; `isPoseResult` true for the contract example (17 joints, `source: 'coreml'`), false for `joints: []`, false for 16 joints, false for `null`.
 - [ ] **Step 4:** `npm test -- types` → FAIL. Implement `types.ts`. → PASS.
 - [ ] **Step 5:** `npm run typecheck` → no errors.
@@ -123,11 +123,11 @@ Tasks 1–6 and Task 7's documentation are implemented. The completion review fi
 - [ ] **Step 4:** Tests PASS; `npm run typecheck` clean.
 - [ ] **Suggested commit:** `feat(pose): frame throttle and overlay geometry (#42)`
 
-### Task 4: `spotter-pose` Nitro module (native detector)
+### Task 4: `steadyforum-pose` Nitro module (native detector)
 
 **Files:**
-- Create in `apps/mobile/modules/spotter-pose/`: `package.json` (name `spotter-pose`, `main`/`react-native` `src/index.ts`, peerDeps react-native, react-native-nitro-modules, react-native-vision-camera), `nitro.json`, `SpotterPose.podspec`, `src/specs/PoseDetector.nitro.ts`, `src/index.ts`, `ios/HybridPoseDetectorFactory.swift`, `ios/HybridPoseDetector.swift`, `nitrogen/generated/**` (generated)
-- Modify: `apps/mobile/package.json` (dependency `"spotter-pose": "file:./modules/spotter-pose"`), `apps/mobile/app.json` (extraPods)
+- Create in `apps/mobile/modules/steadyforum-pose/`: `package.json` (name `steadyforum-pose`, `main`/`react-native` `src/index.ts`, peerDeps react-native, react-native-nitro-modules, react-native-vision-camera), `nitro.json`, `SteadyForumPose.podspec`, `src/specs/PoseDetector.nitro.ts`, `src/index.ts`, `ios/HybridPoseDetectorFactory.swift`, `ios/HybridPoseDetector.swift`, `nitrogen/generated/**` (generated)
+- Modify: `apps/mobile/package.json` (dependency `"steadyforum-pose": "file:./modules/steadyforum-pose"`), `apps/mobile/app.json` (extraPods)
 
 **Interfaces:**
 - Consumes: `ImageOrientation.vision`, `FrameRotation` (Task 1); `ModelLocator`, `PoseDecoder`, `MultiArrayReader`, `PoseResult`, `PoseError` (PoseCore); Vision Camera's `HybridFrameSpec` and `NativeFrame` (`sampleBuffer`), `frame.orientation`, `frame.isMirrored`.
@@ -138,17 +138,17 @@ Tasks 1–6 and Task 7's documentation are implemented. The completion review fi
   ```
   `createPoseDetector` uses `NitroModules.createHybridObject<PoseDetectorFactory>('PoseDetectorFactory')`.
 
-- [ ] **Step 1: Spec + nitro.json.** `nitro.json`: `cxxNamespace ["spotterpose"]`, `ios.iosModuleName "SpotterPose"`, autolinking `PoseDetectorFactory` → swift `HybridPoseDetectorFactory`. Use `react-native-vision-camera-barcode-scanner@5.2.3`'s `nitro.json` and podspec as the reference layout.
-- [ ] **Step 2:** `cd apps/mobile/modules/spotter-pose && npx nitrogen` → `nitrogen/generated/ios/SpotterPose+autolinking.rb` and `HybridPoseDetectorSpec.swift` exist.
-- [ ] **Step 3: Podspec.** Copy barcode-scanner's podspec shape: `s.name "SpotterPose"`, `s.platforms = { :ios => '17.0' }`, source_files `ios/**/*.swift`, `load 'nitrogen/generated/ios/SpotterPose+autolinking.rb'`, `add_nitrogen_files(s)`, dependencies `VisionCamera`, `NitroModules`, `PoseCore`, `React-jsi`, `React-callinvoker`, `install_modules_dependencies(s)`, frameworks `Vision`, `CoreML`, `AVFoundation`.
+- [ ] **Step 1: Spec + nitro.json.** `nitro.json`: `cxxNamespace ["steadyforumpose"]`, `ios.iosModuleName "SteadyForumPose"`, autolinking `PoseDetectorFactory` → swift `HybridPoseDetectorFactory`. Use `react-native-vision-camera-barcode-scanner@5.2.3`'s `nitro.json` and podspec as the reference layout.
+- [ ] **Step 2:** `cd apps/mobile/modules/steadyforum-pose && npx nitrogen` → `nitrogen/generated/ios/SteadyForumPose+autolinking.rb` and `HybridPoseDetectorSpec.swift` exist.
+- [ ] **Step 3: Podspec.** Copy barcode-scanner's podspec shape: `s.name "SteadyForumPose"`, `s.platforms = { :ios => '17.0' }`, source_files `ios/**/*.swift`, `load 'nitrogen/generated/ios/SteadyForumPose+autolinking.rb'`, `add_nitrogen_files(s)`, dependencies `VisionCamera`, `NitroModules`, `PoseCore`, `React-jsi`, `React-callinvoker`, `install_modules_dependencies(s)`, frameworks `Vision`, `CoreML`, `AVFoundation`.
 - [ ] **Step 4: extraPods.** In app.json `expo-build-properties` → `ios.extraPods: [{ "name": "PoseCore", "path": "../../../ml/pose_export/PoseBench/PoseCore" }]` (path relative to `apps/mobile/ios/`).
 - [ ] **Step 5: Swift.**
   - `HybridPoseDetectorFactory.createPoseDetector(size:)` throws `RuntimeError.error(withMessage: "unsupported size \(n); use 320 or 256")` unless size ∈ {320, 256}; otherwise returns `HybridPoseDetector(size:)`.
   - `HybridPoseDetector.init(size:)`: identical model setup to `ml/pose_export/PoseBench/PoseBench/PoseEstimator.swift` (`.all` compute units, `.scaleFit`). `model` property = `ModelLocator.modelName(size:)`.
   - `detect(frame:)`: cast to `NativeFrame`, `CMSampleBufferGetImageBuffer` (throw `RuntimeError` if nil); map `frame.orientation` → `FrameRotation`; call `ImageOrientation.vision(rotation:mirrored: frame.isMirrored, width:height:)` with the buffer's size; `VNImageRequestHandler(cvPixelBuffer:orientation:)`; read output with `MultiArrayReader.floats`; `PoseDecoder.decode(..., frameWidth: uprightWidth, frameHeight: uprightHeight, model:, timestampMs: Int64(Date().timeIntervalSince1970 * 1000))`; convert to Nitro `PoseResult` (`source: "coreml"`, `timestamp_ms` as Double); latency from just before `perform` to after decode, ms.
-- [ ] **Step 6: Build check.** In `apps/mobile`: `npm install && npx expo prebuild -p ios --clean` → `Pod installation complete` and Podfile.lock lists `PoseCore`, `SpotterPose`, `VisionCamera`. Then `xcodebuild -workspace ios/Spotter.xcworkspace -scheme Spotter -configuration Debug -destination 'generic/platform=iOS' -quiet build CODE_SIGNING_ALLOWED=NO` → `BUILD SUCCEEDED`. (Models are added in Task 5; until then the app builds but `createPoseDetector` throws `modelMissing` at runtime, which is expected.)
-- [ ] **Step 7:** `npm run typecheck` clean; `git status --porcelain apps/mobile/modules/spotter-pose/nitrogen` shows only new files from this task (rerun `npx nitrogen` → no diff).
-- [ ] **Suggested commit:** `feat(pose): spotter-pose Nitro detector on PoseCore (#42)`
+- [ ] **Step 6: Build check.** In `apps/mobile`: `npm install && npx expo prebuild -p ios --clean` → `Pod installation complete` and Podfile.lock lists `PoseCore`, `SteadyForumPose`, `VisionCamera`. Then `xcodebuild -workspace ios/SteadyForum.xcworkspace -scheme SteadyForum -configuration Debug -destination 'generic/platform=iOS' -quiet build CODE_SIGNING_ALLOWED=NO` → `BUILD SUCCEEDED`. (Models are added in Task 5; until then the app builds but `createPoseDetector` throws `modelMissing` at runtime, which is expected.)
+- [ ] **Step 7:** `npm run typecheck` clean; `git status --porcelain apps/mobile/modules/steadyforum-pose/nitrogen` shows only new files from this task (rerun `npx nitrogen` → no diff).
+- [ ] **Suggested commit:** `feat(pose): steadyforum-pose Nitro detector on PoseCore (#42)`
 
 ### Task 5: `withPoseModels` config plugin
 
@@ -168,7 +168,7 @@ Tasks 1–6 and Task 7's documentation are implemented. The completion review fi
 - [ ] **Step 1: Failing tests** (Jest, temp dirs via `fs.mkdtempSync`): both `.mlpackage` dirs present → returns 2 paths ending in `yolov8n-pose-320.mlpackage` and `yolov8n-pose-256.mlpackage`; one missing → throws an error whose message contains `uv run export.py` and `ml/pose_export`.
 - [ ] **Step 2:** `npm test -- withPoseModels` → FAIL. Implement `findModels`. → PASS.
 - [ ] **Step 3: Plugin.** `withXcodeProject`: copy each `.mlpackage` (recursive `fs.cpSync`) into `ios/<projectName>/Models/`, add it to the main target as a source file (`project.addSourceFile` with the target's group) so Xcode compiles it to `.mlmodelc`. Idempotent across repeated prebuilds (skip if the file reference already exists).
-- [ ] **Step 4:** With models absent (`mv` the Models dir aside): `npx expo prebuild -p ios --clean` → fails with the export message. Restore, run `uv run export.py` in `ml/pose_export` if needed, prebuild again → success; `grep -c "yolov8n-pose-320.mlpackage" ios/Spotter.xcodeproj/project.pbxproj` ≥ 1.
+- [ ] **Step 4:** With models absent (`mv` the Models dir aside): `npx expo prebuild -p ios --clean` → fails with the export message. Restore, run `uv run export.py` in `ml/pose_export` if needed, prebuild again → success; `grep -c "yolov8n-pose-320.mlpackage" ios/SteadyForum.xcodeproj/project.pbxproj` ≥ 1.
 - [ ] **Step 5:** Xcode build as in Task 4 Step 6 → `BUILD SUCCEEDED`; `find ios/build -name "yolov8n-pose-320.mlmodelc"` (or in DerivedData app bundle) finds it.
 - [ ] **Suggested commit:** `feat(mobile): config plugin bundles pose models at prebuild (#42)`
 

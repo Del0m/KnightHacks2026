@@ -4,28 +4,28 @@
       "name": "importance",
       "displayName": "importance",
       "queryLines": [
-        "SELECT family, SUM(gain) AS gain FROM spotter.gold.gold_risk_feature_importance WHERE family <> 'body_part' GROUP BY family"
+        "SELECT family, SUM(gain) AS gain FROM steadyforum.gold.gold_risk_feature_importance WHERE family <> 'body_part' GROUP BY family"
       ]
     },
     {
       "name": "metrics",
       "displayName": "metrics",
       "queryLines": [
-        "SELECT predictor, metric, value FROM spotter.gold.gold_risk_model_metrics UNPIVOT (value FOR metric IN (roc_auc AS `ROC-AUC`, pr_auc AS `PR-AUC`, brier AS `Brier`))"
+        "SELECT predictor, metric, value FROM steadyforum.gold.gold_risk_model_metrics UNPIVOT (value FOR metric IN (roc_auc AS `ROC-AUC`, pr_auc AS `PR-AUC`, brier AS `Brier`))"
       ]
     },
     {
       "name": "scores",
       "displayName": "scores",
       "queryLines": [
-        "SELECT body_part, FLOOR(score * 10) / 10 AS score_bucket, COUNT(*) AS lifters FROM spotter.gold.gold_injury_risk_model_scores GROUP BY ALL"
+        "SELECT body_part, FLOOR(score * 10) / 10 AS score_bucket, COUNT(*) AS lifters FROM steadyforum.gold.gold_injury_risk_model_scores GROUP BY ALL"
       ]
     },
     {
       "name": "weekly",
       "displayName": "weekly",
       "queryLines": [
-        "SELECT DATE_TRUNC('WEEK', date) AS week, COUNT(DISTINCT CASE WHEN score >= 0.5 THEN user_id END) / COUNT(DISTINCT user_id) AS share_above FROM spotter.gold.gold_injury_risk_scores GROUP BY ALL"
+        "SELECT DATE_TRUNC('WEEK', date) AS week, COUNT(DISTINCT CASE WHEN score >= 0.5 THEN user_id END) / COUNT(DISTINCT user_id) AS share_above FROM steadyforum.gold.gold_injury_risk_scores GROUP BY ALL"
       ]
     }
   ],

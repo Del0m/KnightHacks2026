@@ -124,7 +124,7 @@ const STYLE = [
   "slow_tempo",
   "fresh",
 ];
-const NOUN = ["squatter", "lifter", "presser", "lunger", "spotter", "starter", "mover", "grinder"];
+const NOUN = ["squatter", "lifter", "presser", "lunger", "helper", "starter", "mover", "grinder"];
 const GOAL_TAGS = ["strength", "consistency", "mobility", "confidence", "rehab", "endurance", "form"];
 const SLOTS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].flatMap((d) =>
   ["am", "pm", "eve"].map((p) => `${d}_${p}`),
@@ -673,7 +673,7 @@ async function main() {
     console.log(`Resetting and seeding ${new URL(url).host} ...`);
     const summary = await seedDemo(db, {
       presenterUserId: process.env.DEMO_PRESENTER_USER_ID || undefined,
-      pseudonymSecret: process.env.SPOTTER_PSEUDONYM_SECRET,
+      pseudonymSecret: process.env.STEADYFORUM_PSEUDONYM_SECRET,
     });
     console.log("Seeded:", summary);
   } finally {

@@ -1,10 +1,10 @@
 // CONN-05: the form model's frame-derived rep features, computed from the set's joints so Model
 // Serving sees the same inputs the model was trained on.
 //
-// A port of silver_frames and silver_reps in databricks/pipelines/spotter_sessions/silver.py;
+// A port of silver_frames and silver_reps in databricks/pipelines/steadyforum_sessions/silver.py;
 // keep the two in step. specs/set-record/fixtures/features holds frames with the expected
 // features, checked here (apps/api/test/score-features.test.ts) and in the pipeline
-// (databricks/pipelines/spotter_sessions/tests/test_feature_parity.py).
+// (databricks/pipelines/steadyforum_sessions/tests/test_feature_parity.py).
 //
 // Angles use normalised image coordinates, as in the pipeline: consistent per lifter and
 // device, not exact degrees on non-square frames.

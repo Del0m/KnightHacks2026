@@ -30,7 +30,7 @@ One record per rep, with the columns of the model signature in `databricks/noteb
 The frame-derived features are a port of `silver_frames` and `silver_reps` (CONN-03), so serving sees what training saw. `specs/set-record/fixtures/features/` holds frames with the features the pipeline computes from them, and both sides check against those fixtures:
 
 - `apps/api/test/score-features.test.ts` (`npm test` in `apps/api`)
-- `databricks/pipelines/spotter_sessions/tests/test_feature_parity.py` (`uv run pytest` in `databricks/pipelines`)
+- `databricks/pipelines/steadyforum_sessions/tests/test_feature_parity.py` (`uv run pytest` in `databricks/pipelines`)
 
 If you change a feature in `silver.py`, change `features.ts` too, and regenerate the fixture's `expected` values from the pipeline. A rep with no boundaries, or no usable frames, gets nulls, which the model handles.
 

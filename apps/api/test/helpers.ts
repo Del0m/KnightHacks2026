@@ -28,7 +28,7 @@ export async function createTestDb() {
   return { db: db as unknown as Db, client, close: () => client.close() };
 }
 
-export const ISSUER = "https://auth.test.spotter";
+export const ISSUER = "https://auth.test.steadyforum";
 
 export async function createKeys() {
   const { publicKey, privateKey } = await generateKeyPair("RS256");

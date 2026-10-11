@@ -15,7 +15,7 @@ const DATABRICKS = {
   DATABRICKS_HOST: "https://dbc-secret-host.cloud.databricks.com",
   DATABRICKS_CLIENT_ID: "client-id-value",
   DATABRICKS_CLIENT_SECRET: "client-secret-value",
-  SPOTTER_PSEUDONYM_SECRET: "pseudonym-secret-value",
+  STEADYFORUM_PSEUDONYM_SECRET: "pseudonym-secret-value",
   DATABRICKS_WAREHOUSE_ID: "warehouse-id-value",
 };
 

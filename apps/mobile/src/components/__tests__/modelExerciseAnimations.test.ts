@@ -14,7 +14,7 @@ test('all five skeletal previews stay finite, plant bodyweight limbs, and reset 
       import path from 'node:path';
       import { pathToFileURL } from 'node:url';
       const source = ${JSON.stringify(modelDirectory)};
-      const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'spotter-model-'));
+      const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'steadyforum-model-'));
       try {
         for (const file of ['three.core.js', 'three.module.js', 'BufferGeometryUtils.js', 'GLTFLoader.js', 'movement.js']) {
           const text = fs.readFileSync(path.join(source, file), 'utf8')
@@ -128,5 +128,5 @@ test('renderer yaw rejects malformed input, bounds rotation, and preserves targe
     encoding: 'utf8',
   });
   expect(result).toContain('yaw verified');
-  expect(html).toContain("if(data?.type==='spotter:rotate')rotate(data.degrees)");
+  expect(html).toContain("if(data?.type==='steadyforum:rotate')rotate(data.degrees)");
 });

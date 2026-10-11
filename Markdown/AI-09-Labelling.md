@@ -6,9 +6,9 @@ The delivery target is 10 p.m. Eastern on October 10, 2026. The implemented tool
 
 ## Install and open
 
-Use only the primary Spotter project (Spotter 1): `apps/mobile/ios/Spotter.xcworkspace`, `Spotter.xcodeproj` and the `Spotter` scheme. `Spotter 2`, `Spotter 2.xcodeproj` and `Spotter 2.xcworkspace` are not build targets for this work. Do not select them as a fallback if automatic project discovery is ambiguous. The installed AI-09 Release build's Xcode log confirms it used `Spotter.xcworkspace` and `Spotter.xcodeproj`.
+Use only the primary SteadyForum project (SteadyForum 1): `apps/mobile/ios/SteadyForum.xcworkspace`, `SteadyForum.xcodeproj` and the `SteadyForum` scheme. `SteadyForum 2`, `SteadyForum 2.xcodeproj` and `SteadyForum 2.xcworkspace` are not build targets for this work. Do not select them as a fallback if automatic project discovery is ambiguous. The installed AI-09 Release build's Xcode log confirms it used `SteadyForum.xcworkspace` and `SteadyForum.xcodeproj`.
 
-The route is `spotter://labelling`. Dataset capture uses Core ML at 320 pixels and retains joints only. It does not create an image, audio or video recording. The camera buffers are processed on the phone. Confirm the selected exercise, camera view, side and standard/modified/prescribed context before starting. A modified movement remains a recorded context, not a medical diagnosis.
+The route is `steadyforum://labelling`. Dataset capture uses Core ML at 320 pixels and retains joints only. It does not create an image, audio or video recording. The camera buffers are processed on the phone. Confirm the selected exercise, camera view, side and standard/modified/prescribed context before starting. A modified movement remains a recorded context, not a medical diagnosis.
 
 Native sharing and checksum dependencies require rebuilding the installed app. From `apps/mobile`, use the project's Expo CLI through pnpm:
 
@@ -22,12 +22,12 @@ For a standalone Release build and performance acceptance:
 pnpm exec expo run:ios --device --configuration Release
 ```
 
-Keep bundle identifier `com.knighthacks.spotter` and the existing signing team to update the installed app. A development client can load Metro changes with `pnpm start --lan`. A standalone Release app needs its updated bundled code. Expo Go cannot load the custom pose plugin.
+Keep bundle identifier `com.knighthacks.steadyforum` and the existing signing team to update the installed app. A development client can load Metro changes with `pnpm start --lan`. A standalone Release app needs its updated bundled code. Expo Go cannot load the custom pose plugin.
 
-The October 10 build was installed as a standalone Release on the owner's iPhone 17 Pro Max running iOS 26.6.2 (23G90), from implementation commit `1921fe4`. After reconnecting and unlocking the phone, CoreDevice successfully launched Spotter with the labelling URL, and the owner confirmed the Joint labelling screen is visible. Confirmed capture and review results appear under Device acceptance below. To open the route from this Mac while the phone is connected and unlocked:
+The October 10 build was installed as a standalone Release on the owner's iPhone 17 Pro Max running iOS 26.6.2 (23G90), from implementation commit `1921fe4`. After reconnecting and unlocking the phone, CoreDevice successfully launched SteadyForum with the labelling URL, and the owner confirmed the Joint labelling screen is visible. Confirmed capture and review results appear under Device acceptance below. To open the route from this Mac while the phone is connected and unlocked:
 
 ```sh
-xcrun devicectl device process launch --device Armin --payload-url 'spotter://labelling' com.knighthacks.spotter
+xcrun devicectl device process launch --device Armin --payload-url 'steadyforum://labelling' com.knighthacks.steadyforum
 ```
 
 ## Capture and review
@@ -63,7 +63,7 @@ Deletion on the phone removes linked app-managed drafts/exports and keeps a with
 
 ## Device acceptance: initial rehearsal confirmed; remaining checks pending
 
-The owner confirmed the Joint labelling screen appears and that capture, skeleton playback and human-review save worked on the installed Release build. Saved intervals and labels persisted after closing and reopening Spotter. The owner reported approximately 15 processed FPS during squat capture. Both the dataset bundle and separate private consent evidence physically arrived on the Mac. Trusted validation passed, including checksums, consent and source/training agreement. Unpack and strict reimport of the unpacked files also passed. The validated pilot contains one clip and five accepted squat annotations: four clean and one forward lean. The owner subsequently confirmed that boundary edits save, discarding reduces accepted coverage, cancelling sharing preserves data, and backgrounding during capture restores an incomplete clip. The other device checks below remain pending.
+The owner confirmed the Joint labelling screen appears and that capture, skeleton playback and human-review save worked on the installed Release build. Saved intervals and labels persisted after closing and reopening SteadyForum. The owner reported approximately 15 processed FPS during squat capture. Both the dataset bundle and separate private consent evidence physically arrived on the Mac. Trusted validation passed, including checksums, consent and source/training agreement. Unpack and strict reimport of the unpacked files also passed. The validated pilot contains one clip and five accepted squat annotations: four clean and one forward lean. The owner subsequently confirmed that boundary edits save, discarding reduces accepted coverage, cancelling sharing preserves data, and backgrounding during capture restores an incomplete clip. The other device checks below remain pending.
 
 The unpacked pilot is at `/Users/armindelmo/Downloads/ai09-pilot-2026-10-10/`. It contains `clips.jsonl`, `training.jsonl` and `manifest.json`; the consent evidence remains separately in Downloads. No real participant data or consent evidence was committed. Remaining numeric collection deficit: 35 squat reps and 40 each for push-up, bicep curl, shoulder press and lunge, or 195 additional accepted reps.
 
@@ -115,7 +115,7 @@ Actual check results belong in the delivery report. Passing automated checks ver
 - Mobile `npm run lint`: zero errors; eight pre-existing warnings. TypeScript-aware import resolution fixes the previous `expo-file-system` resolution error.
 - `npx expo export --platform ios --output-dir /private/tmp/ai09-ios-export`: passed.
 - Native Release build: succeeded with zero errors and six warnings; installed successfully on iPhone 17 Pro Max, iOS 26.6.2 (23G90).
-- CoreDevice launch with `spotter://labelling`: succeeded at 5:40 p.m. Eastern; the owner confirmed the Joint labelling screen is visible.
+- CoreDevice launch with `steadyforum://labelling`: succeeded at 5:40 p.m. Eastern; the owner confirmed the Joint labelling screen is visible.
 - Owner rehearsal: capture, skeleton playback and human-review save confirmed; saved intervals and labels persisted after close/reopen. Owner-reported capture rate: approximately 15 FPS.
 - Additional owner checks: saved boundary edits, discard/coverage reduction, cancelled sharing/data retention, and background/incomplete-clip recovery confirmed.
 - Physical dataset export and separate private consent evidence received on the Mac. Trusted validation, unpack and strict reimport passed: one clip, five accepted squat rows (four clean, one forward lean).
@@ -123,4 +123,4 @@ Actual check results belong in the delivery report. Passing automated checks ver
 
 Tests were added before the modules existed and failed with missing-module errors. Additional hardening regressions failed on existing behaviour before their fixes, including invalid consent, revision recovery/pruning, shared closure frames, confidence thresholds and impossible calendar dates. Mobile environment setup was corrected to simulate a foreground iPhone; expected capture/privacy outcomes were retained.
 
-The generated `ios/` checkout contained duplicate Xcode project/workspace files, causing CocoaPods to reject automatic project selection. The unused Spotter 2 copies were temporarily preserved separately for the build, without manually editing native project files, and restored to their original locations after installation. Subsequent builds must exclude those copies from automatic discovery and use only the primary Spotter workspace/project. Preserve the unused copies; they are not authorized targets for AI-09.
+The generated `ios/` checkout contained duplicate Xcode project/workspace files, causing CocoaPods to reject automatic project selection. The unused SteadyForum 2 copies were temporarily preserved separately for the build, without manually editing native project files, and restored to their original locations after installation. Subsequent builds must exclude those copies from automatic discovery and use only the primary SteadyForum workspace/project. Preserve the unused copies; they are not authorized targets for AI-09.

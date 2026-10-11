@@ -1,6 +1,6 @@
 ---
 license: cc-by-4.0
-pretty_name: Spotter form reps
+pretty_name: SteadyForum form reps
 tags:
   - time-series-classification
   - pose-estimation
@@ -19,9 +19,9 @@ configs:
         path: data/test.parquet
 ---
 
-# Spotter form reps
+# SteadyForum form reps
 
-Rep-level body-pose windows from **Spotter**, a phone app that counts reps and checks form for people getting back to the gym after an injury (KnightHacks 2026). Each row is one rep of a gym exercise as 32 frames of 17 body joints, with the form rules' verdict as a label. It's the training data for Spotter's form-quality model ([`bubblesmal/spotter-models`](https://huggingface.co/bubblesmal/spotter-models), `form/`).
+Rep-level body-pose windows from **SteadyForum**, a phone app that counts reps and checks form for people getting back to the gym after an injury (KnightHacks 2026). Each row is one rep of a gym exercise as 32 frames of 17 body joints, with the form rules' verdict as a label. It's the training data for SteadyForum's form-quality model ([`bubblesmal/steadyforum-models`](https://huggingface.co/bubblesmal/steadyforum-models), `form/`).
 
 **There is no video and no real person in this dataset.** The current release is entirely synthetic (see *Collection*).
 
@@ -54,16 +54,16 @@ Keypoint order is COCO: nose, eyes, ears, shoulders, elbows, wrists, hips, knees
 from datasets import load_dataset
 import numpy as np
 
-ds = load_dataset("bubblesmal/spotter-form-reps")
+ds = load_dataset("bubblesmal/steadyforum-form-reps")
 x = np.array(ds["train"][0]["window"]).reshape(32, 17, 2)   # frames x joints x (x, y)
 ```
 
 ## Collection
 
-1. **Sessions.** A generator notebook (`databricks/notebooks/generate_synthetic_sessions.py` in the Spotter repo) writes six weeks of workouts for synthetic lifters (100 in this release) in exactly the format the app uploads: per-rep aggregates plus per-frame joints. Joint positions come from a simple body model driven by each exercise's joint-angle curve, with noise and lifter-to-lifter variation. Three lifters follow a knee or shoulder recovery story.
+1. **Sessions.** A generator notebook (`databricks/notebooks/generate_synthetic_sessions.py` in the SteadyForum repo) writes six weeks of workouts for synthetic lifters (100 in this release) in exactly the format the app uploads: per-rep aggregates plus per-frame joints. Joint positions come from a simple body model driven by each exercise's joint-angle curve, with noise and lifter-to-lifter variation. Three lifters follow a knee or shoulder recovery story.
 2. **Pipeline.** A Databricks medallion pipeline (bronze → silver → gold) parses the uploads, cuts the frames into reps, normalises the joints and resamples each rep to 32 frames (`gold_training_features`).
 3. **Synthetic only.** The release selects sessions whose `device` is `synthetic` (set by the generator) and refuses to publish anything else, so app recordings never end up here.
-4. **Labels.** Each rep is labelled by Spotter's **form rules** (the same spec-driven rules the app runs on the phone), not by people. They're weak labels: consistent, but only as good as the rules.
+4. **Labels.** Each rep is labelled by SteadyForum's **form rules** (the same spec-driven rules the app runs on the phone), not by people. They're weak labels: consistent, but only as good as the rules.
 
 ## Limitations
 
@@ -77,4 +77,4 @@ A `recorded` config will add real, consented recordings of team members doing cl
 
 ## License and privacy
 
-CC BY 4.0. No images or video. Lifter ids are pseudonyms of synthetic accounts. Spotter never uploads video, only joints, and only under a pseudonymous id.
+CC BY 4.0. No images or video. Lifter ids are pseudonyms of synthetic accounts. SteadyForum never uploads video, only joints, and only under a pseudonymous id.

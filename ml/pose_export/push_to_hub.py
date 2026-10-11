@@ -1,14 +1,14 @@
 """Publish the pose and form models to the Hugging Face Hub (CONN-10, Architecture §5).
 
     uv run --group publish push_to_hub.py --dry-run     # build everything into hub_staging/, no upload
-    uv run --group publish push_to_hub.py               # build and upload to bubblesmal/spotter-models
+    uv run --group publish push_to_hub.py               # build and upload to bubblesmal/steadyforum-models
 
 Also runs as a Databricks job (push_to_hub.job.json) after the form model is retrained (CONN-04).
 
 What gets published:
   pose/yolov8n-pose-{320,256}.mlpackage   Core ML, what the iPhone app runs (same export as export.py)
   pose/yolov8n-pose-320.onnx              ONNX, for the cloud endpoint and other platforms
-  form/form_quality_{label,score}.onnx    spotter.ml.form_quality@champion from Unity Catalog
+  form/form_quality_{label,score}.onnx    steadyforum.ml.form_quality@champion from Unity Catalog
   manifest.json                           version + every file's size and md5; the app reads this
   README.md                               model card
 
@@ -17,7 +17,7 @@ settings; form: Unity Catalog version), and the manifest version only goes up wh
 was uploaded. Core ML exports aren't byte-identical between runs, so without this every run
 would make every phone re-download the pose models.
 
-Token: HF_TOKEN (write access to the repo), or on Databricks the secret spotter/hf_write_token.
+Token: HF_TOKEN (write access to the repo), or on Databricks the secret steadyforum/hf_write_token.
 """
 
 from __future__ import annotations
@@ -42,8 +42,8 @@ except NameError:  # Databricks Python tasks exec the file without __file__; arg
 sys.path.insert(0, str(HERE))
 from export import ROWS, SIZES, ExportError, check_output  # noqa: E402
 
-DEFAULT_REPO = os.environ.get("SPOTTER_HUB_REPO", "bubblesmal/spotter-models")
-DEFAULT_FORM_MODEL = "models:/spotter.ml.form_quality@champion"
+DEFAULT_REPO = os.environ.get("STEADYFORUM_HUB_REPO", "bubblesmal/steadyforum-models")
+DEFAULT_FORM_MODEL = "models:/steadyforum.ml.form_quality@champion"
 POSE_WEIGHTS = "yolov8n-pose.pt"
 ONNX_SIZE = 320
 POSE_SETTINGS = {"weights": POSE_WEIGHTS, "coreml_sizes": list(SIZES), "coreml_quantize": 16, "nms": False,
@@ -78,9 +78,9 @@ def hf_token() -> str:
     if not token and ON_DATABRICKS:
         from databricks.sdk.runtime import dbutils  # available on Databricks compute
 
-        token = dbutils.secrets.get(scope="spotter", key="hf_write_token")
+        token = dbutils.secrets.get(scope="steadyforum", key="hf_write_token")
     if not token:
-        raise SystemExit("No Hugging Face token: set HF_TOKEN (write access) or the spotter/hf_write_token secret")
+        raise SystemExit("No Hugging Face token: set HF_TOKEN (write access) or the steadyforum/hf_write_token secret")
     return token
 
 
@@ -172,7 +172,7 @@ def patch_skl2onnx() -> None:
     # ("Expected an int, got a boolean"). Coerce it to int.
     import skl2onnx.common.tree_ensemble as te
 
-    if getattr(te.add_node, "_spotter_patched", False):
+    if getattr(te.add_node, "_steadyforum_patched", False):
         return
     original = te.add_node
 
@@ -181,7 +181,7 @@ def patch_skl2onnx() -> None:
             kwargs["nodes_missing_value_tracks_true"] = int(kwargs["nodes_missing_value_tracks_true"])
         return original(*args, **kwargs)
 
-    add_node._spotter_patched = True
+    add_node._steadyforum_patched = True
     te.add_node = add_node
 
 
@@ -285,9 +285,9 @@ tags:
 base_model: Ultralytics/YOLOv8
 ---
 
-# Spotter models
+# SteadyForum models
 
-Models for **Spotter**, a quiet AI spotter for new gym-goers and people returning from injury
+Models for **SteadyForum**, a quiet AI coach for new gym-goers and people returning from injury
 (Knight Hacks IX). The iPhone app runs the pose model on-device; the form model scores reps.
 The app reads `manifest.json` on launch and downloads any model that changed.
 
@@ -303,12 +303,12 @@ Manifest version **{manifest['version']}**, published {manifest['published_at']}
   and at 320 px to ONNX.
 - Output: one tensor `[1, {ROWS}, N]` of raw candidates: 4 box values, person confidence, then
   17 joints x (x, y, visibility), with sigmoid already applied. Decoding and orientation rules:
-  `docs/pose/how-it-works.md` and `docs/pose/pose-result-contract.md` in the Spotter repo.
+  `docs/pose/how-it-works.md` and `docs/pose/pose-result-contract.md` in the SteadyForum repo.
 - Video never leaves the phone; only joint positions are sent to the cloud.
 
 ## Form quality
 
-- `{form_meta.get('uc_model', 'spotter.ml.form_quality')}` version {form_meta.get('uc_version', '?')}
+- `{form_meta.get('uc_model', 'steadyforum.ml.form_quality')}` version {form_meta.get('uc_version', '?')}
   from Databricks Unity Catalog, as two ONNX graphs: `label` (clean, partial_range, knees_in,
   forward_lean, fast_lowering, other) and `score` (quality, clip to 0-1).
 - Inputs, one row per rep: {', '.join(f'`{f}`' for f in (form or {}).get('inputs', [])) or 'see manifest'}.

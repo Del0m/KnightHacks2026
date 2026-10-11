@@ -2,24 +2,24 @@
 # MAGIC %md
 # MAGIC # AI-14: injury-risk model (training-load and form-trend score, not a diagnosis)
 # MAGIC
-# MAGIC Trains an XGBoost classifier on `spotter.gold.gold_injury_risk_scores` (CONN-03) that forecasts
+# MAGIC Trains an XGBoost classifier on `steadyforum.gold.gold_injury_risk_scores` (CONN-03) that forecasts
 # MAGIC whether the **heuristic** risk flag (`weak_label`) is raised for a lifter and body part on any
 # MAGIC tracked day in the next 7 days. The labels are heuristic (Architecture §11.2): they come from the
 # MAGIC weighted rule in `gold.py`, not from injuries, so this is a training-load and form-trend score.
 # MAGIC **It is not a diagnosis** and must never be presented as one.
 # MAGIC
-# MAGIC - Logs the run to MLflow (`/Users/<me>/spotter_injury_risk`) with the heuristic's own score as a
+# MAGIC - Logs the run to MLflow (`/Users/<me>/steadyforum_injury_risk`) with the heuristic's own score as a
 # MAGIC   baseline, so the model's value over the rule is measured, not assumed.
 # MAGIC - Logs the model as a run artifact (`runs:/<run_id>/model`). The champion is the experiment run
 # MAGIC   tagged `champion=true`, moved only when the held-out PR-AUC is at least the current champion's.
-# MAGIC - Also tries to register **`spotter.ml.injury_risk`** in Unity Catalog. On Databricks Free Edition
+# MAGIC - Also tries to register **`steadyforum.ml.injury_risk`** in Unity Catalog. On Databricks Free Edition
 # MAGIC   the upload to the catalog's storage is denied, so the run gets `uc_registration=skipped` and
 # MAGIC   carries on; when registration works, the `champion` alias is set as well.
 # MAGIC - Scores each lifter and body part's latest day with the champion run's model into
-# MAGIC   `spotter.gold.gold_injury_risk_model_scores` (read by the Neon sync, heuristic fallback) and
-# MAGIC   writes gain importance to `spotter.gold.gold_risk_feature_importance`.
+# MAGIC   `steadyforum.gold.gold_injury_risk_model_scores` (read by the Neon sync, heuristic fallback) and
+# MAGIC   writes gain importance to `steadyforum.gold.gold_risk_feature_importance`.
 # MAGIC
-# MAGIC Run on serverless compute, after the `spotter_sessions` pipeline (`risk_model.job.json`).
+# MAGIC Run on serverless compute, after the `steadyforum_sessions` pipeline (`risk_model.job.json`).
 
 # COMMAND ----------
 
@@ -36,15 +36,15 @@ import pandas as pd
 import xgboost
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
-MODEL_NAME = "spotter.ml.injury_risk"
-SOURCE_TABLE = "spotter.gold.gold_injury_risk_scores"
-MODEL_SCORES_TABLE = "spotter.gold.gold_injury_risk_model_scores"
-IMPORTANCE_TABLE = "spotter.gold.gold_risk_feature_importance"
+MODEL_NAME = "steadyforum.ml.injury_risk"
+SOURCE_TABLE = "steadyforum.gold.gold_injury_risk_scores"
+MODEL_SCORES_TABLE = "steadyforum.gold.gold_injury_risk_model_scores"
+IMPORTANCE_TABLE = "steadyforum.gold.gold_risk_feature_importance"
 MODEL_TABLE_COMMENT = ("Training-load and form-trend score from a model trained on heuristic labels. "
                        "Not a diagnosis.")
 IMPORTANCE_TABLE_COMMENT = ("Gain importance of the injury-risk model's features and feature families. "
                             "The model is trained on heuristic labels. Not a diagnosis.")
-METRICS_TABLE = "spotter.gold.gold_risk_model_metrics"
+METRICS_TABLE = "steadyforum.gold.gold_risk_model_metrics"
 METRICS_TABLE_COMMENT = ("Held-out metrics of the champion injury-risk model and of the heuristic score used as "
                          "next week's predictor. Labels are heuristic. Not a diagnosis.")
 ALIAS = "champion"
@@ -346,7 +346,7 @@ from pyspark.sql import types as T
 
 mlflow.set_registry_uri("databricks-uc")
 user = spark.sql("SELECT current_user()").first()[0]
-experiment = mlflow.set_experiment(f"/Users/{user}/spotter_injury_risk")
+experiment = mlflow.set_experiment(f"/Users/{user}/steadyforum_injury_risk")
 
 source = spark.read.table(SOURCE_TABLE).toPandas()
 labelled = forecast_labels(source, HORIZON_DAYS)

@@ -1,6 +1,6 @@
 {
-  "name": "spotter-delete-users",
-  "description": "CONN-13: daily, deletes the Databricks data of accounts deleted in the app (Neon deletion_requests). Replace <workspace-folder> with the folder holding the delete_user notebook. Needs the secret spotter/neon_database_url. Runbook: docs/runbooks/account-deletion.md.",
+  "name": "steadyforum-delete-users",
+  "description": "CONN-13: daily, deletes the Databricks data of accounts deleted in the app (Neon deletion_requests). Replace <workspace-folder> with the folder holding the delete_user notebook. Needs the secret steadyforum/neon_database_url. Runbook: docs/runbooks/account-deletion.md.",
   "max_concurrent_runs": 1,
   "schedule": {
     "quartz_cron_expression": "0 0 4 * * ?",

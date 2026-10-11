@@ -9,9 +9,9 @@
 //     days?: number, // lookback window for the WHERE clause; defaults to the config's
 //   ): Promise<{ rows: RiskRow[]; source: RiskSource }>;
 //
-// 1. Query spotter.gold.gold_injury_risk_model_scores (same columns as the heuristic table:
+// 1. Query steadyforum.gold.gold_injury_risk_model_scores (same columns as the heuristic table:
 //    user_id, body_part, date, score, top_features).
-// 2. If that throws or returns no rows, query spotter.gold.gold_injury_risk_scores as today.
+// 2. If that throws or returns no rows, query steadyforum.gold.gold_injury_risk_scores as today.
 //    If the heuristic read throws too, the error propagates (readGold records it as failed).
 // 3. Log which source was used, naming the table.
 //
@@ -21,8 +21,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { readRiskRows, upsertRisk, type Db, type RiskRow } from "./syncInsights";
 
-const MODEL_TABLE = "spotter.gold.gold_injury_risk_model_scores";
-const HEURISTIC_TABLE = "spotter.gold.gold_injury_risk_scores";
+const MODEL_TABLE = "steadyforum.gold.gold_injury_risk_model_scores";
+const HEURISTIC_TABLE = "steadyforum.gold.gold_injury_risk_scores";
 
 const modelRow: RiskRow = {
   user_id: "pseudo-1",

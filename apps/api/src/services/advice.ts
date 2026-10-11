@@ -17,7 +17,7 @@
 //      pain ("doesn't hurt", "pain-free") doesn't count unless the sentence goes on with a
 //      contrast ("isn't painful at rest, only when I squat"). An injury marked as past or
 //      recovering in the same sentence ("two years ago", "cleared by my physio") isn't a red flag
-//      on its own, since Spotter is for getting back to training (§1.1): only the injury signal is
+//      on its own, since SteadyForum is for getting back to training (§1.1): only the injury signal is
 //      exempted, every other signal still counts. Deterministic, and errs on the side of flagging.
 //   3. library sources (injury notes, exercises) whose url isn't on REPUTABLE_SOURCE_HOSTS (or
 //      free-exercise-db) are dropped and logged; community answers are kept. No sources left ->
@@ -77,7 +77,7 @@ export type AdviceAnswer =
 
 export const PAIN_REPLY =
   "Pain like this is worth having a doctor or physiotherapist look at before training on it. " +
-  "Spotter can't assess injuries, so there's no AI suggestion for this question.";
+  "SteadyForum can't assess injuries, so there's no AI suggestion for this question.";
 // Ends every AI answer, so it is shown wherever the answer is (Architecture §13). Fixed text, added
 // after the guard and the claim check, which judge only the model's own words.
 export const ADVICE_DISCLAIMER =
@@ -282,7 +282,7 @@ const RED_FLAGS: [id: string, pattern: RegExp][] = [
 ];
 
 // An injury marked as past or recovering in the same sentence isn't a red flag on its own (§1.1:
-// Spotter is for getting back to training). Hours or days ago, today and the like keep it fresh.
+// SteadyForum is for getting back to training). Hours or days ago, today and the like keep it fresh.
 const PAST_INJURY =
   /\b(?:weeks?|months?|years?)\s+(?:ago|back)\b|\blast\s+(?:year|month|season|spring|summer|fall|autumn|winter)\b|\brecover(?:ing|ed|y)\b|\b(?:coming|came|getting|got)\s+back\b|\breturning\s+from\b|\bcleared\b|\brehab\w*|\bheal(?:ed|ing)\b|\bfine\s+now\b|\bphysio\s+said\b|\bold\s+injury\b/;
 const FRESH_INJURY =

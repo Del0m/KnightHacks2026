@@ -1,6 +1,6 @@
 // On-device benchmark (AI-04, Architecture §4.1). Runs YOLOv8 natively on a synthetic frame at 320,
 // then 256 if 320 is too slow. The fps feeds `selectPoseMode`; `usePoseMode` caches the result.
-import { benchmarkPoseModel, getPoseModelId, type PoseBenchmark } from 'spotter-pose';
+import { benchmarkPoseModel, getPoseModelId, type PoseBenchmark } from 'steadyforum-pose';
 import { MIN_ON_DEVICE_FPS } from './mode';
 
 /** Input sizes, in the order they are tried. */

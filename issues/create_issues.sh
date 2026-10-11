@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates the Spotter labels and 75 issues in a GitHub repo, as YOU (via the gh CLI).
+# Creates the SteadyForum labels and 75 issues in a GitHub repo, as YOU (via the gh CLI).
 # Usage: ./create_issues.sh owner/repo
 # Needs: gh (logged in with `gh auth login`) and jq.
 set -euo pipefail

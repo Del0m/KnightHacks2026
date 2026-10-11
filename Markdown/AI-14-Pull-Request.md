@@ -1,6 +1,6 @@
 Closes #54.
 
-This adds the injury-risk model: an XGBoost classifier in `databricks/notebooks/risk_model.py` that forecasts whether the heuristic injury-risk flag will be raised for a lifter and body part in the next 7 days. It runs daily on serverless after the `spotter_sessions` pipeline. It:
+This adds the injury-risk model: an XGBoost classifier in `databricks/notebooks/risk_model.py` that forecasts whether the heuristic injury-risk flag will be raised for a lifter and body part in the next 7 days. It runs daily on serverless after the `steadyforum_sessions` pipeline. It:
 - logs each run to MLflow, with the heuristic's own score as a baseline
 - keeps a champion run
 - scores every lifter's latest day
@@ -18,13 +18,13 @@ Branched from `main` at `033bcf2`. Built in a separate worktree, so the AI-09 la
 
 | Output | Where | Contents |
 |---|---|---|
-| Model | MLflow experiment `/Users/<owner>/spotter_injury_risk`, artifact `runs:/<run_id>/model` | XGBoost 2.1.3 classifier with a signature and input example. The champion is the run tagged `champion=true`. |
-| `spotter.gold.gold_injury_risk_model_scores` | Notebook, overwritten daily | One row per lifter × body part (latest day): `score` (0–1, prior-corrected), `top_features`, `model_version` (champion run id), `scored_at` |
-| `spotter.gold.gold_risk_feature_importance` | Notebook, overwritten daily | Gain per feature and family, ranked, for the champion |
-| `spotter.gold.gold_risk_model_metrics` | Notebook, overwritten daily | Two rows, `model` and `heuristic`: test ROC-AUC, PR-AUC, Brier, test positives and rows |
+| Model | MLflow experiment `/Users/<owner>/steadyforum_injury_risk`, artifact `runs:/<run_id>/model` | XGBoost 2.1.3 classifier with a signature and input example. The champion is the run tagged `champion=true`. |
+| `steadyforum.gold.gold_injury_risk_model_scores` | Notebook, overwritten daily | One row per lifter × body part (latest day): `score` (0–1, prior-corrected), `top_features`, `model_version` (champion run id), `scored_at` |
+| `steadyforum.gold.gold_risk_feature_importance` | Notebook, overwritten daily | Gain per feature and family, ranked, for the champion |
+| `steadyforum.gold.gold_risk_model_metrics` | Notebook, overwritten daily | Two rows, `model` and `heuristic`: test ROC-AUC, PR-AUC, Brier, test positives and rows |
 | `range_side` on `gold_injury_risk_scores` | Pipeline | `injured` when the lifter's injured side is known, else `min` |
 | Risk scores in Neon `risk_insights` | `syncInsights.ts` | Model scores when fresh, heuristic scores otherwise |
-| Dashboard "Spotter: injury-risk trends" | `databricks/dashboards/injury_risk.lvdash.json` | Importance by family, model vs heuristic metrics, model score distribution by body part, share of lifters with a heuristic score ≥ 0.5 per week, a "not a diagnosis" note |
+| Dashboard "SteadyForum: injury-risk trends" | `databricks/dashboards/injury_risk.lvdash.json` | Importance by family, model vs heuristic metrics, model score distribution by body part, share of lifters with a heuristic score ≥ 0.5 per week, a "not a diagnosis" note |
 
 ## Changes
 
@@ -37,12 +37,12 @@ Branched from `main` at `033bcf2`. Built in a separate worktree, so the AI-09 la
   - **Single-class guard:** if either split has a single class, training is skipped and the run is tagged `insufficient_labels`. The existing champion still scores, then the job fails so the skip shows up.
   - **`top_features`:** up to 3 families whose summed XGBoost contribution is ≥ 0.01, largest first.
   - **Champion:** a run tag, moved only when the new test PR-AUC is at least the champion's.
-  - **Unity Catalog:** registration of `spotter.ml.injury_risk` is opt-in (`register_uc` widget, default `false`). A failure tags the run `uc_registration=skipped` with the reason and deletes the `PENDING_REGISTRATION` version it left. When registration works, the `champion` alias follows.
+  - **Unity Catalog:** registration of `steadyforum.ml.injury_risk` is opt-in (`register_uc` widget, default `false`). A failure tags the run `uc_registration=skipped` with the reason and deletes the `PENDING_REGISTRATION` version it left. When registration works, the `champion` alias follows.
   - **Model logging:** `log_model` uses `artifact_path`, since serverless runs MLflow 2.x.
   - **Table comments:** escaped, and every output table's comment ends "Not a diagnosis."
 - **`databricks/notebooks/risk_model.job.json` (new).** A daily serverless job at 05:00 UTC: refresh the pipeline (one retry), then train and score (no retries).
-- **`databricks/dashboards/injury_risk.lvdash.json` (new).** The AI/BI dashboard "Spotter: injury-risk trends", built in the workspace and exported. It reads the three notebook tables and the heuristic history in `gold_injury_risk_scores`.
-- **`databricks/pipelines/spotter_sessions/gold.py` (CONN-03).**
+- **`databricks/dashboards/injury_risk.lvdash.json` (new).** The AI/BI dashboard "SteadyForum: injury-risk trends", built in the workspace and exported. It reads the three notebook tables and the heuristic history in `gold_injury_risk_scores`.
+- **`databricks/pipelines/steadyforum_sessions/gold.py` (CONN-03).**
   - `gold_injury_risk_scores` takes range from the injured side when `silver_reps.injured_side` knows it, and from the smaller side otherwise.
   - The side is resolved once per lifter and body part, from the latest session that names it, so a tag that comes or goes mid-window can't mix sides in the 7- and 28-day ranges.
   - New column `range_side`. The table comment says which range is used.
@@ -105,7 +105,7 @@ There are 32 in `test_risk_model.py` and 8 in `test_synthetic_sessions.py`. They
 - an end-to-end fit
 - the generator's injury plan and decline
 
-Spark tests, from `databricks/pipelines`, `JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH uv run pytest spotter_sessions -q`:
+Spark tests, from `databricks/pipelines`, `JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH uv run pytest steadyforum_sessions -q`:
 
 ```
 ..........                                                               [100%]
@@ -157,7 +157,7 @@ API, from `apps/api`, `npx vitest run`:
 PR-AUC lift over the heuristic: +0.185. **With only 11 test positives this is noisy, and the labels are heuristic**, so the lift shows the model forecasts the rule better than the rule's own score does today. It says nothing about injuries.
 
 **5. Unity Catalog.**
-- Registering `spotter.ml.injury_risk` fails on Free Edition: S3 explicitly denies the artifact upload to the catalog's default storage.
+- Registering `steadyforum.ml.injury_risk` fails on Free Edition: S3 explicitly denies the artifact upload to the catalog's default storage.
 - Each attempt left a `PENDING_REGISTRATION` version. These were cleaned up, and the notebook now deletes them itself.
 - That's why the model is a run artifact with a champion tag, and why UC registration is opt-in.
 
@@ -189,7 +189,7 @@ Both tables carry the "Not a diagnosis" comment.
 | `model` | 0.9967 | 0.8292 | 0.0028 |
 | `heuristic` | 0.9282 | 0.6442 | 0.0086 |
 
-**10. Dashboard.** "Spotter: injury-risk trends" (id `01f1c51e3553182c9969fd45dc0690a7`) is published with `embed_credentials` off and exported to `databricks/dashboards/injury_risk.lvdash.json`. Its tiles:
+**10. Dashboard.** "SteadyForum: injury-risk trends" (id `01f1c51e3553182c9969fd45dc0690a7`) is published with `embed_credentials` off and exported to `databricks/dashboards/injury_risk.lvdash.json`. Its tiles:
 - a not-a-diagnosis text tile
 - feature importance by family (bar)
 - held-out model vs heuristic metrics (grouped bar, from `gold_risk_model_metrics`)
@@ -203,13 +203,13 @@ All four datasets ran, returning 5, 6, 9 and 7 rows.
 - **After:** it read the model table:
 
 ```
-[insights] risk scores from spotter.gold.gold_injury_risk_model_scores (711 rows)
+[insights] risk scores from steadyforum.gold.gold_injury_risk_model_scores (711 rows)
 { progress: 10571, risk: 711, rom: 1988, failed: [] }
 ```
 
 ## Not checked
 
-- **Neon write:** the sync's upsert into Neon wasn't run, because `SPOTTER_PSEUDONYM_SECRET` is empty in the local `.env`.
+- **Neon write:** the sync's upsert into Neon wasn't run, because `STEADYFORUM_PSEUDONYM_SECRET` is empty in the local `.env`.
 - **Dashboard rendering:** the dashboard's queries ran, but its widgets weren't checked visually.
 - **The daily job:** the notebook ran live from a copy in the owner's user folder, but no job was created from `risk_model.job.json`. Its notebook path is still the `<workspace-folder>` placeholder.
 - **Variability:** one training set and one split. With 11 test positives, a different seed could move PR-AUC a lot.

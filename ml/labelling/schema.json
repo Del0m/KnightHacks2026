@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:spotter:joint-dataset:v1",
+  "$id": "urn:steadyforum:joint-dataset:v1",
   "title": "Joint-only private dataset clip",
   "description": "Structural schema. validate.ts additionally enforces consent registry, monotonic timestamps, interval bounds/nonoverlap, exercise/view labels, accepted motion and missing-data quality. Coordinates are upright unmirrored COCO-17; frame times are relative milliseconds; intervals are start-inclusive/end-exclusive. Clean refers only to visible applicable errors.",
   "$ref": "#/$defs/DatasetClip",

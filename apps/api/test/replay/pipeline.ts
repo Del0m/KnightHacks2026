@@ -152,7 +152,7 @@ export async function createReplayApi() {
     clientId: "replay",
     clientSecret: "replay",
     scopes: "all-apis",
-    volumePath: "/Volumes/spotter/raw/sessions",
+    volumePath: "/Volumes/steadyforum/raw/sessions",
     pseudonymSecret: PSEUDONYM_SECRET,
     maxAttempts: 1,
     baseDelayMs: 1,

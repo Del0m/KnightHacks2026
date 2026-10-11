@@ -8,8 +8,8 @@
 # MAGIC including the joint angles behind `gold_rom_trend`.
 # MAGIC
 # MAGIC - **Users** are the demo seed's lifters (`demo-user-01` … in `apps/api/scripts/seed-demo.ts`),
-# MAGIC   under their real pseudonyms (HMAC with the API's `SPOTTER_PSEUDONYM_SECRET`, stored here as
-# MAGIC   the secret `spotter/pseudonym_secret`), so the insight sync maps them to the seeded accounts.
+# MAGIC   under their real pseudonyms (HMAC with the API's `STEADYFORUM_PSEUDONYM_SECRET`, stored here as
+# MAGIC   the secret `steadyforum/pseudonym_secret`), so the insight sync maps them to the seeded accounts.
 # MAGIC - **Recovery users** follow the §17 story: the injured side sits around 70° for the first two
 # MAGIC   weeks of their rehab plan, then gains about 6° a week for three weeks (+18°), ending within
 # MAGIC   5° of the healthy side.
@@ -23,7 +23,7 @@
 # MAGIC   device is "synthetic", and their joints), so sessions a changed generator no longer makes
 # MAGIC   don't linger. Bronze is append-only, so after that run the pipeline with a **full refresh**.
 # MAGIC
-# MAGIC Run it, then run the `spotter_sessions` pipeline and the insight sync.
+# MAGIC Run it, then run the `steadyforum_sessions` pipeline and the insight sync.
 
 # COMMAND ----------
 
@@ -287,7 +287,7 @@ def replace_sessions(sessions, volume: str) -> int:
     import shutil
     import tempfile
 
-    with tempfile.TemporaryDirectory(prefix="spotter-synthetic-") as staging:
+    with tempfile.TemporaryDirectory(prefix="steadyforum-synthetic-") as staging:
         written = write_sessions(sessions, staging)
         if not written:
             raise ValueError("Replacement generated no sessions; existing data was preserved")
@@ -310,7 +310,7 @@ dbutils.widgets.text("users", "30", "demo users (demo-user-01 ...)")
 dbutils.widgets.text("weeks", "6", "weeks of history")
 dbutils.widgets.text("recovery", "demo-user-01:knee:left,demo-user-04:shoulder:right,demo-user-07:knee:right",
                      "recovery users (user:body_part:side, comma-separated)")
-dbutils.widgets.text("volume", "/Volumes/spotter/raw/sessions", "sessions Volume")
+dbutils.widgets.text("volume", "/Volumes/steadyforum/raw/sessions", "sessions Volume")
 dbutils.widgets.dropdown("replace", "true", ["true", "false"], "delete earlier synthetic sessions first")
 dbutils.widgets.text("injured_share", "0.3", "share of other users given an injury (side-tagged)")
 dbutils.widgets.text("decline_share", "0.5", "share of those injured users who decline")
@@ -327,7 +327,7 @@ written = writer(
     generate(
         user_ids=load_seed_user_ids(dbutils.widgets.get("seed_user_ids_path"), int(dbutils.widgets.get("users")), dbutils.widgets.get("presenter_user_id")),
         weeks=int(dbutils.widgets.get("weeks")),
-        secret=dbutils.secrets.get(scope="spotter", key="pseudonym_secret"),
+        secret=dbutils.secrets.get(scope="steadyforum", key="pseudonym_secret"),
         recovery=recovery,
         now=datetime.now(timezone.utc),
         injured_share=float(dbutils.widgets.get("injured_share")),
@@ -335,4 +335,4 @@ written = writer(
     ),
     dbutils.widgets.get("volume"),
 )
-print(f"wrote {written} sessions; now run the spotter_sessions pipeline (full refresh if anything was deleted)")
+print(f"wrote {written} sessions; now run the steadyforum_sessions pipeline (full refresh if anything was deleted)")

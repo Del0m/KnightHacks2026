@@ -7,7 +7,7 @@
 // staging folder first and every file's md5 is checked before anything is swapped in, so a
 // failed or partial download leaves the installed models untouched.
 //
-// Stub until AI engineer A wires it up: the native pose detector (modules/spotter-pose) only
+// Stub until AI engineer A wires it up: the native pose detector (modules/steadyforum-pose) only
 // loads the models bundled at build time. To use a download it needs something like
 // createPoseDetectorFromPath(uri), which compiles the .mlpackage with MLModel.compileModel(at:)
 // (and caches the .mlmodelc). Until then downloads are stored and ready, but not yet used.
@@ -16,7 +16,7 @@ import { Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
 import { PHONE_MODELS, hubFileUrl, isManifest, modelsToUpdate, type Manifest } from './manifest';
 
-export const MODEL_REPO = 'bubblesmal/spotter-models';
+export const MODEL_REPO = 'bubblesmal/steadyforum-models';
 
 export interface UpdateResult {
   status: 'up-to-date' | 'updated' | 'skipped' | 'failed';

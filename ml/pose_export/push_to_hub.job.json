@@ -1,6 +1,6 @@
 {
-  "name": "spotter-push-models-to-hub",
-  "description": "CONN-10: export spotter.ml.form_quality@champion (ONNX) and publish it with the manifest and model card to the Hugging Face Hub. Run after retraining the form model (CONN-04). Runs with --skip-pose: importing Ultralytics' OpenCV crashes serverless compute (SIGABRT), so the pose models (Core ML + ONNX) are published from a Mac with `uv run --group publish push_to_hub.py --skip-form`, which also runs the Core ML models before upload. Replace <workspace-folder> with the folder holding push_to_hub.py and export.py; the HF token comes from the secret spotter/hf_write_token.",
+  "name": "steadyforum-push-models-to-hub",
+  "description": "CONN-10: export steadyforum.ml.form_quality@champion (ONNX) and publish it with the manifest and model card to the Hugging Face Hub. Run after retraining the form model (CONN-04). Runs with --skip-pose: importing Ultralytics' OpenCV crashes serverless compute (SIGABRT), so the pose models (Core ML + ONNX) are published from a Mac with `uv run --group publish push_to_hub.py --skip-form`, which also runs the Core ML models before upload. Replace <workspace-folder> with the folder holding push_to_hub.py and export.py; the HF token comes from the secret steadyforum/hf_write_token.",
   "max_concurrent_runs": 1,
   "tasks": [
     {
@@ -10,7 +10,7 @@
         "python_file": "<workspace-folder>/push_to_hub.py",
         "parameters": [
           "--repo",
-          "bubblesmal/spotter-models",
+          "bubblesmal/steadyforum-models",
           "--staging",
           "/tmp/hub_staging",
           "--skip-pose"

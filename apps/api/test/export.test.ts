@@ -20,7 +20,7 @@ const config: UploadConfig = {
   clientId: "id",
   clientSecret: "secret",
   scopes: "files",
-  volumePath: "/Volumes/spotter/raw/sessions",
+  volumePath: "/Volumes/steadyforum/raw/sessions",
   pseudonymSecret: "test-pseudonym-secret-123456",
   maxAttempts: 2,
   baseDelayMs: 1,

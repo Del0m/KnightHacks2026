@@ -155,7 +155,7 @@ describe("acute red flags", () => {
     "My shoulders feel stiff and tired after presses",
     "I get a burn in my arms on the last curls",
     "Should I do push-ups before or after curls?",
-    // Past or recovering injuries without an acute sign get an answer (Spotter's back-to-the-gym case).
+    // Past or recovering injuries without an acute sign get an answer (SteadyForum's back-to-the-gym case).
     "Since my knee injury last year, cleared by my physio, which leg exercises are good?",
     "I injured my shoulder two years ago and it's fine now. How do I start pressing again?",
     "Coming back from a knee injury, what's a good first squat variation?",
@@ -208,7 +208,7 @@ describe("answer guard", () => {
     "'consider' as a command": "Consider lowering the weight for a few sessions.",
     "commands split over lines": "Soreness is common\nTry a short walk\nUse a foam roller",
     "a bulleted list": "- Rest the knee\n- Ice it\n- Skip squats",
-    "a link": "A neutral grip is easier on the shoulder, as https://spotter-deals.example.com explains.",
+    "a link": "A neutral grip is easier on the shoulder, as https://steadyforum-deals.example.com explains.",
     "a promotion": "A neutral grip works well for most people; DM me for coaching.",
   };
   for (const [label, text] of Object.entries(rejected)) {
@@ -256,7 +256,7 @@ describe("AdviceWriter", () => {
   it("words the fixed reply as agreed, without commands or banned phrases", () => {
     expect(PAIN_REPLY).toBe(
       "Pain like this is worth having a doctor or physiotherapist look at before training on it. " +
-        "Spotter can't assess injuries, so there's no AI suggestion for this question.",
+        "SteadyForum can't assess injuries, so there's no AI suggestion for this question.",
     );
     expect(checkNote(PAIN_REPLY, loadBanned(), { placeholders: [] })).toEqual([]);
   });

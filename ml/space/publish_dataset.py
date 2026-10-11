@@ -7,9 +7,9 @@
     uv run ml/space/publish_dataset.py --dry-run     # export to ml/space/dataset/ only
     uv run ml/space/publish_dataset.py               # export and push (private until you flip it)
 
-Reads spotter.gold.gold_training_features through the SQL warehouse as the spotter-api service
+Reads steadyforum.gold.gold_training_features through the SQL warehouse as the steadyforum-api service
 principal (DATABRICKS_* in apps/api/.env), so it needs only read access to gold. Pushes with
-HF_WRITE_TOKEN to SPOTTER_DATASET_REPO (default bubblesmal/spotter-form-reps).
+HF_WRITE_TOKEN to STEADYFORUM_DATASET_REPO (default bubblesmal/steadyforum-form-reps).
 
 Splits are by lifter (a stable hash of the pseudonym), so no lifter appears in both train and
 test. When AI-09's consented recordings exist, they go in as a second config, `recorded`.
@@ -33,7 +33,7 @@ import requests
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).resolve().parent / "dataset"
 CARD = Path(__file__).resolve().parent / "dataset_card.md"
-DEFAULT_REPO = "bubblesmal/spotter-form-reps"
+DEFAULT_REPO = "bubblesmal/steadyforum-form-reps"
 TEST_SHARE = 0.2
 # This release is synthetic only. Real recordings (phone sessions, AI-09 clips) belong in the
 # separately consented `recorded` config, never here.
@@ -50,11 +50,11 @@ SELECT
   f.window,
   f.flags,
   f.label
-FROM spotter.gold.gold_training_features f
+FROM steadyforum.gold.gold_training_features f
 WHERE f.device = '{SYNTHETIC_DEVICE}'
 """
 # Checked before anything is written or pushed: the devices the selection actually returns.
-DEVICE_CHECK = f"SELECT DISTINCT device FROM spotter.gold.gold_training_features f WHERE f.device = '{SYNTHETIC_DEVICE}'"
+DEVICE_CHECK = f"SELECT DISTINCT device FROM steadyforum.gold.gold_training_features f WHERE f.device = '{SYNTHETIC_DEVICE}'"
 
 
 def load_env() -> None:
@@ -141,7 +141,7 @@ def main() -> None:
     args = parser.parse_args()
     load_env()
 
-    repo = os.environ.get("SPOTTER_DATASET_REPO", DEFAULT_REPO)  # after load_env(), so .env can set it
+    repo = os.environ.get("STEADYFORUM_DATASET_REPO", DEFAULT_REPO)  # after load_env(), so .env can set it
     devices = set(query_arrow(DEVICE_CHECK).column("device").to_pylist())
     if devices - {SYNTHETIC_DEVICE}:
         raise SystemExit(f"refusing to publish: non-synthetic devices in the selection: {sorted(devices)}")

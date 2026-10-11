@@ -8,7 +8,7 @@ type TrainingValue = State & { updateProfile: (p: Partial<Profile>) => void; fin
 const Training = createContext<TrainingValue | null>(null);
 export function TrainingProvider({ children, accountId }: { children: ReactNode; accountId?: string }) {
   // Guest history remains in its old key; it is never assigned to a new account.
-  const key = accountId ? `spotter-training-v1:${encodeURIComponent(accountId)}` : 'spotter-training-v1';
+  const key = accountId ? `steadyforum-training-v1:${encodeURIComponent(accountId)}` : 'steadyforum-training-v1';
   return <TrainingSession key={key} storageKey={key}>{children}</TrainingSession>;
 }
 function TrainingSession({ children, storageKey: key }: { children: ReactNode; storageKey: string }) {

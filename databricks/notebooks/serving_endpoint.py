@@ -4,7 +4,7 @@
 # MAGIC
 # MAGIC Creates or updates the CPU endpoint the API calls during the rest timer
 # MAGIC (`apps/api/src/integrations/databricks/score.ts`), serving the version of
-# MAGIC **`spotter.ml.form_quality`** that holds the `champion` alias (CONN-04). Model Serving takes a
+# MAGIC **`steadyforum.ml.form_quality`** that holds the `champion` alias (CONN-04). Model Serving takes a
 # MAGIC version number, not an alias, so re-run this after the form-model notebook moves `champion`.
 # MAGIC
 # MAGIC It also gives the API's service principal `CAN_QUERY`, then sends one cold and a few warm
@@ -16,7 +16,7 @@
 # COMMAND ----------
 
 dbutils.widgets.text("endpoint", "form-quality")
-dbutils.widgets.text("model", "spotter.ml.form_quality")
+dbutils.widgets.text("model", "steadyforum.ml.form_quality")
 dbutils.widgets.text("alias", "champion")
 # The API's DATABRICKS_CLIENT_ID (the service principal's application id). Empty skips the grant.
 dbutils.widgets.text("api_client_id", "")
