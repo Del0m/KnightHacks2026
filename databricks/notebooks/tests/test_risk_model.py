@@ -417,5 +417,81 @@ class Model(unittest.TestCase):
         self.assertTrue(all(set(t) <= set(FAMILY_NAMES) and len(t) <= 3 for t in out["top_features"]))
 
 
+class ReviewFixes(unittest.TestCase):
+    """Review follow-ups: SQL-safe comments, prior-corrected scores, champion lookup, skip status, datasets."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.df = ns["forecast_labels"](synthetic_frame())
+        cls.train_df, cls.test_df = ns["split_by_user"](cls.df, test_size=0.25, seed=7)
+        cls.model = ns["train"](cls.train_df, {"n_estimators": 30, "max_depth": 3})
+        cls.spw = float(cls.model.get_params()["scale_pos_weight"])
+
+    def test_comment_sql_escapes_quotes(self):
+        stmt = ns["comment_sql"]("spotter.gold.t", "The model's score. Not a diagnosis.")
+        self.assertEqual(stmt, "COMMENT ON TABLE spotter.gold.t IS 'The model\\'s score. Not a diagnosis.'")
+        self.assertEqual(ns["comment_sql"]("a.b.c", "back\\slash"), "COMMENT ON TABLE a.b.c IS 'back\\\\slash'")
+        for table, comment in [(ns["MODEL_SCORES_TABLE"], ns["MODEL_TABLE_COMMENT"]),
+                               (ns["IMPORTANCE_TABLE"], ns["IMPORTANCE_TABLE_COMMENT"])]:
+            literal = ns["comment_sql"](table, comment).split(" IS ", 1)[1]
+            self.assertTrue(literal.startswith("'") and literal.endswith("'"))
+            body = literal[1:-1].replace("\\\\", "").replace("\\'", "")
+            self.assertNotIn("'", body)
+
+    def test_prior_correction_formula(self):
+        p = np.array([0.0, 0.2, 0.5, 0.9, 1.0])
+        out = ns["prior_correct"](p, 4.0)
+        np.testing.assert_allclose(out, p / (p + (1 - p) * 4.0))
+        np.testing.assert_allclose(ns["prior_correct"](p, 1.0), p)
+        np.testing.assert_allclose(ns["prior_correct"](p, None), p)
+
+    def test_score_rows_uses_prior_corrected_probability(self):
+        self.assertNotAlmostEqual(self.spw, 1.0, places=3)  # so the correction changes the scores
+        scored_at = datetime(2026, 10, 10, 6, tzinfo=timezone.utc)
+        out = ns["score_rows"](self.model, self.test_df, "1", scored_at)
+        raw = self.model.predict_proba(ns["build_features"](self.test_df))[:, 1]
+        np.testing.assert_allclose(out["score"].to_numpy(), raw / (raw + (1 - raw) * self.spw), rtol=1e-6)
+
+    def test_evaluate_brier_uses_corrected_probability(self):
+        from sklearn.metrics import brier_score_loss, roc_auc_score
+
+        t = self.test_df[self.test_df["trainable"].astype(bool)]
+        y = t["label"].astype(int)
+        raw = self.model.predict_proba(ns["build_features"](t))[:, 1]
+        corrected = raw / (raw + (1 - raw) * self.spw)
+        metrics = ns["evaluate"](self.model, self.test_df)
+        self.assertAlmostEqual(metrics["model"]["brier"], brier_score_loss(y, corrected), places=6)
+        self.assertAlmostEqual(metrics["model"]["roc_auc"], roc_auc_score(y, corrected), places=6)
+
+    def test_alias_not_found_only_for_missing_champion(self):
+        class FakeMlflowError(Exception):
+            def __init__(self, msg, error_code):
+                super().__init__(msg)
+                self.error_code = error_code
+
+        not_found = ns["is_not_found"]
+        self.assertTrue(not_found(FakeMlflowError("Alias champion not found", "RESOURCE_DOES_NOT_EXIST")))
+        self.assertTrue(not_found(FakeMlflowError("Registered model does not exist", "NOT_FOUND")))
+        self.assertFalse(not_found(FakeMlflowError("Permission denied", "PERMISSION_DENIED")))
+        self.assertFalse(not_found(ConnectionError("timed out")))
+
+    def test_training_status_names_why_training_is_skipped(self):
+        ok = {"train": {"trainable": 10, "positives": 3}, "test": {"trainable": 5, "positives": 1}}
+        self.assertIsNone(ns["training_status"](ok))
+        for split, pos in [("train", 0), ("train", 10), ("test", 0), ("test", 5)]:
+            counts = {k: dict(v) for k, v in ok.items()}
+            counts[split]["positives"] = pos
+            status = ns["training_status"](counts)
+            self.assertIsInstance(status, str)
+            self.assertIn(split, status.lower())
+
+    def test_dataset_frame_is_trainable_features_and_label(self):
+        frame = ns["dataset_frame"](self.test_df)
+        t = self.test_df[self.test_df["trainable"].astype(bool)]
+        self.assertEqual(list(frame.columns), ns["FEATURE_COLUMNS"] + ["label"])
+        self.assertEqual(list(frame.index), list(t.index))
+        self.assertEqual(frame["label"].tolist(), t["label"].astype(int).tolist())
+
+
 if __name__ == "__main__":
     unittest.main()

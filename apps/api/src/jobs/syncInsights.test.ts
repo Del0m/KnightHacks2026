@@ -145,3 +145,67 @@ describe("AI-14 risk source: model first, heuristic fallback", () => {
     ]);
   });
 });
+
+// The model read also returns how long ago the latest scoring run was (minutes, from Databricks'
+// own clock); a run older than 36 hours means the scoring job has stopped, so the heuristic wins.
+describe("AI-14 risk source: stale model scores fall back to the heuristic", () => {
+  const scoredAgo = (minutes: number | null) =>
+    ({ ...modelRow, scored_minutes_ago: minutes }) as unknown as RiskRow;
+
+  it("asks Databricks for the latest scored_at alongside the model rows", async () => {
+    const { query, statements } = fakeQuery({ model: [scoredAgo(60)], heuristic: [heuristicRow] });
+
+    await readRiskRows(query, fakeLog().log);
+
+    expect(statements[0]).toContain(MODEL_TABLE);
+    expect(statements[0]).toContain("max(scored_at)");
+    expect(statements[0]).toContain("scored_minutes_ago");
+    // The heuristic table has no scored_at.
+    expect(statements.slice(1).join("\n")).not.toContain("scored_at");
+  });
+
+  it("uses fresh model rows, returned in the plain RiskRow shape for the upsert", async () => {
+    const { query, statements } = fakeQuery({ model: [scoredAgo(2 * 60)], heuristic: [heuristicRow] });
+
+    const result = await readRiskRows(query, fakeLog().log);
+
+    expect(result).toEqual({ rows: [modelRow], source: "model" });
+    expect(Object.keys(result.rows[0]!).sort()).toEqual(Object.keys(modelRow).sort());
+    expect(statements).toHaveLength(1);
+  });
+
+  it("still counts rows scored exactly 36 hours ago as fresh", async () => {
+    const { query } = fakeQuery({ model: [scoredAgo(36 * 60)], heuristic: [heuristicRow] });
+
+    const result = await readRiskRows(query, fakeLog().log);
+
+    expect(result.source).toBe("model");
+  });
+
+  it("falls back to the heuristic when the model's latest scores are more than 36 hours old", async () => {
+    const { query, statements } = fakeQuery({
+      model: [scoredAgo(37 * 60), scoredAgo(37 * 60)],
+      heuristic: [heuristicRow],
+    });
+    const { log, messages } = fakeLog();
+
+    const result = await readRiskRows(query, log);
+
+    expect(result).toEqual({ rows: [heuristicRow], source: "heuristic" });
+    expect(statements).toHaveLength(2);
+    expect(statements[1]).toContain(HEURISTIC_TABLE);
+    expect(messages()).toContain("gold_injury_risk_scores");
+    expect(messages()).toMatch(/stale/);
+    expect(messages()).toContain("37 h");
+  });
+
+  it("treats model rows without a scored_at as stale", async () => {
+    const { query } = fakeQuery({ model: [scoredAgo(null)], heuristic: [heuristicRow] });
+    const { log, messages } = fakeLog();
+
+    const result = await readRiskRows(query, log);
+
+    expect(result).toEqual({ rows: [heuristicRow], source: "heuristic" });
+    expect(messages()).toMatch(/stale/);
+  });
+});

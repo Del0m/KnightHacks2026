@@ -101,3 +101,27 @@ def test_no_injury_uses_the_smaller_side(risk):
     assert row.range_28d == pytest.approx(80.0, abs=0.5)
     assert "range_shrinking" not in row.top_features
     assert row.range_side == "min"
+
+
+def test_dropped_injury_tag_keeps_the_injured_side(tmp_path, run_pipeline):
+    # knee:left is tagged early, then later sessions lack the tag. Ranges never change, so the
+    # range must stay on the injured left side every day and nothing should look like shrinking.
+    write_lifter(tmp_path, "tag-dropped", ["knee:left"], lambda d: (100.0, 60.0))
+    for day in SESSION_DAYS:
+        if day < SHRINK_FROM:
+            continue
+        on = (START + timedelta(days=day)).isoformat()
+        path = tmp_path / "meta" / on / f"tag-dropped-{on}.json"
+        meta = json.loads(path.read_text())
+        meta["injury_groups"] = []
+        path.write_text(json.dumps(meta))
+    tables = run_pipeline(tmp_path)
+
+    rows = {r.date: r for r in tables["gold_injury_risk_scores"]
+            .filter("user_id = 'tag-dropped' AND body_part = 'knee'").collect()}
+    assert len(rows) == len(SESSION_DAYS)
+    for on, row in rows.items():
+        assert row.range_side == "injured", on
+        assert row.range_7d == pytest.approx(100.0, abs=0.5), on
+        assert row.range_28d == pytest.approx(100.0, abs=0.5), on
+        assert "range_shrinking" not in row.top_features, on
