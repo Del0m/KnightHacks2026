@@ -2,7 +2,7 @@ import { GlassSurface } from '@/components/GlassSurface';
 import { SwipeTabs, TabSwipeBoundary } from '@/components/SwipeTabs';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Tabs } from 'expo-router';
-import { Animated, Easing, PanResponder, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, PanResponder, Platform, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors as c, typography as t, tabAccents, pageColors } from '@/theme/tokens';
 import { NavIcon } from '@/components/NavIcon';
@@ -52,8 +52,8 @@ function GlassTabBar({ state, descriptors, navigation }: BarProps) {
       onPanResponderTerminationRequest: () => false,
     });
   })();
-  return <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center' }}>
-    <TabSwipeBoundary fullWidth><View {...responder.panHandlers} testID="glass-navigation" onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ width: '100%', maxWidth: 620, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12), paddingHorizontal: 12, flexDirection: 'row', backgroundColor: 'transparent', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.95)', boxShadow: '0 -5px 24px rgba(34,99,132,0.07)' }}>
+  return <View testID="navigation-position" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center' }}>
+    <TabSwipeBoundary fullWidth><View {...(Platform.OS === 'web' ? {} : responder.panHandlers)} testID="glass-navigation" onLayout={event => setWidth(event.nativeEvent.layout.width)} style={{ width: '100%', maxWidth: 620, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 12), paddingHorizontal: 12, flexDirection: 'row', backgroundColor: 'transparent', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.95)', boxShadow: '0 -5px 24px rgba(34,99,132,0.07)' }}>
       <GlassSurface radius={28} />
       {width > 0 && <Animated.View pointerEvents="none" testID="tab-highlight" style={{ position: 'absolute', left: 14, top: 12, width: Math.max(0, slot - 4), height: 65, borderRadius: 20, backgroundColor: slot > 0 ? slide.interpolate({ inputRange: tabAccents.map((_, index) => index * slot), outputRange: tabAccents.map(accent => accent.glass), extrapolate: 'clamp' }) : tabAccents[0].glass, borderWidth: 1, borderColor: 'rgba(255,255,255,.9)', boxShadow: 'inset 0 1px 0 white, 0 2px 8px rgba(68,119,148,.1)', transform: [{ translateX: slide }, { scaleX: stretch }] }} />}
       {state.routes.map((route, index) => {

@@ -1,3 +1,4 @@
+import { WebSection } from '@/components/WebSection';
 import { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -32,7 +33,7 @@ export default function PlannerScreen() {
   </> : <><Text style={ui.muted}>Log in to generate and save a personal plan.</Text><Action onPress={() => router.push('/login')}>Log in</Action></>}
   <>
    {weekly.plan?.notes.map((note, i) => <Text key={i} style={ui.muted}>{note}</Text>)}
-   {upcoming.map(({ date, items, generated }) => {
+   <WebSection name="plan-cards">{upcoming.map(({ date, items, generated }) => {
     return <View key={date} testID={`upcoming-${date}`} style={{ padding: 18, borderRadius: 24, gap: 12, borderWidth: 1, borderColor: weekly.selectedDate === date ? c.primary : c.border }}><GlassSurface radius={24} tint={c.primarySoft} colored />
      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text accessibilityRole="header" style={ui.rowTitle}>{dateForDay(date).toLocaleDateString(undefined, { weekday: 'long' })}</Text><Text style={ui.label}>{dateForDay(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text></View>
      {!generated && <Text style={ui.muted}>Daily full body</Text>}
@@ -42,6 +43,7 @@ export default function PlannerScreen() {
      </View>)}{(generated || date === weekly.today) && <Action secondary onPress={() => { weekly.selectDate(date); router.navigate('/'); }}>View workout</Action>}</>
     </View>;
    })}
+   </WebSection>
    {!upcoming.length && <Text style={ui.muted}>Choose workout days in Settings to see your next workouts.</Text>}
   </>
   <Action secondary onPress={() => router.push('/onboarding')}>Edit goals & schedule</Action>
