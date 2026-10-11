@@ -134,7 +134,8 @@ export function matchReps<L extends FrameRange, E extends FrameRange>(labels: L[
 const flagIds = (outcomes: RuleOutcome[]) => outcomes.filter((o) => o.status === 'flag').map((o) => o.rule_id).sort();
 
 /** Reruns the engine on one clip and pairs its reps with the accepted human labels. */
-export function checkClip(clip: DatasetClip): ClipCheck {
+export function checkClip(clip: DatasetClip, opts: { ignoreLabels?: string[] } = {}): ClipCheck {
+  const ignored = new Set(opts.ignoreLabels ?? []);
   const reps = engineReps(clip);
   const accepted = clip.annotations.filter((a) => a.state === 'accepted');
   const m = matchReps(accepted, reps);
@@ -147,8 +148,8 @@ export function checkClip(clip: DatasetClip): ClipCheck {
       exercise_id: clip.exercise_id,
       view: clip.view,
       rep_id: label.rep_id,
-      human_labels: label.human_labels,
-      primary_label: label.primary_label,
+      human_labels: label.human_labels.filter((l) => !ignored.has(l)),
+      primary_label: label.primary_label !== null && ignored.has(label.primary_label) ? null : label.primary_label,
       outcomes: engine.outcomes,
       durations: engine.durations,
     })),
@@ -278,8 +279,10 @@ const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 const spread = (vs: number[]) => (vs.length ? `${fmt(Math.min(...vs))}–${fmt(Math.max(...vs))}` : '—');
 
 /** Markdown summary per exercise. Counts only: no joints or ids beyond short clip prefixes. */
-export function renderReport(checks: ClipCheck[]): string {
+export function renderReport(checks: ClipCheck[], opts: { ignoreLabels?: string[] } = {}): string {
+  const ignored = new Set(opts.ignoreLabels ?? []);
   const out: string[] = ['# Form rules against human labels', ''];
+  for (const l of ignored) out.push(`${l} labels are disregarded: the rules for them are not scored against the labels.`, '');
   const exercises = [...new Set(checks.map((c) => c.exercise_id))].sort();
   for (const ex of exercises) {
     const spec = getSpec(ex)!;
@@ -307,6 +310,10 @@ export function renderReport(checks: ClipCheck[]): string {
       const yes = s.points.filter((p) => p.positive).map((p) => p.value);
       const no = s.points.filter((p) => !p.positive).map((p) => p.value);
       const judged = s.points.length;
+      if (ignored.has(rule.label)) {
+        out.push(`| ${rule.id} | ${rule.label} | labels disregarded | — | ${s.tp + s.fp} | — | — | ${spread(s.points.map((p) => p.value))} | — | ${rule.check.op} ${fmt(current)} | — | — |`);
+        continue;
+      }
       out.push(
         `| ${rule.id} | ${rule.label} | ${judged}${s.skipped ? ` (${s.skipped} skipped)` : ''} | ${s.tp + s.fn} | ${s.tp + s.fp} | ` +
           `${s.tp + s.fp ? frac(s.tp, s.tp + s.fp) : '—'} | ${s.tp + s.fn ? frac(s.tp, s.tp + s.fn) : '—'} | ${spread(yes)} | ${spread(no)} | ` +
