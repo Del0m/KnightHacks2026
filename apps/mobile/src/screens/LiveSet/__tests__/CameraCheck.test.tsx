@@ -10,6 +10,8 @@ jest.mock('react-native-vision-camera', () => ({ Camera: 'Camera', useCameraDevi
 jest.mock('@/pose/usePoseMode', () => ({ startPoseBenchmark: () => Promise.resolve(), usePoseMode: () => ({ mode: 'coreml', size: 320 }) }));
 jest.mock('@/pose/usePoseOutput', () => ({ usePoseOutput: ({ onPose }: { onPose: typeof mockOnPose }) => { mockOnPose = onPose; return { frameOutput: { currentResolution: { width: 1080, height: 1920 } }, error: null }; } }));
 jest.mock('@/components/GlassChoice', () => ({ GlassChoice: 'Choice' }));
+jest.mock('@/screens/Auth/session', () => ({ useAuth: () => ({ user: { id: 'user-1' }, getApiToken: async () => null }) }));
+jest.mock('@/screens/Auth/client', () => ({ apiUrl: 'https://api.test' }));
 jest.mock('../FramingGuide', () => ({ FramingGuide: 'Guide' }));
 beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(10000); Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true }); });
 afterEach(() => jest.useRealTimers());

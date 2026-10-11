@@ -24,8 +24,9 @@ export const MIN_ON_DEVICE_FPS = 12;
  * Picks the pose mode:
  * - iPhone: YOLOv8 at 12+ fps, otherwise cloud. Apple Vision only when the user picks it.
  * - Android: always cloud.
- * - Cloud without consent is `unavailable` (Live Set is gated); unreachable cloud is `paused`.
- *   A phone that can run YOLOv8 falls back to it in both cases instead.
+ * - Cloud without consent is `unavailable` (Live Set is gated), or YOLOv8 on a phone that can run it.
+ * - Consented cloud that is unreachable is `paused`, never YOLOv8: the camera check offers Core ML
+ *   only on an explicit tap (AI-17), so a cloud-preferring phone never switches on its own.
  */
 export function selectPoseMode(m: ModeInputs): PoseMode {
   const ios = m.platform === 'ios';
@@ -35,6 +36,6 @@ export function selectPoseMode(m: ModeInputs): PoseMode {
   if (onDevice && m.preference !== 'cloud') return 'coreml';
 
   if (!m.cloudConsent) return onDevice ? 'coreml' : 'unavailable';
-  if (!m.cloudReachable) return onDevice ? 'coreml' : 'paused';
+  if (!m.cloudReachable) return 'paused';
   return 'cloud';
 }

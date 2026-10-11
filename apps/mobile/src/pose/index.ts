@@ -11,12 +11,10 @@ export {
   type BenchmarkSize,
 } from './benchmark';
 export {
-  CLOUD_RECHECK_MS,
-  checkCloudReachable,
+  reportCloudAvailability,
   rerunBenchmark,
   startPoseBenchmark,
   usePoseMode,
-  type CloudCheck,
   type PoseModeState,
 } from './usePoseMode';
 export {
