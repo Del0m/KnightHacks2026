@@ -8,6 +8,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as rag from "../../../rag/ingest.js";
 import { schema, type Db } from "../src/db.js";
+import { ADVICE_DISCLAIMER } from "../src/services/advice.js";
 import { EMBED_DIM, EMBED_MODEL, QUERY_PREFIX } from "../src/integrations/huggingface/embed.js";
 import type { GenerateJsonInput } from "../src/integrations/huggingface/llm.js";
 import { loadSpecs } from "../src/services/exerciseSpecs.js";
@@ -505,12 +506,15 @@ describe("plans with the exercise library", () => {
         id: `exercise:${item.exercise.id}#0`,
         title: item.exercise.id.replace(/_/g, " "),
       });
-    // Adapted tracked work cites the knee note's "Limit or avoid" and "Strength swaps" sections.
+    // Adapted tracked work cites the knee note's "Limit or avoid" and "... swaps" sections, matched
+    // by heading so the test doesn't depend on where those sections sit in the note.
     const squat = allItems(plan).find((i) => i.exercise.id === "squat" || i.exercise.id === "lunge")!;
-    expect(squat.sources.map((s) => s.id)).toEqual(
-      expect.arrayContaining(["injury_note:knee#0", "injury_note:knee#1"]),
-    );
-    expect(plan.sources.map((s) => s.id)).toEqual(expect.arrayContaining(["injury_note:knee#0"]));
+    const kneeTitles = squat.sources.filter((s) => s.id.startsWith("injury_note:knee#")).map((s) => s.title);
+    expect(kneeTitles.some((t) => /limit or avoid/i.test(t))).toBe(true);
+    expect(kneeTitles.some((t) => /swaps/i.test(t))).toBe(true);
+    expect(plan.sources.some((s) => s.id.startsWith("injury_note:knee#"))).toBe(true);
+    // A plan built from the injury notes carries the consult-a-doctor disclaimer.
+    expect(plan.notes).toContain(ADVICE_DISCLAIMER);
 
     const added = await db
       .select()
