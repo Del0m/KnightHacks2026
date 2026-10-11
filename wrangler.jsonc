@@ -12,5 +12,8 @@
     "directory": "apps/mobile/dist",
     // Static export has a page per route; anything else falls back to the client router.
     "not_found_handling": "single-page-application"
-  }
+  },
+  // PR builds run `wrangler preview`, which needs this block; it can stay empty because the
+  // Worker has no bindings, and assets and compatibility settings come from the top level.
+  "previews": {}
 }
