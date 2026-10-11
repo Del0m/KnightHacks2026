@@ -6,6 +6,7 @@ import type { Db } from "../db.js";
 import { schema } from "../db.js";
 import { conflict, isoDate, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
 import { deleteAccount } from "../services/accountDeletion.js";
+import { mediaKeysOf, type MediaDeps } from "../services/feedMedia.js";
 import type { ProfileEmbeddings } from "../services/profileEmbeddings.js";
 
 const { users, profiles, injuries } = schema;
@@ -161,6 +162,8 @@ export interface MeRouterOptions {
   onAccountDeleted?: (userId: string) => void;
   // CONN-08: re-embeds the profile for buddy matching when goals or bio change.
   profileEmbeddings?: ProfileEmbeddings;
+  // Feed photos and videos: deleted from storage along with the account.
+  media?: MediaDeps;
 }
 
 export function meRouter(db: Db, options: MeRouterOptions = {}): Router {
@@ -170,8 +173,15 @@ export function meRouter(db: Db, options: MeRouterOptions = {}): Router {
   // Idempotent: deleting an already-deleted account is also 204.
   router.delete("/me", async (req, res) => {
     const id = userId(req);
+    // The rows cascade with the user; the files are read first so they can be removed too.
+    const keys = options.media?.storage ? await mediaKeysOf(db, id) : [];
     await deleteAccount(db, id, options.pseudonymSecret);
     options.onAccountDeleted?.(id);
+    if (keys.length) {
+      await options.media!.storage!.delete(keys).catch((err: unknown) => {
+        req.log?.error({ err }, "couldn't delete the account's media files");
+      });
+    }
     res.status(204).end();
   });
 

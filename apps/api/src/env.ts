@@ -67,6 +67,13 @@ export const envSchema = z.object({
   DEMO_PRESENTER_USER_ID: optional,
   HF_WRITE_TOKEN: optional,
 
+  // Feed photos and videos in a private Cloudflare R2 bucket (services/mediaStorage.ts). All four, or
+  // uploads are off. The key needs Object Read & Write on that bucket only.
+  R2_ACCOUNT_ID: optional,
+  R2_ACCESS_KEY_ID: optional,
+  R2_SECRET_ACCESS_KEY: optional,
+  R2_BUCKET: optional,
+
   // CONN-11: cloud pose endpoint (ml/cloud_endpoint). Without it, /pose/stream isn't served.
   POSE_ENDPOINT_URL: optional.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https URL"),
   POSE_ENDPOINT_TIMEOUT_MS: optionalInt,

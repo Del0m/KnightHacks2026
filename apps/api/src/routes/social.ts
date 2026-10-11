@@ -14,6 +14,7 @@ import { badRequest, conflict, HttpError, notFound, parse, send, userId } from "
 import { BLOCKED_MESSAGE, type Moderator } from "../services/moderation.js";
 import { isAbusiveComment } from "../services/commentSafety.js";
 import { notBlocked } from "../services/blocks.js";
+import { attachMedia, mediaForPosts, prepareMedia, type MediaDeps } from "../services/feedMedia.js";
 import { visiblePostsFilter } from "./feed.js";
 
 const { posts, comments, kudos, follows, users, profiles, sessions, moderationBlocks } = schema;
@@ -27,6 +28,8 @@ export const postInput = z
     title: z.string().trim().max(100).optional(),
     session_id: z.string().uuid().nullable().optional(),
     data: z.record(z.unknown()).nullable().optional(),
+    // Uploads from POST /media/uploads: 1-4 photos or 1 video (services/feedMedia.ts).
+    media_ids: z.array(z.string().uuid()).max(4).optional(),
   })
   .strict();
 
@@ -90,7 +93,9 @@ async function visiblePost(db: Db, me: string, postId: string) {
   return row;
 }
 
-export function socialRouter(db: Db, moderator: Moderator): Router {
+const noMedia: MediaDeps = { storage: null, checkImage: null };
+
+export function socialRouter(db: Db, moderator: Moderator, mediaDeps: MediaDeps = noMedia): Router {
   const router = Router();
 
   // The session row lock serializes retries; sharing this workout creates one session post.
@@ -147,19 +152,26 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
     const { checked } = await moderate(db, moderator, req, [title, input.body].filter(Boolean).join("\n"), {
       kind: "post",
     });
-    const [row] = await db
-      .insert(posts)
-      .values({
-        authorId: me,
-        kind: input.kind,
-        body: input.body,
-        sessionId: input.session_id ?? null,
-        data: title !== undefined ? { ...input.data, title } : (input.data ?? null),
-        moderationChecked: checked,
-      })
-      .returning();
-    const { embedding: _embedding, ...post } = row!; // advice-only column
-    send(res, post, 201);
+    // Photos and videos: uploaded as declared, a valid mix, photos past moderation.
+    const uploads = await prepareMedia(db, mediaDeps, req, input.media_ids ?? []);
+    const row = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(posts)
+        .values({
+          authorId: me,
+          kind: input.kind,
+          body: input.body,
+          sessionId: input.session_id ?? null,
+          data: title !== undefined ? { ...input.data, title } : (input.data ?? null),
+          moderationChecked: checked,
+        })
+        .returning();
+      await attachMedia(tx, created!.id, uploads);
+      return created!;
+    });
+    const { embedding: _embedding, ...post } = row; // advice-only column
+    const media = (await mediaForPosts(db, mediaDeps, [post.id])).get(post.id) ?? [];
+    send(res, { ...post, media }, 201);
   });
 
   router.get("/posts/:id/comments", async (req, res) => {

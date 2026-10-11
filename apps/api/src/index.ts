@@ -6,6 +6,9 @@ import { DatabricksUploader, uploadConfigFromEnv } from "./integrations/databric
 import { Moderator as LlamaGuard, moderationConfigFromEnv } from "./integrations/huggingface/moderation.js";
 import { startExportRetry } from "./jobs/retryExports.js";
 import { startModerationRecheck } from "./jobs/recheckModeration.js";
+import { startMediaCleanup } from "./jobs/mediaCleanup.js";
+import { llamaGuardImageChecker } from "./integrations/huggingface/imageModeration.js";
+import { R2Storage, r2ConfigFromEnv } from "./services/mediaStorage.js";
 import { startInsightSync, syncConfigFromEnv } from "./jobs/syncInsights.js";
 import { neonAuthVerifier } from "./middleware/auth.js";
 import { PoseEndpointClient, poseEndpointConfigFromEnv } from "./integrations/huggingface/poseEndpoint.js";
@@ -51,6 +54,8 @@ integrations.configure("set_scoring", scoringConfigured);
 for (const name of ["llm", "moderation", "embeddings"] as const)
   integrations.configure(name, Boolean(env.HF_TOKEN));
 integrations.configure("cloud_pose", Boolean(poseEndpoint));
+const r2 = r2ConfigFromEnv(env);
+integrations.configure("media_storage", Boolean(r2));
 
 const uploader = databricksConfigured(env)
   ? new DatabricksUploader(uploadConfigFromEnv(env), drizzleExportStatusStore(db), fetch, logger)
@@ -149,6 +154,15 @@ const planner = {
 // (the fixed pain reply still works, it needs no model).
 const advice = { writer: new AdviceWriter(llm, logger), embed: planner.embed, log: logger };
 
+// Feed photos and videos: files in R2, photos checked by Llama Guard 4. Without R2, uploads are off.
+const media = {
+  storage: r2 ? new R2Storage(r2) : null,
+  checkImage: env.HF_TOKEN ? llamaGuardImageChecker(moderationConfigFromEnv(env), undefined, logger) : null,
+  log: logger,
+};
+const stopMediaCleanup = media.storage ? startMediaCleanup({ db, media, log: logger }) : () => {};
+if (r2 && !env.HF_TOKEN) logger.warn("R2 is set but HF_TOKEN isn't; feed photos are not moderated");
+
 const verifyToken = neonAuthVerifier(env.NEON_AUTH_JWKS_URL, {
   issuer: env.NEON_AUTH_ISSUER,
   audience: env.NEON_AUTH_AUDIENCE,
@@ -163,6 +177,7 @@ const app = createApp({
   rest,
   planner,
   advice,
+  media,
   // CONN-08: buddy-matching embeddings, refreshed when goals or bio change.
   profileEmbeddings: env.HF_TOKEN
     ? profileEmbeddings(
@@ -217,6 +232,7 @@ function shutdown(signal: string) {
   logger.info({ signal }, "shutting down");
   stopInsightSync();
   stopModerationRecheck();
+  stopMediaCleanup();
   stopExportRetry();
   stopPoseStream();
   server.close(() => {

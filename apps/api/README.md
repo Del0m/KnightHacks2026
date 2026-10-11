@@ -92,6 +92,47 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 - The finished plan's limits keep applying: `GET /me/limits` serves them until the user edits or deletes them, or starts a new rehab plan.
 - `POST /me/milestones/:id/dismiss` hides the suggestion for 14 days.
 
+## Feed photos and videos
+
+A post can carry 1 to 4 photos (JPEG, PNG or WebP, 10 MB each), or 1 video (MP4 or MOV, up to 60 s and 50 MB). Files go straight from the app to a private Cloudflare R2 bucket; the API never handles them.
+
+1. `POST /media/uploads` with `{ content_type, size_bytes, width?, height?, duration_ms? }` (`duration_ms` is required for videos) returns `{ id, upload_url, method: "PUT", headers, expires_at }`.
+2. The app `PUT`s the file to `upload_url` with exactly those `headers` (`content-type`) within 15 minutes.
+3. `POST /posts` with `media_ids: [id, ...]` (in display order) creates the post.
+   - Each upload is checked against what was declared, and photos go through Llama Guard 4.
+   - A flagged photo is a 422. If Llama Guard can't be reached, it's a 503 `moderation_unavailable`: try again.
+4. `GET /feed` and the `POST /posts` response give each post `media: [{ id, kind, url, content_type, width, height, duration_ms }]`.
+   - `url` is a view link that expires in an hour, so the app should re-fetch the feed rather than store it.
+   - Posts without media have `media: []`.
+
+Other endpoints:
+
+- `DELETE /media/:id` drops an upload that hasn't been posted. Uploads never posted are deleted after 24 hours.
+- `POST /posts/:id/report` with `{ reason: "spam" | "harassment" | "inappropriate" | "unsafe" | "other", note? }` returns `{ reported, already_reported, hidden }`. Reporting a post with a video hides it from everyone but its author (`hidden_at` is set in the author's feed) until it's reviewed. Other reports are logged in `post_reports`.
+- To review: `select * from post_reports order by created_at desc`. Then either restore the post with `update posts set hidden_at = null where id = '…'`, or delete it.
+
+Deleting an account deletes its files from R2 too.
+
+**R2 setup** (Cloudflare dashboard). Without these four env vars, uploads return 503 `media_unavailable` and everything else works as before. `GET /health` shows `media_storage`.
+
+1. **R2 → Create bucket.** Name it, e.g. `steadyforum-media`. Keep it **private**: no public access and no custom domain.
+2. **R2 → Manage API tokens → Create API token.** Give it **Object Read & Write**, limited to that bucket. Put the values in Render:
+   - `R2_ACCOUNT_ID`
+   - `R2_ACCESS_KEY_ID`
+   - `R2_SECRET_ACCESS_KEY`
+   - `R2_BUCKET`
+3. **Bucket → Settings → CORS policy.** This lets the website upload; the native app doesn't need it.
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://steadyforum.fit", "https://www.steadyforum.fit"],
+       "AllowedMethods": ["PUT", "GET"],
+       "AllowedHeaders": ["content-type"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+
 ## Conventions
 
 - JSON is **snake_case** on the wire, matching the shared set record (AI-08) and the Databricks payloads. TypeScript and Drizzle use camelCase; `send()` in `src/http.ts` converts responses.
@@ -111,6 +152,7 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 | `GET /buddies/suggestions`, `GET /buddies`, `POST /buddies/:id/request`, `POST /buddies/:id/accept`, `POST /buddies/:id/decline`                                                                                | BE-12        |
 | `GET /me/progress?days=`, `GET /me/insights`                                                                                                                                                                    | BE-13        |
 | `POST /advice`                                                                                                                                                                                                  | BE-11        |
+| `POST /media/uploads`, `DELETE /media/:id`, `POST /posts { media_ids }`, `POST /posts/:id/report`                                                                                                               | Feed media   |
 | `GET /me/rom-trend`, `GET /me/physio-report`, `POST /me/physio-report/share`, `GET /me/physio-report/shares`, `DELETE /me/physio-report/shares/:id`, `GET /reports/:token` (public)                             | BE-16        |
 | `GET /me/milestones`, `POST /me/milestones/:id/accept`, `POST /me/milestones/:id/dismiss`                                                                                                                       | BE-17        |
 | `POST /plans/generate?tz=`, `GET /plans/current?tz=`, `GET /me/exercise-preferences`, `PUT /me/exercise-preferences/:exerciseId`                                                                                | BE-08        |
@@ -128,9 +170,9 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 | `NODE_ENV`, `PORT`, `LOG_LEVEL`                              | Server basics                                                                                                     | `development`, `3000`, `info`                                                                   |
 | `CORS_ORIGINS`                                               | Browser calls from the Expo web build                                                                             | No CORS headers (native apps don't need them)                                                   |
 | `DATABRICKS_HOST`, `_CLIENT_ID`, `_CLIENT_SECRET`            | Service principal for every Databricks call                                                                       | No uploads, scoring or sync                                                                     |
-| `STEADYFORUM_PSEUDONYM_SECRET`                                   | Pseudonymous user ids for Databricks (CONN-02, CONN-06, CONN-13). Never rotate it                                 | No uploads or sync; account deletion can't queue the Databricks delete                          |
-| `DATABRICKS_OAUTH_SCOPES`                                    | Scopes requested for the service principal                                                                        | `all-apis`, which `steadyforum-api` doesn't have: set `files model-serving sql`                     |
-| `DATABRICKS_VOLUME_PATH`                                     | Where finished sessions upload (CONN-02)                                                                          | `/Volumes/steadyforum/raw/sessions`                                                                 |
+| `STEADYFORUM_PSEUDONYM_SECRET`                               | Pseudonymous user ids for Databricks (CONN-02, CONN-06, CONN-13). Never rotate it                                 | No uploads or sync; account deletion can't queue the Databricks delete                          |
+| `DATABRICKS_OAUTH_SCOPES`                                    | Scopes requested for the service principal                                                                        | `all-apis`, which `steadyforum-api` doesn't have: set `files model-serving sql`                 |
+| `DATABRICKS_VOLUME_PATH`                                     | Where finished sessions upload (CONN-02)                                                                          | `/Volumes/steadyforum/raw/sessions`                                                             |
 | `DATABRICKS_SERVING_ENDPOINT`, `DATABRICKS_SCORE_TIMEOUT_MS` | Set scoring during rest (CONN-05)                                                                                 | The phone's rule score; 1200 ms budget. The endpoint scales to zero, so warm it before a demo   |
 | `DATABRICKS_WAREHOUSE_ID`                                    | Insight sync reads (CONN-06). The id is in the warehouse URL (`/sql/warehouses/<id>`), not the `?o=` workspace id | No sync                                                                                         |
 | `INSIGHT_SYNC_ENABLED`                                       | Starts the 15-minute gold → Neon sync on this instance. Set `true` on **exactly one** deployed instance           | Sync doesn't run here                                                                           |
