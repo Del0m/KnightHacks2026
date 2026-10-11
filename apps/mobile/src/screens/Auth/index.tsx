@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { AppPage, Action, ui } from '@/components/AppPage';
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { colors as c, typography as t } from '@/theme/tokens';
@@ -11,7 +11,9 @@ export default function AuthScreen({ mode = 'login' }: { mode?: AuthMode }) {
   const auth = useAuth(), signup = mode === 'signup';
   const [name, setName] = useState(''), [email, setEmail] = useState(''), [password, setPassword] = useState('');
   const [visible, setVisible] = useState(false), [busy, setBusy] = useState(false), [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null), [verification, setVerification] = useState(false);
+  // Neon Auth sends a failed or cancelled Google sign-in back here with ?error= (web).
+  const { error: oauthError } = useLocalSearchParams<{ error?: string }>();
+  const [error, setError] = useState<string | null>(oauthError ? 'Google sign-in didn’t finish. Please try again.' : null), [verification, setVerification] = useState(false);
   const inFlight = useRef(false), emailInput = useRef<TextInput>(null), passwordInput = useRef<TextInput>(null);
   async function run(action: () => Promise<void>) {
     if (inFlight.current) return;
@@ -29,6 +31,12 @@ export default function AuthScreen({ mode = 'login' }: { mode?: AuthMode }) {
       else { setVerification(true); setNotice('Check your email to verify your account, then log in.'); }
     });
   }
+  function google() {
+    void run(async () => {
+      if (await auth.signInWithGoogle()) router.replace('/');
+      else if (Platform.OS !== 'web') setNotice('Google sign-in didn’t finish. You can try again.');
+    });
+  }
   return <AppPage title={signup ? 'Sign up' : 'Log in'}>
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.form}>
       <Text accessibilityRole="header" style={styles.heading}>{signup ? 'Create your account' : 'Log in'}</Text>
@@ -39,6 +47,7 @@ export default function AuthScreen({ mode = 'login' }: { mode?: AuthMode }) {
       {(error || auth.error) && <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.error}>{error || auth.error}</Text>}
       {notice && <Text accessibilityLiveRegion="polite" style={ui.text}>{notice}</Text>}
       <Action disabled={!auth.configured || busy} onPress={submit}>{busy ? 'Please wait…' : signup ? 'Create account' : 'Log in'}</Action>
+      {auth.googleEnabled && <Action secondary disabled={busy} onPress={google}>Continue with Google</Action>}
       {busy && <ActivityIndicator color={c.primary} accessibilityLabel="Signing in" />}
       {verification && auth.configured && <Action secondary disabled={busy} onPress={() => { if (!validateCredentials('login', { name, email, password: 'present' })) void run(async () => { await auth.resendVerification(email); setNotice('If your account needs verification, check your email.'); }); }}>Resend verification email</Action>}
       {auth.error && auth.configured && <Action secondary disabled={busy} onPress={() => { void run(auth.refresh); }}>Retry session</Action>}

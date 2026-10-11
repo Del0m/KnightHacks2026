@@ -4,10 +4,10 @@ import { AuthProvider, useAuth } from '../session';
 import { authClient } from '../client';
 const { act, create } = require('react-test-renderer');
 jest.mock('../client', () => ({
-  authConfigured: true, apiUrl: 'https://api.example.com',
+  authConfigured: true, googleSignInEnabled: true, apiUrl: 'https://api.example.com',
   authClient: {
     getSession: jest.fn(), token: jest.fn(), signOut: jest.fn(),
-    signIn: { email: jest.fn() }, signUp: { email: jest.fn() }, sendVerificationEmail: jest.fn(),
+    signIn: { email: jest.fn(), social: jest.fn() }, signUp: { email: jest.fn() }, sendVerificationEmail: jest.fn(),
   },
 }));
 const client = authClient!;
@@ -18,7 +18,8 @@ function Harness() { const value = useAuth(); useEffect(() => { auth = value; },
 async function mount() { await act(async () => { renderer = create(<AuthProvider><Harness /></AuthProvider>); }); }
 beforeEach(() => {
   jest.clearAllMocks();
-  for (const method of [client.getSession, client.token, client.signOut, client.signIn.email, client.signUp.email, client.sendVerificationEmail]) jest.mocked(method).mockReset();
+  for (const method of [client.getSession, client.token, client.signOut, client.signIn.email, client.signIn.social, client.signUp.email, client.sendVerificationEmail]) jest.mocked(method).mockReset();
+  jest.mocked(client.signIn.social).mockResolvedValue({ data: {}, error: null } as never);
   jest.mocked(client.getSession).mockResolvedValue({ data: { user, session: {} }, error: null } as never);
   jest.mocked(client.signIn.email).mockResolvedValue({ data: {}, error: null } as never);
   jest.mocked(client.signUp.email).mockResolvedValue({ data: {}, error: null } as never);
@@ -88,4 +89,55 @@ it('keeps token acquisition valid across a harmless focus refresh', async () => 
     await act(async () => { resolve({ data: { token: 'jwt' }, error: null } as never); await request; });
     expect(send).toHaveBeenCalledTimes(1);
   } finally { globalThis.fetch = original; }
+});
+
+describe('Google sign-in', () => {
+  const second = { id: 'google-user', email: 'g@example.com', name: 'Google User' };
+  it('returns through the app scheme and confirms the session with the server (native)', async () => {
+    jest.mocked(client.getSession).mockResolvedValueOnce({ data: null, error: null } as never);
+    await mount();
+    expect(auth.googleEnabled).toBe(true);
+    jest.mocked(client.getSession).mockResolvedValue({ data: { user: second, session: {} }, error: null } as never);
+    let result: boolean | undefined;
+    await act(async () => { result = await auth.signInWithGoogle(); });
+    expect(client.signIn.social).toHaveBeenCalledWith({ provider: 'google', callbackURL: '/', errorCallbackURL: '/login' });
+    expect(result).toBe(true);
+    expect(auth.user?.id).toBe('google-user');
+  });
+  it('stays signed out when the user closes Google without finishing', async () => {
+    jest.mocked(client.getSession).mockResolvedValue({ data: null, error: null } as never);
+    await mount();
+    let result: boolean | undefined;
+    await act(async () => { result = await auth.signInWithGoogle(); });
+    expect(result).toBe(false); expect(auth.user).toBeNull();
+  });
+  it('reports a provider error and keeps the current session', async () => {
+    await mount();
+    jest.mocked(client.signIn.social).mockResolvedValue({ data: null, error: { message: 'Provider not found' } } as never);
+    await act(async () => { await expect(auth.signInWithGoogle()).rejects.toThrow('Provider not found'); });
+    expect(auth.user?.id).toBe('first');
+  });
+  it('on the web, sends the browser to Google and back to this site', async () => {
+    const { Platform } = require('react-native');
+    const os = Object.getOwnPropertyDescriptor(Platform, 'OS')!;
+    const hadWindowLocation = 'location' in globalThis;
+    Object.defineProperty(Platform, 'OS', { configurable: true, get: () => 'web' });
+    Object.defineProperty(globalThis, 'location', { configurable: true, value: { origin: 'https://steadyforum.fit' } });
+    const listeners = { add: window.addEventListener, remove: window.removeEventListener };
+    window.addEventListener = jest.fn(); window.removeEventListener = jest.fn(); // the provider listens for focus on web
+    try {
+      await mount();
+      const sessionCalls = jest.mocked(client.getSession).mock.calls.length;
+      let result: boolean | undefined;
+      await act(async () => { result = await auth.signInWithGoogle(); });
+      expect(client.signIn.social).toHaveBeenCalledWith({ provider: 'google', callbackURL: 'https://steadyforum.fit/', errorCallbackURL: 'https://steadyforum.fit/login' });
+      expect(result).toBe(false); // the page is leaving for Google
+      expect(jest.mocked(client.getSession).mock.calls.length).toBe(sessionCalls);
+    } finally {
+      if (renderer) act(() => renderer.unmount());
+      Object.defineProperty(Platform, 'OS', os);
+      window.addEventListener = listeners.add; window.removeEventListener = listeners.remove;
+      if (!hadWindowLocation) delete (globalThis as { location?: unknown }).location;
+    }
+  });
 });

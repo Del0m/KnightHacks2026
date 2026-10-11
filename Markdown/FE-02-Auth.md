@@ -17,6 +17,23 @@ The URLs intentionally remain empty until the backend teammate supplies them. Lo
 
 Configure the actual browser origin and native `steadyforum://` origin with the auth service. Confirm email verification, native cookie support, accepted cookie prefixes, and JWT endpoint/claims with the project's managed Neon Auth configuration. The API needs CORS for its web origin and BE-02 JWT validation. Never use a wildcard CORS origin for credentialed browser auth.
 
+## Google sign-in
+
+"Continue with Google" appears on login and sign-up only when `EXPO_PUBLIC_GOOGLE_SIGN_IN=true`. Until then nothing changes. The API needs no change: it reads only the token's `sub`, so a Google account gets a profile like an email account.
+
+1. **Neon Console → the branch the app uses (demo) → Auth → OAuth providers → Google.**
+   - Neon's shared development credentials are fine for trying it.
+   - For the live site, create an OAuth client (type "Web application") in Google Cloud. Add the redirect URI Neon shows: Better Auth's `<Auth URL>/callback/google`. Paste the client ID and secret into Neon.
+2. **Trusted domains (Neon → Auth → Settings):**
+   - `https://steadyforum.fit` and `https://www.steadyforum.fit`, for the web
+   - `steadyforum://`, for the native app
+3. **Turn it on:** set `EXPO_PUBLIC_GOOGLE_SIGN_IN=true` in the Cloudflare build variables and in local `.env`, then rebuild.
+   - **Native:** `expo-web-browser` is a native module, so rebuild the development build once.
+
+**How it works:**
+- **Web:** the page goes to Google and comes back to the site's `/`. A failure or cancel returns to `/login?error=…`, which the login screen explains.
+- **Native:** Google opens in an in-app browser and returns through the `steadyforum://` scheme. The session is confirmed with the server before the app treats the user as signed in, as with email.
+
 ## Frontend behavior
 
 - Email/password sign-up and login; optional password visibility, native autofill, keyboard navigation, validation, loading/errors, and verification-email resend.
