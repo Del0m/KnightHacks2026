@@ -142,8 +142,18 @@ export interface ReportRange {
   timeZone: string;
 }
 
-/** The plan the report is about: the active one, else the most recent. */
-async function reportPlan(db: Db, userId: string) {
+/**
+ * The plan the report is about: a given one (a share link's), else the active one, else the most
+ * recent. Always the user's own.
+ */
+export async function reportPlan(db: Db, userId: string, planId?: string) {
+  if (planId) {
+    const [plan] = await db
+      .select()
+      .from(rehabPlans)
+      .where(and(eq(rehabPlans.id, planId), eq(rehabPlans.userId, userId)));
+    return plan ?? null;
+  }
   const [active] = await db
     .select()
     .from(rehabPlans)
@@ -172,8 +182,14 @@ export async function defaultRange(
   return { from, to: today, timeZone };
 }
 
-export async function physioReport(db: Db, userId: string, range: ReportRange, today: string) {
-  const plan = await reportPlan(db, userId);
+export async function physioReport(
+  db: Db,
+  userId: string,
+  range: ReportRange,
+  today: string,
+  planId?: string,
+) {
+  const plan = await reportPlan(db, userId, planId);
   if (!plan) throw notFound("Rehab plan");
   const { from, to, timeZone } = range;
   const start = localDayBounds(from, timeZone).start;
@@ -292,6 +308,7 @@ export async function createShare(
   userId: string,
   range: ReportRange,
   days: number,
+  rehabPlanId: string,
   now = new Date(),
 ): Promise<{ id: string; token: string; expiresAt: Date }> {
   const token = randomBytes(24).toString("base64url"); // 192 bits, unguessable
@@ -301,6 +318,7 @@ export async function createShare(
     .values({
       userId,
       tokenHash: hashToken(token),
+      rehabPlanId,
       fromDate: range.from,
       toDate: range.to,
       timeZone: range.timeZone,

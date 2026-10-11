@@ -240,6 +240,39 @@ describe("range of motion and the physio report", () => {
     expect((await request(later.app).get(short.body.path)).status).toBe(404);
     expect((await me.post("/me/physio-report/share", { expires_in_days: 90 })).status).toBe(400);
   });
+
+  it("keeps a link on the plan that was shared after the user moves to a new one", async () => {
+    const first = await rehabUser(t, "r-bound");
+    const me = await t.as("r-bound");
+    const share = await me.post("/me/physio-report/share", {});
+    await t.db.update(schema.rehabPlans).set({ status: "done" }).where(eq(schema.rehabPlans.id, first.id));
+    const [second] = await t.db
+      .insert(schema.rehabPlans)
+      .values({ userId: "r-bound", startOn: "2026-10-06", status: "active" })
+      .returning();
+    await t.db.insert(schema.rehabLimits).values({
+      rehabPlanId: second!.id,
+      exerciseId: "lunge",
+      angle: "knee",
+      side: "both",
+      maxRangeDeg: 90,
+      sets: 2,
+      reps: 8,
+    });
+
+    const page = await request(t.app).get(share.body.path);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain("Rehab plan started 2026-09-14");
+    expect(page.text).toContain("Squat");
+    expect(page.text).not.toContain("Lunge"); // the new prescription wasn't shared
+    // The user's own report follows the current plan.
+    expect((await me.get("/me/physio-report")).body.exercises.map((e: { name: string }) => e.name)).toEqual([
+      "Lunge",
+    ]);
+    // Deleting the shared plan ends its links.
+    await t.db.delete(schema.rehabPlans).where(eq(schema.rehabPlans.id, first.id));
+    expect((await request(t.app).get(share.body.path)).status).toBe(404);
+  });
 });
 
 describe("back-to-gym milestone", () => {
@@ -282,6 +315,8 @@ describe("back-to-gym milestone", () => {
     expect(res.body.checks.every((c: { met: boolean }) => c.met)).toBe(true);
     // Asking again returns the same suggestion.
     expect((await me.get("/me/milestones")).body.milestone.id).toBe(res.body.milestone.id);
+    const before = await me.get("/me/limits");
+    expect(before.body.limits.squat).toHaveLength(1);
 
     const accepted = await me.post(`/me/milestones/${res.body.milestone.id}/accept`, { share_post: true });
     expect(accepted.status).toBe(200);
@@ -294,8 +329,49 @@ describe("back-to-gym milestone", () => {
       .from(schema.rehabLimits)
       .where(eq(schema.rehabLimits.rehabPlanId, plan.id));
     expect(limits).toHaveLength(1); // never changes or removes limits
+    // ...and the phone keeps applying them: moving on to gym plans doesn't lift the physio's limits.
+    const after = await me.get("/me/limits");
+    expect(after.body.limits).toEqual(before.body.limits);
+    expect(after.body.rehab_plan).toMatchObject({ id: plan.id, status: "done", started: true });
     expect((await me.post(`/me/milestones/${res.body.milestone.id}/accept`)).status).toBe(409); // already accepted
     expect((await me.post("/plans/generate")).status).toBe(201); // gym plans are open again
+
+    // A new rehab plan from the physio replaces them.
+    const [next] = await t.db
+      .insert(schema.rehabPlans)
+      .values({ userId: "m-ready", startOn: "2026-10-01", status: "active" })
+      .returning();
+    await t.db.insert(schema.rehabLimits).values({
+      rehabPlanId: next!.id,
+      exerciseId: "lunge",
+      angle: "knee",
+      side: "both",
+      maxRangeDeg: 90,
+      sets: 2,
+      reps: 8,
+    });
+    const replaced = await me.get("/me/limits");
+    expect(Object.keys(replaced.body.limits)).toEqual(["lunge"]);
+    expect(replaced.body.rehab_plan.id).toBe(next!.id);
+  });
+
+  it("re-checks on accept, and withdraws a suggestion that no longer holds", async () => {
+    const plan = await rehabUser(t, "m-stale");
+    await steady("m-stale");
+    await goodWeeks("m-stale");
+    const me = await t.as("m-stale");
+    const { body } = await me.get("/me/milestones");
+    expect(body.milestone.status).toBe("pending");
+    // A rep past the limits after the suggestion was fetched, and accept without fetching again.
+    await workout(t.db, "m-stale", "2026-10-07T09:00:00Z", "gold", 1);
+    const res = await me.post(`/me/milestones/${body.milestone.id}/accept`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("milestone_no_longer_met");
+    expect(res.body.details.checks.find((c: { id: string }) => c.id === "no_limit_flags").met).toBe(false);
+    const [still] = await t.db.select().from(schema.rehabPlans).where(eq(schema.rehabPlans.id, plan.id));
+    expect(still!.status).toBe("active");
+    expect((await me.get("/me/milestones")).body.milestone).toBeNull();
+    expect((await me.post(`/me/milestones/${body.milestone.id}/accept`)).status).toBe(404); // withdrawn
   });
 
   it("waits when the range has held for only one week", async () => {

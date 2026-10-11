@@ -25,6 +25,7 @@ import {
   physioReport,
   REPORT_DISCLAIMER,
   reportHtml,
+  reportPlan,
   resolveShare,
   revokeShare,
   romTrendFor,
@@ -72,6 +73,7 @@ export function publicRecoveryRouter(db: Db, options: RecoveryOptions = {}): Rou
       share.userId,
       { from: share.fromDate, to: share.toDate, timeZone: share.timeZone },
       today,
+      share.rehabPlanId, // the plan that was shared, not whichever is current
     );
     res.set({
       "Cache-Control": "no-store",
@@ -115,7 +117,9 @@ export function recoveryRouter(db: Db, options: RecoveryOptions = {}): Router {
       req.body ?? {},
     );
     const range = await rangeFor(db, me, body, date, timeZone);
-    const share = await createShare(db, me, range, body.expires_in_days, options.now?.());
+    const plan = await reportPlan(db, me);
+    if (!plan) throw notFound("Rehab plan");
+    const share = await createShare(db, me, range, body.expires_in_days, plan.id, options.now?.());
     send(
       res,
       {
@@ -149,7 +153,8 @@ export function recoveryRouter(db: Db, options: RecoveryOptions = {}): Router {
       z.object({ share_post: z.boolean().default(false) }).strict(),
       req.body ?? {},
     );
-    send(res, await acceptMilestone(db, userId(req), id, share_post));
+    const { date } = today(req);
+    send(res, await acceptMilestone(db, userId(req), id, share_post, date, options.now?.()));
   });
 
   router.post("/me/milestones/:id/dismiss", async (req, res) => {

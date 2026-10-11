@@ -1,5 +1,5 @@
 {
-  "id": "6c89e083-d761-4ddf-ad04-bfbd711871e6",
+  "id": "71a893c9-0016-4d39-a4a7-0c1fb2c0123e",
   "prevId": "cac125ff-9b2b-4301-8d83-6f883ab82650",
   "version": "7",
   "dialect": "postgresql",
@@ -3242,6 +3242,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "rehab_plan_id": {
+          "name": "rehab_plan_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
         "from_date": {
           "name": "from_date",
           "type": "date",
@@ -3310,6 +3316,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "report_shares_rehab_plan_id_rehab_plans_id_fk": {
+          "name": "report_shares_rehab_plan_id_rehab_plans_id_fk",
+          "tableFrom": "report_shares",
+          "tableTo": "rehab_plans",
+          "columnsFrom": [
+            "rehab_plan_id"
           ],
           "columnsTo": [
             "id"

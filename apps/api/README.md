@@ -44,7 +44,7 @@ Before judging, set `DATABASE_URL` and `DEMO_DATABASE_URL` to `demo` and run `np
 
 ## Rehab plans (BE-15)
 
-- `GET /me/limits` is the one read the phone needs (AI-16, INT-07). It's versioned (`version: 1`): `body_parts` drive the spec injury overrides, and `limits` holds the active plan's limits keyed by exercise id, exactly as entered.
+- `GET /me/limits` is the one read the phone needs (AI-16, INT-07). It's versioned (`version: 1`): `body_parts` drive the spec injury overrides, and `limits` holds the active plan's limits keyed by exercise id, exactly as entered. With no active plan, they're the limits of the plan the user finished by accepting the back-to-gym milestone (BE-17).
 - A limit's `angle` must be a `joint_angle` in that exercise's spec, and `max_range_deg` is flexion from straight (0-180).
 - One active plan per user (enforced in the database). The API never edits limits on its own; only the user does.
 - Every rehab route takes `?tz=` (the user's IANA time zone, default UTC). `started`, `review_due` and today's sets use the user's local date, not the server's.
@@ -78,6 +78,7 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 - `POST /me/physio-report/share` with `{ from?, to?, expires_in_days? }` (1-30, default 14) returns `path: /reports/<token>`.
   - That page is public and printable, and shows a first name only.
   - Only a hash of the token is stored.
+  - A link always shows the plan that was shared, even after the user finishes it and starts another. Deleting that plan ends its links.
   - Missing, expired and revoked links are all 404.
 - `GET /me/physio-report/shares` lists the links, and `DELETE /me/physio-report/shares/:id` revokes one.
 - `GET /me/milestones` returns the back-to-gym suggestion when all three checks hold, plus the checks themselves:
@@ -87,7 +88,9 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 
   The thresholds are in `MILESTONE_RULES` (`services/milestone.ts`). They're rules of thumb, not medical criteria.
 
-- `POST /me/milestones/:id/accept` with `{ share_post? }` marks the rehab plan done, so `POST /plans/generate` works again, and never changes its limits. `POST /me/milestones/:id/dismiss` hides the suggestion for 14 days.
+- `POST /me/milestones/:id/accept` with `{ share_post? }` runs the checks again first: if they no longer hold, it withdraws the suggestion and returns 409 `milestone_no_longer_met` with the checks. Otherwise it marks the rehab plan done, so `POST /plans/generate` works again.
+- The finished plan's limits keep applying: `GET /me/limits` serves them until the user edits or deletes them, or starts a new rehab plan.
+- `POST /me/milestones/:id/dismiss` hides the suggestion for 14 days.
 
 ## Conventions
 
@@ -117,27 +120,27 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 
 `src/env.ts` validates every variable once at boot; a missing required one stops the API with a readable list. Each integration takes its config from that validated env. Only `DATABASE_URL` and `NEON_AUTH_JWKS_URL` are required: everything else switches a feature on, and without it that feature uses the fallback below while the API still runs.
 
-| Variable | Powers | Without it |
-| --- | --- | --- |
-| `DATABASE_URL` | **Required.** Neon (one pool for routes, export status and the insight sync) | API won't start |
-| `NEON_AUTH_JWKS_URL` | **Required.** Verifying sign-in tokens (BE-02) | API won't start |
-| `NEON_AUTH_ISSUER`, `NEON_AUTH_AUDIENCE` | Extra `iss` / `aud` checks on tokens | Those claims aren't checked |
-| `NODE_ENV`, `PORT`, `LOG_LEVEL` | Server basics | `development`, `3000`, `info` |
-| `CORS_ORIGINS` | Browser calls from the Expo web build | No CORS headers (native apps don't need them) |
-| `DATABRICKS_HOST`, `_CLIENT_ID`, `_CLIENT_SECRET` | Service principal for every Databricks call | No uploads, scoring or sync |
-| `SPOTTER_PSEUDONYM_SECRET` | Pseudonymous user ids for Databricks (CONN-02, CONN-06, CONN-13). Never rotate it | No uploads or sync; account deletion can't queue the Databricks delete |
-| `DATABRICKS_OAUTH_SCOPES` | Scopes requested for the service principal | `all-apis`, which `spotter-api` doesn't have: set `files model-serving sql` |
-| `DATABRICKS_VOLUME_PATH` | Where finished sessions upload (CONN-02) | `/Volumes/spotter/raw/sessions` |
-| `DATABRICKS_SERVING_ENDPOINT`, `DATABRICKS_SCORE_TIMEOUT_MS` | Set scoring during rest (CONN-05) | The phone's rule score; 1200 ms budget. The endpoint scales to zero, so warm it before a demo |
-| `DATABRICKS_WAREHOUSE_ID` | Insight sync reads (CONN-06). The id is in the warehouse URL (`/sql/warehouses/<id>`), not the `?o=` workspace id | No sync |
-| `INSIGHT_SYNC_ENABLED` | Starts the 15-minute gold → Neon sync on this instance. Set `true` on **exactly one** deployed instance | Sync doesn't run here |
-| `SYNC_LOOKBACK_DAYS` | Days of progress/risk each sync re-reads | 49 |
-| `HF_TOKEN` | gpt-oss (rest notes, plans), Llama Guard and the threats/harassment check, bge-small embeddings, cloud pose | Fixed rest notes, rules planner, no moderation (everything allowed), tag-overlap buddy matching |
-| `HF_LLM_CHAIN`, `HF_LLM_ATTEMPTS`, `HF_LLM_TIMEOUT_MS` | gpt-oss model:provider chain and budgets | Tested defaults in `llm.ts` |
-| `HF_GUARD_MODEL`, `HF_GUARD_PROVIDER`, `HF_GUARD_TIMEOUT_MS` | Llama Guard model, provider and budget | Llama Guard 4 on DeepInfra, 5 s |
-| `POSE_ENDPOINT_URL`, `POSE_ENDPOINT_TIMEOUT_MS` | Cloud pose mode, `/pose/stream` (CONN-11) | Cloud mode off; phones use on-device pose |
-| `DEMO_DATABASE_URL`, `DEMO_PRESENTER_USER_ID` | Script-only: `npm run db:seed:demo` | Seeding refuses to run |
-| `HF_WRITE_TOKEN` | Script-only: publishing models (CONN-10) and the dataset (CONN-12) | Can't publish |
+| Variable                                                     | Powers                                                                                                            | Without it                                                                                      |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                               | **Required.** Neon (one pool for routes, export status and the insight sync)                                      | API won't start                                                                                 |
+| `NEON_AUTH_JWKS_URL`                                         | **Required.** Verifying sign-in tokens (BE-02)                                                                    | API won't start                                                                                 |
+| `NEON_AUTH_ISSUER`, `NEON_AUTH_AUDIENCE`                     | Extra `iss` / `aud` checks on tokens                                                                              | Those claims aren't checked                                                                     |
+| `NODE_ENV`, `PORT`, `LOG_LEVEL`                              | Server basics                                                                                                     | `development`, `3000`, `info`                                                                   |
+| `CORS_ORIGINS`                                               | Browser calls from the Expo web build                                                                             | No CORS headers (native apps don't need them)                                                   |
+| `DATABRICKS_HOST`, `_CLIENT_ID`, `_CLIENT_SECRET`            | Service principal for every Databricks call                                                                       | No uploads, scoring or sync                                                                     |
+| `SPOTTER_PSEUDONYM_SECRET`                                   | Pseudonymous user ids for Databricks (CONN-02, CONN-06, CONN-13). Never rotate it                                 | No uploads or sync; account deletion can't queue the Databricks delete                          |
+| `DATABRICKS_OAUTH_SCOPES`                                    | Scopes requested for the service principal                                                                        | `all-apis`, which `spotter-api` doesn't have: set `files model-serving sql`                     |
+| `DATABRICKS_VOLUME_PATH`                                     | Where finished sessions upload (CONN-02)                                                                          | `/Volumes/spotter/raw/sessions`                                                                 |
+| `DATABRICKS_SERVING_ENDPOINT`, `DATABRICKS_SCORE_TIMEOUT_MS` | Set scoring during rest (CONN-05)                                                                                 | The phone's rule score; 1200 ms budget. The endpoint scales to zero, so warm it before a demo   |
+| `DATABRICKS_WAREHOUSE_ID`                                    | Insight sync reads (CONN-06). The id is in the warehouse URL (`/sql/warehouses/<id>`), not the `?o=` workspace id | No sync                                                                                         |
+| `INSIGHT_SYNC_ENABLED`                                       | Starts the 15-minute gold → Neon sync on this instance. Set `true` on **exactly one** deployed instance           | Sync doesn't run here                                                                           |
+| `SYNC_LOOKBACK_DAYS`                                         | Days of progress/risk each sync re-reads                                                                          | 49                                                                                              |
+| `HF_TOKEN`                                                   | gpt-oss (rest notes, plans), Llama Guard and the threats/harassment check, bge-small embeddings, cloud pose       | Fixed rest notes, rules planner, no moderation (everything allowed), tag-overlap buddy matching |
+| `HF_LLM_CHAIN`, `HF_LLM_ATTEMPTS`, `HF_LLM_TIMEOUT_MS`       | gpt-oss model:provider chain and budgets                                                                          | Tested defaults in `llm.ts`                                                                     |
+| `HF_GUARD_MODEL`, `HF_GUARD_PROVIDER`, `HF_GUARD_TIMEOUT_MS` | Llama Guard model, provider and budget                                                                            | Llama Guard 4 on DeepInfra, 5 s                                                                 |
+| `POSE_ENDPOINT_URL`, `POSE_ENDPOINT_TIMEOUT_MS`              | Cloud pose mode, `/pose/stream` (CONN-11)                                                                         | Cloud mode off; phones use on-device pose                                                       |
+| `DEMO_DATABASE_URL`, `DEMO_PRESENTER_USER_ID`                | Script-only: `npm run db:seed:demo`                                                                               | Seeding refuses to run                                                                          |
+| `HF_WRITE_TOKEN`                                             | Script-only: publishing models (CONN-10) and the dataset (CONN-12)                                                | Can't publish                                                                                   |
 
 ### GET /health
 
@@ -164,14 +167,14 @@ Always 200 with `status: "ok"` for the host's liveness check, plus each integrat
 
 ### Where each piece runs
 
-| Piece | Called from | What happens |
-| --- | --- | --- |
-| CONN-02 upload | `POST /sessions/:id/finish`, after the response; retried every 10 min | Session uploads to the Volume; `sessions.export_status` tracks it |
-| CONN-05 set scoring | `POST /sessions/:id/sets` (INT-05 rest-time result) | Databricks scores the set; on timeout or error, the phone's score |
-| CONN-06 insight sync | Boot, then every 15 min, where `INSIGHT_SYNC_ENABLED=true` | Gold tables upserted into `progress_daily`, `risk_insights` and `rom_trend`; a table that can't be read is left as it was |
-| CONN-07 LLM | Rest notes (INT-05), planner (AI-12), threats/harassment check | Falls back to the fixed note or the rules planner |
-| CONN-08 RAG ingest | `npm run rag:ingest` in `rag/` | Writes `doc_chunks` for the planner and advice |
-| CONN-08 profile embeddings | `PUT /me/profile` when goals or bio change; `npm run db:embed-profiles` backfills | Buddy matching ranks by goal similarity |
-| CONN-09 moderation | `POST /posts`, `POST /posts/:id/comments` | Blocks with a friendly 422; self-harm returns `details.support`; blocks are logged to `moderation_blocks` |
+| Piece                      | Called from                                                                       | What happens                                                                                                              |
+| -------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| CONN-02 upload             | `POST /sessions/:id/finish`, after the response; retried every 10 min             | Session uploads to the Volume; `sessions.export_status` tracks it                                                         |
+| CONN-05 set scoring        | `POST /sessions/:id/sets` (INT-05 rest-time result)                               | Databricks scores the set; on timeout or error, the phone's score                                                         |
+| CONN-06 insight sync       | Boot, then every 15 min, where `INSIGHT_SYNC_ENABLED=true`                        | Gold tables upserted into `progress_daily`, `risk_insights` and `rom_trend`; a table that can't be read is left as it was |
+| CONN-07 LLM                | Rest notes (INT-05), planner (AI-12), threats/harassment check                    | Falls back to the fixed note or the rules planner                                                                         |
+| CONN-08 RAG ingest         | `npm run rag:ingest` in `rag/`                                                    | Writes `doc_chunks` for the planner and advice                                                                            |
+| CONN-08 profile embeddings | `PUT /me/profile` when goals or bio change; `npm run db:embed-profiles` backfills | Buddy matching ranks by goal similarity                                                                                   |
+| CONN-09 moderation         | `POST /posts`, `POST /posts/:id/comments`                                         | Blocks with a friendly 422; self-harm returns `details.support`; blocks are logged to `moderation_blocks`                 |
 
 `test/conn-compat.test.ts` runs the merged CONN-06/08/09 and AI-05 code against this schema.

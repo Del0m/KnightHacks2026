@@ -15,6 +15,11 @@ export const reportShares = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     tokenHash: text().notNull().unique(),
+    // The plan the user shared. The link keeps showing that plan, even after they finish it and
+    // start another; deleting the plan deletes its links.
+    rehabPlanId: uuid()
+      .notNull()
+      .references(() => rehabPlans.id, { onDelete: "cascade" }),
     fromDate: date().notNull(),
     toDate: date().notNull(),
     timeZone: text().notNull(), // the report's days are the user's local days

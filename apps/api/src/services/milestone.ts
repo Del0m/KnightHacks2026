@@ -9,7 +9,7 @@
 import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
-import { conflict, notFound } from "../http.js";
+import { conflict, HttpError, notFound } from "../http.js";
 import { addDays, daysBetween, mondayOf } from "./planHistory.js";
 import { PHYSIO_LIMIT_RULE } from "./physioReport.js";
 import { activePlan, started } from "./rehab.js";
@@ -215,9 +215,30 @@ async function pendingMilestone(db: Db, userId: string, id: string) {
   return row;
 }
 
-/** Accept: the rehab plan is marked done (its limits untouched); a feed post only if asked for. */
-export async function acceptMilestone(db: Db, userId: string, id: string, sharePost: boolean) {
+/**
+ * Accept: the rehab plan is marked done (its limits keep applying, see limitsPlan in rehab.ts); a
+ * feed post only if asked for. The checks run again first, because a suggestion fetched earlier may
+ * no longer hold (say a physio_limit flag since): then it's withdrawn and the answer is a 409.
+ */
+export async function acceptMilestone(
+  db: Db,
+  userId: string,
+  id: string,
+  sharePost: boolean,
+  today: string,
+  now = new Date(),
+) {
   const row = await pendingMilestone(db, userId, id);
+  const { plan: current, checks, eligible } = await evaluateMilestone(db, userId, today, now);
+  if (!eligible || current?.id !== row.rehabPlanId) {
+    await db.delete(milestones).where(eq(milestones.id, id));
+    throw new HttpError(
+      409,
+      "milestone_no_longer_met",
+      "This suggestion no longer applies: not every check holds right now.",
+      { checks },
+    );
+  }
   return db.transaction(async (tx) => {
     const [plan] = await tx
       .update(rehabPlans)
