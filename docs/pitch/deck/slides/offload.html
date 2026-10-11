@@ -1,0 +1,25 @@
+<section id="offload" hidden data-transition="fade" style="background:#F5F9FD;color:#10233F;font-family:'Barlow', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<p style="font-size:28px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#1F64C8">Where the pose AI runs</p>
+<h2 style="font-family:'Barlow Condensed', Arial, sans-serif;font-size:72px;font-weight:700;line-height:1.05;color:#10233F">On the phone when it can. Offloaded when it can't.</h2>
+<div style="display:flex;gap:32px;flex:1">
+<div style="flex:1;display:flex;flex-direction:column;gap:18px;background:#FFFFFF;border:3px solid #1F64C8;border-radius:28px;padding:40px">
+<p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#1F64C8">On-device</p>
+<h3 style="font-size:40px;font-weight:700;line-height:1.15;color:#10233F">iPhones that hold 12+ fps</h3>
+<p style="font-size:28px;line-height:1.4;color:#44546A">A two-second benchmark on first launch decides. YOLOv8n-pose runs in Core ML on the Neural Engine.</p>
+<p style="font-size:28px;line-height:1.4;color:#10233F;font-weight:600">Video stays on the phone. Works in airplane mode.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:18px;background:#FFFFFF;border:3px dashed #B86A00;border-radius:28px;padding:40px">
+<p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8A4F00">Cloud offload</p>
+<h3 style="font-size:40px;font-weight:700;line-height:1.15;color:#10233F">Android, slower iPhones, or by choice</h3>
+<p style="font-size:28px;line-height:1.4;color:#44546A">Frames stream over a WebSocket to the Spotter API, which relays them to our Hugging Face pose endpoint. Only joints come back.</p>
+<p style="font-size:28px;line-height:1.4;color:#10233F;font-weight:600">Needs consent. Frames are processed in memory, never stored.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:18px;background:#E4EEF9;border-radius:28px;padding:40px">
+<p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#44546A">Fallbacks</p>
+<h3 style="font-size:40px;font-weight:700;line-height:1.15;color:#10233F">Never a dead end</h3>
+<p style="font-size:28px;line-height:1.4;color:#44546A"><b style="color:#10233F">No consent:</b> on-device if the phone can, else log sets by hand.</p>
+<p style="font-size:28px;line-height:1.4;color:#44546A"><b style="color:#10233F">Cloud unreachable:</b> on-device if it can, else pause quietly.</p>
+</div>
+</div>
+<aside>Logic lives in apps/mobile/src/pose/mode.ts. The phone never talks to Hugging Face directly. Before judging, confirm the cloud path is wired: cloudReachable is stubbed to false until the cloud pose work lands, so right now a phone that fails Core ML pauses. Same rep rules and silent cues run in both modes.</aside>
+</section>
