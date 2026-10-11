@@ -143,5 +143,6 @@ Always 200 with `status: "ok"` for the host's liveness check, plus each integrat
 | CONN-08 RAG ingest | `npm run rag:ingest` in `rag/` | Writes `doc_chunks` for the planner and advice |
 | CONN-08 profile embeddings | `PUT /me/profile` when goals or bio change; `npm run db:embed-profiles` backfills | Buddy matching ranks by goal similarity |
 | CONN-09 moderation | `POST /posts`, `POST /posts/:id/comments` | Blocks with a friendly 422; self-harm returns `details.support`; blocks are logged to `moderation_blocks` |
+| INT-04 moderation re-check | Boot, then every 5 min, when `HF_TOKEN` is set | Posts and comments saved while moderation was unreachable (`moderation_checked = false`) are re-checked: kept if allowed, removed and logged to `moderation_blocks` if blocked |
 
 `test/conn-compat.test.ts` runs the merged CONN-06/08/09 and AI-05 code against this schema.

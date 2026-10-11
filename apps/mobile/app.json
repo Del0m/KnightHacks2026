@@ -53,7 +53,8 @@
           "photosPermission": "Choose a photo for your SteadyForum profile.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "scheme": "spotter"
   }

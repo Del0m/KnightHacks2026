@@ -10,7 +10,7 @@ import path from 'path';
 import { JOINT_NAMES, isPoseResult, type PoseResult } from '../../pose/types';
 import { FIXTURES_DIR, loadFixtures } from '../__fixtures__/load';
 import { runClip, runClipRules } from '../__fixtures__/run';
-import { CLIP_DEFS, generateAll, generateClip, serializeClip, sortFlags } from '../__fixtures__/synth';
+import { CLIP_DEFS, generateAll, generateClip, hold, move, serializeClip, sortFlags } from '../__fixtures__/synth';
 import { applyInjuries } from '../overrides';
 import { isAbsentFrame, type Clip } from '../recording';
 import { STILL_BAND_DEG } from '../repCounter';
@@ -301,6 +301,31 @@ describe('the press rest clips need the primary gate', () => {
     expect(spec.primary_angle.gate).toBeDefined();
     expect(runClip(clip).counted).toHaveLength(clip.expected!.reps);
     expect(runClip(clip, {}, ungated).counted.length).toBeGreaterThan(clip.expected!.reps);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Push-up pace (AI-10): a push-up of about one second is the owner's normal pace, not fast lowering.
+
+describe('push-up tempo', () => {
+  const lockout = CLIP_DEFS.find((d) => d.name === 'push_up_lockout')!;
+  const pushUps = (downMs: number) =>
+    generateClip({
+      ...lockout,
+      name: `push_up_down_${downMs}`,
+      script: [hold(1500), ...[86, 88, 85, 87].flatMap((b) => [move(b, downMs), hold(100), move(168, 450), hold(400)]), hold(700)],
+    });
+  const tempoFlags = (downMs: number) =>
+    runClipRules(pushUps(downMs)).reps.filter((r) => r.flags.some((f) => f.rule_id === 'tempo')).length;
+
+  it('does not flag one-second push-ups', () => {
+    expect(runClipRules(pushUps(450)).reps).toHaveLength(4);
+    expect(tempoFlags(450)).toBe(0);
+  });
+
+  it('still flags a drop to the floor', () => {
+    expect(runClipRules(pushUps(200)).reps).toHaveLength(4);
+    expect(tempoFlags(200)).toBe(4);
   });
 });
 

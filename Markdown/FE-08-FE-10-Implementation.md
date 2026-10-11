@@ -84,3 +84,9 @@ Verification: 71 mobile suites / 750 tests and 28 API files / 540 tests passed. 
 Issue #36 covers post details/comments and reactions. This branch supplies comment threads, composing and titles, server moderation, Rep counts, a pale native flexed-arm emoji that becomes full color when liked, the three glass post finishes, server filters and preview examples. AI-suggested comments carry a visible label based on the API's `ai_suggested` flag. Reactions now use Expo selection haptics on successful native likes rather than React Native's fixed-duration iOS vibration; failures and unlikes do not trigger the tap. The native build must include ExpoHaptics.
 
 Report and block write routes are absent in the current API. The existing Feed respects persisted mutual blocks, but this PR does not invent working report/block buttons. Those FE-11 acceptance criteria remain open; link the issue without closing it. The account-scoped feed and comments remain authenticated and previews never publish.
+
+## Main integration — October 11
+
+The approved merge retains main's moderation status and background rechecks alongside title moderation and rejection of unchecked new comments. Background post checks include the title. Tests retain legacy unchecked-comment recovery without allowing new unchecked comments. The two push-up replay snapshots now match main's reduced lowering threshold; no exercise rule was changed here.
+
+Verification after integration: 77 mobile suites / 804 tests; 29 API files / 544 tests; both TypeScript checks; mobile lint with zero errors and nine warnings; web and iOS exports. The additive moderation-status migration was applied to the local testing database. Main also adds labelling tools and cloud-pose support; its new shared labelling directory requires restarting an already-running Metro server.

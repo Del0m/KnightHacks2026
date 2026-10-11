@@ -32,6 +32,7 @@ export interface RestTimeDeps {
 export interface RestRep {
   rangeDeg: number;
   tempoMs: number;
+  loweringMs?: number | null;
   quality?: number | null;
   startMs?: number | null;
   endMs?: number | null;
@@ -118,7 +119,11 @@ export async function restTimeResult(
   const noteInput: NoteInput = {
     exerciseName: name,
     rules,
-    reps: args.reps.map((r) => ({ tempo_ms: r.tempoMs, flags: r.flags.map((f) => ({ rule_id: f.ruleId })) })),
+    reps: args.reps.map((r) => ({
+      tempo_ms: r.tempoMs,
+      lowering_ms: r.loweringMs ?? null,
+      flags: r.flags.map((f) => ({ rule_id: f.ruleId })),
+    })),
   };
 
   const timed = async <T>(work: Promise<T>) => {

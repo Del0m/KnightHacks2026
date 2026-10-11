@@ -11,6 +11,8 @@ type AuthContextValue = AuthState & {
   authenticate: (mode: AuthMode, fields: Credentials) => Promise<boolean>;
   resendVerification: (email: string) => Promise<void>;
   apiFetch: ReturnType<typeof createAuthenticatedFetch>;
+  /** A fresh API token for connections fetch can't make (the cloud pose WebSocket, AI-17); null when signed out. */
+  getApiToken: () => Promise<string | null>;
 };
 const AuthContext = createContext<AuthContextValue | null>(null);
 const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Please try again.';
@@ -75,6 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await authClient.sendVerificationEmail({ email: email.trim() });
     if (error) throw new Error(error.message || 'Could not send verification email.');
   }
+  async function getApiToken() {
+    if (!authClient || !state.user || activeUser.current !== state.user.id) return null;
+    const { data, error } = await authClient.token();
+    return error || !data?.token ? null : data.token;
+  }
   async function apiFetch(path: string, options?: RequestInit) {
     const requestGeneration = generation.current;
     function invalidate() {
@@ -92,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (requestGeneration !== generation.current) throw new Error('Your account changed. Please try again.');
     return response;
   }
-  return <AuthContext.Provider value={{ ...state, configured: authConfigured, refresh, authenticate, logout, resendVerification, apiFetch }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ ...state, configured: authConfigured, refresh, authenticate, logout, resendVerification, apiFetch, getApiToken }}>{children}</AuthContext.Provider>;
 }
 export function useAuth() {
   const value = useContext(AuthContext);

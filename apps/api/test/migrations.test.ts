@@ -24,7 +24,7 @@ describe("migrations", () => {
       const client = new PGlite({ extensions: { vector } });
       try {
         const migrations = readMigrationFiles({ migrationsFolder });
-        expect(migrations).toHaveLength(11);
+        expect(migrations).toHaveLength(12);
         for (const migration of migrations.slice(0, appliedCount)) {
           await client.exec(`BEGIN;\n${migration.sql.join("\n")}\nCOMMIT;`);
         }
