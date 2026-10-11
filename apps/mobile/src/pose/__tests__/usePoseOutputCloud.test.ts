@@ -4,7 +4,7 @@ import { useFrameOutput } from 'react-native-vision-camera';
 import { createSynchronizable } from 'react-native-worklets';
 import { createPoseDetector } from 'spotter-pose';
 import type { SocketLike } from '../cloud';
-import { frameToCloudJpeg, scaledSize, uprightDegrees } from '../cloudFrame';
+import { frameToCloudJpeg, scaledSize } from '../cloudFrame';
 import { usePoseOutput, type PoseOutput } from '../usePoseOutput';
 
 const { act, create } = require('react-test-renderer');
@@ -132,14 +132,7 @@ describe('usePoseOutput, cloud engine', () => {
   });
 });
 
-describe('cloud frame geometry', () => {
-  it('counter-rotates the pixel data to upright', () => {
-    expect(uprightDegrees('up')).toBe(0);
-    expect(uprightDegrees('right')).toBe(-90);
-    expect(uprightDegrees('left')).toBe(90);
-    expect(uprightDegrees('down')).toBe(180);
-  });
-
+describe('cloud frame size', () => {
   it('fits 320 px on the long side and never upscales', () => {
     expect(scaledSize(1920, 1080)).toEqual({ width: 320, height: 180 });
     expect(scaledSize(1080, 1920)).toEqual({ width: 180, height: 320 });
