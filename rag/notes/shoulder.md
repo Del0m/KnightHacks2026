@@ -1,7 +1,7 @@
 ---
 body_part: shoulder
 title: Training around a sore or recovering shoulder
-reviewed: false
+reviewed: true
 ---
 
 ## Keep it moving

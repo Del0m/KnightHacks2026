@@ -1,7 +1,7 @@
 ---
 body_part: knee
 title: Training around an injured or recovering knee
-reviewed: false
+reviewed: true
 ---
 
 ## Easing a sore knee

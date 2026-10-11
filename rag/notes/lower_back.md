@@ -1,7 +1,7 @@
 ---
 body_part: lower_back
 title: Returning to lifting after lower back pain
-reviewed: false
+reviewed: true
 ---
 
 ## Keep moving

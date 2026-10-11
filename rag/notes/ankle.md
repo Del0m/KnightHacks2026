@@ -1,7 +1,7 @@
 ---
 body_part: ankle
 title: Training around a sprained or injured ankle or foot
-reviewed: false
+reviewed: true
 ---
 
 ## Sprain grades and recovery time

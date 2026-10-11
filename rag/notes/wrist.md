@@ -1,7 +1,7 @@
 ---
 body_part: wrist
 title: Training around an injured or sore wrist
-reviewed: false
+reviewed: true
 ---
 
 ## Why it's worth getting checked
