@@ -542,3 +542,27 @@ class UcRegistrationOptIn(unittest.TestCase):
         src = NOTEBOOK.read_text()
         self.assertIn('dbutils.widgets.dropdown("register_uc", "false"', src)
         self.assertIn("delete_model_version", src)
+
+
+class MetricsTable(unittest.TestCase):
+    """The champion's held-out metrics, model vs heuristic, for the dashboard."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ns = load_notebook()
+
+    def test_metrics_rows_pairs_model_and_heuristic(self):
+        logged = {"test_roc_auc": 0.99, "test_pr_auc": 0.8, "test_brier": 0.003,
+                  "heuristic_roc_auc": 0.9, "heuristic_pr_auc": 0.6, "heuristic_brier": 0.009,
+                  "test_positives": 11.0, "test_trainable": 1375.0}
+        rows = self.ns["metrics_rows"](logged, "run-1", "t")
+        self.assertEqual([r["predictor"] for r in rows], ["model", "heuristic"])
+        self.assertEqual(rows[0]["pr_auc"], 0.8)
+        self.assertEqual(rows[1]["roc_auc"], 0.9)
+        for r in rows:
+            self.assertEqual((r["model_version"], r["trained_at"], r["test_positives"], r["test_rows"]),
+                             ("run-1", "t", 11, 1375))
+
+    def test_metrics_table_constants(self):
+        self.assertEqual(self.ns["METRICS_TABLE"], "spotter.gold.gold_risk_model_metrics")
+        self.assertIn("Not a diagnosis", self.ns["METRICS_TABLE_COMMENT"])
