@@ -569,7 +569,7 @@ flowchart LR
     V -- "closest matches" --> F
 ```
 
-- **Sources:** [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (800+ exercises, public domain) and short injury-modification notes written by the team, citing public guidelines (CDC/NIH). Don't scrape ExRx.
+- **Sources:** [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (800+ exercises, public domain) and short injury-modification notes written by the team (`rag/notes`). Each section names the pages that support it: public health bodies, national professional bodies and major academic medical centres only (NHS, MedlinePlus/NIH, AAOS OrthoInfo, ChoosePT, Cleveland Clinic, Harvard Health). Programming tips no such page states are marked as team guidance. A rewritten note stays out of the index until a person reviews it. Don't scrape ExRx.
 - **Safety check:** drops anything contraindicated for a reported injury, caps weekly volume increases at 10%, puts compound and machine work first for beginners, and adds "check with your physio" notes. Every plan item stores the chunks it came from, so the app can show "why this exercise".
 - **Exercises:** the five camera-tracked exercises come first. Library exercises can be planned too; they're added to `exercises` on first use without a form spec (`has_spec: false`), so the app shows them as logged by hand. A library exercise that loads an injured joint is filtered out in the vector search and again in code. A tracked exercise whose spec has an `injury_override` for that joint stays, with the spec's note, unless the injury is severe.
 - **Looking back (temporal history):** the last six weeks, with recent weeks counting more (a set's weight halves every two weeks). Per exercise: sessions, sets and reps, clean share and its trend, medals, PRs, and whether it was done when planned. Plus the range-of-motion trend and how much of the last plan was done. These set each item's sets and reps (up when work is clean and medalled, down when form or range dips) and the weekly cap: total reps at most 10% over the last week with training.
@@ -583,7 +583,16 @@ flowchart LR
 1. Moderate with Llama Guard.
 2. Find similar answered questions with pgvector.
 3. Draft a short, sourced answer with gpt-oss, labelled **"AI suggestion"**, posted as the first comment. Community answers follow.
-4. Questions mentioning acute pain get a fixed "please see a medical professional" reply instead of an LLM answer.
+4. Questions mentioning pain get a fixed "please see a medical professional" reply instead of an LLM answer.
+
+**Answer writer (AI-13):** `apps/api/src/services/advice.ts`, called by BE-11 with the question and the sources it retrieved:
+- **Pain:** following §1.1, a check in code returns the fixed reply for any pain word that isn't negated, and for acute signs (a pop or tear, swelling, numbness, can't bear weight, chest pain or dizziness, a fresh injury). The model never sees the question. Soreness, stiffness and tightness still get an answer, and so does a past or recovering injury with no pain or acute sign: training again after an injury is what Spotter is for.
+- **Sources:** the question and up to 6 sources go to gpt-oss as data. The answer is at most 3 sentences and cites 1 to 3 of them by id.
+- **Reputable sources only:** library sources reach the model only from the allow-listed sites above, plus free-exercise-db for technique. Team-guidance sections are never cited. Community answers can be cited and are labelled as community.
+- **Guard:** the answer is shown only when every cited id was given, every number in it comes from a cited source, it passes the §7 tone check (no commands or banned phrases), and it names no condition, cause, medication or guaranteed outcome, and carries no links or promotions.
+- **Claim check:** a second gpt-oss call checks each sentence against the text of the sources it cites. Any added fact, benefit or cause means no answer. Both calls share one time budget.
+- **Disclaimer:** every AI answer ends with "This is general information, not medical advice. Always consult a doctor before acting on it." It is part of the answer text, so it shows wherever the answer does.
+- **Fallback:** anything else (nothing to cite, a slow or failed model, a rejected answer) means no AI comment; community answers carry the thread.
 
 ---
 
@@ -699,7 +708,7 @@ flowchart LR
 
 - **Pseudonymous IDs** in Databricks, never email or handle.
 - **Injury data** is private by default and only used for buddy matching if the user opts in.
-- **No medical claims.** Every injury-related screen shows a disclaimer.
+- **No medical claims.** Every injury-related screen shows a disclaimer, and anything built from the injury notes (AI advice answers, the planner's sources) carries "always consult a doctor" (`ADVICE_DISCLAIMER` in `apps/api/src/services/advice.ts`).
 - **Account deletion** cascades in Neon and queues a delete job in Databricks.
 
 ---

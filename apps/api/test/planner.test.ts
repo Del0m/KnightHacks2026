@@ -8,6 +8,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as rag from "../../../rag/ingest.js";
 import { schema, type Db } from "../src/db.js";
+import { ADVICE_DISCLAIMER } from "../src/services/advice.js";
 import { EMBED_DIM, EMBED_MODEL, QUERY_PREFIX } from "../src/integrations/huggingface/embed.js";
 import type { GenerateJsonInput } from "../src/integrations/huggingface/llm.js";
 import { loadSpecs } from "../src/services/exerciseSpecs.js";
@@ -464,11 +465,11 @@ describe("plans with the exercise library", () => {
     close = created.close;
     t = await setup({ db, close, planner: deps });
     await loadSpecs(db, path.join(ROOT, "specs/exercises"));
-    const notes = ["knee", "shoulder"].flatMap((part) =>
+    const notes = ["knee", "shoulder", "lower_back"].flatMap((part) =>
       rag.noteChunks(
         rag.parseNote(
           `${part}.md`,
-          readFileSync(path.join(ROOT, "rag/notes", `${part}.md`), "utf8").replace(/\r\n/g, "\n"),
+          readFileSync(path.join(ROOT, "rag/notes", `${part}.md`), "utf8"),
         ),
       ),
     );
@@ -479,6 +480,19 @@ describe("plans with the exercise library", () => {
     await rag.ingest(created.client, async (texts) => texts.map(fakeVector), chunks);
   });
   afterAll(() => close());
+
+  it.each(["knee", "shoulder", "lower_back"])(
+    "cites a %s note section on adapted work and adds the disclaimer",
+    async (part) => {
+      await profile(t, `l-note-${part}`, { experience_level: "intermediate", goals: ["strength", "core", "back"] });
+      const me = await t.as(`l-note-${part}`);
+      await me.post("/me/injuries", { body_part: part, severity: "mild" });
+      const plan = (await me.post("/plans/generate")).body as Plan;
+      const cited = allItems(plan).some((i) => i.sources.some((s) => s.id.startsWith(`injury_note:${part}#`)));
+      expect(cited).toBe(true);
+      expect(plan.notes).toContain(ADVICE_DISCLAIMER);
+    },
+  );
 
   it("retrieves library exercises with the injury filter, cites their chunks and adds them to the library", async () => {
     await profile(t, "l-knee", { experience_level: "intermediate", goals: ["strength", "core", "back"] });
@@ -505,12 +519,9 @@ describe("plans with the exercise library", () => {
         id: `exercise:${item.exercise.id}#0`,
         title: item.exercise.id.replace(/_/g, " "),
       });
-    // Adapted tracked work cites the knee note's "Limit or avoid" and "Strength swaps" sections.
-    const squat = allItems(plan).find((i) => i.exercise.id === "squat" || i.exercise.id === "lunge")!;
-    expect(squat.sources.map((s) => s.id)).toEqual(
-      expect.arrayContaining(["injury_note:knee#0", "injury_note:knee#1"]),
-    );
-    expect(plan.sources.map((s) => s.id)).toEqual(expect.arrayContaining(["injury_note:knee#0"]));
+    expect(plan.sources.some((s) => s.id.startsWith("injury_note:knee#"))).toBe(true);
+    // A plan built from the injury notes carries the consult-a-doctor disclaimer.
+    expect(plan.notes).toContain(ADVICE_DISCLAIMER);
 
     const added = await db
       .select()

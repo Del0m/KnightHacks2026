@@ -13,16 +13,17 @@ npm run db:load-specs  # loads specs/exercises/*.json once AI-05 lands
 npm run dev            # http://localhost:3000/health
 ```
 
-| Script                                  | What it does                                                                                  |
-| --------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `npm run dev`                           | Watch mode, reads `.env`                                                                      |
-| `npm test`                              | Vitest. Runs the real migrations on in-memory Postgres (PGlite + pgvector), so no Neon needed |
-| `npm run typecheck` / `lint` / `format` | tsc (`tsconfig.check.json`), ESLint, Prettier                                                 |
-| `npm start`                             | Run the server (through `tsx`, which the CONN files' extensionless imports need)              |
-| `npm run db:generate`                   | Diff `drizzle/schema/*` into a new SQL migration                                              |
-| `npm run db:migrate`                    | Apply migrations to the branch in `DATABASE_URL`                                              |
-| `npm run db:load-specs`                 | Upsert exercise specs into `exercises`                                                        |
-| `npm run db:seed:demo`                  | **Wipe** and reseed the branch in `DEMO_DATABASE_URL`                                         |
+| Script                                  | What it does                                                                                                                                                           |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                           | Watch mode, reads `.env`                                                                                                                                               |
+| `npm test`                              | Vitest. Runs the real migrations on in-memory Postgres (PGlite + pgvector), so no Neon needed                                                                          |
+| `npm run typecheck` / `lint` / `format` | tsc (`tsconfig.check.json`), ESLint, Prettier                                                                                                                          |
+| `npm start`                             | Run the server (through `tsx`, which the CONN files' extensionless imports need)                                                                                       |
+| `npm run db:generate`                   | Diff `drizzle/schema/*` into a new SQL migration                                                                                                                       |
+| `npm run db:migrate`                    | Apply migrations to the branch in `DATABASE_URL`                                                                                                                       |
+| `npm run db:load-specs`                 | Upsert exercise specs into `exercises`                                                                                                                                 |
+| `npm run db:seed:demo`                  | **Wipe** and reseed the branch in `DEMO_DATABASE_URL`                                                                                                                  |
+| `npm run advice:samples`                | AI-13: answer the sample advice questions on gpt-oss (needs `HF_TOKEN`) and write a review to `docs/reviews/advice-<date>.md`. `--only id,id`, `--timeout-ms`, `--out` |
 
 ## Migrations on your own Neon branch
 

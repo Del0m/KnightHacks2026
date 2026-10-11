@@ -7,8 +7,11 @@
 //   free-exercise-db  876 exercises, public domain (Unlicense), pinned to one commit.
 //                     One chunk per exercise. metadata.loads lists the joints it works, so the
 //                     planner (AI-12) can filter by injury.
-//   injury-notes      rag/notes/*.md, one chunk per "## " section. Notes are skipped until a
-//                     teammate reviews them and sets reviewed: true.
+//   injury-notes      rag/notes/*.md, one chunk per "## " section. Each section's first line is
+//                     "Sources: <url>, <url>" (the pages that support that section) or
+//                     "Sources: team guidance" (team-written, never cited as a health body's
+//                     advice). metadata.sources and metadata.team_guidance carry them per chunk.
+//                     Notes are skipped until a teammate reviews them and sets reviewed: true.
 //
 // Re-runnable: chunk ids are stable and each row stores a hash of its text, so a re-run only
 // embeds new or changed chunks, upserts them, and deletes chunks whose source is gone.
@@ -130,17 +133,25 @@ export function exerciseChunk(e: Exercise): Chunk {
   };
 }
 
+interface NoteSection {
+  heading: string;
+  text: string;
+  sources: string[]; // the URLs that support this section; empty for team guidance
+  team_guidance: boolean;
+}
+
 interface Note {
   file: string;
   body_part: string;
   title: string;
   reviewed: boolean;
-  sources: string[];
-  sections: { heading: string; text: string }[];
+  sections: NoteSection[];
 }
 
-// Minimal front matter: "key: value" lines; sources is a JSON-style list.
+// Front matter is minimal "key: value" lines. A note-level "sources" key from the old format is
+// ignored: sources live on each section's "Sources:" line.
 export function parseNote(file: string, raw: string): Note {
+  raw = raw.replace(/\r\n/g, "\n"); // Windows checkouts (core.autocrlf)
   const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!m) throw new Error(`${file}: missing front matter`);
   const meta: Record<string, string> = {};
@@ -153,9 +164,20 @@ export function parseNote(file: string, raw: string): Note {
   const sections = m[2]
     .split(/^## /m)
     .slice(1) // text before the first heading is notes for the team, not content
-    .map((s) => {
-      const [heading, ...rest] = s.split("\n");
-      return { heading: heading.trim(), text: rest.join(" ").replace(/\s+/g, " ").trim() };
+    .map((s): NoteSection => {
+      const [first, ...lines] = s.split("\n");
+      const heading = first.trim();
+      const body = lines.join("\n").trim();
+      const src = body.match(/^Sources:[ \t]*(.*)/i); // the section's first line only
+      if (!src) {
+        throw new Error(`${file}: section "${heading}" must start with "Sources: <url>, ..." or "Sources: team guidance"`);
+      }
+      const list = src[1].trim();
+      const team_guidance = list.toLowerCase() === "team guidance";
+      const sources = team_guidance ? [] : list.split(",").map((u) => u.trim()).filter(Boolean);
+      if (!team_guidance && !sources.length) throw new Error(`${file}: section "${heading}" has an empty Sources line`);
+      const text = body.slice(src[0].length).replace(/\s+/g, " ").trim();
+      return { heading, text, sources, team_guidance };
     })
     .filter((s) => s.text);
 
@@ -164,7 +186,6 @@ export function parseNote(file: string, raw: string): Note {
     body_part: meta.body_part,
     title: meta.title,
     reviewed: meta.reviewed === "true",
-    sources: JSON.parse(meta.sources || "[]"),
     sections,
   };
 }
@@ -179,7 +200,8 @@ export function noteChunks(note: Note): Chunk[] {
       body_part: note.body_part,
       title: note.title,
       section: s.heading,
-      sources: note.sources,
+      sources: s.sources,
+      team_guidance: s.team_guidance,
       reviewed: note.reviewed,
       file: `rag/notes/${note.file}`,
     },

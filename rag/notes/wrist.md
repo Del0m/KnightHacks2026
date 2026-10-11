@@ -2,29 +2,32 @@
 body_part: wrist
 title: Training around an injured or sore wrist
 reviewed: true
-sources: ["https://www.woodlandssportsmedicine.com/blog/you-can-still-train-when-you-hurt-your-wrist-heres-how", "https://www.brianmac.co.uk/articles/article330.htm"]
 ---
 
-## Get it checked first
-The wrist is complex, with three joints and many bones, ligaments, tendons and nerves, so there are many ways to injure it. Any wrist pain should be evaluated before going back to training, both to get the right treatment early and to find out which exercises are safe.
+## Why it's worth getting checked
+Sources: https://www.orthoinfo.org/en/diseases--conditions/wrist-sprains/, https://www.nhs.uk/symptoms/hand-pain/wrist-pain/
+The wrist is a complex system that relies heavily on ligaments for stability. An unrecognised (occult) fracture can be mistaken for a mild or moderate sprain, so pain and swelling that last more than 48 hours are worth seeing a doctor about. A wrist that might be broken isn't something to treat yourself.
+
+## Easing a sore wrist
+Sources: https://www.nhs.uk/symptoms/hand-pain/wrist-pain/, https://www.orthoinfo.org/en/diseases--conditions/wrist-sprains/
+Resting the wrist when you can, while keeping the hands and wrists moving with gentle exercises, helps. Ice for up to 20 minutes every 2 to 3 hours, and a splint, especially at night, are common self-care steps. Mild sprains usually improve with rest, ice, compression and elevation. For a significant wrist sprain, formal therapy can be quite helpful during recovery.
 
 ## Limit or avoid
-Push-ups, planks and other moves that put body weight through the wrists, which can turn mild, temporary pain into chronic pain. Weightlifting that depends on wrist strength and flexibility, including holding dumbbells or a barbell. Stretches and poses that press on the wrist, such as downward dog. Avoid these entirely until the wrist has healed.
+Sources: https://www.nhs.uk/symptoms/hand-pain/wrist-pain/
+Activities that cause the pain are usually stopped or cut down. Lifting heavy objects and gripping anything too tightly are best avoided while the wrist is sore.
 
-## Train the legs and core
-Leg and core work doesn't rely on the arms: leg press, bodyweight squats, walking lunges, Bulgarian split squats, hip thrusts, calf raises, crunches and sit-ups. Core options include Russian twists, V-ups, supermans, swimmers, hollow-body holds, and planks on the forearms instead of the hands. Jumping drills such as box jumps and squat jumps are only for people already experienced with them, since losing balance could re-injure the wrist.
-
-## Cardio
-Cycling, running, the elliptical and swimming give a full workout without straining the wrists, and build endurance.
+## Legs, core and cardio
+Sources: team guidance
+Leg and core work doesn't need the hands: leg press, bodyweight squats, bodyweight walking lunges and Bulgarian split squats (no dumbbells in the hands), hip thrusts, calf raises, crunches, Russian twists, supermans, hollow-body holds, and planks on the forearms instead of the hands. Jumping drills are only for people already used to them, since a fall could re-injure the wrist. Running, the elliptical without gripping the handles, and other cardio that doesn't press on the hands keep endurance up.
 
 ## Upper body without loading the wrist
-Once the wrist is only mildly sore, not in a cast or splint, and it has been checked: resistance bands can replace dumbbells for chest presses, shoulder presses, bicep curls and chest flies, and make it easy to keep the wrist neutral. Kettlebells keep the wrist straight for rows and floor presses. Push-ups and planks can be done gripping dumbbell or kettlebell handles instead of flat hands. Lighter weights for more reps, and extra single-arm work on the uninjured side (rows, lat pull-downs, chest and shoulder presses), keep training going and can correct imbalances.
+Sources: team guidance
+Push-ups, flat-hand planks, downward dog, and holding dumbbells or a barbell all put weight through the wrist. Once a doctor has checked it and it isn't in a cast or splint, resistance bands can stand in for dumbbells with the wrist kept neutral, push-ups can be done gripping dumbbell or kettlebell handles, and single-arm work on the uninjured side keeps training going. Lighter weights for more reps put less strain on the joint.
 
-## Healing and recovery
-Rest, ice, compression and elevation (RICE) through the day help reduce inflammation, with frequent breaks from repetitive hand use. A physical therapist can build an exercise and stretching plan for the specific injury and sport, including stretches for the arms, hands and wrists as healing progresses.
+## Returning to grip work
+Sources: team guidance
+Grip work, such as farmer's walks, deadlift holds, reverse curls and towel hangs, puts a lot of load through the wrist, so it is for after a doctor or physical therapist has cleared the wrist or it has fully recovered. Ramping back up slowly, and wrist straps or a brace, can help when resuming.
 
-## Returning to normal training
-Ramp back up slowly. Wrist straps or braces can support the joint when resuming. Later, grip work strengthens the hands, wrists and forearms and helps prevent future soreness: light dumbbell or grip-tool isolation work, farmer's walks with a kettlebell, deadlift holds, reverse curls and towel bar hangs.
-
-## When to stop and get help
-Stop and rest the wrist if pain or other symptoms return during recovery. If the pain is significant, contact a doctor right away.
+## When to get checked
+Sources: https://www.nhs.uk/symptoms/hand-pain/wrist-pain/, https://www.orthoinfo.org/en/diseases--conditions/wrist-sprains/
+Get urgent medical advice if you think the wrist might be broken, or for severe wrist pain, if you heard a snap, grinding or popping noise when it happened, you can't move the wrist or hold things, it has changed shape or colour, you have lost the feeling in part or all of the hand, there's a lump on the wrist that is very painful, hot or red, or you feel faint, dizzy or sick from the pain, or unwell, hot, cold or shivery. See a doctor if the pain is stopping normal activities, is getting worse or keeps coming back, pain and swelling last more than 2 days, the wrist hasn't improved after 2 weeks of home care, there's any tingling or loss of sensation in the hand or wrist, the wrist is painful, warm, swollen and stiff, you feel unwell with a high temperature, or you have diabetes, since hand problems can be more serious with diabetes. A wrist "sprain" can hide a fracture.
