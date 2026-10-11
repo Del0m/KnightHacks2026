@@ -48,7 +48,12 @@ describe('usePoseOutput frame lifecycle', () => {
     lastMs = null;
     getDirty = jest.fn(() => lastMs);
     setBlocking = jest.fn((value: number) => { lastMs = value; });
-    jest.mocked(createSynchronizable).mockReturnValue({ getDirty, setBlocking } as never);
+    // The frame clock starts null; any other synchronizable (cloud counters) is a plain cell.
+    jest.mocked(createSynchronizable).mockImplementation(((init: unknown) => {
+      if (init === null) return { getDirty, setBlocking };
+      let v = init;
+      return { getDirty: () => v, setBlocking: (x: unknown) => { v = typeof x === 'function' ? (x as (p: unknown) => unknown)(v) : x; } };
+    }) as never);
     jest.mocked(createPoseDetector).mockReturnValue({ model: 'yolov8n-pose-320', detect, setFrameOutput } as never);
     jest.mocked(useFrameOutput).mockReturnValue({} as never);
     act(() => { renderer = create(React.createElement(Harness)); });
@@ -66,6 +71,14 @@ describe('usePoseOutput frame lifecycle', () => {
     expect(frame.dispose).toHaveBeenCalledTimes(1);
     act(() => jest.advanceTimersByTime(500));
     expect(output.fps).toBe(1);
+  });
+
+  it('has no cloud status and keeps the native capture time', () => {
+    expect(output.cloudStatus).toBeNull();
+    const timed = { result: undefined, latencyMs: 8, timestampMs: 1_800_000_000_000 };
+    detect.mockReturnValueOnce(timed);
+    processFrame(makeFrame(1));
+    expect(onPose).toHaveBeenCalledWith(timed);
   });
 
   it('binds the native frame output before inference so camera switches use the live connection', () => {

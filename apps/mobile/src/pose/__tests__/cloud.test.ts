@@ -3,41 +3,47 @@ import {
   encodeFrame,
   parseServerMessage,
   poseStreamUrl,
-  probeCloud,
-  type CloudState,
+  type CloudDrops,
+  type CloudFailure,
+  type CloudStatus,
   type SocketLike,
 } from '../cloud';
+import type { PoseDetection } from '../types';
 
+const T0 = 1_800_000_000_000;
 const joints = Array.from({ length: 17 }, (_, i) => ({ x: i / 20, y: 0.5, c: 0.9 }));
-const result = { source: 'cloud', model: 'yolov8n-pose-320', timestamp_ms: 1000, score: 0.92, joints };
+const result = { source: 'coreml', model: 'yolov8n-pose-320', timestamp_ms: T0, score: 0.92, joints };
 
 class FakeSocket implements SocketLike {
   binaryType?: string;
-  readyState = 0;
+  readyState = 1;
   sent: ArrayBuffer[] = [];
-  closed = false;
+  closed = 0;
   onopen: (() => void) | null = null;
   onmessage: ((e: { data: unknown }) => void) | null = null;
   onerror: ((e: unknown) => void) | null = null;
   onclose: ((e: unknown) => void) | null = null;
   constructor(public url: string, public token: string) {}
   send(data: ArrayBuffer) { this.sent.push(data); }
-  close() { this.closed = true; this.readyState = 3; }
+  close() { this.closed += 1; this.readyState = 3; }
   // Server side
-  open() { this.readyState = 1; this.onopen?.(); }
   reply(msg: object) { this.onmessage?.({ data: JSON.stringify(msg) }); }
-  drop() { this.readyState = 3; this.onclose?.({}); }
+  raw(data: unknown) { this.onmessage?.({ data }); }
+  stamps() { return this.sent.map((f) => new DataView(f).getFloat64(0, false)); }
 }
 
 const jpeg = (marker: number) => new Uint8Array([0xff, 0xd8, marker]).buffer;
-const frameMarker = (frame: ArrayBuffer) => new Uint8Array(frame)[10];
+const pose = (timestamp_ms: number, extra: object = {}) =>
+  ({ type: 'pose', timestamp_ms, result, latency_ms: 90, endpoint_ms: 10, dropped: 0, ...extra });
+const flush = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
 
-describe('frame encoding', () => {
-  it('puts the timestamp in 8 big-endian bytes, then the JPEG', () => {
-    const frame = encodeFrame(1_791_682_526_428.5, jpeg(7));
+describe('frame packet', () => {
+  it('is an 8-byte big-endian float64 timestamp followed by the JPEG bytes', () => {
+    expect(Array.from(new Uint8Array(encodeFrame(1, jpeg(7)))))
+      .toEqual([0x3f, 0xf0, 0, 0, 0, 0, 0, 0, 0xff, 0xd8, 7]);
+    const frame = encodeFrame(1_791_682_526_428.5, jpeg(9));
     expect(frame.byteLength).toBe(11);
     expect(new DataView(frame).getFloat64(0, false)).toBe(1_791_682_526_428.5);
-    expect(Array.from(new Uint8Array(frame, 8))).toEqual([0xff, 0xd8, 7]);
   });
 
   it('turns the API URL into the relay URL', () => {
@@ -52,12 +58,12 @@ describe('message parser', () => {
     expect(parseServerMessage('{"type":"ready"}')).toEqual({ type: 'ready' });
     expect(parseServerMessage('{"type":"status","status":"warming"}')).toEqual({ type: 'status', status: 'warming' });
     expect(parseServerMessage('{"type":"error","message":"boom"}')).toEqual({ type: 'error', message: 'boom' });
-    expect(parseServerMessage(JSON.stringify({ type: 'pose', timestamp_ms: 5, result, latency_ms: 80, endpoint_ms: 12, dropped: 2 })))
+    expect(parseServerMessage(JSON.stringify(pose(5, { latency_ms: 80, dropped: 2 }))))
       .toMatchObject({ type: 'pose', timestamp_ms: 5, latency_ms: 80, dropped: 2 });
     expect(parseServerMessage(JSON.stringify({ type: 'pose', timestamp_ms: 5, result: null }))).toMatchObject({ result: null, dropped: 0 });
 
-    for (const bad of ['not json', '{}', '{"type":"pose"}', '{"type":"status","status":"other"}', new ArrayBuffer(2),
-      JSON.stringify({ type: 'pose', timestamp_ms: 5, result: { ...result, joints: joints.slice(1) } })]) {
+    for (const bad of ['not json', 'null', '{}', '{"type":"pose"}', '{"type":"status","status":"other"}', new ArrayBuffer(2),
+      JSON.stringify(pose(5, { result: { ...result, joints: joints.slice(1) } }))]) {
       expect(parseServerMessage(bad)).toBeNull();
     }
   });
@@ -65,177 +71,342 @@ describe('message parser', () => {
 
 describe('CloudPoseClient', () => {
   let sockets: FakeSocket[];
-  let states: [CloudState, string | null][];
-  let poses: { score: number | undefined; dropped: number }[];
+  let statuses: CloudStatus[];
+  let available: boolean[];
+  let failures: CloudFailure[];
+  let poses: [PoseDetection, CloudDrops][];
   let client: CloudPoseClient;
-  let now: number;
-  const token = jest.fn(async () => 'neon-jwt');
+  let getToken: jest.Mock<Promise<string | null>, []>;
 
-  function start(getToken: () => Promise<string | null> = token) {
+  function start() {
     client = new CloudPoseClient({
       url: 'wss://api.test/pose/stream',
       getToken,
       createSocket: (url, t) => { const s = new FakeSocket(url, t); sockets.push(s); return s; },
-      onPose: (d, dropped) => poses.push({ score: d.result?.score, dropped }),
-      onState: (s, e) => states.push([s, e]),
-      backoffMs: [1000, 2000],
-      now: () => now,
+      onPose: (d, drops) => poses.push([d, drops]),
+      onStatus: (s) => statuses.push(s),
+      onAvailability: (a) => available.push(a),
+      onFailure: (k) => failures.push(k),
     });
     client.start();
   }
   const socket = () => sockets.at(-1)!;
   async function connected() {
-    await Promise.resolve(); await Promise.resolve();
-    socket().open();
+    await flush();
     socket().reply({ type: 'ready' });
   }
+  /** Sends a frame captured now and returns its timestamp. */
+  function send(marker = 1) {
+    const ts = Date.now();
+    client.send(ts, jpeg(marker));
+    return ts;
+  }
+  async function advance(ms: number) { await jest.advanceTimersByTimeAsync(ms); await flush(); }
 
   beforeEach(() => {
     jest.useFakeTimers();
-    sockets = []; states = []; poses = []; now = 1000;
-    token.mockClear();
+    jest.setSystemTime(T0);
+    sockets = []; statuses = []; available = []; failures = []; poses = [];
+    getToken = jest.fn(async () => 'neon-jwt');
   });
   afterEach(() => { client.close(); jest.useRealTimers(); });
 
-  it('authenticates with the session token and goes live on ready', async () => {
+  it('connects with the token in the socket options, then tracks on ready', async () => {
     start();
+    expect(statuses).toEqual(['connecting']);
     await connected();
     expect(socket().token).toBe('neon-jwt');
+    expect(socket().url).not.toContain('neon-jwt');
     expect(socket().binaryType).toBe('arraybuffer');
-    expect(states.at(-1)).toEqual(['live', null]);
+    expect(statuses).toEqual(['connecting', 'tracking']);
+    expect(available).toEqual([true]);
   });
 
-  it('keeps one frame in flight; the newest waiting frame replaces older ones', async () => {
+  it('sends nothing before ready, then the exact packet', async () => {
     start();
-    client.send(encodeFrame(1, jpeg(1))); // before ready: waits
-    await connected();
-    expect(socket().sent.map(frameMarker)).toEqual([1]);
-
-    client.send(encodeFrame(2, jpeg(2)));
-    client.send(encodeFrame(3, jpeg(3))); // replaces 2
-    expect(socket().sent).toHaveLength(1);
-
-    socket().reply({ type: 'pose', timestamp_ms: 1, result, latency_ms: 90, endpoint_ms: 10, dropped: 0 });
-    expect(poses).toEqual([{ score: 0.92, dropped: 0 }]);
-    expect(socket().sent.map(frameMarker)).toEqual([1, 3]);
-
-    socket().reply({ type: 'pose', timestamp_ms: 3, result: null, latency_ms: 90, endpoint_ms: 10, dropped: 1 });
-    expect(poses.at(-1)).toEqual({ score: undefined, dropped: 1 });
-  });
-
-  it('labels results as cloud', async () => {
-    const seen: string[] = [];
-    client = new CloudPoseClient({
-      url: 'x', getToken: token, onPose: (d) => seen.push(d.result!.source),
-      createSocket: (url, t) => { const s = new FakeSocket(url, t); sockets.push(s); return s; },
-    });
-    client.start();
-    await connected();
-    client.send(encodeFrame(1, jpeg(1)));
-    socket().reply({ type: 'pose', timestamp_ms: 1, result: { ...result, source: 'coreml' }, latency_ms: 1, endpoint_ms: 1, dropped: 0 });
-    expect(seen).toEqual(['cloud']);
-  });
-
-  it('shows warming as reconnecting and holds frames until the relay back-off ends', async () => {
-    start();
-    await connected();
-    client.send(encodeFrame(1, jpeg(1)));
-    socket().reply({ type: 'status', status: 'warming' });
-    expect(states.at(-1)).toEqual(['reconnecting', null]);
-
-    client.send(encodeFrame(2, jpeg(2)));
-    expect(socket().sent).toHaveLength(1); // the relay would drop it unanswered
-    now += 2000;
-    jest.advanceTimersByTime(2000);
-    expect(socket().sent.map(frameMarker)).toEqual([1, 2]);
-
-    socket().reply({ type: 'pose', timestamp_ms: 2, result, latency_ms: 1, endpoint_ms: 1, dropped: 1 });
-    expect(states.at(-1)).toEqual(['live', null]);
-  });
-
-  it('gives up on a frame with no reply, so a lost reply cannot stall the stream', async () => {
-    start();
-    await connected();
-    client.send(encodeFrame(1, jpeg(1)));
-    client.send(encodeFrame(2, jpeg(2)));
-    expect(socket().sent).toHaveLength(1);
-    jest.advanceTimersByTime(8000);
-    expect(socket().sent.map(frameMarker)).toEqual([1, 2]);
-  });
-
-  it('reconnects with backoff after a close or an error, with a fresh token', async () => {
-    start();
-    await connected();
-    socket().drop();
-    expect(states.at(-1)).toEqual(['reconnecting', 'Connection to the pose service dropped.']);
-    expect(sockets).toHaveLength(1);
-
-    jest.advanceTimersByTime(999);
-    expect(sockets).toHaveLength(1);
-    jest.advanceTimersByTime(1);
-    await connected();
-    expect(sockets).toHaveLength(2);
-    expect(states.at(-1)).toEqual(['live', null]);
-
-    socket().reply({ type: 'error', message: 'endpoint returned HTTP 500' });
-    expect(sockets[1]!.closed).toBe(true);
-    expect(states.at(-1)).toEqual(['reconnecting', 'endpoint returned HTTP 500']);
-    jest.advanceTimersByTime(1000); // ready reset the backoff
-    await connected();
-    expect(sockets).toHaveLength(3);
-    expect(token).toHaveBeenCalledTimes(3);
-  });
-
-  it('backs off further while the relay stays unreachable, and waits for a login', async () => {
-    let t: string | null = null;
-    start(async () => t);
-    await Promise.resolve(); await Promise.resolve();
-    expect(sockets).toHaveLength(0);
-    expect(states.at(-1)).toEqual(['reconnecting', 'Please log in to use cloud mode.']);
-    t = 'jwt';
-    jest.advanceTimersByTime(1000);
-    await Promise.resolve(); await Promise.resolve();
-    socket().drop(); // never got ready
-    expect(states.at(-1)).toEqual(['reconnecting', 'Could not reach the pose service.']);
-    jest.advanceTimersByTime(1999);
-    expect(sockets).toHaveLength(1);
-    jest.advanceTimersByTime(1);
-    await Promise.resolve(); await Promise.resolve();
-    expect(sockets).toHaveLength(2);
-  });
-
-  it('stops for good on close, without reconnecting', async () => {
-    start();
-    await connected();
-    client.close();
-    expect(socket().closed).toBe(true);
-    expect(states.at(-1)).toEqual(['closed', null]);
-    jest.advanceTimersByTime(60_000);
-    client.send(encodeFrame(1, jpeg(1)));
-    expect(sockets).toHaveLength(1);
+    await flush();
+    const ts = send(7);
     expect(socket().sent).toHaveLength(0);
+    socket().reply({ type: 'ready' });
+    expect(Array.from(new Uint8Array(socket().sent[0]!))).toEqual(Array.from(new Uint8Array(encodeFrame(ts, jpeg(7)))));
   });
-});
 
-describe('probeCloud', () => {
-  const make = (react: (s: FakeSocket) => void) => (url: string, token: string) => {
-    const s = new FakeSocket(url, token);
-    setTimeout(() => react(s), 0);
-    return s;
-  };
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  it('turns replies into detections: result null is no person, results are labelled cloud', async () => {
+    start();
+    await connected();
+    let ts = send();
+    socket().reply(pose(ts, { latency_ms: 95 }));
+    expect(poses[0]![0]).toEqual({ result: { ...result, source: 'cloud' }, latencyMs: 95, timestampMs: ts });
+    await advance(100);
+    ts = send();
+    socket().reply(pose(ts, { result: null }));
+    expect(poses[1]![0]).toEqual({ result: undefined, latencyMs: 90, timestampMs: ts });
+  });
 
-  it('is reachable on ready or warming, and not on error, close or timeout', async () => {
-    const run = (react: (s: FakeSocket) => void) => {
-      const p = probeCloud('wss://x', 'jwt', 5000, make(react));
-      jest.runAllTimers();
-      return p;
-    };
-    await expect(run((s) => s.reply({ type: 'ready' }))).resolves.toBe(true);
-    await expect(run((s) => s.reply({ type: 'status', status: 'warming' }))).resolves.toBe(true);
-    await expect(run((s) => s.reply({ type: 'error', message: 'no' }))).resolves.toBe(false);
-    await expect(run((s) => s.drop())).resolves.toBe(false);
-    await expect(run(() => {})).resolves.toBe(false);
+  it('accepts only the reply to the in-flight frame, once; malformed, duplicate and obsolete replies are dropped', async () => {
+    start();
+    await connected();
+    const a = send();
+    socket().reply(pose(a - 100)); // obsolete
+    socket().raw('{"type":"pose"'); // malformed
+    socket().raw(new ArrayBuffer(4));
+    expect(poses).toHaveLength(0);
+    socket().reply(pose(a));
+    socket().reply(pose(a)); // duplicate
+    expect(poses).toHaveLength(1);
+    await advance(100);
+    const b = send();
+    socket().reply(pose(a)); // duplicate of an answered frame
+    expect(poses).toHaveLength(1);
+    socket().reply(pose(b));
+    expect(poses).toHaveLength(2);
+    expect(failures).toEqual([]);
+  });
+
+  it('drops a reply more than 1 s old as stale and frees the in-flight slot', async () => {
+    start();
+    await connected();
+    const a = send(1);
+    await advance(1001);
+    send(2);
+    expect(socket().sent).toHaveLength(1);
+    socket().reply(pose(a));
+    expect(poses).toHaveLength(0);
+    expect(failures).toEqual(['stale']);
+    expect(socket().sent).toHaveLength(2); // the waiting frame went out
+  });
+
+  it('accepts a reply exactly 1 s old', async () => {
+    start();
+    await connected();
+    const a = send();
+    await advance(1000);
+    socket().reply(pose(a));
+    expect(poses).toHaveLength(1);
+  });
+
+  it('keeps one frame in flight and one pending; the newest pending frame wins and replacements count', async () => {
+    start();
+    await connected();
+    const a = send(1);
+    await advance(10); send(2);
+    await advance(10); send(3);
+    await advance(10); const d = send(4);
+    await advance(900);
+    expect(socket().sent).toHaveLength(1); // never a second transmission before the reply
+    socket().reply(pose(a));
+    expect(socket().stamps()).toEqual([a, d]);
+    expect(poses[0]![1]).toEqual({ replaced: 2, relay: 0 });
+    socket().reply(pose(d, { dropped: 3 }));
+    expect(poses[1]![1]).toEqual({ replaced: 0, relay: 3 });
+  });
+
+  it('gives up after 5 s without ready and reconnects with a fresh token', async () => {
+    start();
+    await flush();
+    await advance(4999);
+    expect(failures).toEqual([]);
+    await advance(1);
+    expect(failures).toEqual(['connect']);
+    expect(sockets[0]!.closed).toBe(1);
+    expect(statuses.at(-1)).toBe('reconnecting');
+    expect(available).toEqual([]);
+    await advance(500);
+    expect(sockets).toHaveLength(2);
+    expect(getToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('times out a frame after 5 s without a reply and reconnects as a new generation', async () => {
+    start();
+    await connected();
+    const a = send();
+    await advance(4999);
+    expect(failures).toEqual([]);
+    await advance(1);
+    expect(failures).toEqual(['timeout']);
+    expect(sockets[0]!.closed).toBe(1);
+    expect(available).toEqual([true, false]);
+    expect(statuses.at(-1)).toBe('reconnecting');
+    await advance(500);
+    await connected();
+    expect(sockets).toHaveLength(2);
+    expect(statuses.at(-1)).toBe('tracking');
+    sockets[0]!.reply(pose(a)); // late reply on the old socket
+    expect(poses).toHaveLength(0);
+  });
+
+  it('treats a relay error as an inference failure and reconnects', async () => {
+    start();
+    await connected();
+    send();
+    socket().reply({ type: 'error', message: 'endpoint returned HTTP 500' });
+    expect(failures).toEqual(['inference']);
+    expect(sockets[0]!.closed).toBe(1);
+    expect(available).toEqual([true, false]);
+    await advance(500);
+    expect(sockets).toHaveLength(2);
+  });
+
+  it('while warming: reconnecting, pending frames discarded, at most one probe per 2 s', async () => {
+    start();
+    await connected();
+    const a = send(1); // in flight
+    await advance(10);
+    send(2); // pending
+    socket().reply({ type: 'status', status: 'warming' });
+    expect(statuses.at(-1)).toBe('reconnecting');
+    expect(failures).toEqual(['warming']);
+    expect(available).toEqual([true, false]);
+    expect(socket().sent).toHaveLength(1); // pending frame discarded, not sent
+
+    jest.setSystemTime(a + 1999);
+    send(3);
+    expect(socket().sent).toHaveLength(1);
+    jest.setSystemTime(a + 2000);
+    const probe = send(4);
+    expect(socket().stamps()).toEqual([a, probe]);
+    jest.setSystemTime(a + 2100);
+    send(5); // probe in flight: discarded
+    socket().reply({ type: 'status', status: 'warming' });
+    expect(failures).toEqual(['warming', 'warming']);
+    jest.setSystemTime(probe + 1999);
+    send(6);
+    expect(socket().sent).toHaveLength(2);
+    jest.setSystemTime(probe + 2000);
+    const probe2 = send(7);
+    expect(socket().stamps()).toEqual([a, probe, probe2]);
+    socket().reply(pose(probe2));
+    expect(poses).toHaveLength(1);
+    expect(poses[0]![1]).toEqual({ replaced: 0, relay: 0 });
+    expect(statuses.at(-1)).toBe('tracking');
+    expect(available).toEqual([true, false, true]);
+    expect(sockets).toHaveLength(1);
+
+    // Back to normal: frames queue again.
+    await advance(100);
+    const b = send(8);
+    await advance(10);
+    send(9);
+    expect(socket().stamps()).toEqual([a, probe, probe2, b]);
+  });
+
+  it('handles an error followed by a close once', async () => {
+    start();
+    await flush();
+    socket().onerror?.({});
+    socket().onclose?.({});
+    expect(failures).toEqual(['connect']);
+    expect(statuses).toEqual(['connecting', 'reconnecting']);
+    await advance(500);
+    expect(sockets).toHaveLength(2);
+    socket().reply({ type: 'ready' });
+    socket().onerror?.({});
+    socket().onclose?.({});
+    expect(failures).toEqual(['connect']); // a drop after ready is not a connect failure
+    expect(available).toEqual([true, false]);
+    await advance(5000);
+    expect(sockets).toHaveLength(3);
+  });
+
+  it('backs off 500, 1000, 2000, 4000, 8000, then 15000 ms repeating', async () => {
+    const calls: number[] = [];
+    getToken.mockImplementation(async () => { calls.push(Date.now()); return null; });
+    start();
+    await flush();
+    for (const ms of [500, 1000, 2000, 4000, 8000, 15000, 15000]) await advance(ms);
+    expect(calls.slice(1).map((t, i) => t - calls[i]!)).toEqual([500, 1000, 2000, 4000, 8000, 15000, 15000]);
+    expect(failures.every((f) => f === 'connect')).toBe(true);
+    expect(sockets).toHaveLength(0);
+  });
+
+  it('resets the backoff only after a fresh accepted pose, not on ready', async () => {
+    start();
+    await flush();
+    socket().onclose?.({}); // fail 1 -> 500
+    await advance(500);
+    socket().onclose?.({}); // fail 2 -> 1000
+    await advance(1000);
+    socket().reply({ type: 'ready' });
+    socket().onclose?.({}); // ready did not reset -> 2000
+    await advance(1999);
+    expect(sockets).toHaveLength(3);
+    await advance(1);
+    expect(sockets).toHaveLength(4);
+    socket().reply({ type: 'ready' });
+    const a = send();
+    await advance(1001);
+    socket().reply(pose(a)); // stale: no reset
+    socket().onclose?.({}); // -> 4000
+    await advance(3999);
+    expect(sockets).toHaveLength(4);
+    await advance(1);
+    socket().reply({ type: 'ready' });
+    const b = send();
+    socket().reply(pose(b)); // fresh: reset
+    socket().onclose?.({});
+    await advance(500);
+    expect(sockets).toHaveLength(6);
+  });
+
+  it('close stops sockets, timers and a token still being fetched', async () => {
+    let resolve!: (t: string) => void;
+    getToken.mockImplementation(() => new Promise((r) => { resolve = r; }));
+    start();
+    client.close();
+    expect(statuses.at(-1)).toBe('stopped');
+    resolve('late');
+    await flush();
+    expect(sockets).toHaveLength(0);
+    await advance(60_000);
+    expect(sockets).toHaveLength(0);
+    expect(getToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('close ends a live stream and ignores every later callback', async () => {
+    start();
+    await connected();
+    const a = send();
+    const s = socket();
+    const handlers = { msg: s.onmessage, close: s.onclose, error: s.onerror };
+    const before = { statuses: statuses.length, available: available.length };
+    client.close();
+    expect(s.closed).toBe(1);
+    expect(statuses.at(-1)).toBe('stopped');
+    handlers.msg?.({ data: JSON.stringify(pose(a)) });
+    handlers.error?.({});
+    handlers.close?.({});
+    client.send(Date.now(), jpeg(2));
+    await advance(60_000);
+    expect(poses).toHaveLength(0);
+    expect(failures).toEqual([]);
+    expect(sockets).toHaveLength(1);
+    expect(s.sent).toHaveLength(1);
+    expect(statuses.length).toBe(before.statuses + 1);
+    expect(available.length).toBe(before.available);
+  });
+
+  it('ignores sockets and timers from an older generation', async () => {
+    start();
+    await connected();
+    const old = socket();
+    const handlers = { msg: old.onmessage, close: old.onclose, error: old.onerror };
+    const a = send();
+    await advance(5000); // timeout: generation 1 ends
+    expect(failures).toEqual(['timeout']);
+    await advance(500);
+    await connected();
+    const b = send();
+    handlers.msg?.({ data: JSON.stringify(pose(a)) });
+    handlers.msg?.({ data: JSON.stringify({ type: 'status', status: 'warming' }) });
+    handlers.msg?.({ data: JSON.stringify({ type: 'error', message: 'x' }) });
+    handlers.error?.({});
+    handlers.close?.({});
+    expect(failures).toEqual(['timeout']);
+    expect(statuses.at(-1)).toBe('tracking');
+    expect(sockets).toHaveLength(2);
+    socket().reply(pose(b));
+    expect(poses).toHaveLength(1);
+    await advance(30_000); // no stray timers from generation 1
+    expect(sockets).toHaveLength(2);
   });
 });
