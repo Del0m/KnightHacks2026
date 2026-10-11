@@ -10,7 +10,7 @@ import { createBasicPoseDetector, createCloudFrameEncoder, createPoseDetector } 
 import CameraCheck from '../CameraCheck';
 import type { SocketLike } from '@/pose/cloud';
 import { __clearPoseStoreForTests, saveBenchmark, saveCloudConsent, savePreference } from '@/pose/modeStore';
-import { __resetPoseModeForTests } from '@/pose/usePoseMode';
+import { __resetPoseModeForTests, usePoseMode, type PoseModeState } from '@/pose/usePoseMode';
 import { __setCloudSocketForTests } from '@/pose/useCloudConfig';
 import type { PosePreference } from '@/pose/mode';
 import * as modeStore from '@/pose/modeStore';
@@ -277,5 +277,132 @@ describe('camera check: cloud consent belongs to the account', () => {
     expect(text).not.toMatch(/never leaves/i);
     expect(text).toMatch(/SteadyForum/);
     expect(text).toMatch(/never stored/i);
+  });
+});
+
+describe('camera check: nothing is sent outside an eligible session', () => {
+  const rerender = () => act(() => h.renderer!.update(<CameraCheck exercise="squat" onContinue={h.onContinue} />));
+  const sent = () => h.sockets.reduce((n, s) => n + s.sent.length, 0);
+  /** Consent changed elsewhere (e.g. settings) for the same account. */
+  function consentElsewhere(userId: string) {
+    let latest!: PoseModeState;
+    function Probe() { latest = usePoseMode(userId); return null; }
+    act(() => { create(<Probe />); });
+    return (c: boolean) => act(() => latest.setCloudConsent(c));
+  }
+  function deferToken() {
+    const pending: ((token: string | null) => void)[] = [];
+    mockSession.current.getApiToken.mockImplementation(() => new Promise<string | null>((r) => pending.push(r)));
+    return pending;
+  }
+  async function expectSilent() {
+    const count = h.sockets.length, frames = sent();
+    t.frame();
+    await t.advance(60_000);
+    expect(h.sockets.every((s) => s.closed)).toBe(true);
+    expect(h.sockets.length).toBe(count);
+    expect(sent()).toBe(frames);
+  }
+
+  it('stops at once when consent is revoked, and a late encoder delivery sends nothing', async () => {
+    phone({ fps: 5 });
+    const setConsent = consentElsewhere('user-1');
+    await t.mount();
+    act(() => t.socket().reply({ type: 'ready' }));
+    t.frame();
+    expect(sent()).toBe(1);
+    h.queue = [];
+    t.frame(); // encoded, still on its way to JS
+    act(() => t.socket().reply({ type: 'pose', timestamp_ms: t.socket().stamps()[0], result: null, latency_ms: 1, endpoint_ms: 1, dropped: 0 }));
+    setConsent(false);
+    expect(t.socket().closed).toBe(true);
+    t.drain();
+    h.queue = null;
+    expect(sent()).toBe(1);
+    expect(t.labels()).toContain('Allow cloud tracking');
+    await expectSilent();
+  });
+
+  it('never connects when consent is revoked while the token is on its way', async () => {
+    phone({ fps: 5 });
+    const pending = deferToken();
+    const setConsent = consentElsewhere('user-1');
+    await t.mount();
+    expect(pending).toHaveLength(1);
+    setConsent(false);
+    await act(async () => { pending[0]('jwt-user-1'); });
+    expect(h.sockets).toHaveLength(0);
+    await expectSilent();
+  });
+
+  it('stops at once on logout', async () => {
+    phone({ fps: 5 });
+    await t.mount();
+    act(() => t.socket().reply({ type: 'ready' }));
+    mockSession.current = { user: null, getApiToken: jest.fn(async () => null) };
+    rerender();
+    expect(t.socket().closed).toBe(true);
+    await expectSilent();
+  });
+
+  it("stops at once on an account change, and a late token for the old account is never used", async () => {
+    phone({ fps: 5 });
+    modeStore.saveCloudConsent('user-2', true);
+    const pending = deferToken();
+    await t.mount();
+    expect(pending).toHaveLength(1);
+    mockSession.current = { ...mockSession.current, user: { id: 'user-2', email: 'user-2@example.com', name: 'user-2' } };
+    rerender();
+    await t.flush();
+    expect(pending).toHaveLength(2);
+    await act(async () => { pending[0]('jwt-user-1'); });
+    expect(h.sockets).toHaveLength(0);
+    await act(async () => { pending[1]('jwt-user-2'); });
+    expect(h.sockets.map((s) => s.token)).toEqual(['jwt-user-2']);
+  });
+
+  it('switching to an account without consent stops the stream', async () => {
+    phone({ fps: 5 });
+    await t.mount();
+    act(() => t.socket().reply({ type: 'ready' }));
+    mockSession.current = { user: { id: 'user-2', email: 'user-2@example.com', name: 'user-2' }, getApiToken: jest.fn(async () => 'jwt-user-2') };
+    rerender();
+    expect(t.socket().closed).toBe(true);
+    expect(t.labels()).toContain('Allow cloud tracking');
+    await expectSilent();
+    expect(h.sockets.map((s) => s.token)).toEqual(['jwt-user-1']);
+  });
+
+  it('stops while backgrounded, including a delivery that lands after', async () => {
+    let onAppState!: (state: string) => void;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_: string, cb: (state: string) => void) => { onAppState = cb; return { remove: jest.fn() }; }) as never);
+    phone({ fps: 5 });
+    await t.mount();
+    act(() => t.socket().reply({ type: 'ready' }));
+    h.queue = [];
+    t.frame();
+    act(() => onAppState('background'));
+    expect(h.sockets[0].closed).toBe(true);
+    t.drain();
+    h.queue = null;
+    expect(sent()).toBe(0);
+    await t.advance(60_000);
+    expect(h.sockets).toHaveLength(1);
+
+    act(() => onAppState('active'));
+    await t.flush();
+    expect(h.sockets).toHaveLength(2);
+    expect(h.sockets[1].closed).toBe(false);
+  });
+
+  it('stops when the screen loses focus, even if the token arrives later', async () => {
+    phone({ fps: 5 });
+    const pending = deferToken();
+    await t.mount();
+    act(() => mockBlurs.at(-1)!());
+    await act(async () => { pending[0]('jwt-user-1'); });
+    expect(h.sockets).toHaveLength(0);
+    await t.advance(60_000);
+    expect(h.sockets).toHaveLength(0);
   });
 });
