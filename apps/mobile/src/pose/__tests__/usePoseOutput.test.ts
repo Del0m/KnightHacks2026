@@ -51,7 +51,7 @@ describe('usePoseOutput frame lifecycle', () => {
     // The frame clock starts null; any other synchronizable (cloud counters) is a plain cell.
     jest.mocked(createSynchronizable).mockImplementation(((init: unknown) => {
       if (init === null) return { getDirty, setBlocking };
-      let v = init;
+      let v: unknown = init;
       return { getDirty: () => v, setBlocking: (x: unknown) => { v = typeof x === 'function' ? (x as (p: unknown) => unknown)(v) : x; } };
     }) as never);
     jest.mocked(createPoseDetector).mockReturnValue({ model: 'yolov8n-pose-320', detect, setFrameOutput } as never);

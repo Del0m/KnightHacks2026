@@ -4,7 +4,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 import { getPoseModelId } from 'steadyforum-pose';
 import { runPoseBenchmark, type BenchmarkResult, type BenchmarkSize } from './benchmark';
-import { probeCloud, type CreateSocket } from './cloud';
+import type { CreateSocket } from './cloud';
 import { selectPoseMode, type PoseMode, type PosePreference } from './mode';
 import {
   loadBenchmark,
@@ -112,17 +112,10 @@ export interface CloudCheck {
   createSocket?: CreateSocket; // tests
 }
 
-/** Probes the relay and records the answer, so `selectPoseMode` can return cloud or paused. */
-export async function checkCloudReachable(check: CloudCheck): Promise<boolean> {
-  let reachable = false;
-  try {
-    const token = await check.getToken();
-    reachable = token != null && (await probeCloud(check.url, token, 5000, check.createSocket));
-  } catch {
-    reachable = false;
-  }
-  if (getState().cloudReachable !== reachable) update({ cloudReachable: reachable });
-  return reachable;
+/** The relay probe is gone (AI-17): reachability comes from the streaming socket, so this reads false. */
+export async function checkCloudReachable(_check: CloudCheck): Promise<boolean> {
+  if (getState().cloudReachable) update({ cloudReachable: false });
+  return false;
 }
 
 export interface PoseModeState {

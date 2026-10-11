@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createBasicPoseDetector, createPoseDetector } from 'steadyforum-pose';
+import { createBasicPoseDetector, createCloudFrameEncoder, createPoseDetector } from 'steadyforum-pose';
 import type { CameraFrameOutput, Frame } from 'react-native-vision-camera';
 import { useFrameOutput } from 'react-native-vision-camera';
 import { createSynchronizable, scheduleOnRN } from 'react-native-worklets';
-import { CloudPoseClient, encodeFrame, type CloudState, type CreateSocket } from './cloud';
-import { frameToCloudJpeg } from './cloudFrame';
+import { CloudPoseClient, type CloudFailure, type CloudStatus, type CreateSocket } from './cloud';
 import { shouldProcess } from './throttle';
 import type { PoseDetection } from './types';
 
@@ -18,6 +17,8 @@ export type PoseEngine = 'coreml' | 'vision' | 'cloud';
 
 /** Cloud mode sends ~10 fps (the relay's endpoint answers one frame at a time). */
 const CLOUD_MAX_FPS = 10;
+/** Encoded frames on their way from the worklet to the socket; past this a frame is dropped unencoded. */
+const MAX_CLOUD_DELIVERIES = 2;
 
 export interface CloudConfig {
   /** The relay's WebSocket URL, from `poseStreamUrl(apiUrl)`. */
@@ -25,6 +26,9 @@ export interface CloudConfig {
   /** A fresh Neon Auth token for each connection (`authClient.token()`). Never the HF token. */
   getToken: () => Promise<string | null>;
   createSocket?: CreateSocket; // tests
+  /** The relay is ready (true), or failed or dropped (false). */
+  onAvailability?: (available: boolean) => void;
+  onFailure?: (kind: CloudFailure) => void;
 }
 const STATS_INTERVAL_MS = 500;
 
@@ -37,10 +41,13 @@ export interface PoseOutput {
   error: string | null;
   /** Model name, e.g. `yolov8n-pose-320` or `apple-vision-body-pose`; null when the detector could not be created. */
   model: string | null;
-  /** Frames the camera pipeline dropped (`onFrameDropped`), plus frames the cloud relay skipped, since mount. */
+  /**
+   * Frames dropped since mount: by the camera pipeline (`onFrameDropped`) and, in cloud mode, frames
+   * skipped on the way to JS, replaced while waiting, or skipped by the relay. Throttling isn't counted.
+   */
   dropped: number;
-  /** Cloud mode only: 'reconnecting' while the endpoint warms up or after a drop (show "reconnecting"). */
-  cloudState: CloudState | null;
+  /** Cloud mode only: 'reconnecting' while the endpoint warms up or after a failure; 'stopped' without a config. */
+  cloudStatus: CloudStatus | null;
 }
 
 /**
@@ -57,8 +64,8 @@ export function usePoseOutput(opts: {
   size?: 320 | 256;
   maxFps?: number;
   onPose: (d: PoseDetection) => void;
-  /** Required for `engine: 'cloud'`. */
-  cloud?: CloudConfig;
+  /** `engine: 'cloud'` streams only while this is set; null stops the transport. A new object reconnects. */
+  cloud?: CloudConfig | null;
 }): PoseOutput {
   const { engine = 'coreml', size = 320, onPose, cloud } = opts;
   const isCloud = engine === 'cloud';
@@ -75,15 +82,27 @@ export function usePoseOutput(opts: {
   }, [engine, size]);
   const { detector, createError } = created;
 
+  const cloudEncoder = useMemo(() => {
+    if (!isCloud) return { encoder: null, encoderError: null };
+    try {
+      return { encoder: createCloudFrameEncoder(), encoderError: null };
+    } catch (e) {
+      return { encoder: null, encoderError: String(e) };
+    }
+  }, [isCloud]);
+  const { encoder, encoderError } = cloudEncoder;
+
   const [frameError, setFrameError] = useState<string | null>(null);
-  const [cloudState, setCloudState] = useState<CloudState | null>(null);
-  const [cloudError, setCloudError] = useState<string | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<CloudStatus>('stopped');
   const [cloudModel, setCloudModel] = useState<string | null>(null);
   const [fps, setFps] = useState(0);
   const [dropped, setDropped] = useState(0);
 
   // Last processed frame time (ms), shared with the frame thread. Null until the first frame.
   const lastMs = useMemo(() => createSynchronizable<number | null>(null), []);
+  // Cloud frames scheduled from the worklet but not yet handed to the client, and frames skipped for it.
+  const deliveries = useMemo(() => createSynchronizable(0), []);
+  const deliverySkips = useMemo(() => createSynchronizable(0), []);
 
   const onPoseRef = useRef(onPose);
   useLayoutEffect(() => { onPoseRef.current = onPose; }, [onPose]);
@@ -96,24 +115,24 @@ export function usePoseOutput(opts: {
     onPoseRef.current(d);
   }, []);
 
-  // Cloud mode: one client per URL; frames from the worklet go to it on the JS thread.
+  // Cloud mode: one client per config; frames from the worklet go to it on the JS thread.
   const cloudClient = useRef<CloudPoseClient | null>(null);
-  const getTokenRef = useRef(cloud?.getToken);
-  useLayoutEffect(() => { getTokenRef.current = cloud?.getToken; }, [cloud?.getToken]);
-  const cloudUrl = isCloud ? cloud?.url ?? null : null;
-  const createSocket = cloud?.createSocket;
+  const cloudConfig = isCloud ? cloud ?? null : null;
+  const cloudActive = cloudConfig != null && encoder != null;
   useEffect(() => {
-    if (!cloudUrl) return;
+    if (!cloudConfig) return;
     const client = new CloudPoseClient({
-      url: cloudUrl,
-      getToken: () => getTokenRef.current?.() ?? Promise.resolve(null),
-      createSocket,
-      onPose: (d, skipped) => {
-        droppedCount.current += skipped;
+      url: cloudConfig.url,
+      getToken: cloudConfig.getToken,
+      createSocket: cloudConfig.createSocket,
+      onPose: (d, drops) => {
+        droppedCount.current += drops.replaced + drops.relay;
         if (d.result) setCloudModel((m) => (m === d.result!.model ? m : d.result!.model));
         handleDetection(d);
       },
-      onState: (state, error) => { setCloudState(state); setCloudError(error); },
+      onStatus: setCloudStatus,
+      onAvailability: cloudConfig.onAvailability,
+      onFailure: cloudConfig.onFailure,
     });
     cloudClient.current = client;
     client.start();
@@ -121,11 +140,12 @@ export function usePoseOutput(opts: {
       client.close();
       if (cloudClient.current === client) cloudClient.current = null;
     };
-  }, [cloudUrl, createSocket, handleDetection]);
+  }, [cloudConfig, handleDetection]);
 
   const sendCloudFrame = useCallback((timestampMs: number, jpeg: ArrayBuffer) => {
-    cloudClient.current?.send(encodeFrame(timestampMs, jpeg));
-  }, []);
+    deliveries.setBlocking((n) => n - 1);
+    cloudClient.current?.send(timestampMs, jpeg);
+  }, [deliveries]);
 
   const handleFrameError = useCallback((message: string) => {
     failedCount.current += 1;
@@ -138,10 +158,17 @@ export function usePoseOutput(opts: {
       try {
         const nowMs = frame.timestamp * 1000;
         if (isCloud) {
-          if (!shouldProcess(nowMs, lastMs.getDirty(), maxFps)) return;
+          if (!cloudActive || encoder == null || !shouldProcess(nowMs, lastMs.getDirty(), maxFps)) return;
           lastMs.setBlocking(nowMs);
-          // Encoded here, off the JS thread; only the JPEG bytes cross to the socket.
-          scheduleOnRN(sendCloudFrame, Date.now(), frameToCloudJpeg(frame));
+          // JS hasn't taken the last frames yet: drop this one rather than queue it.
+          if (deliveries.getDirty() >= MAX_CLOUD_DELIVERIES) {
+            deliverySkips.setBlocking((n) => n + 1);
+            return;
+          }
+          // Encoded natively, off the JS thread; only the JPEG bytes cross to the socket.
+          const encoded = encoder.encode(frame);
+          deliveries.setBlocking((n) => n + 1);
+          scheduleOnRN(sendCloudFrame, encoded.timestampMs, encoded.jpeg);
           return;
         }
         if (detector == null || !shouldProcess(nowMs, lastMs.getDirty(), maxFps)) return;
@@ -155,7 +182,7 @@ export function usePoseOutput(opts: {
         frame.dispose();
       }
     },
-    [detector, isCloud, maxFps, lastMs, handleDetection, handleFrameError, sendCloudFrame],
+    [detector, isCloud, cloudActive, encoder, maxFps, lastMs, deliveries, deliverySkips, handleDetection, handleFrameError, sendCloudFrame],
   );
 
   const onFrameDropped = useCallback(() => {
@@ -166,7 +193,8 @@ export function usePoseOutput(opts: {
 
   useLayoutEffect(() => {
     detector?.setFrameOutput(frameOutput);
-  }, [detector, frameOutput]);
+    encoder?.setFrameOutput(frameOutput);
+  }, [detector, encoder, frameOutput]);
 
   // Publish fps and the drop count at most every 500 ms, so frames do not drive re-renders.
   useEffect(() => {
@@ -174,19 +202,19 @@ export function usePoseOutput(opts: {
       const cutoff = Date.now() - FPS_WINDOW_MS;
       processedAt.current = processedAt.current.filter((t) => t > cutoff);
       setFps(processedAt.current.length);
-      setDropped(droppedCount.current);
+      setDropped(droppedCount.current + deliverySkips.getDirty());
     }, STATS_INTERVAL_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [deliverySkips]);
 
   if (isCloud) {
     return {
       frameOutput,
       fps,
-      error: (cloud ? null : 'Cloud mode needs the API URL and a signed-in session.') ?? cloudError ?? frameError,
-      model: cloudModel ?? (cloud ? 'cloud' : null),
+      error: encoderError ?? frameError,
+      model: cloudModel ?? 'cloud',
       dropped,
-      cloudState,
+      cloudStatus: cloudConfig ? cloudStatus : 'stopped',
     };
   }
   return {
@@ -195,6 +223,6 @@ export function usePoseOutput(opts: {
     error: createError ?? frameError,
     model: detector?.model ?? null,
     dropped,
-    cloudState: null,
+    cloudStatus: null,
   };
 }

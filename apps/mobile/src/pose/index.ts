@@ -19,7 +19,15 @@ export {
   type CloudCheck,
   type PoseModeState,
 } from './usePoseMode';
-export { CloudPoseClient, encodeFrame, parseServerMessage, poseStreamUrl, probeCloud, type CloudState } from './cloud';
+export {
+  CloudPoseClient,
+  encodeFrame,
+  parseServerMessage,
+  poseStreamUrl,
+  type CloudDrops,
+  type CloudFailure,
+  type CloudStatus,
+} from './cloud';
 export { PoseSkeleton } from './PoseSkeleton';
 export type { Fit } from './overlayGeometry';
 export * from './types';
