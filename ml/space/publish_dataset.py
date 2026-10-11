@@ -82,6 +82,19 @@ def databricks_token() -> str:
     return res.json()["access_token"]
 
 
+def fetch_link(url: str, attempts: int = 3) -> bytes:
+    """One result chunk from its presigned link (no auth header). Retries an error or an empty
+    body, which cloud storage occasionally returns."""
+    for attempt in range(1, attempts + 1):
+        res = requests.get(url, timeout=120)
+        if res.ok and res.content:
+            return res.content
+        if attempt == attempts:
+            raise SystemExit(f"result chunk download failed: HTTP {res.status_code}, {len(res.content)} bytes")
+        time.sleep(attempt)
+    raise AssertionError("unreachable")
+
+
 def query_arrow(sql: str) -> pa.Table:
     """Runs a statement with EXTERNAL_LINKS + ARROW_STREAM, since the windows are too big inline."""
     host = os.environ["DATABRICKS_HOST"].rstrip("/")
@@ -113,8 +126,7 @@ def query_arrow(sql: str) -> pa.Table:
             f"{host}/api/2.0/sql/statements/{statement_id}/result/chunks/{index}", headers=headers, timeout=60
         ).json()
         for link in chunk.get("external_links", []):
-            data = requests.get(link["external_link"], timeout=120).content  # presigned: no auth header
-            tables.append(ipc.open_stream(io.BytesIO(data)).read_all())
+            tables.append(ipc.open_stream(io.BytesIO(fetch_link(link["external_link"]))).read_all())
     return pa.concat_tables(tables)
 
 
