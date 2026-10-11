@@ -1,0 +1,285 @@
+{
+  "datasets": [
+    {
+      "name": "importance",
+      "displayName": "importance",
+      "queryLines": [
+        "SELECT family, SUM(gain) AS gain FROM spotter.gold.gold_risk_feature_importance WHERE family <> 'body_part' GROUP BY family"
+      ]
+    },
+    {
+      "name": "metrics",
+      "displayName": "metrics",
+      "queryLines": [
+        "SELECT predictor, metric, value FROM spotter.gold.gold_risk_model_metrics UNPIVOT (value FOR metric IN (roc_auc AS `ROC-AUC`, pr_auc AS `PR-AUC`, brier AS `Brier`))"
+      ]
+    },
+    {
+      "name": "scores",
+      "displayName": "scores",
+      "queryLines": [
+        "SELECT body_part, FLOOR(score * 10) / 10 AS score_bucket, COUNT(*) AS lifters FROM spotter.gold.gold_injury_risk_model_scores GROUP BY ALL"
+      ]
+    },
+    {
+      "name": "weekly",
+      "displayName": "weekly",
+      "queryLines": [
+        "SELECT DATE_TRUNC('WEEK', date) AS week, COUNT(DISTINCT CASE WHEN score >= 0.5 THEN user_id END) / COUNT(DISTINCT user_id) AS share_above FROM spotter.gold.gold_injury_risk_scores GROUP BY ALL"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "injury_risk",
+      "displayName": "Injury-risk trends",
+      "layout": [
+        {
+          "widget": {
+            "name": "note",
+            "multilineTextboxSpec": {
+              "lines": [
+                "**A training-load and form-trend score from heuristic labels. Not a diagnosis.** The model forecasts whether the rule-based flag is raised in the next 7 days; it has never seen a confirmed injury."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "importance",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "importance",
+                  "fields": [
+                    {
+                      "name": "family",
+                      "expression": "`family`"
+                    },
+                    {
+                      "name": "gain",
+                      "expression": "`gain`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "family",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "gain",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Feature importance by family (share of gain)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "metrics",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "metrics",
+                  "fields": [
+                    {
+                      "name": "metric",
+                      "expression": "`metric`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    },
+                    {
+                      "name": "predictor",
+                      "expression": "`predictor`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "metric",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "predictor",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Held-out test: model vs heuristic score"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "scores",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "scores",
+                  "fields": [
+                    {
+                      "name": "score_bucket",
+                      "expression": "`score_bucket`"
+                    },
+                    {
+                      "name": "lifters",
+                      "expression": "`lifters`"
+                    },
+                    {
+                      "name": "body_part",
+                      "expression": "`body_part`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "score_bucket",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "lifters",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "body_part",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Model score distribution by body part (latest day)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "weekly",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "weekly",
+                  "fields": [
+                    {
+                      "name": "week",
+                      "expression": "`week`"
+                    },
+                    {
+                      "name": "share_above",
+                      "expression": "`share_above`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "week",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "share_above",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Share of lifters with heuristic score \u2265 0.5, by week"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 8,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ]
+}

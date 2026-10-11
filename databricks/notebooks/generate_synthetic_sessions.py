@@ -13,7 +13,15 @@
 # MAGIC - **Recovery users** follow the §17 story: the injured side sits around 70° for the first two
 # MAGIC   weeks of their rehab plan, then gains about 6° a week for three weeks (+18°), ending within
 # MAGIC   5° of the healthy side.
-# MAGIC - Session ids are deterministic, so re-running overwrites instead of duplicating.
+# MAGIC - **Other injured lifters** (`injured_share` of the rest, AI-14) carry a `knee:left`-style tag
+# MAGIC   that silver resolves to a side. Half of them (`decline_share`) train through it: from an onset
+# MAGIC   day in week 3 or 4 their load jumps, then over two weeks the injured side loses range, the
+# MAGIC   lowering gets faster and more reps are flagged, so the heuristic risk score (gold) crosses 0.5
+# MAGIC   for most of them. The rest stay steady with a small deficit; healthy lifters get no tags or flags.
+# MAGIC - Session ids are deterministic, so re-running overwrites instead of duplicating. With
+# MAGIC   `replace` = true (default) it stages the replacement files before deleting earlier synthetic sessions (meta files whose
+# MAGIC   device is "synthetic", and their joints), so sessions a changed generator no longer makes
+# MAGIC   don't linger. Bronze is append-only, so after that run the pipeline with a **full refresh**.
 # MAGIC
 # MAGIC Run it, then run the `spotter_sessions` pipeline and the insight sync.
 
@@ -58,6 +66,9 @@ EXERCISES = {
     "shoulder_press": {"angle": "elbow", "range": 80.0, "kg": (6, 20)},
 }
 INJURY_ANGLE = {"knee": "knee", "shoulder": "elbow", "elbow": "elbow", "wrist": "elbow"}
+# Body parts given to non-recovery injured lifters (each reflected by an angle silver measures).
+INJURY_PARTS = ["knee", "knee", "shoulder"]
+DECLINE_DAYS = 14  # an injured side goes from fine to its worst over two weeks
 
 
 def pseudonymize(user_id: str, secret: str) -> str:
@@ -70,6 +81,38 @@ def recovery_offset(week: int) -> float:
     if week < 2:
         return 22.0
     return max(4.0, 22.0 - 6.0 * (week - 1))  # weeks 2, 3, 4 -> 16, 10, 4 below; then 4
+
+
+def plan_injuries(user_ids: list[str], recovery: dict, weeks: int, seed: int = 7,
+                  injured_share: float = 0.3, decline_share: float = 0.5) -> dict:
+    """user_id -> {part, side, course, onset_day, severity}; course is recovery, decline or stable.
+
+    Recovery users come from `recovery`; `injured_share` of the others get an injury and
+    `decline_share` of those decline. Exact counts and a separate RNG, so it's deterministic and
+    doesn't depend on how many sessions are generated.
+    """
+    rng = random.Random(f"injuries/{seed}")
+    plan = {u: {"part": part, "side": side, "course": "recovery", "onset_day": None, "severity": None}
+            for u, (part, side) in recovery.items() if u in user_ids}
+    others = [u for u in user_ids if u not in plan]
+    injured = rng.sample(others, round(injured_share * len(others)))
+    declining = set(rng.sample(injured, round(decline_share * len(injured))))
+    for u in injured:
+        course = "decline" if u in declining else "stable"
+        onset_week = rng.randint(max(1, weeks - 3), max(1, weeks - 2))
+        plan[u] = {
+            "part": rng.choice(INJURY_PARTS), "side": rng.choice(["left", "right"]), "course": course,
+            "onset_day": 7 * onset_week + rng.randint(0, 3) if course == "decline" else None,
+            "severity": round(rng.uniform(0.75, 1.2), 2) if course == "decline" else None,
+        }
+    return plan
+
+
+def decline_progress(injury: dict | None, day_index: int) -> float:
+    """0 before a declining lifter's onset, rising to their severity over DECLINE_DAYS."""
+    if not injury or injury["course"] != "decline" or day_index < injury["onset_day"]:
+        return 0.0
+    return injury["severity"] * min(1.0, (day_index - injury["onset_day"]) / DECLINE_DAYS)
 
 
 # ---- Joints ----
@@ -97,11 +140,16 @@ def skeleton(knee_l: float, knee_r: float, elbow_l: float, elbow_r: float) -> li
     return kp
 
 
-def rep_frames(start_ms: int, duration_ms: int, angle: str, range_l: float, range_r: float):
+def rep_frames(start_ms: int, duration_ms: int, angle: str, range_l: float, range_r: float,
+               lowering_share: float = 0.5):
+    """Frames for one rep; the bottom comes `lowering_share` of the way through (0.5 = even tempo)."""
     frames = []
     n = max(8, int(duration_ms / 1000 * FPS))
     for f in range(n + 1):
-        depth = math.sin(math.pi * f / n)  # 0 -> 1 -> 0 over the rep
+        u = f / n
+        # 0 -> 1 -> 0 over the rep; with lowering_share 0.5 this is sin(pi * u).
+        depth = math.sin(math.pi / 2 * (u / lowering_share if u < lowering_share
+                                         else (1 - u) / (1 - lowering_share)))
         knee_l = 170 - range_l * depth if angle == "knee" else 170
         knee_r = 170 - range_r * depth if angle == "knee" else 170
         elbow_l = 170 - range_l * depth if angle == "elbow" else 170
@@ -112,16 +160,20 @@ def rep_frames(start_ms: int, duration_ms: int, angle: str, range_l: float, rang
 
 # ---- Sessions ----
 
-def generate(user_ids: list[str], weeks: int, secret: str, recovery: dict, now: datetime, seed: int = 7):
+def generate(user_ids: list[str], weeks: int, secret: str, recovery: dict, now: datetime, seed: int = 7,
+             injured_share: float = 0.3, decline_share: float = 0.5):
     """Yields (date, session_id, meta, joints_lines) in upload.ts's format."""
     rng = random.Random(seed)
+    plan = plan_injuries(user_ids, recovery, weeks, seed, injured_share, decline_share)
     # Weeks start on Monday, like the pipeline's weeks (date_trunc("week")), so each generated week
     # lands in one gold_rom_trend week. The rehab plan starts on the first Monday.
     first = (now - timedelta(weeks=weeks)).replace(hour=0, minute=0, second=0, microsecond=0)
     start = first - timedelta(days=first.weekday())
     for user_id in user_ids:
         pseudonym = pseudonymize(user_id, secret)
-        injury = recovery.get(user_id)  # (body_part, side) or None
+        planned = plan.get(user_id)
+        injury = (planned["part"], planned["side"]) if planned else None
+        course = planned["course"] if planned else None
         level = rng.choice(["beginner", "beginner", "intermediate", "advanced"])
         if injury:
             part = injury[0]
@@ -129,11 +181,18 @@ def generate(user_ids: list[str], weeks: int, secret: str, recovery: dict, now: 
         else:
             exercises = rng.sample(sorted(EXERCISES), 3)
         per_week = rng.randint(2, 4)
+        # Stable injuries: a small, steady deficit on the injured side.
+        deficit = rng.uniform(3, 8) if course == "stable" else 0.0
         for week in range(weeks):
-            for s in range(per_week):
+            # Declining lifters ramp up: two extra sessions a week from their onset week.
+            onset_week = planned["onset_day"] // 7 if course == "decline" else weeks
+            for s in range(per_week + (2 if week >= onset_week else 0)):
                 day = start + timedelta(days=7 * week + rng.randint(0, 6), hours=rng.choice([7, 12, 18]))
+                if week == onset_week and course == "decline":  # extra load lands from the onset on
+                    day = max(day, start + timedelta(days=planned["onset_day"], hours=day.hour))
                 if day > now:
                     continue
+                progress = decline_progress(planned, (day.date() - start.date()).days)
                 session_id = str(uuid.uuid5(NAMESPACE, f"{user_id}/{week}/{s}"))
                 sets_meta, joints_lines = [], []
                 for set_index, exercise in enumerate(rng.sample(exercises, min(2, len(exercises)))):
@@ -143,22 +202,35 @@ def generate(user_ids: list[str], weeks: int, secret: str, recovery: dict, now: 
                     for rep_index in range(rng.randint(6, 10)):
                         ranges = {"left": healthy + rng.gauss(0, 2), "right": healthy + rng.gauss(0, 2)}
                         if injury and INJURY_ANGLE.get(injury[0]) == spec["angle"] and injury[1] in ranges:
-                            ranges[injury[1]] -= recovery_offset(week) + rng.gauss(0, 1.5)
+                            if course == "recovery":
+                                ranges[injury[1]] -= recovery_offset(week) + rng.gauss(0, 1.5)
+                            else:  # stable deficit, or up to ~30° lost as a decline sets in
+                                ranges[injury[1]] -= deficit + 28.0 * progress + rng.gauss(0, 1.5)
                         duration = int(rng.uniform(2000, 3000))
-                        frames += rep_frames(t, duration, spec["angle"], ranges["left"], ranges["right"])
-                        flagged = injury is not None and rng.random() < 0.4 - 0.05 * week
+                        # Declining lifters drop into the rep faster (gold's tempo_speeding_up).
+                        lowering = max(0.2, 0.5 - 0.25 * progress + rng.gauss(0, 0.02))
+                        frames += rep_frames(t, duration, spec["angle"], ranges["left"], ranges["right"], lowering)
+                        if course == "recovery":
+                            flagged = rng.random() < 0.4 - 0.05 * week
+                        elif course is not None:
+                            flagged = rng.random() < 0.08 + 0.55 * progress
+                        else:
+                            flagged = False
+                        rule = "tempo" if lowering < 0.4 and rng.random() < 0.5 else "depth"
                         reps.append({
                             "rep_index": rep_index, "start_ms": t, "end_ms": t + duration,
                             "tempo_ms": duration, "range_deg": round(min(ranges.values()), 1),
                             "quality": round(0.55 if flagged else rng.uniform(0.8, 0.98), 2),
                             "lowering_ms": None, "rising_ms": None,
-                            "flags": [{"rule_id": "depth", "severity": "form", "rep_index": rep_index}] if flagged else [],
+                            "flags": [{"rule_id": rule, "severity": "form", "rep_index": rep_index}] if flagged else [],
                         })
                         t += duration + 600
                     lo, hi = spec["kg"]
                     sets_meta.append({
                         "set_index": set_index, "exercise_id": exercise,
-                        "weight_kg": round(lo + (hi - lo) * (0.4 + 0.1 * week), 1) if hi else None,
+                        # Declining lifters also load up ~40% from their onset week.
+                        "weight_kg": round((lo + (hi - lo) * (0.4 + 0.1 * week))
+                                           * (1.4 if week >= onset_week else 1.0), 1) if hi else None,
                         "medal": None, "end_reason": None, "partial_reps": None,
                         "frame_count": len(frames), "reps": reps,
                     })
@@ -171,11 +243,28 @@ def generate(user_ids: list[str], weeks: int, secret: str, recovery: dict, now: 
                     "device": "synthetic", "inference_mode": "coreml", "medal": None, "form_score": None,
                     "experience_level": level,
                     "injury_groups": [f"{injury[0]}:{injury[1]}"] if injury else [],
-                    "rehab_start_on": start.date().isoformat() if injury else None,
+                    "rehab_start_on": start.date().isoformat() if course == "recovery" else None,
                     "joints_path": f"joints/{date}/{session_id}.ndjson.gz",
                     "exported_at": now.isoformat(), "sets": sets_meta,
                 }
                 yield date, session_id, meta, joints_lines
+
+
+def clear_synthetic(volume: str) -> int:
+    """Deletes earlier generated sessions: meta/<date>/*.json with device "synthetic", and their joints."""
+    removed = 0
+    for meta_path in Path(volume, "meta").glob("*/*.json"):
+        try:
+            meta = json.loads(meta_path.read_text())
+        except (OSError, ValueError):
+            continue
+        if not isinstance(meta, dict) or meta.get("device") != "synthetic":
+            continue
+        if meta.get("joints_path"):
+            Path(volume, meta["joints_path"]).unlink(missing_ok=True)
+        meta_path.unlink()
+        removed += 1
+    return removed
 
 
 def write_sessions(sessions, volume: str) -> int:
@@ -193,6 +282,22 @@ def write_sessions(sessions, volume: str) -> int:
     return n
 
 
+def replace_sessions(sessions, volume: str) -> int:
+    """Fully generate and serialize replacements before deleting any existing data."""
+    import shutil
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="spotter-synthetic-") as staging:
+        written = write_sessions(sessions, staging)
+        if not written:
+            raise ValueError("Replacement generated no sessions; existing data was preserved")
+        clear_synthetic(volume)
+        # Publish joints before metadata, as with normal uploads.
+        for folder in ("joints", "meta"):
+            shutil.copytree(Path(staging, folder), Path(volume, folder), dirs_exist_ok=True)
+        return written
+
+
 # COMMAND ----------
 
 # MAGIC %md ## Run
@@ -206,6 +311,9 @@ dbutils.widgets.text("weeks", "6", "weeks of history")
 dbutils.widgets.text("recovery", "demo-user-01:knee:left,demo-user-04:shoulder:right,demo-user-07:knee:right",
                      "recovery users (user:body_part:side, comma-separated)")
 dbutils.widgets.text("volume", "/Volumes/spotter/raw/sessions", "sessions Volume")
+dbutils.widgets.dropdown("replace", "true", ["true", "false"], "delete earlier synthetic sessions first")
+dbutils.widgets.text("injured_share", "0.3", "share of other users given an injury (side-tagged)")
+dbutils.widgets.text("decline_share", "0.5", "share of those injured users who decline")
 
 recovery = {
     u: (part, side)
@@ -214,14 +322,17 @@ recovery = {
 presenter = dbutils.widgets.get("presenter_user_id")
 if presenter and "demo-user-01" in recovery:
     recovery[presenter] = recovery.pop("demo-user-01")
-written = write_sessions(
+writer = replace_sessions if dbutils.widgets.get("replace") == "true" else write_sessions
+written = writer(
     generate(
         user_ids=load_seed_user_ids(dbutils.widgets.get("seed_user_ids_path"), int(dbutils.widgets.get("users")), dbutils.widgets.get("presenter_user_id")),
         weeks=int(dbutils.widgets.get("weeks")),
         secret=dbutils.secrets.get(scope="spotter", key="pseudonym_secret"),
         recovery=recovery,
         now=datetime.now(timezone.utc),
+        injured_share=float(dbutils.widgets.get("injured_share")),
+        decline_share=float(dbutils.widgets.get("decline_share")),
     ),
     dbutils.widgets.get("volume"),
 )
-print(f"wrote {written} sessions; now run the spotter_sessions pipeline")
+print(f"wrote {written} sessions; now run the spotter_sessions pipeline (full refresh if anything was deleted)")
