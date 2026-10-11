@@ -1,4 +1,4 @@
-import { calendarDay, exercises } from '@/data/workout';
+import { calendarDay, dailyWorkout, exercises } from '@/data/workout';
 import { readPlan, readPrescription, routineForDay, weekStart, modelExercise } from '@/screens/Planner/plan';
 import type { SessionStart } from '../../../../specs/set-record/types';
 import { WorkoutSummary } from '@/screens/Summary';
@@ -28,7 +28,7 @@ function WorkoutScreen({ mode, exercise, cameraPosition }: { mode?: string; exer
   const auth = useAuth(), owner = useRef(auth.user?.id);
   const [restored] = useState(() => readActiveWorkout(auth.user?.id ?? null));
   const [planned] = useState(() => auth.user?.id ? readPlan(auth.user.id, weekStart(calendarDay())) : null);
-  const [initialDraft] = useState<ActiveWorkout>(() => restored ?? { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, startedAt: new Date().toISOString(), sets: [], feedbacks: [], checkpoint: {}, exercise: cameraSpec(exercise).id, mode: mode === 'manual' || Platform.OS !== 'ios' ? 'manual' : 'camera', cameraPosition, restUntil: 0, ...(planned ? { routine: routineForDay(planned.plan, planned.selectedDate), planDate: planned.selectedDate, planId: planned.plan.id } : {}) });
+  const [initialDraft] = useState<ActiveWorkout>(() => restored ?? { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, startedAt: new Date().toISOString(), sets: [], feedbacks: [], checkpoint: {}, exercise: cameraSpec(exercise).id, mode: mode === 'manual' || Platform.OS !== 'ios' ? 'manual' : 'camera', cameraPosition, restUntil: 0, ...(planned ? { routine: routineForDay(planned.plan, planned.selectedDate), planDate: planned.selectedDate, planId: planned.plan.id } : { routine: dailyWorkout(), planDate: calendarDay() }) });
   const started = useRef(initialDraft.startedAt), checkpoint = useRef<UploadCheckpoint>(initialDraft.checkpoint), recorded = useRef(false);
   const { finish, workouts, removeWorkout } = useTraining();
   const sessionStart = useRef<SessionStart | null>(restored?.sessionStart ?? null);

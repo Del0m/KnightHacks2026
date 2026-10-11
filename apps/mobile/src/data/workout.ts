@@ -16,6 +16,18 @@ export const initialProfile: Profile = { name: '', bio: '', avatar: '', days: [1
 export function calendarDay(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
+/** Local calendar days keep the routine stable offline and across daylight-saving changes. */
+export function dailyWorkout(date = calendarDay()) {
+  const [year, month, day] = date.split('-').map(Number);
+  const ordinal = Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+  const offset = ordinal % practiceExercises.length;
+  return [...practiceExercises.slice(offset), ...practiceExercises.slice(0, offset)].map((exercise, index) => ({
+    ...exercise,
+    sets: 2 + ((Math.floor(ordinal / 5) >> index) & 1),
+    reps: 8 + 2 * ((ordinal + index) % 3),
+    tracked: true,
+  }));
+}
 export function streak(workouts: Workout[], now = new Date()) {
   const days = new Set(workouts.map(w => w.day));
   const cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());

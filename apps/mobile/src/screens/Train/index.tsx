@@ -12,7 +12,7 @@ import { ExerciseMenu } from '@/components/ExerciseMenu';
 import { ExerciseTabs, type ExerciseTab } from '@/components/ExerciseTabs';
 import { RotationSlider } from '@/components/RotationSlider';
 import { Streak } from '@/components/Streak';
-import { exercises, practiceExercises, streak, completedToday, calendarDay, type ExerciseId } from '@/data/workout';
+import { dailyWorkout, practiceExercises, streak, completedToday, calendarDay, type ExerciseId } from '@/data/workout';
 import { useTraining } from '@/state/Training';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { cameraSpec } from '@/screens/LiveSet/exercises';
@@ -20,11 +20,11 @@ import { colors as c, typography as t } from '@/theme/tokens';
 export default function TrainScreen() {
   const { user } = useAuth(), account = user?.id ?? null;
   const weekly = useWeeklyPlan();
-  const routine = useMemo(() => weekly.plan ? routineForDay(weekly.plan, weekly.selectedDate).map(e => ({ ...e, muscles: e.tracked ? 'Camera tracking' : 'Manual logging' })) : exercises, [weekly.plan, weekly.selectedDate]);
+  const routine = useMemo(() => weekly.plan ? routineForDay(weekly.plan, weekly.selectedDate).map(e => ({ ...e, muscles: e.tracked ? 'Camera tracking' : 'Manual logging' })) : dailyWorkout(weekly.today), [weekly.plan, weekly.selectedDate, weekly.today]);
   const firstModel = useMemo(() => routine.length ? modelExercise(routine[0].id) : null, [routine]);
   const [activeWorkout, setActiveWorkout] = useState(() => readActiveWorkout(account));
   const { workouts } = useTraining(), reduced = useReducedMotion();
-  const [selected, setSelected] = useState<ExerciseId | null>(exercises[0].id), [playing, setPlaying] = useState(false);
+  const [selected, setSelected] = useState<ExerciseId | null>(firstModel), [playing, setPlaying] = useState(false);
   const [expanded, setExpanded] = useState<ExerciseId | null>(null), [rotation, setRotation] = useState(0), [section, setSection] = useState<ExerciseTab>('workout');
   const navigation = useNavigation<{ addListener(event: 'tabPress', listener: () => void): () => void }>();
   const resetPreview = useCallback(() => { setActiveWorkout(readActiveWorkout(account)); setSelected(firstModel); setRotation(0); setExpanded(null); setPlaying(reduced === false); }, [reduced, account, firstModel]);
@@ -46,7 +46,7 @@ export default function TrainScreen() {
     <View style={styles.separator} />
     <ExerciseTabs value={section} onChange={setSection} />
     {section === 'workout' ? <>
-    <Text accessibilityRole="header" style={styles.agenda}>{weekly.plan ? weekly.selectedDate === weekly.today ? "Today’s workout" : `Workout · ${weekly.selectedDate}` : "Full body"}</Text>
+    <Text accessibilityRole="header" style={styles.agenda}>{weekly.plan ? weekly.selectedDate === weekly.today ? "Today’s workout" : `Workout · ${weekly.selectedDate}` : "Daily full body"}</Text>
     <View>{routine.map((e, i) => <View key={e.id}><PolishedPressable testID={`exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ selected: selected === modelExercise(e.id) && modelExercise(e.id) !== null, expanded: expanded === modelExercise(e.id) && modelExercise(e.id) !== null }} accessibilityHint="Show demonstration and practice options." onPress={() => { const id = modelExercise(e.id); if (id) select(id); }} style={({ pressed }) => [styles.row, { backgroundColor: selected === modelExercise(e.id) && modelExercise(e.id) !== null || pressed ? 'rgba(255,255,255,0.65)' : 'transparent' }]}>
       <Text style={[styles.number, selected === modelExercise(e.id) && modelExercise(e.id) !== null && { color: c.primary }]}>{orderLabel(i + 1)}</Text>
       <Text style={[styles.name, selected === modelExercise(e.id) && modelExercise(e.id) !== null && { color: c.primary }]}>{e.name}</Text>
@@ -57,7 +57,7 @@ export default function TrainScreen() {
     </> : <>
     <View>{practiceExercises.map(e => <View key={e.id}><PolishedPressable testID={`practice-exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ selected: selected === modelExercise(e.id) && modelExercise(e.id) !== null, expanded: expanded === modelExercise(e.id) && modelExercise(e.id) !== null }} onPress={() => select(e.id)} style={[styles.row, selected === modelExercise(e.id) && modelExercise(e.id) !== null && { backgroundColor: 'rgba(255,255,255,.65)' }]}><Text style={styles.name}>{e.name}</Text><Text style={styles.detail}>{e.muscles}</Text></PolishedPressable>{menu(e.id)}</View>)}</View></>}
     <PolishedPressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={ui.muted}>Set goals & workout days</Text></PolishedPressable>
-    <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>{weekly.plan ? "Your selected plan day" : "Sample full-body routine"}</Text>
+    <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>{weekly.plan ? "Your selected plan day" : `Full body · ${weekly.today}`}</Text>
   </AppPage>;
 }
 const styles = StyleSheet.create({
