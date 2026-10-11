@@ -480,7 +480,8 @@ function itemSources(c: Candidate, ctx: Context, bodyParts: string[]): string[] 
   const notes = ctx.noteChunks.filter(
     (n) =>
       bodyParts.includes(n.metadata.body_part as string) &&
-      /limit|avoid|swap/i.test(String(n.metadata.section)),
+      // Every note ends with "When to get checked"; most also have "Limit or avoid".
+      /^(limit or avoid|when to get checked)$/i.test(String(n.metadata.section)),
   );
   return [...(c.chunkId ? [c.chunkId] : []), ...notes.map((n) => n.id)];
 }
@@ -1039,8 +1040,8 @@ async function chunkTitles(db: Db, ids: string[]): Promise<Map<string, string>> 
 
 function planNotes(ctx: Context, items: DraftItem[], capped: boolean): string[] {
   const notes: string[] = [];
-  // Anything built from the injury notes carries the consult-a-doctor disclaimer (Architecture §13).
-  if (items.some((i) => i.sources.some((id) => id.startsWith("injury_note:")))) notes.push(ADVICE_DISCLAIMER);
+  // A plan made with injury notes retrieved carries the consult-a-doctor disclaimer (Architecture §13).
+  if (ctx.noteChunks.length) notes.push(ADVICE_DISCLAIMER);
   const parts = [...new Set(ctx.injuries.map((i) => i.bodyPart).filter((p) => p !== "other"))];
   if (parts.length) {
     notes.push(

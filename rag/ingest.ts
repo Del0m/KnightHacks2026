@@ -135,6 +135,7 @@ interface Note {
 // Front matter is minimal "key: value" lines. A note-level "sources" key from the old format is
 // ignored: sources live on each section's "Sources:" line.
 export function parseNote(file: string, raw: string): Note {
+  raw = raw.replace(/\r\n/g, "\n"); // Windows checkouts (core.autocrlf)
   const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!m) throw new Error(`${file}: missing front matter`);
   const meta: Record<string, string> = {};

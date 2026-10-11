@@ -33,6 +33,10 @@ A knee that is very swollen or can't take weight.
 describe("injury note sections", () => {
   const note = parseNote("knee.md", SAMPLE);
 
+  it("reads Windows (CRLF) line endings the same as LF", () => {
+    expect(parseNote("knee.md", SAMPLE.replace(/\n/g, "\r\n"))).toEqual(note);
+  });
+
   it("reads each section's sources and keeps the Sources line out of the text", () => {
     expect(note.sections.map((s) => [s.heading, s.sources, s.team_guidance, s.text])).toEqual([
       [
