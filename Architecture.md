@@ -581,6 +581,7 @@ flowchart LR
 - **Reputable sources only:** library sources reach the model only from the allow-listed sites above, plus free-exercise-db for technique. Team-guidance sections are never cited. Community answers can be cited and are labelled as community.
 - **Guard:** the answer is shown only when every cited id was given, every number in it comes from a cited source, it passes the §7 tone check (no commands or banned phrases), and it names no condition, cause, medication or guaranteed outcome, and carries no links or promotions.
 - **Claim check:** a second gpt-oss call checks each sentence against the text of the sources it cites. Any added fact, benefit or cause means no answer. Both calls share one time budget.
+- **Disclaimer:** every AI answer ends with "This is general information, not medical advice. Always consult a doctor before acting on it." It is part of the answer text, so it shows wherever the answer does.
 - **Fallback:** anything else (nothing to cite, a slow or failed model, a rejected answer) means no AI comment; community answers carry the thread.
 
 ---
@@ -697,7 +698,7 @@ flowchart LR
 
 - **Pseudonymous IDs** in Databricks, never email or handle.
 - **Injury data** is private by default and only used for buddy matching if the user opts in.
-- **No medical claims.** Every injury-related screen shows a disclaimer.
+- **No medical claims.** Every injury-related screen shows a disclaimer, and anything built from the injury notes (AI advice answers, the planner's sources) carries "always consult a doctor" (`ADVICE_DISCLAIMER` in `apps/api/src/services/advice.ts`).
 - **Account deletion** cascades in Neon and queues a delete job in Databricks.
 
 ---

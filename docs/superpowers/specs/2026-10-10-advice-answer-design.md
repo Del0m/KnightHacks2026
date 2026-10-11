@@ -58,7 +58,9 @@ export class AdviceWriter {
 6. `answerable: false` → `none: not_answerable`.
 7. Guard → `none: guard_rejected` when: no cited id; more than `MAX_CITED_SOURCES` cited ids; any cited id not among the prompt's sources; `answerProblems(answer)` non-empty; or the answer states a number that none of its cited sources contains (grounding, as the rest note keeps its rule's numbers).
 8. Claim check: a second `generateJson` call (schema name `advice_verify`) gets `{ sentences: splitSentences(answer), sources: [{ id, content }] }` with only the cited sources (content as shown to the model) and returns `{ supported: boolean[] }`, one per sentence: is the sentence fully supported by those sources? Any `false` → `none: unsupported_claim`. A thrown error, a missed deadline, or the wrong shape (not an array of booleans the same length as the sentences) → `none: verify_failed`. Both model calls share the one `timeoutMs` budget; the check gets what remains.
-9. Otherwise `ai` with the trimmed answer and the cited sources (deduplicated by id, input order).
+9. Otherwise `ai`: the trimmed answer followed by `ADVICE_DISCLAIMER` ("This is general information, not medical advice. Always consult a doctor before acting on it."), and the cited sources (deduplicated by id, input order). The disclaimer is part of `text`, so it is shown wherever the answer is; the guard and the claim check see only the model's words.
+
+Any other place that shows injury-note content (the planner's "why this exercise", a library screen) shows `ADVICE_DISCLAIMER` with it.
 
 ## Reputable sources
 
