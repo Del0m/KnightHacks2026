@@ -578,10 +578,10 @@
       "start_ms": 1000,
       "end_ms": 2733,
       "tempo_ms": 1733,
-      "range_deg": 81.9,
+      "range_deg": 76.2,
       "quality": null,
-      "lowering_ms": 867,
-      "rising_ms": 866,
+      "lowering_ms": 733,
+      "rising_ms": 1000,
       "flags": [
         {
           "rule_id": "tempo",
@@ -595,10 +595,10 @@
       "start_ms": 3600,
       "end_ms": 5400,
       "tempo_ms": 1800,
-      "range_deg": 80.4,
+      "range_deg": 75.2,
       "quality": null,
-      "lowering_ms": 867,
-      "rising_ms": 933,
+      "lowering_ms": 800,
+      "rising_ms": 1000,
       "flags": []
     },
     {
@@ -606,10 +606,10 @@
       "start_ms": 6267,
       "end_ms": 8067,
       "tempo_ms": 1800,
-      "range_deg": 84.3,
+      "range_deg": 80,
       "quality": null,
-      "lowering_ms": 933,
-      "rising_ms": 867,
+      "lowering_ms": 800,
+      "rising_ms": 1000,
       "flags": []
     }
   ]

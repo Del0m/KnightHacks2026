@@ -68,84 +68,110 @@
     ]
   },
   "set_payload": {
+    "schema_version": 1,
+    "set_index": 0,
     "exercise_id": "push_up",
     "weight_kg": null,
+    "end_reason": "manual",
+    "partial_reps": 0,
     "fps": 15,
     "frames": {
-      "count": 262,
-      "sha256": "927c9274f95c67a0"
+      "count": 248,
+      "sha256": "efd7905d4d5af3c2"
     },
     "reps": [
       {
+        "rep_index": 0,
+        "start_ms": 1000,
+        "end_ms": 2867,
         "tempo_ms": 1867,
-        "range_deg": 81.4,
+        "range_deg": 69.5,
         "quality": null,
-        "start_ms": 1933,
-        "end_ms": 4533,
+        "lowering_ms": 734,
+        "rising_ms": 1133,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 0
           }
         ]
       },
       {
+        "rep_index": 1,
+        "start_ms": 4067,
+        "end_ms": 5934,
         "tempo_ms": 1867,
-        "range_deg": 77.5,
+        "range_deg": 69.2,
         "quality": null,
-        "start_ms": 5000,
-        "end_ms": 7467,
+        "lowering_ms": 667,
+        "rising_ms": 1200,
         "flags": [
           {
             "rule_id": "hip_sag",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 1
           },
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 1
           }
         ]
       },
       {
+        "rep_index": 2,
+        "start_ms": 7134,
+        "end_ms": 9000,
         "tempo_ms": 1866,
-        "range_deg": 81.3,
+        "range_deg": 70.8,
         "quality": null,
-        "start_ms": 8067,
-        "end_ms": 10600,
+        "lowering_ms": 600,
+        "rising_ms": 1266,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 2
           }
         ]
       },
       {
+        "rep_index": 3,
+        "start_ms": 10134,
+        "end_ms": 12000,
         "tempo_ms": 1866,
-        "range_deg": 79.6,
+        "range_deg": 68.5,
         "quality": null,
-        "start_ms": 11067,
-        "end_ms": 13533,
+        "lowering_ms": 666,
+        "rising_ms": 1200,
         "flags": [
           {
             "rule_id": "hip_sag",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 3
           },
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 3
           }
         ]
       },
       {
+        "rep_index": 4,
+        "start_ms": 13200,
+        "end_ms": 15134,
         "tempo_ms": 1934,
-        "range_deg": 83.1,
+        "range_deg": 72.7,
         "quality": null,
-        "start_ms": 14133,
-        "end_ms": 16933,
+        "lowering_ms": 734,
+        "rising_ms": 1200,
         "flags": [
           {
             "rule_id": "tempo",
-            "severity": "form"
+            "severity": "form",
+            "rep_index": 4
           }
         ]
       }
@@ -159,6 +185,8 @@
       "exercise_id": "push_up",
       "reps": 5,
       "weight_kg": null,
+      "end_reason": "manual",
+      "partial_reps": 0,
       "medal": "bronze",
       "clean_share": 0,
       "score_source": "databricks",
@@ -229,7 +257,7 @@
         "startedAt": "2026-10-10T15:00:00.000Z",
         "finishedAt": "2026-10-10T15:05:00.000Z",
         "device": "replay",
-        "inferenceMode": "on_device",
+        "inferenceMode": "coreml",
         "medal": "bronze",
         "formScore": 0,
         "exportStatus": "exported",
@@ -246,6 +274,8 @@
           "exerciseId": "push_up",
           "reps": 5,
           "weightKg": null,
+          "endReason": "manual",
+          "partialReps": 0,
           "medal": "bronze",
           "cleanShare": 0,
           "scoreSource": "databricks",
@@ -294,10 +324,12 @@
           "id": "<id 3>",
           "setId": "<id 1>",
           "position": 0,
-          "startMs": 1933,
-          "endMs": 4533,
+          "startMs": 1000,
+          "endMs": 2867,
+          "loweringMs": 734,
+          "risingMs": 1133,
           "tempoMs": 1867,
-          "rangeDeg": 81.4,
+          "rangeDeg": 69.5,
           "quality": null,
           "clean": false
         },
@@ -305,10 +337,12 @@
           "id": "<id 4>",
           "setId": "<id 1>",
           "position": 1,
-          "startMs": 5000,
-          "endMs": 7467,
+          "startMs": 4067,
+          "endMs": 5934,
+          "loweringMs": 667,
+          "risingMs": 1200,
           "tempoMs": 1867,
-          "rangeDeg": 77.5,
+          "rangeDeg": 69.2,
           "quality": null,
           "clean": false
         },
@@ -316,10 +350,12 @@
           "id": "<id 5>",
           "setId": "<id 1>",
           "position": 2,
-          "startMs": 8067,
-          "endMs": 10600,
+          "startMs": 7134,
+          "endMs": 9000,
+          "loweringMs": 600,
+          "risingMs": 1266,
           "tempoMs": 1866,
-          "rangeDeg": 81.3,
+          "rangeDeg": 70.8,
           "quality": null,
           "clean": false
         },
@@ -327,10 +363,12 @@
           "id": "<id 6>",
           "setId": "<id 1>",
           "position": 3,
-          "startMs": 11067,
-          "endMs": 13533,
+          "startMs": 10134,
+          "endMs": 12000,
+          "loweringMs": 666,
+          "risingMs": 1200,
           "tempoMs": 1866,
-          "rangeDeg": 79.6,
+          "rangeDeg": 68.5,
           "quality": null,
           "clean": false
         },
@@ -338,10 +376,12 @@
           "id": "<id 7>",
           "setId": "<id 1>",
           "position": 4,
-          "startMs": 14133,
-          "endMs": 16933,
+          "startMs": 13200,
+          "endMs": 15134,
+          "loweringMs": 734,
+          "risingMs": 1200,
           "tempoMs": 1934,
-          "rangeDeg": 83.1,
+          "rangeDeg": 72.7,
           "quality": null,
           "clean": false
         }
@@ -413,10 +453,10 @@
             "set_index": 0,
             "exercise_id": "push_up",
             "fps": 15,
-            "frame_count": 262,
+            "frame_count": 248,
             "first_t_ms": 0,
-            "last_t_ms": 17400,
-            "frames_sha256": "927c9274f95c67a0"
+            "last_t_ms": 16467,
+            "frames_sha256": "efd7905d4d5af3c2"
           }
         ]
       },
@@ -429,7 +469,7 @@
           "started_at": "2026-10-10T15:00:00.000Z",
           "finished_at": "2026-10-10T15:05:00.000Z",
           "device": "replay",
-          "inference_mode": "on_device",
+          "inference_mode": "coreml",
           "medal": "bronze",
           "form_score": 0,
           "experience_level": "beginner",
@@ -443,83 +483,102 @@
               "exercise_id": "push_up",
               "weight_kg": null,
               "medal": "bronze",
-              "frame_count": 262,
+              "end_reason": "manual",
+              "partial_reps": 0,
+              "frame_count": 248,
               "reps": [
                 {
                   "rep_index": 0,
-                  "start_ms": 1933,
-                  "end_ms": 4533,
+                  "start_ms": 1000,
+                  "end_ms": 2867,
                   "tempo_ms": 1867,
-                  "range_deg": 81.4,
-                  "quality": 0,
+                  "range_deg": 69.5,
+                  "quality": null,
+                  "lowering_ms": 734,
+                  "rising_ms": 1133,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 0
                     }
                   ]
                 },
                 {
                   "rep_index": 1,
-                  "start_ms": 5000,
-                  "end_ms": 7467,
+                  "start_ms": 4067,
+                  "end_ms": 5934,
                   "tempo_ms": 1867,
-                  "range_deg": 77.5,
-                  "quality": 0,
+                  "range_deg": 69.2,
+                  "quality": null,
+                  "lowering_ms": 667,
+                  "rising_ms": 1200,
                   "flags": [
                     {
                       "rule_id": "hip_sag",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 1
                     },
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 1
                     }
                   ]
                 },
                 {
                   "rep_index": 2,
-                  "start_ms": 8067,
-                  "end_ms": 10600,
+                  "start_ms": 7134,
+                  "end_ms": 9000,
                   "tempo_ms": 1866,
-                  "range_deg": 81.3,
-                  "quality": 0,
+                  "range_deg": 70.8,
+                  "quality": null,
+                  "lowering_ms": 600,
+                  "rising_ms": 1266,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 2
                     }
                   ]
                 },
                 {
                   "rep_index": 3,
-                  "start_ms": 11067,
-                  "end_ms": 13533,
+                  "start_ms": 10134,
+                  "end_ms": 12000,
                   "tempo_ms": 1866,
-                  "range_deg": 79.6,
-                  "quality": 0,
+                  "range_deg": 68.5,
+                  "quality": null,
+                  "lowering_ms": 666,
+                  "rising_ms": 1200,
                   "flags": [
                     {
                       "rule_id": "hip_sag",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 3
                     },
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 3
                     }
                   ]
                 },
                 {
                   "rep_index": 4,
-                  "start_ms": 14133,
-                  "end_ms": 16933,
+                  "start_ms": 13200,
+                  "end_ms": 15134,
                   "tempo_ms": 1934,
-                  "range_deg": 83.1,
-                  "quality": 0,
+                  "range_deg": 72.7,
+                  "quality": null,
+                  "lowering_ms": 734,
+                  "rising_ms": 1200,
                   "flags": [
                     {
                       "rule_id": "tempo",
-                      "severity": "form"
+                      "severity": "form",
+                      "rep_index": 4
                     }
                   ]
                 }

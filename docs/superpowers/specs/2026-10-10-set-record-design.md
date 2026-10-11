@@ -41,13 +41,13 @@ AI-08 (#48) packages a finished set on the phone. INT-01 (#85) makes that payloa
 | `start_ms` | int ≥ 0 \| null | `startedAt - origin` |
 | `end_ms` | int ≥ 0 \| null | `countedAt - origin` (so `end_ms - start_ms == tempo_ms`) |
 | `tempo_ms` | int 0–120000 | `durations.rep` |
-| `range_deg` | number 0–180 | max − min of the primary angle over `windows.rep`, 0.1° |
+| `range_deg` | number 0–180 | max − min of the primary angle over `windows.rep` frames with `t <= countedAt` that pass the primary gate, 0.1° |
 | `quality` | number 0–1 \| null | `null` |
-| `lowering_ms` | int ≥ 0 \| null | time from `startedAt` to the frame with the **minimum** primary angle in `[startedAt, countedAt]` (silver's `bottom_ms`, same for every direction) |
-| `rising_ms` | int ≥ 0 \| null | `tempo_ms - lowering_ms` |
+| `lowering_ms` | int ≥ 0 \| null | start → turn: `phaseDuration(spec, rep, 'outbound')`, the first gated frame at the direction-aware extreme; the lowering only for eccentric-first exercises |
+| `rising_ms` | int ≥ 0 \| null | turn → count: `tempo_ms - lowering_ms` |
 | `flags` | `Flag[]` ≤ 20 | `SetFlags.reps[rep_index].flags` |
 
-`null` for `start_ms` / `end_ms` / `lowering_ms` / `rising_ms` only happens on the server side (legacy or seeded rows); the phone always fills them, except `lowering_ms` / `rising_ms` when the rep has no window frame in range.
+`null` for `start_ms` / `end_ms` / `lowering_ms` / `rising_ms` only happens on the server side (legacy or seeded rows); the phone always fills them.
 
 Fractional capture times round clock positions before subtraction: `tempo_ms = end_ms - start_ms` and `rising_ms = tempo_ms - lowering_ms`. This can differ by 1 ms from rounding `durations.rep` independently. The unrounded engine duration must still match `countedAt - startedAt`.
 
@@ -82,7 +82,7 @@ Fractional capture times round clock positions before subtraction: `tempo_ms = e
 - `upload.ts` and `score.ts` use the shared types; the stub interfaces go. `buildMetadata` returns `ExportMeta`, `buildJointsFile` writes `ExportJointsLine`s, and both take `set_index` from the set (not the array position).
 - `setInput` / `createSessionInput` zod mirror `SetRecord` / `SessionStart` and are typed against them (`z.ZodType<SetRecord, z.ZodTypeDef, unknown>`), so drift fails tsc. Unknown keys are stripped (zod default), so a client still sending `clean` or `medal` isn't rejected.
 - `buildExportSession` passes `quality` through (null stays null), `set_index` = `sets.position`, and the new fields.
-- Migration `0008_set_record`, after main's `0007_db12_rehab`: rename enum value `on_device` → `coreml`, add `vision`, drop the `inference_mode` default; add `sets.end_reason text`, `sets.partial_reps integer`, `reps.lowering_ms integer`, `reps.rising_ms integer` (all nullable). Upgrade tests cover populated databases through both `0006` and `0007`.
+- Migration `0010_set_record`, after main's `0009_ai12_planner`: rename enum value `on_device` → `coreml`, add `vision`, drop the `inference_mode` default; add `sets.end_reason text`, `sets.partial_reps integer`, `reps.lowering_ms integer`, `reps.rising_ms integer` (all nullable). Legacy flag severities other than `form` / `safety` are rewritten to `form`, and the export maps any stray value to `form` instead of failing the finish. Upgrade tests cover populated databases through `0006` to `0009`.
 - INT-08's manual workout screen stays local until a separate manual-upload contract exists. The upload helper takes shared `SessionStart` / `SetRecord` types and preserves caller-supplied set indices and pose source.
 
 ## 5. Databricks

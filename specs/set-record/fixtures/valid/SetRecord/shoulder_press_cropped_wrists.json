@@ -1682,10 +1682,10 @@
       "start_ms": 1000,
       "end_ms": 2800,
       "tempo_ms": 1800,
-      "range_deg": 85.3,
+      "range_deg": 77.8,
       "quality": null,
-      "lowering_ms": 1800,
-      "rising_ms": 0,
+      "lowering_ms": 600,
+      "rising_ms": 1200,
       "flags": []
     },
     {
@@ -1693,10 +1693,10 @@
       "start_ms": 9000,
       "end_ms": 10867,
       "tempo_ms": 1867,
-      "range_deg": 82.2,
+      "range_deg": 75.2,
       "quality": null,
-      "lowering_ms": 1867,
-      "rising_ms": 0,
+      "lowering_ms": 733,
+      "rising_ms": 1134,
       "flags": []
     },
     {
@@ -1704,10 +1704,10 @@
       "start_ms": 17067,
       "end_ms": 18867,
       "tempo_ms": 1800,
-      "range_deg": 85.6,
+      "range_deg": 76.6,
       "quality": null,
-      "lowering_ms": 1800,
-      "rising_ms": 0,
+      "lowering_ms": 800,
+      "rising_ms": 1000,
       "flags": []
     },
     {
@@ -1715,10 +1715,10 @@
       "start_ms": 25133,
       "end_ms": 26933,
       "tempo_ms": 1800,
-      "range_deg": 84.5,
+      "range_deg": 76.2,
       "quality": null,
-      "lowering_ms": 1800,
-      "rising_ms": 0,
+      "lowering_ms": 800,
+      "rising_ms": 1000,
       "flags": []
     }
   ]
