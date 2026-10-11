@@ -4,6 +4,7 @@ import { FlatList, Text } from 'react-native';
 import FeedScreen, { FeedCard } from '../index';
 import { useAuth } from '@/screens/Auth/session';
 const { act, create } = require('react-test-renderer');
+jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]) }));
 jest.mock('@/screens/Auth/session', () => ({ useAuth: jest.fn() }));
 jest.mock('@/components/AppPage', () => ({ AppPage: ({ children }: React.PropsWithChildren) => children, Action: 'Action', pageStyles: () => ({}) }));

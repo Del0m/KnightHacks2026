@@ -23,11 +23,12 @@ it('publishes a custom post only on explicit submit and prevents duplicate taps'
  act(() => screen.unmount());
 });
 it('loads existing comments and retains the draft after moderation rejection', async () => {
- const request = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => [] }).mockResolvedValueOnce({ ok: false, status: 422, json: async () => ({ message: 'Please keep it kind.' }) });
+ const request = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => [{ id: 'ai-comment', ai_suggested: true, body: 'Try a controlled descent.', created_at: '2026-10-11T00:00:00Z', author: null }] }).mockResolvedValueOnce({ ok: false, status: 422, json: async () => ({ message: 'Please keep it kind.' }) });
  const onCreated = jest.fn();
  let screen: ReturnType<typeof create>;
  await act(async () => { screen = create(<FeedEditor post={examplePosts[0]} request={request} examples={false} onClose={jest.fn()} onCreated={onCreated} />); });
  expect(request.mock.calls[0][0]).toBe(`/posts/${examplePosts[0].id}/comments`);
+ expect(screen.root.findAllByType(Text).some((n: any) => n.props.children === 'AI-suggested answer')).toBe(true);
  act(() => screen.root.findAllByType(TextInput).find((n: any) => n.props.accessibilityLabel !== 'Post title').props.onChangeText('My comment'));
  await act(async () => screen.root.findAllByType('Action').find((n: any) => n.props.children === 'Post comment').props.onPress());
  expect(screen.root.findAllByType(TextInput).find((n: any) => n.props.accessibilityLabel !== 'Post title').props.value).toBe('My comment');

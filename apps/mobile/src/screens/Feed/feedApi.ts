@@ -23,12 +23,12 @@ export async function toggleKudos(request: ApiRequest, id: string, gave: boolean
 export function isGoldWorkout(post: FeedPost) { return ['session', 'medal'].includes(post.kind) && (post.data?.tier === 'gold' || post.data?.medal === 'gold'); }
 
 
-export type FeedComment = { id: string; body: string; created_at: string; author: { id: string | null; handle: string | null; display_name?: string | null } | null };
+export type FeedComment = { ai_suggested?: boolean; id: string; body: string; created_at: string; author: { id: string | null; handle: string | null; display_name?: string | null } | null };
 export async function fetchComments(request: ApiRequest, id: string, signal?: AbortSignal): Promise<FeedComment[]> {
  const response = await request(`/posts/${encodeURIComponent(id)}/comments`, { signal });
  if (!response.ok) throw new Error('Could not load comments. Try again.');
  const rows = await response.json();
- if (!Array.isArray(rows) || !rows.every(r => r && typeof r.id === 'string' && typeof r.body === 'string' && typeof r.created_at === 'string' && Number.isFinite(Date.parse(r.created_at)) && (r.author === null || r.author && (r.author.id === null || typeof r.author.id === 'string') && (r.author.handle === null || typeof r.author.handle === 'string')))) throw new Error('Could not read comments. Try again.');
+ if (!Array.isArray(rows) || !rows.every(r => r && typeof r.id === 'string' && typeof r.body === 'string' && (r.ai_suggested === undefined || typeof r.ai_suggested === 'boolean') && typeof r.created_at === 'string' && Number.isFinite(Date.parse(r.created_at)) && (r.author === null || r.author && (r.author.id === null || typeof r.author.id === 'string') && (r.author.handle === null || typeof r.author.handle === 'string')))) throw new Error('Could not read comments. Try again.');
  return rows;
 }
 async function writePost(request: ApiRequest, path: string, body: object) {

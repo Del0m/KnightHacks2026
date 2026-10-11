@@ -44,7 +44,7 @@ export function FeedEditor({ post, request, examples, onClose, onCreated }: { po
      {post && <View style={{ gap: 6, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#E6DCEE' }}><Text style={ui.rowTitle}>{post.author.display_name || post.author.handle || 'Member'}</Text><Text style={ui.text}>{post.body}</Text></View>}
      {loading && <ActivityIndicator accessibilityLabel="Loading comments" />}
      {post && !loading && !rows.length && !error && <Text style={ui.muted}>No comments yet</Text>}
-     {rows.map(row => <View key={row.id} style={{ gap: 5 }}><Text style={[ui.label, { color: '#443354' }]}>{row.author?.display_name || row.author?.handle || 'Member'}</Text><Text style={ui.text}>{row.body}</Text></View>)}
+     {rows.map(row => <View key={row.id} style={{ gap: 5 }}><Text style={[ui.label, { color: '#443354' }]}>{row.author?.display_name || row.author?.handle || 'Member'}</Text>{row.ai_suggested && <Text style={[ui.muted, { fontSize: 12 }]}>AI-suggested answer</Text>}<Text style={ui.text}>{row.body}</Text></View>)}
      {error && <Text accessibilityRole="alert" style={ui.muted}>{error}</Text>}
      {post && !loading && error && !rows.length && <Action secondary onPress={() => { setLoading(true); setError(null); setReload(v => v + 1); }}>Retry comments</Action>}
     </ScrollView>}

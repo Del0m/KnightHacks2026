@@ -1,5 +1,6 @@
+import * as Haptics from 'expo-haptics';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, View, LayoutAnimation, Platform, Vibration } from 'react-native';
+import { ActivityIndicator, FlatList, Text, View, LayoutAnimation, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { AppPage, Action, pageStyles } from '@/components/AppPage';
 import { GlassSurface } from '@/components/GlassSurface';
@@ -43,13 +44,13 @@ function FeedSession({ initialExamples = false }: { initialExamples?: boolean })
   return () => { controller.current?.abort(); };
  }, [load]));
  async function kudos(post: FeedPost) {
-  if (examples) { if (!post.viewer_gave_kudos && Platform.OS !== 'web') Vibration.vibrate(35); setPreview(rows => rows.map(p => p.id === post.id ? { ...p, viewer_gave_kudos: !p.viewer_gave_kudos, kudos_count: p.kudos_count + (p.viewer_gave_kudos ? -1 : 1) } : p)); return; }
+  if (examples) { if (!post.viewer_gave_kudos && Platform.OS !== 'web') void Haptics.selectionAsync().catch(() => {}); setPreview(rows => rows.map(p => p.id === post.id ? { ...p, viewer_gave_kudos: !p.viewer_gave_kudos, kudos_count: p.kudos_count + (p.viewer_gave_kudos ? -1 : 1) } : p)); return; }
   if (kudosLocks.current.has(post.id) || !controller.current) return;
   const signal = controller.current.signal;
   kudosLocks.current.add(post.id); setPendingKudos([...kudosLocks.current]);
   try {
    await toggleKudos(request.current, post.id, post.viewer_gave_kudos);
-   if (!signal.aborted && !post.viewer_gave_kudos && Platform.OS !== 'web') Vibration.vibrate(35);
+   if (!signal.aborted && !post.viewer_gave_kudos && Platform.OS !== 'web') void Haptics.selectionAsync().catch(() => {});
    if (!signal.aborted) setPosts(rows => rows.map(p => p.id === post.id ? { ...p, viewer_gave_kudos: !post.viewer_gave_kudos, kudos_count: Math.max(0, p.kudos_count + (p.viewer_gave_kudos === !post.viewer_gave_kudos ? 0 : post.viewer_gave_kudos ? -1 : 1)) } : p));
   } catch (e) { if (!signal.aborted) setError(e instanceof Error ? e.message : 'Could not update rep.'); }
   finally { kudosLocks.current.delete(post.id); if (controller.current && !controller.current.signal.aborted) setPendingKudos([...kudosLocks.current]); }
