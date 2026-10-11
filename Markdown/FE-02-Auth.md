@@ -19,7 +19,7 @@ Configure the actual browser origin and native `steadyforum://` origin with the 
 
 ## Google sign-in
 
-"Continue with Google" appears on login and sign-up only when `EXPO_PUBLIC_GOOGLE_SIGN_IN=true`. Until then nothing changes. The API needs no change: it reads only the token's `sub`, so a Google account gets a profile like an email account.
+"Continue with Google" appears on login and sign-up in both the website and app when Neon Auth is configured. Google sign-in is enabled by default; set `EXPO_PUBLIC_GOOGLE_SIGN_IN=false` to hide it in an environment without a Google provider. The API needs no change: it reads only the token's `sub`, so a Google account gets a profile like an email account.
 
 1. **Neon Console → the branch the app uses (demo) → Auth → OAuth providers → Google.**
    - Neon's shared development credentials are fine for trying it.
@@ -27,12 +27,12 @@ Configure the actual browser origin and native `steadyforum://` origin with the 
 2. **Trusted domains (Neon → Auth → Settings):**
    - `https://steadyforum.fit` and `https://www.steadyforum.fit`, for the web
    - `steadyforum://`, for the native app
-3. **Turn it on:** set `EXPO_PUBLIC_GOOGLE_SIGN_IN=true` in the Cloudflare build variables and in local `.env`, then rebuild.
+3. **Build:** remove any `EXPO_PUBLIC_GOOGLE_SIGN_IN=false` override or set it to `true` in the Cloudflare build variables and local `apps/mobile/.env.local`, then rebuild. Expo embeds this public flag in the bundle; changing it requires a new export or app build, not just restarting the static server.
    - **Native:** `expo-web-browser` is a native module, so rebuild the development build once.
 
 **How it works:**
-- **Web:** the page goes to Google and comes back to the site's `/`. A failure or cancel returns to `/login?error=…`, which the login screen explains.
-- **Native:** Google opens in an in-app browser and returns through the `steadyforum://` scheme. The session is confirmed with the server before the app treats the user as signed in, as with email.
+- **Web:** Google returns to `/login?oauth=google`. The client sends Neon's `neon_auth_session_verifier` to `/get-session` with the challenge cookie, confirms the user, and removes the callback parameters. Only a confirmed session opens Train; a failed exchange stays on login with an error.
+- **Native:** Neon rejects custom-scheme OAuth callbacks, so Google returns to `https://steadyforum.fit/google-app-callback.html`, which hands the verifier back through `steadyforum://google-auth`. The app exchanges it using its challenge cookie in SecureStore before treating the user as signed in. Deploy the callback page along with the website before testing the app flow.
 
 ## Frontend behavior
 

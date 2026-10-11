@@ -20,6 +20,12 @@ const DATABRICKS = {
 };
 
 describe("env", () => {
+  it("allows the website and local preview by default while preserving an explicit CORS allowlist", () => {
+    const origins = loadEnv(REQUIRED).CORS_ORIGINS?.split(",");
+    expect(origins).toEqual(["https://steadyforum.fit", "https://www.steadyforum.fit", "http://localhost:4173", "http://127.0.0.1:4173"]);
+    expect(loadEnv({ ...REQUIRED, CORS_ORIGINS: "https://custom.example.com" }).CORS_ORIGINS).toBe("https://custom.example.com");
+    expect(origins).not.toContain("*");
+  });
   it("boots with only Neon and auth; Databricks and Hugging Face are optional", () => {
     const env = loadEnv(REQUIRED);
     expect(env.HF_TOKEN).toBeUndefined();
@@ -142,9 +148,18 @@ describe("GET /health", () => {
     status.configure("insight_sync", true);
     status.configure("cloud_pose", false);
     status.fail("insight_sync", "http_403");
-    t = await setup({ integrations: status });
+    t = await setup({ integrations: status, corsOrigins: loadEnv(REQUIRED).CORS_ORIGINS.split(",") });
   });
   afterAll(() => t.close());
+
+  it("permits authenticated browser preflights only from the configured website origins", async () => {
+    const allowed = await request(t.app).options("/me").set("Origin", "http://localhost:4173").set("Access-Control-Request-Headers", "authorization,content-type");
+    expect(allowed.status).toBe(204);
+    expect(allowed.headers["access-control-allow-origin"]).toBe("http://localhost:4173");
+    expect(allowed.headers["access-control-allow-headers"]).toBe("Authorization, Content-Type");
+    const denied = await request(t.app).options("/me").set("Origin", "https://untrusted.example.com");
+    expect(denied.headers["access-control-allow-origin"]).toBeUndefined();
+  });
 
   it("stays 200 and lists Neon and each integration as live, disabled or error", async () => {
     const res = await request(t.app).get("/health");
