@@ -10,6 +10,7 @@ import { colors as c, typography as t } from '@/theme/tokens';
 import { assessFraming, FRAME_STALE_MS, updateStability, type Size } from './framing';
 import { cameraSpec } from './exercises';
 import { FramingGuide } from './FramingGuide';
+import { useTorchPulse } from './useTorchPulse';
 
 export default function CameraCheck({ exercise, onContinue }: { exercise: string; onContinue: (mode?: 'camera' | 'manual', position?: 'front' | 'back') => void }) {
   if (Platform.OS !== 'ios') return <View style={s.group}><Text style={s.heading}>Live framing is available on iPhone.</Text><Text style={s.text}>Use the placement guide above, or continue with manual tracking on this device.</Text><GlassChoice label="Continue without camera" onPress={() => onContinue('manual')} compact /></View>;
@@ -52,6 +53,9 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
   const [view, setView] = useState<Size | null>(null), [image, setImage] = useState<Size | null>(null);
   const [cameraError, setCameraError] = useState(false), [now, setNow] = useState(Date.now);
   const stableSince = useRef<number | null>(null);
+  const lastDetection = useRef(0);
+  const confirmed = useRef(false);
+  const { signal, torchMode } = useTorchPulse(position === 'back' && Boolean(device?.hasTorch) && !cameraError);
   const [ready, setReady] = useState(false);
   const outputRef = useRef<{ currentResolution?: Size } | null>(null);
   const mirrored = position === 'front';
@@ -62,6 +66,8 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
   }
   const output = usePoseOutput({ engine, size, maxFps: 15, onPose: detection => {
     const time = Date.now(); setNow(time); setResult(detection.result); resolution();
+    if (time - lastDetection.current > FRAME_STALE_MS) stableSince.current = null;
+    lastDetection.current = time;
     if (image && view) {
       const next = updateStability(stableSince.current, assessFraming(detection.result, image, view, mirrored, time).kind === 'ready', time);
       stableSince.current = next.since; setReady(next.ready);
@@ -77,17 +83,22 @@ function CameraPreview({ position, engine, size, exercise, onFlip, onContinue }:
   }, [now, result, output.error, cameraError]);
   const framing = image && view ? assessFraming(result, image, view, mirrored, now) : null;
   const valid = ready && framing?.kind === 'ready' && !output.error && !cameraError;
+  useEffect(() => {
+    if (!valid || confirmed.current) return;
+    confirmed.current = true;
+    signal(() => onContinue('camera', position));
+  }, [valid, signal, onContinue, position]);
   if (!device) return <View style={s.group}><Text style={s.heading}>This camera isn’t available.</Text><GlassChoice compact label="Switch camera" onPress={onFlip} /><GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} /></View>;
   return <View style={s.group}>
     <View style={s.status} accessibilityLiveRegion="polite"><Text style={[s.heading, valid && { color: '#14744C' }]}>{cameraError || output.error ? 'Camera check interrupted' : valid ? '✓ Ready' : framing?.kind === 'ready' ? 'Hold your position…' : framing?.title ?? 'Looking for you'}</Text><Text style={s.text}>{cameraError || output.error ? 'Try switching cameras, or continue with manual tracking.' : framing?.hint ?? 'Return to your exercise spot with your whole body visible.'}</Text></View>
     <View testID="framing-preview" style={s.preview} onLayout={event => { setView(event.nativeEvent.layout); stableSince.current = null; setReady(false); }}>
-      <Camera style={[StyleSheet.absoluteFill, mirrored && { transform: [{ scaleX: -1 }] }]} device={device} outputs={[output.frameOutput]} isActive mirrorMode="off" orientationSource="interface" resizeMode="cover" onConfigured={() => { resolution(); setCameraError(false); stableSince.current = null; setReady(false); setResult(undefined); }} onError={() => { setCameraError(true); stableSince.current = null; setReady(false); }} />
+      <Camera style={[StyleSheet.absoluteFill, mirrored && { transform: [{ scaleX: -1 }] }]} device={device} outputs={[output.frameOutput]} isActive torchMode={torchMode} mirrorMode="off" orientationSource="interface" resizeMode="cover" onConfigured={() => { resolution(); setCameraError(false); stableSince.current = null; setReady(false); setResult(undefined); }} onError={() => { setCameraError(true); stableSince.current = null; setReady(false); }} />
       <FramingGuide ready={Boolean(valid)} />
     </View>
     {(cameraSpec(exercise).recommended_view === 'side') && <Text style={s.text}>Side-on view: face across the camera, so it can see your movement from the side.</Text>}
     <Text style={s.caption}>Keep your full rep inside the frame. The eight-foot guide is approximate.</Text>
     <GlassChoice compact label={position === 'front' ? 'Use back camera' : 'Use front camera'} onPress={onFlip} />
-    <GlassChoice label="Framing checked · continue" primary selected disabled={!valid} onPress={() => onContinue('camera', position)} />
+    <Text style={s.caption}>Hold your position for one second. Your workout starts automatically.{position === 'back' && device.hasTorch ? ' The light flashes when you’re ready.' : ''}</Text>
     <GlassChoice compact label="Continue without camera" onPress={() => onContinue('manual')} />
     <Text style={s.caption}>Your workout uses the camera to count reps.</Text>
   </View>;

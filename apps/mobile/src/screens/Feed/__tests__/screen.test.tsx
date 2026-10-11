@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Existing React renderer convention. */
 import React from 'react';
 import { FlatList, Text } from 'react-native';
-import FeedScreen from '../index';
+import FeedScreen, { FeedCard } from '../index';
 import { useAuth } from '@/screens/Auth/session';
 const { act, create } = require('react-test-renderer');
 jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]) }));
@@ -10,6 +10,15 @@ jest.mock('@/components/AppPage', () => ({ AppPage: ({ children }: React.PropsWi
 jest.mock('@/components/GlassSurface', () => ({ GlassSurface: () => null }));
 jest.mock('@/components/PolishedPressable', () => ({ PolishedPressable: 'Button' }));
 const post = (id: string) => ({ id, kind: 'session', body: `Workout ${id}`, created_at: '2026-10-10T12:00:00Z', author: { id: 'sam', handle: 'sam' }, data: { tier: 'gold' }, kudos_count: 1, comment_count: 2, viewer_gave_kudos: false });
+it('renders a shared workout with the author, medal, exercises and positive highlight', () => {
+ let screen: ReturnType<typeof create>;
+ const workout = { date: '2026-10-10', exercises: [{ id: 'squat', name: 'Squat', sets: 3, reps: 30 }], highlights: ['Squat: new rep best of 12 reps.'] };
+ act(() => { screen = create(<FeedCard post={{ ...post('summary'), author: { id: 'sam', handle: 'sam', display_name: 'Sam' }, data: { tier: 'gold', workout } }} pending={false} onKudos={jest.fn()} />); });
+ const text = screen.root.findAllByType(Text).map((n: any) => JSON.stringify(n.props.children)).join(' ');
+ expect(text).toContain('Sam'); expect(text).toContain('Gold'); expect(text).toContain('Squat'); expect(text).toContain('30'); expect(text).toContain('new rep best');
+ expect(text).not.toContain('Workout summary');
+ act(() => screen.unmount());
+});
 it('loads cursor pages once, deduplicates overlapping posts, and refreshes from the beginning', async () => {
  const apiFetch = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('a')], next_cursor: 'next' }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('a'), post('b')], next_cursor: null }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('c')], next_cursor: null }) });
  jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);

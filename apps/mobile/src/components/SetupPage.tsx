@@ -8,10 +8,10 @@ import { colors as c, typography as t } from '@/theme/tokens';
 import { GlassChoice } from './GlassChoice';
 import { Action } from './AppPage';
 
-export function SetupPage({ children, step, total, eyebrow, title, intro, action, onAction, disabled, onBack, secondary, onSecondary, compact = false }: {
+export function SetupPage({ children, step, total, eyebrow, title, intro, action, onAction, disabled, onBack, secondary, onSecondary, compact = false, hideAction = false }: {
   children: ReactNode; step: number; total: number; eyebrow: string; title: string; intro: string;
   action: string; onAction: () => void; disabled?: boolean; onBack: () => void;
-  secondary?: string; onSecondary?: () => void; compact?: boolean;
+  secondary?: string; onSecondary?: () => void; compact?: boolean; hideAction?: boolean;
 }) {
   const reduced = useReducedMotion();
   const [entrance] = useState(() => new Animated.Value(1));
@@ -39,10 +39,10 @@ export function SetupPage({ children, step, total, eyebrow, title, intro, action
           <Text accessibilityRole="header" accessibilityLiveRegion="polite" style={[s.title, compact && { fontSize: 32, lineHeight: 36 }]}>{title}</Text><Text style={[s.intro, compact && { fontSize: 15, lineHeight: 21 }]}>{intro}</Text>
           <Animated.View style={{ gap: 28, marginTop: compact ? 16 : 26, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>{children}</Animated.View>
         </ScrollView>
-        <View style={s.footer}>
+        {!hideAction && <View style={s.footer}>
           <Action onPress={onAction} disabled={disabled}>{action}</Action>
           {secondary && onSecondary && <GlassChoice label={secondary} onPress={onSecondary} disabled={disabled && action.includes('Saving')} compact />}
-        </View>
+        </View>}
       </KeyboardAvoidingView>
     </SafeAreaView>
   </LinearGradient>;

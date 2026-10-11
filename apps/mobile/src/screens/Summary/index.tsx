@@ -3,11 +3,12 @@ import { Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { AppPage, Action, ui } from '@/components/AppPage';
 import { GlassSurface } from '@/components/GlassSurface';
+import { workoutPost } from './workoutPost';
 import { colors, typography } from '@/theme/tokens';
 import { useAuth } from '@/screens/Auth/session';
 import { markWorkoutShared, readWorkoutResult, subscribeWorkoutResults, syncWorkouts, workoutShared } from '@/services/workoutQueue';
 import type { WorkoutSet } from '@/services/workoutApi';
-import type { Workout } from '@/data/workout';
+import { calendarDay, type Workout } from '@/data/workout';
 import { MEDAL_LABEL } from '@/screens/LiveSet/restCardContent';
 import { exerciseName, medalExplanation, phoneSummary } from './summary';
 type Props = { workoutId: string; records: WorkoutSet[]; history: Workout[]; syncStatus: string };
@@ -29,7 +30,9 @@ function SummarySession({ workoutId, records, history, syncStatus }: Props) {
   if (!share || shared || lock.current || !account || !server) return;
   lock.current = true; setBusy(true); setError(null);
   try {
-   const response = await request.current(`/sessions/${server.session_id}/share`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: `Workout complete: ${result.total_reps} reps · ${MEDAL_LABEL[medal]} medal.`, data: { tier: medal, form_score: measured ? result.form_score : null, total_reps: result.total_reps, clean_reps: measured ? result.clean_reps : null } }) });
+   const day = history.find(w => w.id === workoutId)?.day ?? calendarDay();
+   const priorMeasured = history.some(w => w.id !== workoutId && finishedAt - Date.parse(w.finishedAt) <= 28 * 86400000 && Date.parse(w.finishedAt) < finishedAt && w.details?.length && w.details.every(s => s.goodReps !== undefined));
+   const response = await request.current(`/sessions/${server.session_id}/share`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(workoutPost(records, result, day, priorMeasured)) });
    if (!response.ok) throw new Error('Could not share your workout. Try again.');
    markWorkoutShared(account, workoutId);
    if (live.current) { setShared(true); setShare(false); }

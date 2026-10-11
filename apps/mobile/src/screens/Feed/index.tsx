@@ -7,6 +7,7 @@ import { PolishedPressable } from '@/components/PolishedPressable';
 import { pageColors } from '@/theme/tokens';
 import { useAuth } from '@/screens/Auth/session';
 import { fetchFeed, isGoldWorkout, toggleKudos, type FeedPost } from './feedApi';
+import { readPublicWorkout } from '@/screens/Summary/workoutPost';
 const c = pageColors('Feed'), ui = pageStyles('Feed');
 export default function FeedScreen() {
  const { user } = useAuth();
@@ -56,6 +57,8 @@ function FeedSession() {
 }
 export function FeedCard({ post, pending, onKudos }: { post: FeedPost; pending: boolean; onKudos: () => void }) {
  const gold = isGoldWorkout(post), name = post.author.display_name || post.author.handle || 'Member';
+ const workout = post.kind === 'session' ? readPublicWorkout(post.data) : null;
+ const medal = post.data?.tier;
  const label = gold ? 'Gold workout' : ({ session: 'Workout', pr: 'Personal record', medal: 'Medal', goal: 'Goal', advice: 'Advice' }[post.kind] ?? 'Update');
  return <View style={{ borderRadius: 24, overflow: 'hidden', padding: 20, gap: 14, borderWidth: 1, borderColor: gold ? '#CDB76D' : c.border }}>
   <GlassSurface radius={24} tint={gold ? '#F8EAC0' : c.primarySoft} colored />
@@ -64,7 +67,14 @@ export function FeedCard({ post, pending, onKudos }: { post: FeedPost; pending: 
    <View style={{ flex: 1 }}><Text style={ui.rowTitle}>{name}</Text><Text style={ui.muted}>{new Date(post.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text></View>
    <Text style={[ui.label, gold && { color: '#71540B' }]}>{label}</Text>
   </View>
-  <Text style={ui.text}>{post.body}</Text>
+  {workout ? <View style={{ gap: 12 }}>
+   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+    <Text style={[ui.heading, { marginTop: 0, flex: 1 }]}>Workout · {new Date(`${workout.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
+    {typeof medal === 'string' && ['gold', 'silver', 'bronze'].includes(medal) && <Text style={[ui.label, { color: medal === 'gold' ? '#71540B' : c.text }]}>★ {medal[0].toUpperCase() + medal.slice(1)}</Text>}
+   </View>
+   {workout.exercises.map(e => <View key={e.id} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 14 }}><Text style={[ui.text, { flex: 1 }]}>{e.name}</Text><Text style={ui.muted}>{e.sets} sets · {e.reps} reps</Text></View>)}
+   {workout.highlights.map((highlight, i) => <Text key={i} style={ui.text}>{highlight}</Text>)}
+  </View> : <Text style={ui.text}>{post.body}</Text>}
   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: gold ? '#DCCEAA' : c.border, paddingTop: 8 }}>
    <PolishedPressable accessibilityRole="button" accessibilityLabel={`${post.viewer_gave_kudos ? 'Remove' : 'Give'} kudos, ${post.kudos_count}`} accessibilityState={{ selected: post.viewer_gave_kudos, disabled: pending }} disabled={pending} onPress={onKudos} style={{ minHeight: 44, justifyContent: 'center', paddingRight: 20 }}><Text style={[ui.label, { color: post.viewer_gave_kudos ? c.primary : c.text }]}>{post.viewer_gave_kudos ? '♥' : '♡'} {post.kudos_count} kudos</Text></PolishedPressable>
    <Text style={ui.muted}>{post.comment_count} {post.comment_count === 1 ? 'comment' : 'comments'}</Text>
