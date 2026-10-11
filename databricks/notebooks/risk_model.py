@@ -10,9 +10,12 @@
 # MAGIC
 # MAGIC - Logs the run to MLflow (`/Users/<me>/spotter_injury_risk`) with the heuristic's own score as a
 # MAGIC   baseline, so the model's value over the rule is measured, not assumed.
-# MAGIC - Registers **`spotter.ml.injury_risk`** and moves `champion` only when the held-out PR-AUC is at
-# MAGIC   least the current champion's.
-# MAGIC - Scores each lifter and body part's latest day with the champion into
+# MAGIC - Logs the model as a run artifact (`runs:/<run_id>/model`). The champion is the experiment run
+# MAGIC   tagged `champion=true`, moved only when the held-out PR-AUC is at least the current champion's.
+# MAGIC - Also tries to register **`spotter.ml.injury_risk`** in Unity Catalog. On Databricks Free Edition
+# MAGIC   the upload to the catalog's storage is denied, so the run gets `uc_registration=skipped` and
+# MAGIC   carries on; when registration works, the `champion` alias is set as well.
+# MAGIC - Scores each lifter and body part's latest day with the champion run's model into
 # MAGIC   `spotter.gold.gold_injury_risk_model_scores` (read by the Neon sync, heuristic fallback) and
 # MAGIC   writes gain importance to `spotter.gold.gold_risk_feature_importance`.
 # MAGIC
@@ -42,6 +45,8 @@ MODEL_TABLE_COMMENT = ("Training-load and form-trend score from a model trained 
 IMPORTANCE_TABLE_COMMENT = ("Gain importance of the injury-risk model's features and feature families. "
                             "The model is trained on heuristic labels. Not a diagnosis.")
 ALIAS = "champion"
+CHAMPION_TAG = "champion"  # run tag: "true" on the champion run only
+MODEL_ARTIFACT_PATH = "model"
 SEED = 7
 HORIZON_DAYS = 7
 TEST_SIZE = 0.2
@@ -300,6 +305,19 @@ def is_not_found(exc: BaseException) -> bool:
     return getattr(exc, "error_code", None) in NOT_FOUND_CODES
 
 
+def choose_champion(current_metrics, new_pr_auc) -> bool:
+    """Promote when there is no champion run (None), it has no test_pr_auc, or new_pr_auc >= it."""
+    if not current_metrics or current_metrics.get("test_pr_auc") is None:
+        return True
+    return float(new_pr_auc) >= float(current_metrics["test_pr_auc"])
+
+
+def registration_skip_reason(exc: BaseException, max_len: int = 500) -> str:
+    """First non-blank line of the error (the exception type when there is none), for a run tag."""
+    lines = [l.strip() for l in str(exc).splitlines() if l.strip()]
+    return (lines[0] if lines else type(exc).__name__)[:max_len]
+
+
 # COMMAND ----------
 
 # MAGIC %md ## Run
@@ -316,7 +334,7 @@ from pyspark.sql import types as T
 
 mlflow.set_registry_uri("databricks-uc")
 user = spark.sql("SELECT current_user()").first()[0]
-mlflow.set_experiment(f"/Users/{user}/spotter_injury_risk")
+experiment = mlflow.set_experiment(f"/Users/{user}/spotter_injury_risk")
 
 source = spark.read.table(SOURCE_TABLE).toPandas()
 labelled = forecast_labels(source, HORIZON_DAYS)
@@ -347,11 +365,12 @@ if status:
 # MAGIC %md ### Train, evaluate, log and register
 # MAGIC
 # MAGIC Skipped (with an `insufficient_labels` tag) when either split lacks a class, so no model is
-# MAGIC registered that can't be trained or measured.
+# MAGIC logged that can't be trained or measured. The model is logged as a run artifact; Unity Catalog
+# MAGIC registration is attempted afterwards and a failure only tags the run `uc_registration=skipped`.
 
 # COMMAND ----------
 
-info, metrics = None, None
+info, metrics, uc_version = None, None, None
 with mlflow.start_run(run_name="injury_risk_xgboost") as run:
     mlflow.log_params(PARAMS)
     mlflow.log_params({
@@ -390,27 +409,39 @@ with mlflow.start_run(run_name="injury_risk_xgboost") as run:
         example = build_features(_trainable(test_df)).head(5)
         info = mlflow.xgboost.log_model(
             xgb_model=model,
-            artifact_path="model",  # MLflow 2.x on serverless; 3.x still accepts it
+            artifact_path=MODEL_ARTIFACT_PATH,  # MLflow 2.x on serverless; 3.x still accepts it
             signature=infer_signature(example, model.predict_proba(example)[:, 1]),
             input_example=example,
             pip_requirements=[f"xgboost=={xgboost.__version__}", f"pandas=={pd.__version__}",
                               f"numpy=={np.__version__}", f"mlflow=={mlflow.__version__}"],
-            registered_model_name=MODEL_NAME,
         )
         mlflow.set_tag("status", "trained")
+
+        # Best effort: Free Edition denies the artifact upload to the catalog's default storage.
+        try:
+            uc_version = mlflow.register_model(f"runs:/{run.info.run_id}/{MODEL_ARTIFACT_PATH}", MODEL_NAME).version
+            mlflow.set_tag("uc_registration", f"version {uc_version}")
+        except Exception as exc:
+            reason = registration_skip_reason(exc)
+            mlflow.set_tag("uc_registration", "skipped")
+            mlflow.set_tag("uc_registration_reason", reason)
+            print(f"Unity Catalog registration skipped ({reason}); the model stays a run artifact.")
 
 if info:
     print(f"Run {run.info.run_id}: model {metrics['model']}, heuristic {metrics['heuristic']}")
     print(f"PR-AUC lift over the heuristic: {lift:+.3f}")
-    print(f"Registered {MODEL_NAME} version {info.registered_model_version}")
+    print(f"Logged runs:/{run.info.run_id}/{MODEL_ARTIFACT_PATH}"
+          + (f"; registered {MODEL_NAME} version {uc_version}" if uc_version else ""))
     display(per_family)
 
 # COMMAND ----------
 
 # MAGIC %md ### Promote
 # MAGIC
-# MAGIC Move `champion` to the new version only if its held-out PR-AUC is at least the champion's.
-# MAGIC The lift over the heuristic is printed alongside as context.
+# MAGIC The champion is the experiment run tagged `champion=true` (one at a time). The new run takes the
+# MAGIC tag only if its held-out PR-AUC is at least the champion's; the old run is set to `champion=false`.
+# MAGIC When the model was registered in Unity Catalog, the `champion` alias follows it. The lift over
+# MAGIC the heuristic is printed alongside as context.
 
 # COMMAND ----------
 
@@ -418,27 +449,34 @@ client = MlflowClient()
 
 
 def get_champion():
-    """The champion model version, or None when the model or alias doesn't exist yet."""
-    try:
-        return client.get_model_version_by_alias(MODEL_NAME, ALIAS)
-    except Exception as exc:
-        if is_not_found(exc):
-            return None
-        raise
+    """The latest finished run tagged champion=true in this experiment, or None."""
+    runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string=f"tags.{CHAMPION_TAG} = 'true' AND attributes.status = 'FINISHED'",
+        order_by=["attributes.start_time DESC"],
+        max_results=1,
+    )
+    return runs[0] if runs else None
 
 
 if info:
-    new_version = info.registered_model_version
+    new_run_id = run.info.run_id
     new_pr_auc = metrics["model"]["pr_auc"]
     current = get_champion()
-    current_pr_auc = (client.get_run(current.run_id).data.metrics.get("test_pr_auc", -1.0)
-                      if current else -1.0)
-    context = f"PR-AUC {new_pr_auc:.3f} vs champion {current_pr_auc:.3f}; lift over heuristic {lift:+.3f}"
-    if new_pr_auc >= current_pr_auc:
-        client.set_registered_model_alias(MODEL_NAME, ALIAS, new_version)
-        print(f"{ALIAS} -> version {new_version} ({context})")
+    current_metrics = current.data.metrics if current else None
+    current_pr_auc = (current_metrics or {}).get("test_pr_auc")
+    shown = "none" if current_pr_auc is None else f"{current_pr_auc:.3f}"
+    context = f"PR-AUC {new_pr_auc:.3f} vs champion {shown}; lift over heuristic {lift:+.3f}"
+    if choose_champion(current_metrics, new_pr_auc):
+        client.set_tag(new_run_id, CHAMPION_TAG, "true")
+        if current:
+            client.set_tag(current.info.run_id, CHAMPION_TAG, "false")
+        if uc_version:
+            client.set_registered_model_alias(MODEL_NAME, ALIAS, uc_version)
+        print(f"{CHAMPION_TAG} -> run {new_run_id} ({context})")
     else:
-        print(f"Kept {ALIAS} on version {current.version} ({context})")
+        client.set_tag(new_run_id, CHAMPION_TAG, "false")
+        print(f"Kept {CHAMPION_TAG} on run {current.info.run_id} ({context})")
 
 # COMMAND ----------
 
@@ -477,23 +515,24 @@ def overwrite(rows, schema, table, comment):
 
 champion = get_champion()
 if champion is None:
-    print(f"No {ALIAS} for {MODEL_NAME}; nothing scored. The Neon sync falls back to {SOURCE_TABLE}.")
+    print(f"No run tagged {CHAMPION_TAG}=true; nothing scored. The Neon sync falls back to {SOURCE_TABLE}.")
 else:
-    champion_model = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}@{ALIAS}")
-    trained_at = datetime.fromtimestamp(int(champion.creation_timestamp) / 1000, tz=timezone.utc)
+    champion_run_id = champion.info.run_id
+    champion_model = mlflow.xgboost.load_model(f"runs:/{champion_run_id}/{MODEL_ARTIFACT_PATH}")
+    trained_at = datetime.fromtimestamp(int(champion.info.start_time) / 1000, tz=timezone.utc)
     scored_at = datetime.now(timezone.utc)
 
     latest = (source.assign(_day=_day_numbers(source["date"]))
               .sort_values("_day", kind="mergesort")
               .groupby(["user_id", "body_part"], sort=False).tail(1)
               .drop(columns="_day"))
-    scores = score_rows(champion_model, latest, champion.version, scored_at)
+    scores = score_rows(champion_model, latest, champion_run_id, scored_at)
     scores["date"] = pd.to_datetime(scores["date"]).dt.date
     scores["top_features"] = scores["top_features"].map(list)
 
     champion_importance, _ = importance(champion_model)
     importance_rows = [
-        (str(champion.version), r.feature, r.family, float(r.gain), int(r.rank), trained_at)
+        (champion_run_id, r.feature, r.family, float(r.gain), int(r.rank), trained_at)
         for r in champion_importance.itertuples(index=False)
     ]
     score_records = [tuple(r) for r in scores[OUTPUT_COLUMNS].itertuples(index=False, name=None)]
@@ -506,5 +545,5 @@ else:
 
 # Fail the run after scoring, so a skipped training shows up in the job's status.
 if status:
-    scored = f"scored with {ALIAS} version {champion.version}" if champion else "nothing scored"
+    scored = f"scored with {CHAMPION_TAG} run {champion.info.run_id}" if champion else "nothing scored"
     raise RuntimeError(f"Training skipped: {status}; {scored}. Check {SOURCE_TABLE} and the heuristic flag rate.")
