@@ -328,9 +328,9 @@ describe("CONN-09 moderation", () => {
     const none = await new LlamaGuard(config, safeGuard, silent, llm("none")).moderate("crushed it", "comment");
     expect(none).toEqual({ allowed: true, checked: true, categories: [] });
 
-    // Advice isn't shown to other members, so the check doesn't run on it.
-    const advice = await new LlamaGuard(config, safeGuard, silent, llm("threat")).moderate("knee hurts", "advice");
-    expect(advice).toEqual({ allowed: true, checked: true, categories: [] });
+    // Advice questions are posts other members see (BE-11), so the check runs on them too.
+    const advice = await new LlamaGuard(config, safeGuard, silent, llm("threat")).moderate("watch your back", "advice");
+    expect(advice).toMatchObject({ allowed: false, checked: true, categories: ["S15"] });
 
     const down = { generateJson: async () => Promise.reject(new Error("all providers down")) } as never;
     const unchecked = await new LlamaGuard(config, safeGuard, silent, down).moderate("hi", "comment");

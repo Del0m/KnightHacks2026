@@ -541,6 +541,8 @@ erDiagram
 | `PUT /me/exercise-preferences/:exerciseId` · `GET /me/exercise-preferences` | Thumbs up/down on an exercise, from any screen; feeds the planner |
 | `GET /feed` · `POST /posts` · `POST /posts/:id/kudos` · `POST /posts/:id/comments` | Social |
 | `POST /advice` | Ask the community; an AI-suggested first answer is attached |
+| `GET /me/rom-trend` · `GET /me/physio-report` · `POST /me/physio-report/share` · `GET /reports/:token` | Range-of-motion trend and the physio report; a report is only public through a link the user makes, which expires and can be revoked |
+| `GET /me/milestones` · `POST /me/milestones/:id/accept` · `POST /me/milestones/:id/dismiss` | Back-to-gym suggestion; the user always decides |
 | `GET /buddies/suggestions` · `POST /buddies/:id/request` | Buddy matching |
 | `GET /exercises` · `GET /exercises/:id/spec` | Exercise library and form specs |
 
@@ -598,6 +600,12 @@ flowchart LR
 - **Claim check:** a second gpt-oss call checks each sentence against the text of the sources it cites. Any added fact, benefit or cause means no answer. Both calls share one time budget.
 - **Disclaimer:** every AI answer ends with "This is general information, not medical advice. Always consult a doctor before acting on it." It is part of the answer text, so it shows wherever the answer does.
 - **Fallback:** anything else (nothing to cite, a slow or failed model, a rejected answer) means no AI comment; community answers carry the thread.
+
+**Endpoint (BE-11):** `POST /advice` in `apps/api/src/routes/advice.ts`, with retrieval in `services/adviceThread.ts`:
+- **Moderation:** the question is moderated like a post, including the threats and harassment check, because it appears in the feed and other members answer it.
+- **Retrieval:** the question's bge-small embedding (stored on the post) finds the nearest injury-note sections and exercises in `doc_chunks`. It also finds similar advice questions the asker can see in the feed (cosine 0.75 or more), and uses their community answers. Earlier AI answers and blocked users' comments are never used.
+- **Storage:** the AI answer is the first comment, with `ai_suggested: true` and the sources it cites. The fixed pain reply is a comment with `ai_suggested: false`. Neither has an author: Spotter posts them.
+- **Failures:** if embedding, retrieval or the model fails, the question still posts.
 
 ---
 

@@ -62,6 +62,33 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 - Needs `npm run db:load-specs` for the tracked exercises. `rag:ingest` (CONN-08) adds the library and injury notes; without it plans use the five tracked exercises only. Without `HF_TOKEN` every plan is a rules plan.
 - A new spec in `specs/exercises` also needs an entry in `TRACKED` in `planner.ts` (movement pattern, joints it loads, library twin) before the planner uses it.
 
+## Advice (BE-11)
+
+- `POST /advice` with `{ "body": "..." }` saves the question as an `advice` post. It returns 201 with `{ post, outcome, reply, reason? }`, where `outcome` is `ai`, `fixed_pain` or `none`.
+- Moderation is the same as for posts: a blocked question is a 422 and nothing is saved.
+- The first answer is a normal comment, so `GET /posts/:id/comments` shows it. `ai_suggested: true` marks the AI answer and `sources` lists what it cites. `author: null` means Spotter posted it.
+- Without `HF_TOKEN` there's no AI answer, but questions that mention pain still get the fixed reply.
+
+## Recovery (BE-16, BE-17)
+
+- `GET /me/rom-trend?angle=knee&weeks=12` returns weekly peak range per side from `rom_trend` (CONN-14), the injured side and a one-line summary.
+- `GET /me/physio-report?from=&to=` returns the report as JSON. It defaults to the rehab plan's start until today, at most 26 weeks.
+  - It includes the days with prescribed exercises against prescribed days, sets per exercise, the trend, left vs right, and reps past the limits.
+  - Reps past the limits are AI-16's `physio_limit` flags. They count 0 until the phone applies physio limits.
+- `POST /me/physio-report/share` with `{ from?, to?, expires_in_days? }` (1-30, default 14) returns `path: /reports/<token>`.
+  - That page is public and printable, and shows a first name only.
+  - Only a hash of the token is stored.
+  - Missing, expired and revoked links are all 404.
+- `GET /me/physio-report/shares` lists the links, and `DELETE /me/physio-report/shares/:id` revokes one.
+- `GET /me/milestones` returns the back-to-gym suggestion when all three checks hold, plus the checks themselves:
+  - range within 5° of the physio's maximum or the healthy side for 2 weeks in a row
+  - 3 silver or gold workouts on the rehab exercises in 2 weeks
+  - no `physio_limit` flags in the last week
+
+  The thresholds are in `MILESTONE_RULES` (`services/milestone.ts`). They're rules of thumb, not medical criteria.
+
+- `POST /me/milestones/:id/accept` with `{ share_post? }` marks the rehab plan done, so `POST /plans/generate` works again, and never changes its limits. `POST /me/milestones/:id/dismiss` hides the suggestion for 14 days.
+
 ## Conventions
 
 - JSON is **snake_case** on the wire, matching the shared set record (AI-08) and the Databricks payloads. TypeScript and Drizzle use camelCase; `send()` in `src/http.ts` converts responses.
@@ -80,6 +107,9 @@ Code: `src/services/planner.ts` (search, rules plan, gpt-oss draft, safety check
 | `POST /posts`, `GET/POST /posts/:id/comments`, `POST/DELETE /posts/:id/kudos`, `POST/DELETE /follows/:userId`                                                                                                   | BE-10        |
 | `GET /buddies/suggestions`, `GET /buddies`, `POST /buddies/:id/request`, `POST /buddies/:id/accept`, `POST /buddies/:id/decline`                                                                                | BE-12        |
 | `GET /me/progress?days=`, `GET /me/insights`                                                                                                                                                                    | BE-13        |
+| `POST /advice`                                                                                                                                                                                                  | BE-11        |
+| `GET /me/rom-trend`, `GET /me/physio-report`, `POST /me/physio-report/share`, `GET /me/physio-report/shares`, `DELETE /me/physio-report/shares/:id`, `GET /reports/:token` (public)                             | BE-16        |
+| `GET /me/milestones`, `POST /me/milestones/:id/accept`, `POST /me/milestones/:id/dismiss`                                                                                                                       | BE-17        |
 | `POST /plans/generate?tz=`, `GET /plans/current?tz=`, `GET /me/exercise-preferences`, `PUT /me/exercise-preferences/:exerciseId`                                                                                | BE-08        |
 | `GET/POST /me/rehab-plans`, `GET/PUT/DELETE /me/rehab-plans/:id`, `POST /me/rehab-plans/:id/limits`, `PUT/DELETE /me/rehab-plans/:id/limits/:limitId`, `GET /me/rehab-plans/active/today?tz=`, `GET /me/limits` | BE-15        |
 

@@ -19,7 +19,7 @@
 // and comments get a second check on the CONN-07 gpt-oss chain, run alongside Llama Guard, that
 // adds these two custom categories. ~0.2-0.4 s on cerebras. unitary/toxic-bert was tried and
 // rejected: "I'm going to destroy legs today" scores higher on threat than "watch your back".
-// Advice isn't shown to other members, so it skips this check.
+// Advice questions run it too: they are posts in the feed (BE-11), so other members see them.
 //
 // If either check can't be reached the content is allowed with checked: false, so posting keeps
 // working during an outage; callers should store that flag and re-check or review later.
@@ -180,7 +180,7 @@ export class Moderator {
     const deadline = Date.now() + this.config.timeoutMs;
     const [guard, personal] = await Promise.all([
       this.llamaGuard(content, kind, deadline),
-      kind === "advice" ? Promise.resolve([]) : this.personal(content, kind, deadline),
+      this.personal(content, kind, deadline),
     ]);
     const result = applyPolicy([...(guard ?? []), ...(personal ?? [])]);
     return guard && personal ? result : { ...result, checked: false };
