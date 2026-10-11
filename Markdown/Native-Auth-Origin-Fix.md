@@ -27,3 +27,9 @@ The final realm-separation Release was installed on the connected iPhone. The ow
 ## Confirmed hosted JWKS value
 
 The owner supplied a screenshot showing `NEON_AUTH_JWKS_URL` set to the Neon auth base ending `/neondb/auth/`. A public unauthenticated check returned 404 for that exact URL. The correct endpoint, ending `/neondb/auth/.well-known/jwks.json`, returned 200 with one signing key. Render must use the full signing-key URL and redeploy. This is a server configuration change; changing the phone's auth base URL would be incorrect. The hosted deployment has not yet been reconfigured or verified with a real account token.
+
+## Confirmed client/server branch mismatch
+
+After the owner corrected Render's JWKS configuration, the phone still received API 401 responses. Comparing the ignored mobile configuration and installed Release bundle established that the phone used `ep-square-frost` Auth, while Render used `ep-snowy-sea` signing keys. Both public key endpoints returned 200, but the branches had different signing keys. The owner independently confirmed the phone account existed only on dev, not demo, and that Render's optional issuer/audience settings were unset.
+
+The local mobile environment now uses demo Auth (`ep-snowy-sea`) and the Render API. The public environment example contains the same matched endpoints. A standalone rebuild is required because Expo embeds these public URLs in its bundle; the native bundling script uses `--reset-cache`. Existing dev accounts do not automatically become demo accounts: sign out and create or use a demo account. The current native scheme is `steadyforum://`, not the retired `spotter://`. No server authentication checks were relaxed, and no private environment file is tracked. Final authenticated acceptance still requires signing in on the phone.
