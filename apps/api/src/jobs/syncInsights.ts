@@ -136,19 +136,44 @@ export function explainRisk(bodyPart: string, features: string[]): string {
 
 // ---- Databricks ----
 
-// AI-14: the trained model's scores (risk_model.py) win when they exist; until then, or if that
-// table is empty or unreadable, the heuristic scores are used as before. Both tables have the
-// same columns and the same top_features family names, so the upsert and explainRisk() don't care.
+// AI-14: the trained model's scores (risk_model.py) win when they exist and are fresh; until then,
+// or if that table is empty, stale or unreadable, the heuristic scores are used as before. Both
+// tables have the same columns and the same top_features family names, so the upsert and
+// explainRisk() don't care.
 export type RiskSource = "model" | "heuristic";
 const RISK_TABLES: Record<RiskSource, string> = {
   model: "spotter.gold.gold_injury_risk_model_scores",
   heuristic: "spotter.gold.gold_injury_risk_scores",
 };
+// The scoring job runs daily; a latest run older than this means it has stopped.
+export const MODEL_MAX_AGE_HOURS = 36;
 
-const riskStatement = (table: string, days: number) => `
-      SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features
+const riskStatement = (table: string, days: number, extra = "") => `
+      SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features${extra}
       FROM ${table}
       WHERE date >= date_sub(current_date(), ${days}) AND score IS NOT NULL`;
+
+// Age of the model's latest scoring run, on Databricks' clock so the API's clock doesn't matter.
+const modelStatement = (days: number) =>
+  riskStatement(
+    RISK_TABLES.model,
+    days,
+    ",\n             timestampdiff(MINUTE, max(scored_at) OVER (), current_timestamp()) AS scored_minutes_ago",
+  );
+
+type ModelRow = RiskRow & { scored_minutes_ago?: number | null };
+
+// Why the model rows can't be used, or null when they're fresh. A missing column (undefined) is
+// trusted; a null age means no row has a scored_at.
+function modelStaleness(rows: ModelRow[]): string | null {
+  const ages = rows.map((r) => r.scored_minutes_ago).filter((a) => a !== undefined);
+  if (ages.some((a) => a === null || Number.isNaN(Number(a)))) return "stale (no scored_at)";
+  const oldest = Math.max(...ages.map(Number));
+  if (oldest > MODEL_MAX_AGE_HOURS * 60) {
+    return `stale (latest scores ${Math.floor(oldest / 60)} h old, limit ${MODEL_MAX_AGE_HOURS} h)`;
+  }
+  return null;
+}
 
 // If the heuristic read throws too, the error propagates so the caller can leave Neon as it was.
 export async function readRiskRows(
@@ -158,12 +183,15 @@ export async function readRiskRows(
 ): Promise<{ rows: RiskRow[]; source: RiskSource }> {
   let why: string;
   try {
-    const rows = await query(riskStatement(RISK_TABLES.model, days));
-    if (rows.length > 0) {
+    const modelRows = (await query(modelStatement(days))) as ModelRow[];
+    const stale = modelRows.length > 0 ? modelStaleness(modelRows) : null;
+    if (modelRows.length > 0 && !stale) {
+      // Back to the plain RiskRow shape for the upsert.
+      const rows = modelRows.map(({ scored_minutes_ago: _age, ...row }) => row);
       log.info(`[insights] risk scores from ${RISK_TABLES.model} (${rows.length} rows)`);
       return { rows, source: "model" };
     }
-    why = "no rows";
+    why = stale ?? "no rows";
   } catch (err) {
     why = err instanceof Error ? err.message.split("\n")[0]! : String(err);
   }
