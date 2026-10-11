@@ -1,0 +1,125 @@
+/* Let the shared translucent glass layer show through on website actions. */
+html [data-testid^="glass-action"] > div:first-child { opacity: .4; }
+/* Web-only layout. Native screens and model bundles retain their current design. */
+html [data-testid^="web-"] { display: contents; }
+html [data-testid^="page-"] { min-width: 0; }
+html [data-testid="model-rotation"] > div:nth-child(2) {
+  background-color: #fff !important;
+  height: 24px !important;
+  transform: scaleX(1.8);
+  border-radius: 999px !important;
+  border: 1px solid rgba(255,255,255,.9);
+  box-shadow: 0 2px 6px rgba(44,92,121,.2);
+}
+html [data-testid="web-train-routine"] [role="button"][aria-selected="true"] {
+  background: linear-gradient(110deg, rgba(255,255,255,.95), rgba(220,242,254,.55)) !important;
+}
+html [data-testid="web-train-routine"] [role="button"][data-testid^="exercise-"],
+html [data-testid="web-train-routine"] [role="button"][data-testid^="practice-exercise-"] {
+  border-radius: 16px; padding: 14px 12px; min-height: 68px;
+  border-bottom-color: rgba(155,189,208,.22);
+}
+@media (hover: hover) and (pointer: fine) {
+  html [data-testid="web-train-routine"] [role="button"]:hover { scale: 1.01; }
+  html [data-testid="glass-navigation"] [role="tab"]:hover { background-color: rgba(255,255,255,.55); }
+}
+@media (min-width: 1000px) {
+  html [data-testid^="page-"]:not([data-testid="page-brand"]):not([data-testid="page-header-action"]) {
+    max-width: 1200px !important; padding: 30px 32px 48px !important;
+    gap: 22px !important;
+  }
+  html [data-testid="page-brand"] {
+    min-height: 64px; align-items: flex-start; flex-direction: column;
+    justify-content: flex-start; gap: 18px;
+  }
+  html [data-testid="page-brand"] > [role="heading"] {
+    font-size: 32px !important; line-height: 42px !important; letter-spacing: -1.1px !important;
+  }
+  html [data-testid="page-header-action"] { min-height: 0; }
+  html [data-testid="page-header-action"]:empty { display: none; }
+  html [data-testid="page-me"] [data-testid="page-header-action"],
+  html [data-testid="page-buddies"] [data-testid="page-header-action"] {
+    position: absolute; top: 4px; right: 636px; z-index: 25;
+    width: 48px; height: 48px; align-items: center; justify-content: center;
+  }
+  html [data-testid="navigation-position"] {
+    top: 24px !important; bottom: auto !important; left: auto !important;
+    right: max(32px, calc((100vw - 1136px) / 2)) !important;
+    width: 620px !important; z-index: 20;
+  }
+  html [data-testid="glass-navigation"] {
+    border-radius: 24px !important; border-bottom-width: 1px !important;
+    padding-top: 8px !important; padding-bottom: 8px !important;
+  }
+  html [data-testid="glass-navigation"] [role="tab"] {
+    min-height: 50px; flex-direction: row !important; gap: 10px !important;
+    justify-content: center;
+  }
+  html [data-testid="glass-navigation"] [role="tab"] > div:last-child { font-size: 15px !important; }
+  html [data-testid="tab-highlight"] { top: 8px !important; height: 50px !important; }
+  html [data-testid="page-train"] > [data-testid="workout-streak"] {
+    align-self: flex-start; padding: 0 16px; border-radius: 999px;
+    background: rgba(255,255,255,.7); border: 1px solid white;
+  }
+  html [data-testid="page-train"] > [data-testid="workout-streak"] > div:last-child {
+    font-size: 16px !important; line-height: 24px !important;
+  }
+  html [data-testid="web-account-gate"] {
+    display: flex; width: 100%; max-width: 680px; align-self: center;
+    padding: 18px 40px; border-radius: 32px; background: rgba(255,255,255,.75);
+    border: 1px solid white; box-shadow: 0 20px 60px rgba(44,92,121,.08);
+  }
+  html [data-testid="web-train-layout"] {
+    display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: start; gap: 28px;
+  }
+  html [data-testid="web-train-preview"], html [data-testid="web-train-routine"] {
+    display: flex; min-width: 0; gap: 18px; padding: 26px;
+    border-radius: 32px; border: 1px solid rgba(255,255,255,.95);
+    box-shadow: inset 0 1px 0 white, 0 18px 54px rgba(44,92,121,.08);
+  }
+  html [data-testid="web-train-preview"] {
+    background: radial-gradient(ellipse at 50% 35%, #fff 0%, rgba(255,255,255,.8) 42%, rgba(220,243,253,.6) 100%);
+  }
+  html [data-testid="web-train-preview"] [data-testid="workout-figure"] {
+    height: clamp(380px, 49vh, 520px) !important;
+  }
+  html [data-testid="web-train-routine"] { background: rgba(255,255,255,.64); padding: 28px; }
+  html [data-testid="web-train-routine"] > div:first-child { display: none; }
+  html [data-testid="web-train-routine"] > [role="heading"] {
+    font-size: 28px !important; line-height: 34px !important; margin-top: 10px !important;
+  }
+  html [data-testid="web-plan-cards"], html [data-testid="web-buddy-cards"] {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px;
+    align-items: start;
+  }
+  html [data-testid="web-plan-cards"] > div, html [data-testid="web-buddy-cards"] > div {
+    min-width: 0; box-shadow: 0 12px 34px rgba(44,62,100,.06);
+  }
+  html [data-testid="web-progress-layout"] {
+    display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.3fr);
+    gap: 32px; align-items: start;
+  }
+  html [data-testid="web-progress-profile"], html [data-testid="web-progress-detail"] {
+    display: flex; min-width: 0; padding: 28px; border-radius: 30px; gap: 18px;
+    background: rgba(255,255,255,.65); border: 1px solid rgba(255,255,255,.95);
+    box-shadow: 0 16px 40px rgba(91,53,66,.06);
+  }
+  html [data-testid="page-feed"] { max-width: 940px !important; }
+  html [data-testid="page-log-in"], html [data-testid="page-sign-up"] {
+    max-width: 980px !important;
+  }
+  html [data-testid="page-log-in"] > div:last-child, html [data-testid="page-sign-up"] > div:last-child {
+    margin-top: 24px; padding: 38px 44px !important; border-radius: 32px;
+    background: rgba(255,255,255,.72); border: 1px solid white;
+    box-shadow: 0 20px 60px rgba(44,92,121,.08); max-width: 520px !important;
+  }
+}
+@media (min-width: 1000px) and (max-width: 1150px) {
+  html [data-testid="web-plan-cards"], html [data-testid="web-buddy-cards"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html [data-testid="web-train-preview"], html [data-testid="web-train-routine"] { padding: 20px; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  html [data-testid="web-train-preview"], html [data-testid="web-train-routine"],
+  html [data-testid="web-progress-profile"], html [data-testid="web-progress-detail"] { background: #F7FCFF; }
+}

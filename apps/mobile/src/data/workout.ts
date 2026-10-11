@@ -18,7 +18,7 @@ export function calendarDay(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 /** Local calendar days keep the routine stable offline and across daylight-saving changes. */
-export function dailyWorkout(date = calendarDay()) {
+export function dailyWorkout(date = calendarDay(), firstExercise?: ExerciseId) {
   const [year, month, day] = date.split('-').map(Number);
   const ordinal = Math.floor(Date.UTC(year, month - 1, day) / 86400000);
   const offset = ordinal % practiceExercises.length;
@@ -26,12 +26,13 @@ export function dailyWorkout(date = calendarDay()) {
   const selected = rotated.slice(0, 3);
   // Keep both upper- and lower-body work when the rotation reaches two leg exercises.
   if (!selected.some(e => e.id === 'press' || e.id === 'push_up')) selected[2] = rotated.find(e => e.id === 'press' || e.id === 'push_up')!;
-  return selected.map((exercise, index) => ({
+  const routine = selected.map((exercise, index) => ({
     ...exercise,
     sets: 2 + ((Math.floor(ordinal / 5) >> index) & 1),
     reps: 8 + 2 * ((ordinal + index) % 3),
     tracked: true,
   }));
+  return firstExercise ? routine.sort((a, b) => Number(b.id === firstExercise) - Number(a.id === firstExercise)) : routine;
 }
 /** One schedule predicate shared by streaks and upcoming workout dates. */
 export function isWorkoutDay(day: string, schedule: Schedule = { kind: 'weekly', days: initialProfile.days }) {

@@ -1,3 +1,4 @@
+import { WebSection } from '@/components/WebSection';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -57,6 +58,7 @@ export default function ProgressScreen() {
   }
   function edit() { setName(displayName === 'Your name' ? '' : displayName); setBio(profile.bio); setEditing(true); }
   return <AppPage title="Me" headerAction={<GlassChoice compact label="Settings" icon={<SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={23} tintColor={c.text} />} onPress={() => router.push('/settings')} />}>
+    <WebSection name="progress-layout"><WebSection name="progress-profile">
     <View style={styles.profile}>
       <View style={styles.identity}>
         <PolishedPressable accessibilityRole="button" accessibilityLabel="Change profile picture" disabled={photoBusy} onPress={() => { void pickPhoto(); }} style={styles.avatar}>
@@ -79,6 +81,7 @@ export default function ProgressScreen() {
       <Streak days={streak(workouts, new Date(), setup.profile?.schedule ?? { kind: 'weekly', days: profile.days })} />
     </View>
     {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+    </WebSection><WebSection name="progress-detail">
     <View style={styles.tabs} onLayout={event => setTabWidth(event.nativeEvent.layout.width)}>
       {tabWidth > 0 && <Animated.View pointerEvents="none" style={[styles.tabLine, { width: tabWidth / 3, backgroundColor: slide.interpolate({ inputRange: [0, tabWidth / 3, 2 * tabWidth / 3], outputRange: sectionColors, extrapolate: 'clamp' }), transform: [{ translateX: slide }] }]} />}
       {sections.map((label, index) => <PolishedPressable key={label} accessibilityRole="tab" accessibilityState={{ selected: index === section }} accessibilityLabel={label} onPress={() => setSection(index)} style={styles.tab}><SymbolView name={sectionIcons[index]} tintColor={sectionColors[index]} size={25} style={{ opacity: index === section ? 1 : 0.6 }} /></PolishedPressable>)}
@@ -97,6 +100,7 @@ export default function ProgressScreen() {
       <Text style={ui.muted}>{auth.user?.email}</Text>
       <PolishedPressable accessibilityRole="button" disabled={loggingOut} onPress={() => { setLoggingOut(true); setError(null); void auth.logout().catch(error => setError(error.message)).finally(() => setLoggingOut(false)); }}><Text style={styles.link}>{loggingOut ? 'Logging out…' : 'Log out'}</Text></PolishedPressable>
     </View>
+    </WebSection></WebSection>
   </AppPage>;
 }
 export function WorkoutCalendar() {

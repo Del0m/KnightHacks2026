@@ -1,6 +1,15 @@
 import { dailyWorkout } from '../workout';
 import { readPrescription } from '@/screens/Planner/plan';
 
+test('a preferred first exercise changes order without changing prescriptions', () => {
+ const original = dailyWorkout('2026-10-11');
+ const routine = dailyWorkout('2026-10-11', 'lunge');
+ expect(routine[0].id).toBe('lunge');
+ expect(routine).toEqual([original.find(e => e.id === 'lunge'), ...original.filter(e => e.id !== 'lunge')]);
+ expect(dailyWorkout('2026-10-11')).toEqual(original);
+ expect(dailyWorkout('2026-10-11', 'curl')).toEqual(original);
+});
+
 test('a daily routine is stable, full body, and supported by camera tracking', () => {
  const routine = dailyWorkout('2026-10-11');
  expect(dailyWorkout('2026-10-11')).toEqual(routine);

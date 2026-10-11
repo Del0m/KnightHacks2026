@@ -1,3 +1,4 @@
+import { WebSection } from '@/components/WebSection';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -10,7 +11,7 @@ export function AccountGate({ title, children }: { title: string; children: Reac
   const colors = pageColors(title), ui = pageStyles(title);
   const { user, loading, error } = useAuth();
   if (user) return children;
-  return <AppPage title={title}><View style={ui.empty}>
+  return <AppPage title={title}><WebSection name="account-gate"><View style={ui.empty}>
     {loading ? <ActivityIndicator accessibilityLabel="Restoring your session" color={colors.primary} /> : <>
       <SymbolView name={{ ios: 'lock', android: 'lock', web: 'lock' }} tintColor={colors.primary} size={32} />
       <Text accessibilityRole="header" style={ui.emptyTitle}>Log in to use {title === 'Me' ? 'your account' : title}</Text>
@@ -19,5 +20,5 @@ export function AccountGate({ title, children }: { title: string; children: Reac
       <Action onPress={() => router.push('/login')}>Log in</Action>
       <Action secondary onPress={() => router.push('/signup')}>Create account</Action>
     </>}
-  </View></AppPage>;
+  </View></WebSection></AppPage>;
 }

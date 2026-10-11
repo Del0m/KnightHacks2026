@@ -1,3 +1,4 @@
+import { WebSection } from '@/components/WebSection';
 import { useOnboarding } from '@/screens/Onboarding/state';
 import { useWeeklyPlan } from '@/screens/Planner/useWeeklyPlan';
 import { modelExercise, routineForDay } from '@/screens/Planner/plan';
@@ -5,7 +6,7 @@ import { readActiveWorkout } from '@/services/workoutQueue';
 import { useAuth } from '@/screens/Auth/session';
 import { PolishedPressable } from '@/components/PolishedPressable';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { AppPage, Action, ui } from '@/components/AppPage';
 import { BodyPreview } from '@/components/BodyPreview';
@@ -21,7 +22,7 @@ import { colors as c, typography as t } from '@/theme/tokens';
 export default function TrainScreen() {
   const { user } = useAuth(), account = user?.id ?? null;
   const weekly = useWeeklyPlan();
-  const routine = useMemo(() => weekly.plan ? routineForDay(weekly.plan, weekly.selectedDate).map(e => ({ ...e, muscles: e.tracked ? 'Camera tracking' : 'Manual logging' })) : dailyWorkout(weekly.today), [weekly.plan, weekly.selectedDate, weekly.today]);
+  const routine = useMemo(() => weekly.plan ? routineForDay(weekly.plan, weekly.selectedDate).map(e => ({ ...e, muscles: e.tracked ? 'Camera tracking' : 'Manual logging' })) : dailyWorkout(weekly.today, Platform.OS === 'web' ? 'lunge' : undefined), [weekly.plan, weekly.selectedDate, weekly.today]);
   const firstModel = useMemo(() => routine.length ? modelExercise(routine[0].id) : null, [routine]);
   const [activeWorkout, setActiveWorkout] = useState(() => readActiveWorkout(account));
   const { workouts, profile } = useTraining(), setup = useOnboarding(), reduced = useReducedMotion();
@@ -36,6 +37,7 @@ export default function TrainScreen() {
   const menu = (id: ExerciseId) => <ExerciseMenu open={expanded === id} onPractice={() => practice(id)} />;
   return <AppPage compact><Streak days={streak(workouts, new Date(), setup.profile?.schedule ?? { kind: 'weekly', days: profile?.days ?? initialProfile.days })} />
     <View style={styles.separator} />
+    <WebSection name="train-layout"><WebSection name="train-preview">
     <View style={{ position: 'relative' }}>
       <BodyPreview selected={selected} playing={playing} height={320} rotation={rotation} />
       <PolishedPressable testID="glass-playback" accessibilityRole="button" accessibilityLabel={playing ? 'Pause movement' : 'Play movement'} accessibilityHint={selected ? 'Toggle the exercise demonstration' : 'Select an exercise first'} disabled={!selected} onPress={() => setPlaying(p => !p)} style={({ pressed }) => [styles.playback, { opacity: selected ? pressed ? .75 : 1 : .55, transform: [{ scale: pressed ? .97 : 1 }] }]}>
@@ -44,6 +46,7 @@ export default function TrainScreen() {
       </PolishedPressable>
     </View>
     <RotationSlider value={rotation} onChange={setRotation} />
+    </WebSection><WebSection name="train-routine">
     <View style={styles.separator} />
     <ExerciseTabs value={section} onChange={setSection} />
     {section === 'workout' ? <>
@@ -59,6 +62,7 @@ export default function TrainScreen() {
     <View>{practiceExercises.map(e => <View key={e.id}><PolishedPressable testID={`practice-exercise-${e.id}`} accessibilityRole="button" accessibilityState={{ selected: selected === modelExercise(e.id) && modelExercise(e.id) !== null, expanded: expanded === modelExercise(e.id) && modelExercise(e.id) !== null }} onPress={() => select(e.id)} style={[styles.row, selected === modelExercise(e.id) && modelExercise(e.id) !== null && { backgroundColor: 'rgba(255,255,255,.65)' }]}><Text style={styles.name}>{e.name}</Text><Text style={styles.detail}>{e.muscles}</Text></PolishedPressable>{menu(e.id)}</View>)}</View></>}
     <PolishedPressable accessibilityRole="button" onPress={() => router.push('/onboarding')} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={ui.muted}>Set goals & workout days</Text></PolishedPressable>
     <Text style={[ui.muted, { textAlign: 'center', fontSize: 12 }]}>{weekly.plan ? "Your selected plan day" : `Full body · ${weekly.today}`}</Text>
+    </WebSection></WebSection>
   </AppPage>;
 }
 const styles = StyleSheet.create({

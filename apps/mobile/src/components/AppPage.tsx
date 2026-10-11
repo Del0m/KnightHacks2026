@@ -30,8 +30,8 @@ export function AppPage({ children, title = 'Train', intro, compact = false, hea
       onContentSizeChange: (_width: number, height: number) => { position.current.content = height; },
       onLayout: (event: import('react-native').LayoutChangeEvent) => { position.current.viewport = event.nativeEvent.layout.height; },
     } : {})}>
-      <Animated.View style={[ui.content, !scrollable && { flex: 1 }, compact && { gap: 8 }, { opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [7, 0] }) }] }]}>
-        <View style={ui.brandRow}><Text accessibilityRole="header" style={ui.brand}>SteadyForum</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, flexShrink: 1 }}>{headerAction}</View></View>
+      <Animated.View testID={`page-${title.toLowerCase().replaceAll(' ', '-')}`} style={[ui.content, !scrollable && { flex: 1 }, compact && { gap: 8 }, { opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [7, 0] }) }] }]}>
+        <View testID="page-brand" style={ui.brandRow}><Text accessibilityRole="header" style={ui.brand}>SteadyForum</Text><View testID="page-header-action" style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, flexShrink: 1 }}>{headerAction}</View></View>
         {intro && <Text style={ui.pageTitle} accessibilityRole="header">{intro}</Text>}{children}
       </Animated.View>
     </ScrollContainer></PageScroll.Provider></PageScrollLock.Provider></SafeAreaView>
@@ -39,7 +39,7 @@ export function AppPage({ children, title = 'Train', intro, compact = false, hea
 }
 export function Action({ children, onPress, secondary = false, disabled = false, tone }: { children: string; onPress: () => void; secondary?: boolean; disabled?: boolean; tone?: 'green' }) {
   const colors = usePageColors();
-  return <PolishedPressable testID="glass-action" accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [ui.action, { backgroundColor: 'transparent', overflow: 'hidden', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), 0 5px 18px rgba(60,45,60,0.10)' }, secondary && { backgroundColor: 'transparent' }, { opacity: disabled ? .45 : pressed ? .8 : 1, transform: [{ scale: pressed ? .985 : 1 }] }]}><GlassSurface tint={tone === 'green' ? '#C5ECD8' : colors.primarySoft} colored radius={22} /><Text style={[ui.actionText, { color: tone === 'green' ? '#165737' : colors.text }]}>{children}</Text></PolishedPressable>;
+  return <PolishedPressable testID={Platform.OS === 'web' && secondary ? 'glass-action-secondary' : 'glass-action'} accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [ui.action, { backgroundColor: 'transparent', overflow: 'hidden', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), 0 5px 18px rgba(60,45,60,0.10)' }, secondary && { backgroundColor: 'transparent' }, { opacity: disabled ? .45 : pressed ? .8 : 1, transform: [{ scale: pressed ? .985 : 1 }] }]}><GlassSurface tint={tone === 'green' ? '#C5ECD8' : colors.primarySoft} colored radius={22} /><Text style={[ui.actionText, { color: tone === 'green' ? '#165737' : colors.text }]}>{children}</Text></PolishedPressable>;
 }
 export const ui = StyleSheet.create({
   scroll: { flexGrow: 1, paddingBottom: 134 }, content: { width: '100%', maxWidth: 660, alignSelf: 'center', paddingHorizontal: 24, paddingTop: 22, gap: 16 },

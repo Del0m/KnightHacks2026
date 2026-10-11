@@ -12,13 +12,13 @@ const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.set
 const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(.12,1.22,.08);controls.enableDamping=true;controls.dampingFactor=.08;controls.minDistance=.25;controls.maxDistance=5;controls.touches.ONE=THREE.TOUCH.ROTATE;controls.touches.TWO=THREE.TOUCH.DOLLY_PAN;
 scene.add(new THREE.HemisphereLight(0xeef8ff,0x617888,1.5));const key=new THREE.DirectionalLight(0xffffff,1.8);key.position.set(-2,3,4);scene.add(key);const rim=new THREE.DirectionalLight(0x8ed6ff,.9);rim.position.set(3,2,-2);scene.add(rim);
 // Capture opaque depth so foreground weights cannot leak into glass transmission.
-const bodyMeshes=[],depthTarget=new THREE.WebGLRenderTarget(1,1,{depthTexture:new THREE.DepthTexture(1,1),minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter}),depthMaterial=new THREE.MeshDepthMaterial(),bufferSize=new THREE.Vector2();
+const bodyMeshes=[],depthTarget=new THREE.WebGLRenderTarget(1,1,{depthTexture:new THREE.DepthTexture(1,1),minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter}),bufferSize=new THREE.Vector2();
 const shimmerUniform={value:0},glowUniform={value:0},armStart={value:new THREE.Vector3()},armEnd={value:new THREE.Vector3()},armStartR={value:new THREE.Vector3()},armEndR={value:new THREE.Vector3()};
 // A bright studio with dark reflection strips gives clear glass a readable outline.
 const envScene=new THREE.Scene();envScene.background=new THREE.Color(0x263d4c);
 for(const [x,y,z,w,h,color] of [[-3,2,2,2,5,0xffffff],[3,2,1,2,4,0xffffff],[0,4,-2,5,2,0xffffff],[-2,1,-1,.65,4,0x263d4c],[2,1,-2,.5,4,0x3b5363]]){const panel=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color,side:THREE.DoubleSide}));panel.position.set(x,y,z);panel.lookAt(0,1,0);envScene.add(panel);}const pmrem=new THREE.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(envScene,.02).texture;pmrem.dispose();
 // Transmission retains reflections; lowering opacity alone would wash out the glass.
-const glass=new THREE.MeshPhysicalMaterial({color:0xf3faff,metalness:0,roughness:.035,transmission:native?0:1,thickness:.12,ior:1.46,attenuationColor:0xe2f3ff,attenuationDistance:3,clearcoat:1,clearcoatRoughness:.04,envMapIntensity:1.2});
+const glass=new THREE.MeshPhysicalMaterial({color:0xf3faff,metalness:0,roughness:.035,transmission:0,thickness:.12,ior:1.46,attenuationColor:0xe2f3ff,attenuationDistance:3,clearcoat:1,clearcoatRoughness:.04,envMapIntensity:1.2});
 glass.onBeforeCompile=shader=>{
  shader.uniforms.opaqueDepth={value:depthTarget.depthTexture};shader.uniforms.glassBackdrop={value:backdropTexture};
  const transmission=THREE.ShaderChunk.transmission_pars_fragment.replace('transmittedLight = getTransmissionSample( refractionCoords, roughness, ior );',`transmittedLight = getTransmissionSample( refractionCoords, roughness, ior );
@@ -29,8 +29,8 @@ glass.onBeforeCompile=shader=>{
      transmittedLight = vec4( texture2D( glassBackdrop, refractionCoords ).rgb, 1.0 );
    }`);
  shader.fragmentShader='uniform sampler2D opaqueDepth; uniform sampler2D glassBackdrop;\n'+shader.fragmentShader.replace('#include <transmission_pars_fragment>',transmission);
- if(native){
-  // Sample an ordinary, single-pass RGBA8 scene target instead of Three's
+ {
+  // Use the app’s rainbow glass finish on both renderers. Sample an ordinary, single-pass RGBA8 scene target instead of Three's
   // internal transmission pass. Keep Snell refraction and exclude foreground
   // weights using opaque depth; the body itself never enters this target.
   shader.uniforms.nativeScene={value:depthTarget.texture};shader.uniforms.nativeProjection={value:camera.projectionMatrix};
@@ -122,7 +122,7 @@ renderer.setAnimationLoop(()=>{
  }
  controls.update();
  // Hide only the body mesh; weights attached to the skeleton still participate.
- bodyMeshes.forEach(mesh=>{mesh.visible=false;});scene.overrideMaterial=native?null:depthMaterial;
+ bodyMeshes.forEach(mesh=>{mesh.visible=false;});scene.overrideMaterial=null;
  renderer.setRenderTarget(depthTarget);renderer.render(scene,camera);
  renderer.setRenderTarget(null);scene.overrideMaterial=null;bodyMeshes.forEach(mesh=>{mesh.visible=true;});
  renderer.render(scene,camera);
