@@ -143,6 +143,8 @@ jobs:
           python-version: '3.11'
           enable-cache: true
           cache-dependency-glob: ml/pose_export/uv.lock
+      - name: Install OpenMP runtime required by XGBoost
+        run: brew install libomp
       - name: Install locked ML test dependencies
         run: uv sync --locked --group dev
       - name: Test exports, real cloud inference and synthetic sessions

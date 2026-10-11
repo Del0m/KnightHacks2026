@@ -37,4 +37,4 @@ Verification only was explicitly selected for this pipeline. Existing package ma
 
 These automated tests do not replace rebuilding and testing the complete iOS app on a device, or checking renamed resources against deployed services. Those rollout steps remain in `docs/runbooks/steadyforum-rename.md`.
 
-Notebook model tests install pinned XGBoost 2.1.3, pandas and scikit-learn from the ML dev dependency group. Pose inference and notebook tests run in separate Python processes because the combined native ML runtimes crashed on macOS during validation. Both suites produce JUnit reports.
+The macOS ML job installs Homebrew `libomp`, which XGBoost requires at runtime. Notebook model tests install pinned XGBoost 2.1.3, pandas and scikit-learn from the ML dev dependency group. Pose inference and notebook tests run in separate Python processes because the combined native ML runtimes crashed on macOS during validation. Both suites produce JUnit reports.
