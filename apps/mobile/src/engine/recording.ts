@@ -47,12 +47,15 @@ export function compactPose(r: PoseResult): PoseResult {
   };
 }
 
-/** Collects detections into a `Clip`. `nowMs` stamps no-person frames, which carry no time of their own; pass pose-clock time (`createPoseClock`). */
+/**
+ * Collects detections into a `Clip`. A no-person frame is stamped with its capture time
+ * (`timestampMs`, set by cloud mode), else `nowMs`; pass pose-clock time (`createPoseClock`).
+ */
 export function createClipRecorder(meta: { exercise: string; image: { width: number; height: number } }) {
   const frames: ClipFrame[] = [];
   return {
     add(d: PoseDetection, nowMs: number) {
-      frames.push(d.result ? compactPose(d.result) : { absent: true, timestamp_ms: nowMs });
+      frames.push(d.result ? compactPose(d.result) : { absent: true, timestamp_ms: d.timestampMs ?? nowMs });
     },
     get length() {
       return frames.length;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Native renderer test. */
 import React from 'react';
 import { AppState, Text, View } from 'react-native';
 import { useCameraPermission } from 'react-native-vision-camera';

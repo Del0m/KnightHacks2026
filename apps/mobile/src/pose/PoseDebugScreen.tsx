@@ -137,8 +137,10 @@ function LiveCamera({ poseMode, cloud, position, setPosition }: {
     resetRules();
   }, [resetEngine, resetRules]);
   const recorder = useRef<ReturnType<typeof createClipRecorder> | null>(null);
-  const clock = useRef(createPoseClock()).current;
+  const clock = useRef(createPoseClock());
   const [recording, setRecording] = useState(false);
+  // Capture to result, ms: what the owner's on-device demo measures.
+  const [age, setAge] = useState<number | null>(null);
 
   // On a cold start `onConfigured` can fire before the resolution is known, so the first pose fills it in.
   const frameOutputRef = useRef<{ currentResolution?: Size } | null>(null);
@@ -146,11 +148,27 @@ function LiveCamera({ poseMode, cloud, position, setPosition }: {
     setDetection(d);
     setImageSize((s) => s ?? uprightSize(frameOutputRef.current?.currentResolution));
     formOnPose(d);
-    if (d.result) clock.observe(d.result.timestamp_ms);
-    recorder.current?.add(d, clock.now());
-  }, [formOnPose, clock]);
-  const { frameOutput, fps, error, model, dropped } = usePoseOutput({ engine, size, maxFps: 15, onPose, cloud });
+    // Capture time; a no-person cloud frame has one too.
+    const captured = d.timestampMs ?? d.result?.timestamp_ms;
+    setAge(captured != null ? Date.now() - captured : null);
+    if (captured != null) clock.current.observe(captured);
+    recorder.current?.add(d, clock.current.now());
+  }, [formOnPose]);
+  const { frameOutput, fps, error, model, dropped, cloudStatus } = usePoseOutput({ engine, size, maxFps: 15, onPose, cloud });
   useLayoutEffect(() => { frameOutputRef.current = frameOutput; }, [frameOutput]);
+
+  // An interruption or a source switch starts over: no overlay, rep state or clock spans the gap.
+  const live = engine !== 'cloud' || cloudStatus === 'tracking';
+  const [source, setSource] = useState({ engine, live });
+  if (source.engine !== engine || source.live !== live) {
+    setSource({ engine, live });
+    setDetection(null);
+    setAge(null);
+  }
+  useEffect(() => {
+    resetForm();
+    clock.current = createPoseClock();
+  }, [engine, live, resetForm]);
 
   const onLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -239,6 +257,9 @@ function LiveCamera({ poseMode, cloud, position, setPosition }: {
           </Text>
           <Text style={styles.readoutText}>
             {model ?? 'no model'} · dropped {dropped}
+          </Text>
+          <Text style={styles.readoutText} testID="pose-source-readout">
+            source {engine} · {cloudStatus ?? 'on device'} · capture→result {age ?? '–'} ms
           </Text>
           <Text style={styles.readoutText}>
             mode {mode} · consent {cloudConsent ? 'yes' : needsCloudConsent ? 'needed' : 'no'}

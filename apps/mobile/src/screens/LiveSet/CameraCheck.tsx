@@ -95,15 +95,22 @@ function CameraPreview({ position, engine, size, cloud, onUseLocal, exercise, on
     if (r) setImage({ width: Math.min(r.width, r.height), height: Math.max(r.width, r.height) });
   }
   const output = usePoseOutput({ engine, size, maxFps: 15, cloud: cloudConfig, onPose: detection => {
-    const time = Date.now(); setNow(time); setResult(detection.result); resolution(); setFailingSince(null);
+    // A frame captured more than FRAME_STALE_MS ago counts as no pose, so it can't hold Ready.
+    const time = Date.now(), captured = detection.timestampMs ?? detection.result?.timestamp_ms;
+    const pose = captured == null || time - captured <= FRAME_STALE_MS ? detection.result : undefined;
+    setNow(time); setResult(pose); resolution(); setFailingSince(null);
     if (time - lastDetection.current > FRAME_STALE_MS) stableSince.current = null;
     lastDetection.current = time;
     if (image && view) {
-      const next = updateStability(stableSince.current, assessFraming(detection.result, image, view, mirrored, time).kind === 'ready', time);
+      const next = updateStability(stableSince.current, assessFraming(pose, image, view, mirrored, time).kind === 'ready', time);
       stableSince.current = next.since; setReady(next.ready);
     }
   } });
   useLayoutEffect(() => { outputRef.current = output.frameOutput; }, [output.frameOutput]);
+  // Leaving cloud tracking clears the pose and readiness; the effect below then restarts the hold.
+  const tracking = engine !== 'cloud' || output.cloudStatus === 'tracking';
+  const [wasTracking, setWasTracking] = useState(tracking);
+  if (wasTracking !== tracking) { setWasTracking(tracking); if (!tracking) { setResult(undefined); setReady(false); } }
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(timer);
