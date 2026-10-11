@@ -1,0 +1,7 @@
+[
+  { "name": "Hugging Face", "color": "#8A6500", "claim": "Cloud pose endpoint, gpt-oss rest notes, Llama Guard moderation, bge-small retrieval, our models on the Hub.", "where": "Rest note · blocked post · Hub and Space", "built": true },
+  { "name": "Databricks", "color": "#C8322B", "claim": "Lakeflow bronze, silver and gold over every set, an MLflow form model on Model Serving, gold tables synced to Neon.", "where": "Medal score · pipeline and Genie", "built": true },
+  { "name": "Neon", "color": "#0A7D55", "claim": "Neon Auth, the social graph, and pgvector for buddy matching and coaching search.", "where": "Buddy suggestion · feed", "built": true },
+  { "name": "Best use of AI", "color": "#1F64C8", "claim": "AI that stays quiet during the set and speaks only when it helps.", "where": "The live set and rest note", "built": true },
+  { "name": "Presage", "color": "#6A3FB5", "claim": "Pulse and breathing during rest, measured from the phone camera.", "where": "Rest card", "built": false }
+]

@@ -1,0 +1,241 @@
+{
+  "comment": "Single source for the animated architecture flow (R2). Coordinates are in a 1664x680 diagram space. Keep in step with ../architecture-handout.html and the deck's how slide.",
+  "nodes": [
+    {
+      "id": "phone",
+      "title": "1 · Your phone",
+      "color": "#1F64C8",
+      "x": 0,
+      "y": 0,
+      "w": 420,
+      "h": 680,
+      "at": 0.8,
+      "lines": [
+        {
+          "text": "Camera",
+          "sub": "One phone, no extra kit",
+          "at": 2.0
+        },
+        {
+          "text": "Pose AI on the phone",
+          "sub": "YOLOv8n-pose, 17 joints, ~10 ms",
+          "at": 3.0,
+          "offloadSub": "Offloaded: frames go to the cloud"
+        },
+        {
+          "text": "Form engine",
+          "sub": "Reps, joint angles, form rules",
+          "at": 4.5
+        },
+        {
+          "text": "Silent screen",
+          "sub": "Skeleton and an amber cue",
+          "at": 5.5
+        }
+      ],
+      "footer": "Video is never stored."
+    },
+    {
+      "id": "api",
+      "title": "2 · Spotter API",
+      "color": "#4B5650",
+      "x": 620,
+      "y": 110,
+      "w": 420,
+      "h": 280,
+      "at": 7.0,
+      "lines": [
+        {
+          "text": "Node + Express",
+          "sub": "Sessions, plans, feed, rehab"
+        }
+      ]
+    },
+    {
+      "id": "databricks",
+      "title": "4 · Databricks",
+      "color": "#C8322B",
+      "x": 1244,
+      "y": 0,
+      "w": 420,
+      "h": 250,
+      "at": 9.0,
+      "lines": [
+        {
+          "text": "Bronze → Silver → Gold",
+          "sub": "MLflow form model scores the set"
+        }
+      ]
+    },
+    {
+      "id": "huggingface",
+      "title": "5 · Hugging Face",
+      "color": "#8A6500",
+      "x": 1244,
+      "y": 290,
+      "w": 420,
+      "h": 390,
+      "at": 11.5,
+      "lines": [
+        {
+          "text": "gpt-oss",
+          "sub": "Rest notes and plans"
+        },
+        {
+          "text": "Llama Guard",
+          "sub": "Feed moderation"
+        },
+        {
+          "text": "Inference Endpoint",
+          "sub": "Cloud pose, only when needed",
+          "offload": true
+        }
+      ]
+    },
+    {
+      "id": "neon",
+      "title": "3 · Neon Postgres",
+      "color": "#0A7D55",
+      "x": 620,
+      "y": 490,
+      "w": 420,
+      "h": 190,
+      "at": 14.0,
+      "lines": [
+        {
+          "text": "Accounts, feed, buddies",
+          "sub": "pgvector, synced Databricks trends"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "set",
+      "x1": 420,
+      "y1": 170,
+      "x2": 620,
+      "y2": 170,
+      "at": 7.4,
+      "label": "finished set",
+      "lx": 430,
+      "ly": 120
+    },
+    {
+      "id": "score",
+      "x1": 1040,
+      "y1": 170,
+      "x2": 1244,
+      "y2": 170,
+      "at": 9.4,
+      "both": true,
+      "label": "joints out,\nscores back",
+      "lx": 1050,
+      "ly": 100
+    },
+    {
+      "id": "words",
+      "x1": 1040,
+      "y1": 315,
+      "x2": 1244,
+      "y2": 315,
+      "at": 11.9,
+      "both": true,
+      "label": "prompts, text",
+      "lx": 1060,
+      "ly": 265
+    },
+    {
+      "id": "store",
+      "x1": 830,
+      "y1": 390,
+      "x2": 830,
+      "y2": 490,
+      "at": 14.4,
+      "both": true,
+      "label": "history, feed",
+      "lx": 850,
+      "ly": 420
+    },
+    {
+      "id": "back",
+      "x1": 620,
+      "y1": 330,
+      "x2": 420,
+      "y2": 330,
+      "at": 16.5,
+      "label": "note, medal",
+      "lx": 430,
+      "ly": 345
+    },
+    {
+      "id": "frames",
+      "x1": 420,
+      "y1": 250,
+      "x2": 620,
+      "y2": 250,
+      "at": 18.8,
+      "offload": true,
+      "label": "live frames",
+      "lx": 430,
+      "ly": 200
+    },
+    {
+      "id": "relay",
+      "x1": 1040,
+      "y1": 372,
+      "x2": 1244,
+      "y2": 372,
+      "at": 19.4,
+      "offload": true,
+      "label": "",
+      "lx": 0,
+      "ly": 0
+    }
+  ],
+  "captions": [
+    {
+      "at": 0.8,
+      "text": "Your phone films the set. No extra kit."
+    },
+    {
+      "at": 3.0,
+      "text": "Pose AI runs on the phone: 17 joints per frame, in about 10 ms."
+    },
+    {
+      "at": 4.5,
+      "text": "The form engine checks every rep against the exercise's rules."
+    },
+    {
+      "at": 5.5,
+      "text": "During the set it stays quiet: just the skeleton and an amber cue."
+    },
+    {
+      "at": 7.0,
+      "text": "When the set ends, only the joints go to our API."
+    },
+    {
+      "at": 9.0,
+      "text": "Databricks scores the set with our MLflow form model."
+    },
+    {
+      "at": 11.5,
+      "text": "gpt-oss on Hugging Face words one kind rest note."
+    },
+    {
+      "at": 14.0,
+      "text": "Neon keeps your history, your feed and your buddy matches."
+    },
+    {
+      "at": 16.5,
+      "text": "The note and medal arrive while you rest."
+    },
+    {
+      "at": 18.5,
+      "text": "Android or a slower iPhone? With consent, frames go to our cloud pose endpoint and are never stored.",
+      "offload": true
+    }
+  ],
+  "offloadAt": 18.5,
+  "duration": 25
+}
