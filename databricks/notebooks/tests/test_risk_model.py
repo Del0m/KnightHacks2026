@@ -533,3 +533,12 @@ class ChampionRun(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UcRegistrationOptIn(unittest.TestCase):
+    """Each failed UC registration leaves a PENDING_REGISTRATION version, so it is opt-in."""
+
+    def test_registration_is_behind_a_widget_off_by_default(self):
+        src = NOTEBOOK.read_text()
+        self.assertIn('dbutils.widgets.dropdown("register_uc", "false"', src)
+        self.assertIn("delete_model_version", src)
