@@ -4,7 +4,8 @@
 //   1. how many reps were clean, counted from the phone's rule flags (INT-06), so it always
 //      agrees with the set medal ("6 of 8 reps were clean.")
 //   2. at most one suggestion: the highest-priority flagged rule's spec rest_note, with {n},
-//      {total}, {value} and {t} filled in, optionally rephrased by gpt-oss (CONN-07)
+//      {total}, {value} and {t} filled in, optionally rephrased by gpt-oss (CONN-07). Like the
+//      fixed notes, it may be a fact and a reason (two sentences), and it keeps their numbers.
 //
 // The LLM only writes part 2 and only when there is a flag; its sentence must pass the same tone
 // check as the specs' fixed notes (specs/validate.mjs: banned phrases, no commands, no "!").
@@ -30,6 +31,7 @@ export interface SpecRule {
 export interface NoteRep {
   flags: { rule_id: string }[];
   tempo_ms?: number | null;
+  lowering_ms?: number | null; // AI-08: start of the rep to its turn; what the tempo rules measure
 }
 
 export interface NoteInput {
@@ -45,7 +47,8 @@ export interface NoteFacts {
 }
 
 const banned = loadBanned();
-const MAX_SUGGESTION_CHARS = 160;
+const MAX_SUGGESTION_CHARS = 200;
+const MAX_SUGGESTION_SENTENCES = 2; // a fact and a reason, like the fixed notes
 
 export function noteFacts(input: NoteInput): NoteFacts {
   const total = input.reps.length;
@@ -67,11 +70,15 @@ export function goodNews(facts: NoteFacts): string {
   return `${facts.clean} of ${facts.total} reps were clean.`;
 }
 
-// Seconds for duration rules ({t}): the average rep time of the flagged reps, one decimal.
+// Seconds for duration rules ({t}): the flagged reps' average lowering time, one decimal. Every
+// spec's tempo rule measures the lowering phase and its note says "on the way down", so the
+// whole rep's tempo_ms would overstate it ("1.6 s on the way down" for a rep lowered in 0.7 s).
+// Reps without lowering_ms (unmeasured) are left out; with none, the note can't be filled and
+// the fixed "n of m clean" line is used instead.
 function flaggedSeconds(input: NoteInput, ruleId: string): string | null {
   const times = input.reps
-    .filter((r) => r.flags.some((f) => f.rule_id === ruleId) && typeof r.tempo_ms === "number")
-    .map((r) => r.tempo_ms!);
+    .filter((r) => r.flags.some((f) => f.rule_id === ruleId) && typeof r.lowering_ms === "number")
+    .map((r) => r.lowering_ms!);
   if (!times.length) return null;
   return (times.reduce((a, b) => a + b, 0) / times.length / 1000).toFixed(1).replace(/\.0$/, "");
 }
@@ -105,13 +112,32 @@ export function fixedNote(input: NoteInput): RestNote {
   };
 }
 
-/** Problems with an LLM-written suggestion, or [] if it may be shown. */
-export function suggestionProblems(text: string): string[] {
+const numbers = (text: string) => text.match(/\d+(?:\.\d+)?/g) ?? [];
+
+/**
+ * Problems with an LLM-written suggestion, or [] if it may be shown. With `original` (the filled-in
+ * rule note it rewrites), the suggestion must keep the original's numbers and add none: "about
+ * 0.8 s" and "on 3 reps" make a note specific (Architecture §7), and an invented number is a
+ * wrong fact.
+ */
+export function suggestionProblems(text: string, original?: string): string[] {
   const problems = checkNote(text, banned, { placeholders: [] });
   if (text.length > MAX_SUGGESTION_CHARS) problems.push("too long");
-  if ((text.match(/[.?!](\s|$)/g) ?? []).length > 1) problems.push("more than one sentence");
+  if ((text.match(/[.?!](\s|$)/g) ?? []).length > MAX_SUGGESTION_SENTENCES) {
+    problems.push(`more than ${MAX_SUGGESTION_SENTENCES} sentences`);
+  }
+  const kept = new Set(numbers(text));
+  const dropped = original ? numbers(original).filter((n) => !kept.has(n)) : [];
+  if (dropped.length) problems.push(`drops the original's numbers (${dropped.join(", ")})`);
+  const given = new Set(original ? numbers(original) : []);
+  const invented = original ? [...kept].filter((n) => !given.has(n)) : [];
+  if (invented.length) problems.push(`adds numbers the original doesn't have (${invented.join(", ")})`);
   // The clean count comes from goodNews(), which matches the medal; the LLM mustn't restate it.
   if (/\b\d+ (of|out of) \d+\b/i.test(text)) problems.push("restates the clean count");
+  // About the movement, not the person: "your knees drifted" is fine, "you are leaning" is not.
+  if (/\byou(?:'re|\s+are|\s+were|\s+seem|\s+look)\b/i.test(text.replace(/\u2019/g, "'"))) {
+    problems.push("describes the person, not the movement");
+  }
   return problems;
 }
 
@@ -122,16 +148,39 @@ const SUGGESTION_SCHEMA: JsonSchema = {
   properties: { suggestion: { type: "string", maxLength: MAX_SUGGESTION_CHARS } },
 };
 
+// Worked examples pin the tone better than rules alone. Without them gpt-oss either adds reasons
+// the spec doesn't give ("engages the deltoids") or turns a suggestion into a claim that the
+// lifter already did it ("Your hips are level with your knees").
 const SYSTEM = [
-  "You rewrite one coaching suggestion for a lifter resting between sets.",
-  "Write exactly one short, kind sentence (under 25 words) about the movement, not the person.",
-  "Describe what helps, as an observation or an option. Never give a command, never start with a verb like",
-  "'keep', 'try' or 'make', and never use words like must, should, don't, always, never, bad or wrong.",
-  "No exclamation marks and no rep counts. Keep the meaning of the original note.",
+  "You reword one coaching note for a lifter resting between sets, so it reads naturally and kindly.",
+  "Reword only: say what the original says and nothing more. Add no new facts, reasons, benefits,",
+  "muscles or advice, and change none. Keep every number, written as digits exactly as given.",
+  "What happened stays in the past tense; what helps stays an option for the next set, never something",
+  "already done. Write one or two short sentences (under 35 words in all) about the movement, not the person.",
+  "Never give a command or start a sentence with an imperative verb (keep, try, make, lower, push...),",
+  "never use words like must, should, don't, always, never, bad or wrong, no exclamation marks, and never",
+  "say how many reps were clean.",
+  "Examples of original -> reworded:",
+  "'Next set, try lowering until your hips are level with your knees.' ->",
+  "'Lowering until your hips are level with your knees could give a fuller squat next set.'",
+  "'Your knees drifted inward on 3 reps. Pointing them over your toes keeps them comfortable.' ->",
+  "'Your knees drifted inward on 3 reps. Knees that point over your toes tend to feel more comfortable.'",
+  "'Your reps took about 0.8 s on the way down. Around 2 s gives you more control.' ->",
+  "'The way down took about 0.8 s per rep. Closer to 2 s gives more control.'",
 ].join(" ");
 
+// Console or pino: both take a plain message.
+export interface LogLike {
+  warn(msg: string): void;
+}
+
+const silent: LogLike = { warn: () => {} };
+
 export class RestNoteWriter {
-  constructor(private readonly llm: Pick<HfLlm, "generateJson"> | null) {}
+  constructor(
+    private readonly llm: Pick<HfLlm, "generateJson"> | null,
+    private readonly log: LogLike = silent,
+  ) {}
 
   /** The rest note for a set. Never throws; falls back to the fixed note within `timeoutMs`. */
   async write(input: NoteInput, timeoutMs: number): Promise<RestNote> {
@@ -154,13 +203,19 @@ export class RestNoteWriter {
         // gpt-oss reasons before it answers and the reasoning counts against max_tokens: at 200
         // the reasoning used it all and the reply came back empty. 1024 answers in ~0.3-0.9 s.
         maxTokens: 1024,
-        temperature: 0.4,
+        temperature: 0.2,
       });
       const suggestion = data.suggestion.trim();
-      if (suggestionProblems(suggestion).length) return fixed;
+      const problems = suggestionProblems(suggestion, ruleNote);
+      if (problems.length) {
+        this.log.warn(`[rest-note] guard rejected "${suggestion}": ${problems.join("; ")}`);
+        return fixed;
+      }
       return { text: `${goodNews(facts)} ${suggestion}`, source: "llm", rule_id: fixed.rule_id };
-    } catch {
-      return fixed; // slow or failed: the fixed note is always ready
+    } catch (err) {
+      // Slow or failed: the fixed note is always ready.
+      this.log.warn(`[rest-note] LLM failed: ${err instanceof Error ? err.message : String(err)}`);
+      return fixed;
     }
   }
 }

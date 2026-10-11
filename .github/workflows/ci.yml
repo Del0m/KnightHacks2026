@@ -34,10 +34,13 @@ jobs:
           cache-dependency-path: |
             apps/api/package-lock.json
             rag/package-lock.json
+            apps/mobile/package-lock.json
       - name: Install API dependencies
         run: npm ci
       - name: Install RAG dependencies used by integration tests
         run: npm ci --prefix ../../rag
+      - name: Install mobile dependencies for cross-package integration imports
+        run: npm ci --prefix ../mobile
       - name: Typecheck
         run: npm run typecheck
       - name: Lint

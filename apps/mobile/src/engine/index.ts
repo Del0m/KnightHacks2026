@@ -31,3 +31,4 @@ export {
   type SetRecorder,
 } from './setRecord';
 export * from './types';
+export { assertEvaluationSpec } from './validation';

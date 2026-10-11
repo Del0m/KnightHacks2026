@@ -16,7 +16,7 @@
     "start_enter": 155,
     "reverse_deg": 5,
     "min_state_ms": 150,
-    "set_end_still_ms": 8000
+    "set_end_still_ms": 4000
   },
   "rules": [
     {
@@ -56,12 +56,12 @@
       "id": "tempo",
       "phase": "outbound",
       "view": "any",
-      "check": { "metric": "duration_ms", "op": ">=", "value": 800 },
+      "check": { "metric": "duration_ms", "op": ">=", "value": 250 },
       "severity": "form",
       "priority": 4,
       "label": "fast_lowering",
       "joints": ["left_shoulder", "right_shoulder", "left_elbow", "right_elbow"],
-      "rest_note": "Your reps took about {t} s on the way down. Around 2 s gives you more control."
+      "rest_note": "Your reps took about {t} s on the way down. A steady lowering gives you more control."
     }
   ],
   "injury_overrides": {

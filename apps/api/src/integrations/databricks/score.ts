@@ -16,22 +16,30 @@
 // Job fallback (if serving isn't available on Free Edition): the phone score is shown live,
 // and the pipeline's gold_workout_medals (CONN-03) recomputes medals in batch afterwards.
 //
-import type { Flag, Rep } from "../../../../../specs/set-record/types.js";
+// The frame-derived features (tempo split, symmetry, trunk lean, knee tracking) are computed
+// here from the set's joints, the same way the pipeline computes them for training (features.ts).
+// Endpoint setup: databricks/notebooks/serving_endpoint.py, runbook docs/runbooks/set-scoring.md.
+
+import type { Flag, JointFrame, Rep } from "../../../../../specs/set-record/types.js";
 export type { Medal } from "../../../../../specs/set-record/types.js";
 import type { Medal } from "../../../../../specs/set-record/types.js";
+import type { Env } from "../../env.js";
+import { repFeatures } from "./features.js";
 
+// ---- Input / output ----
+
+// A rep of the AI-08 set record. Boundaries are optional: without them the model gets null
+// features for that rep, which it handles.
 export type ScoreRep = Pick<Rep, "range_deg" | "tempo_ms"> &
-  Partial<Omit<Rep, "range_deg" | "tempo_ms" | "flags">> & {
-    flags: (Pick<Flag, "rule_id"> & Partial<Omit<Flag, "rule_id">>)[];
-    asymmetry?: number | null;
-    max_trunk_angle?: number | null;
-    min_knee_ankle_ratio?: number | null;
+  Partial<Pick<Rep, "start_ms" | "end_ms" | "quality">> & {
+    flags: Pick<Flag, "rule_id">[]; // the phone's rule result
   };
 
 export interface ScoreSetInput {
   exercise_id: string;
   weight_kg: number | null;
   reps: ScoreRep[];
+  frames?: JointFrame[]; // the set's joints, on the same clock as the rep boundaries
   baseline_share?: number | null; // lifter's 4-week clean share; defaults to the beginner baseline
 }
 
@@ -57,7 +65,17 @@ export interface ScoreConfig {
   timeoutMs: number; // whole budget: token (if not cached) + invocation
 }
 
-export function scoreConfigFromEnv(env = process.env): ScoreConfig {
+type ScoreEnv = Pick<
+  Env,
+  | "DATABRICKS_HOST"
+  | "DATABRICKS_CLIENT_ID"
+  | "DATABRICKS_CLIENT_SECRET"
+  | "DATABRICKS_OAUTH_SCOPES"
+  | "DATABRICKS_SERVING_ENDPOINT"
+  | "DATABRICKS_SCORE_TIMEOUT_MS"
+>;
+
+export function scoreConfigFromEnv(env: ScoreEnv): ScoreConfig {
   const required = ["DATABRICKS_HOST", "DATABRICKS_CLIENT_ID", "DATABRICKS_CLIENT_SECRET"] as const;
   const missing = required.filter((k) => !env[k]);
   if (missing.length) throw new Error(`Missing env for Databricks scoring: ${missing.join(", ")}`);
@@ -160,16 +178,13 @@ export class DatabricksScorer {
   private async invoke(input: ScoreSetInput, signal: AbortSignal) {
     const token = await this.getToken(signal);
     // Column names match the model signature in databricks/notebooks/form_model.py.
-    const records = input.reps.map((r) => ({
+    const features = repFeatures(input.exercise_id, input.reps, input.frames);
+    const records = input.reps.map((r, i) => ({
       exercise_id: input.exercise_id,
       weight_kg: input.weight_kg,
       range_deg: r.range_deg,
       tempo_ms: r.tempo_ms,
-      lowering_ms: r.lowering_ms ?? null,
-      rising_ms: r.rising_ms ?? null,
-      asymmetry: r.asymmetry ?? null,
-      max_trunk_angle: r.max_trunk_angle ?? null,
-      min_knee_ankle_ratio: r.min_knee_ankle_ratio ?? null,
+      ...features[i]!,
     }));
 
     const res = await this.fetchImpl(

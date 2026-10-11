@@ -18,6 +18,7 @@ import {
   type ScoreSetInput,
   type SetScore,
 } from "../integrations/databricks/score.js";
+import type { JointFrame } from "../integrations/databricks/upload.js";
 import { BASELINE_WINDOW_DAYS, baselineShare } from "./medals.js";
 import { fixedNote, type NoteInput, type RestNote, type RestNoteWriter, type SpecRule } from "./restNote.js";
 
@@ -31,9 +32,10 @@ export interface RestTimeDeps {
 export interface RestRep {
   rangeDeg: number;
   tempoMs: number;
-  quality?: number | null;
   loweringMs?: number | null;
-  risingMs?: number | null;
+  quality?: number | null;
+  startMs?: number | null;
+  endMs?: number | null;
   flags: { ruleId: string }[];
 }
 
@@ -89,6 +91,7 @@ export async function restTimeResult(
     exerciseId: string;
     weightKg: number | null;
     reps: RestRep[];
+    frames?: JointFrame[]; // the set's joints, for the model's frame-derived features
     saveMs: number;
   },
 ): Promise<RestTimeResult> {
@@ -107,15 +110,20 @@ export async function restTimeResult(
       range_deg: r.rangeDeg,
       tempo_ms: r.tempoMs,
       quality: r.quality ?? null,
-      lowering_ms: r.loweringMs ?? null,
-      rising_ms: r.risingMs ?? null,
+      start_ms: r.startMs ?? null,
+      end_ms: r.endMs ?? null,
       flags: r.flags.map((f) => ({ rule_id: f.ruleId })),
     })),
+    frames: args.frames,
   };
   const noteInput: NoteInput = {
     exerciseName: name,
     rules,
-    reps: args.reps.map((r) => ({ tempo_ms: r.tempoMs, flags: r.flags.map((f) => ({ rule_id: f.ruleId })) })),
+    reps: args.reps.map((r) => ({
+      tempo_ms: r.tempoMs,
+      lowering_ms: r.loweringMs ?? null,
+      flags: r.flags.map((f) => ({ rule_id: f.ruleId })),
+    })),
   };
 
   const timed = async <T>(work: Promise<T>) => {

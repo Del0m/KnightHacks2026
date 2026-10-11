@@ -1042,10 +1042,10 @@
       "start_ms": 1000,
       "end_ms": 2533,
       "tempo_ms": 1533,
-      "range_deg": 63.5,
+      "range_deg": 54,
       "quality": null,
-      "lowering_ms": 733,
-      "rising_ms": 800,
+      "lowering_ms": 667,
+      "rising_ms": 866,
       "flags": [
         {
           "rule_id": "tempo",
@@ -1059,10 +1059,10 @@
       "start_ms": 3600,
       "end_ms": 5200,
       "tempo_ms": 1600,
-      "range_deg": 72.8,
+      "range_deg": 63.3,
       "quality": null,
-      "lowering_ms": 800,
-      "rising_ms": 800,
+      "lowering_ms": 733,
+      "rising_ms": 867,
       "flags": [
         {
           "rule_id": "knee_tracking",
@@ -1081,10 +1081,10 @@
       "start_ms": 6333,
       "end_ms": 7867,
       "tempo_ms": 1534,
-      "range_deg": 59.8,
+      "range_deg": 53,
       "quality": null,
-      "lowering_ms": 734,
-      "rising_ms": 800,
+      "lowering_ms": 600,
+      "rising_ms": 934,
       "flags": [
         {
           "rule_id": "tempo",
@@ -1098,10 +1098,10 @@
       "start_ms": 8933,
       "end_ms": 10533,
       "tempo_ms": 1600,
-      "range_deg": 70.2,
+      "range_deg": 63.4,
       "quality": null,
-      "lowering_ms": 800,
-      "rising_ms": 800,
+      "lowering_ms": 734,
+      "rising_ms": 866,
       "flags": [
         {
           "rule_id": "knee_tracking",
@@ -1120,10 +1120,10 @@
       "start_ms": 11600,
       "end_ms": 13133,
       "tempo_ms": 1533,
-      "range_deg": 61.6,
+      "range_deg": 52.8,
       "quality": null,
-      "lowering_ms": 800,
-      "rising_ms": 733,
+      "lowering_ms": 667,
+      "rising_ms": 866,
       "flags": [
         {
           "rule_id": "tempo",
@@ -1137,10 +1137,10 @@
       "start_ms": 14200,
       "end_ms": 15800,
       "tempo_ms": 1600,
-      "range_deg": 70.9,
+      "range_deg": 62,
       "quality": null,
-      "lowering_ms": 800,
-      "rising_ms": 800,
+      "lowering_ms": 667,
+      "rising_ms": 933,
       "flags": [
         {
           "rule_id": "knee_tracking",

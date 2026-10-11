@@ -287,7 +287,7 @@ base_model: Ultralytics/YOLOv8
 
 # SteadyForum models
 
-Models for **SteadyForum**, a quiet AI steadyforum for new gym-goers and people returning from injury
+Models for **SteadyForum**, a quiet AI coach for new gym-goers and people returning from injury
 (Knight Hacks IX). The iPhone app runs the pose model on-device; the form model scores reps.
 The app reads `manifest.json` on launch and downloads any model that changed.
 

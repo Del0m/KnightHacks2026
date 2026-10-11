@@ -1,20 +1,24 @@
 // BE-10: write side of the social layer. Every user-written post and comment passes moderation
 // (CONN-09 behind the Moderator port) before it is saved. Auto-posts on medals and PRs are
 // written by session finish (services/sessions.ts) only when the user opted in.
+//
+// A blocked post or comment is a 422 moderation_blocked. When it's self-harm, details.support is
+// true: the app should show the message with support resources, not as an error. Other blocks
+// are logged to moderation_blocks.
 import { and, asc, eq } from "drizzle-orm";
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
-import { badRequest, HttpError, notFound, parse, send, userId } from "../http.js";
+import { badRequest, conflict, HttpError, notFound, parse, send, userId } from "../http.js";
 import { BLOCKED_MESSAGE, type Moderator } from "../services/moderation.js";
 import { visiblePostsFilter } from "./feed.js";
 
-const { posts, comments, kudos, follows, users, profiles, sessions } = schema;
+const { posts, comments, kudos, follows, users, profiles, sessions, moderationBlocks } = schema;
 
 export const postInput = z
   .object({
-    // Advice questions go through POST /advice (BE-11) once it exists.
+    // Advice questions go through POST /advice (BE-11), which adds the AI-suggested first answer.
     kind: z.enum(["session", "pr", "medal", "goal"]),
     body: z.string().trim().min(1).max(2000),
     session_id: z.string().uuid().nullable().optional(),
@@ -24,11 +28,37 @@ export const postInput = z
 
 export const commentInput = z.object({ body: z.string().trim().min(1).max(1000) }).strict();
 
-async function moderate(moderator: Moderator, text: string, kind: "post" | "comment") {
-  const verdict = await moderator.check(text, kind);
-  if (!verdict.allowed) {
-    throw new HttpError(422, "moderation_blocked", verdict.message || BLOCKED_MESSAGE);
+// Also used by POST /advice (BE-11): an advice question is a post, checked as "advice".
+export async function moderate(
+  db: Db,
+  moderator: Moderator,
+  req: Request,
+  text: string,
+  target: { kind: "post"; checkAs?: "advice" } | { kind: "comment"; postId: string },
+): Promise<{ checked: boolean }> {
+  const verdict = await moderator.check(
+    text,
+    target.kind === "post" ? (target.checkAs ?? "post") : "comment",
+  );
+  // checked: false means moderation was unreachable; the content is saved and re-checked later
+  // (jobs/recheckModeration.ts, INT-04).
+  if (verdict.allowed) return { checked: verdict.checked !== false };
+  if (verdict.support) {
+    throw new HttpError(422, "moderation_blocked", verdict.message || BLOCKED_MESSAGE, { support: true });
   }
+  // The user still gets their 422 if logging fails.
+  try {
+    await db.insert(moderationBlocks).values({
+      authorId: userId(req),
+      kind: target.kind,
+      postId: target.kind === "comment" ? target.postId : null,
+      body: text,
+      categories: verdict.categories ?? [],
+    });
+  } catch (err) {
+    req.log?.error({ err }, "couldn't log blocked content");
+  }
+  throw new HttpError(422, "moderation_blocked", verdict.message || BLOCKED_MESSAGE);
 }
 
 async function visiblePost(db: Db, me: string, postId: string) {
@@ -44,6 +74,44 @@ async function visiblePost(db: Db, me: string, postId: string) {
 export function socialRouter(db: Db, moderator: Moderator): Router {
   const router = Router();
 
+  // The session row lock serializes retries; sharing this workout creates one session post.
+  router.put("/sessions/:id/share", async (req, res) => {
+    const me = userId(req),
+      sessionId = parse(z.string().uuid(), req.params.id);
+    const input = parse(postInput.pick({ body: true, data: true }), req.body);
+    const { checked } = await moderate(db, moderator, req, input.body, { kind: "post" });
+    const post = await db.transaction(async (tx) => {
+      const [session] = await tx
+        .select()
+        .from(sessions)
+        .where(and(eq(sessions.id, sessionId), eq(sessions.userId, me)))
+        .for("update")
+        .limit(1);
+      if (!session) throw notFound("Session");
+      if (!session.finishedAt) throw conflict("This session is not finished");
+      const [existing] = await tx
+        .select()
+        .from(posts)
+        .where(and(eq(posts.authorId, me), eq(posts.sessionId, sessionId), eq(posts.kind, "session")))
+        .limit(1);
+      if (existing) return existing;
+      const [created] = await tx
+        .insert(posts)
+        .values({
+          authorId: me,
+          kind: "session",
+          sessionId,
+          body: input.body,
+          data: input.data ?? null,
+          moderationChecked: checked,
+        })
+        .returning();
+      return created;
+    });
+    const { embedding: _embedding, ...shared } = post!; // advice-only column
+    send(res, shared);
+  });
+
   router.post("/posts", async (req, res) => {
     const me = userId(req);
     const input = parse(postInput, req.body);
@@ -54,7 +122,7 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         .where(and(eq(sessions.id, input.session_id), eq(sessions.userId, me)));
       if (!own) throw notFound("Session");
     }
-    await moderate(moderator, input.body, "post");
+    const { checked } = await moderate(db, moderator, req, input.body, { kind: "post" });
     const [row] = await db
       .insert(posts)
       .values({
@@ -63,9 +131,11 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         body: input.body,
         sessionId: input.session_id ?? null,
         data: input.data ?? null,
+        moderationChecked: checked,
       })
       .returning();
-    send(res, row, 201);
+    const { embedding: _embedding, ...post } = row!; // advice-only column
+    send(res, post, 201);
   });
 
   router.get("/posts/:id/comments", async (req, res) => {
@@ -77,6 +147,7 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
         id: comments.id,
         body: comments.body,
         aiSuggested: comments.aiSuggested,
+        sources: comments.sources, // BE-11: what an AI answer cites
         createdAt: comments.createdAt,
         author: { id: users.id, handle: users.handle },
       })
@@ -92,8 +163,11 @@ export function socialRouter(db: Db, moderator: Moderator): Router {
     const postId = parse(z.string().uuid(), req.params.id);
     const input = parse(commentInput, req.body);
     await visiblePost(db, me, postId);
-    await moderate(moderator, input.body, "comment");
-    const [row] = await db.insert(comments).values({ postId, authorId: me, body: input.body }).returning();
+    const { checked } = await moderate(db, moderator, req, input.body, { kind: "comment", postId });
+    const [row] = await db
+      .insert(comments)
+      .values({ postId, authorId: me, body: input.body, moderationChecked: checked })
+      .returning();
     send(res, row, 201);
   });
 

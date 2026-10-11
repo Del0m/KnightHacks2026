@@ -1,0 +1,357 @@
+{
+  "clip": {
+    "name": "shoulder_press_rest_positions",
+    "exercise": "shoulder_press",
+    "source": "synthetic",
+    "frames": 448
+  },
+  "engine": {
+    "reps": 3,
+    "partials": 3,
+    "set_end": "still",
+    "per_rep": [
+      {
+        "index": 1,
+        "side": "left",
+        "extreme_deg": 170.1,
+        "durations_ms": {
+          "outbound": 267,
+          "peak": 866,
+          "return": 667,
+          "rep": 1800
+        }
+      },
+      {
+        "index": 2,
+        "side": "left",
+        "extreme_deg": 168.4,
+        "durations_ms": {
+          "outbound": 267,
+          "peak": 867,
+          "return": 666,
+          "rep": 1800
+        }
+      },
+      {
+        "index": 3,
+        "side": "left",
+        "extreme_deg": 170.6,
+        "durations_ms": {
+          "outbound": 266,
+          "peak": 867,
+          "return": 667,
+          "rep": 1800
+        }
+      }
+    ]
+  },
+  "set_payload": {
+    "schema_version": 1,
+    "set_index": 0,
+    "exercise_id": "shoulder_press",
+    "weight_kg": null,
+    "end_reason": "still",
+    "partial_reps": 3,
+    "fps": 15,
+    "frames": {
+      "count": 364,
+      "sha256": "0975996cec843523"
+    },
+    "reps": [
+      {
+        "rep_index": 0,
+        "start_ms": 1000,
+        "end_ms": 2800,
+        "tempo_ms": 1800,
+        "range_deg": 78.2,
+        "quality": null,
+        "lowering_ms": 667,
+        "rising_ms": 1133,
+        "flags": []
+      },
+      {
+        "rep_index": 1,
+        "start_ms": 3733,
+        "end_ms": 5533,
+        "tempo_ms": 1800,
+        "range_deg": 75.7,
+        "quality": null,
+        "lowering_ms": 667,
+        "rising_ms": 1133,
+        "flags": []
+      },
+      {
+        "rep_index": 2,
+        "start_ms": 6467,
+        "end_ms": 8267,
+        "tempo_ms": 1800,
+        "range_deg": 76,
+        "quality": null,
+        "lowering_ms": 733,
+        "rising_ms": 1067,
+        "flags": []
+      }
+    ]
+  },
+  "api": {
+    "set_response": {
+      "id": "<id 1>",
+      "session_id": "<id 2>",
+      "position": 0,
+      "exercise_id": "shoulder_press",
+      "reps": 3,
+      "weight_kg": null,
+      "end_reason": "still",
+      "partial_reps": 3,
+      "medal": "gold",
+      "clean_share": 1,
+      "score_source": "databricks",
+      "score": {
+        "source": "databricks",
+        "medal": "gold",
+        "clean_share": 1,
+        "reps": [
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": true
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": true
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": true
+          }
+        ]
+      },
+      "rest_note": {
+        "text": "3 of 3 reps were clean.",
+        "source": "fixed",
+        "rule_id": null
+      },
+      "created_at": "<time>",
+      "clean_reps": 3,
+      "set_id": "<id 1>"
+    },
+    "finish_response": {
+      "session_id": "<id 2>",
+      "finished_at": "2026-10-10T15:05:00.000Z",
+      "medal": "gold",
+      "form_score": 1,
+      "baseline_share": 0.7,
+      "total_reps": 3,
+      "clean_reps": 3,
+      "personal_records": [
+        {
+          "exercise_id": "shoulder_press",
+          "metric": "max_reps",
+          "value": 3,
+          "previous_value": null
+        }
+      ],
+      "posts": []
+    },
+    "llm_called": false,
+    "rows": {
+      "session": {
+        "id": "<id 2>",
+        "userId": "replay-shoulder_press_rest_positions",
+        "startedAt": "2026-10-10T15:00:00.000Z",
+        "finishedAt": "2026-10-10T15:05:00.000Z",
+        "device": "replay",
+        "inferenceMode": "coreml",
+        "medal": "gold",
+        "formScore": 1,
+        "exportStatus": "exported",
+        "exportError": null,
+        "exportAttempts": 1,
+        "exportStartedAt": "<time>",
+        "exportedAt": "<time>"
+      },
+      "sets": [
+        {
+          "id": "<id 1>",
+          "sessionId": "<id 2>",
+          "position": 0,
+          "exerciseId": "shoulder_press",
+          "reps": 3,
+          "weightKg": null,
+          "endReason": "still",
+          "partialReps": 3,
+          "medal": "gold",
+          "cleanShare": 1,
+          "scoreSource": "databricks",
+          "score": {
+            "reps": [
+              {
+                "clean": true,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": true,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": true,
+                "label": "clean",
+                "quality": 0.8
+              }
+            ],
+            "medal": "gold",
+            "source": "databricks",
+            "clean_share": 1
+          },
+          "restNote": {
+            "text": "3 of 3 reps were clean.",
+            "source": "fixed",
+            "rule_id": null
+          },
+          "createdAt": "<time>"
+        }
+      ],
+      "reps": [
+        {
+          "id": "<id 3>",
+          "setId": "<id 1>",
+          "position": 0,
+          "startMs": 1000,
+          "endMs": 2800,
+          "loweringMs": 667,
+          "risingMs": 1133,
+          "tempoMs": 1800,
+          "rangeDeg": 78.2,
+          "quality": null,
+          "clean": true
+        },
+        {
+          "id": "<id 4>",
+          "setId": "<id 1>",
+          "position": 1,
+          "startMs": 3733,
+          "endMs": 5533,
+          "loweringMs": 667,
+          "risingMs": 1133,
+          "tempoMs": 1800,
+          "rangeDeg": 75.7,
+          "quality": null,
+          "clean": true
+        },
+        {
+          "id": "<id 5>",
+          "setId": "<id 1>",
+          "position": 2,
+          "startMs": 6467,
+          "endMs": 8267,
+          "loweringMs": 733,
+          "risingMs": 1067,
+          "tempoMs": 1800,
+          "rangeDeg": 76,
+          "quality": null,
+          "clean": true
+        }
+      ],
+      "form_flags": [],
+      "medals": [
+        {
+          "id": "<id 6>",
+          "userId": "replay-shoulder_press_rest_positions",
+          "sessionId": "<id 2>",
+          "tier": "gold",
+          "formScore": 1,
+          "baselineShare": 0.7,
+          "awardedAt": "2026-10-10T15:05:00.000Z"
+        }
+      ]
+    }
+  },
+  "upload": {
+    "export_status": "exported",
+    "files": [
+      {
+        "path": "/Volumes/steadyforum/raw/sessions/joints/2026-10-10/<id 2>.ndjson.gz",
+        "sets": [
+          {
+            "set_index": 0,
+            "exercise_id": "shoulder_press",
+            "fps": 15,
+            "frame_count": 364,
+            "first_t_ms": 0,
+            "last_t_ms": 24200,
+            "frames_sha256": "0975996cec843523"
+          }
+        ]
+      },
+      {
+        "path": "/Volumes/steadyforum/raw/sessions/meta/2026-10-10/<id 2>.json",
+        "metadata": {
+          "schema_version": 1,
+          "session_id": "<id 2>",
+          "user_id": "e00f7910d65a8db6f4aba3787eb6b1f7",
+          "started_at": "2026-10-10T15:00:00.000Z",
+          "finished_at": "2026-10-10T15:05:00.000Z",
+          "device": "replay",
+          "inference_mode": "coreml",
+          "medal": "gold",
+          "form_score": 1,
+          "experience_level": "beginner",
+          "injury_groups": [],
+          "rehab_start_on": null,
+          "joints_path": "/Volumes/steadyforum/raw/sessions/joints/2026-10-10/<id 2>.ndjson.gz",
+          "exported_at": "<time>",
+          "sets": [
+            {
+              "set_index": 0,
+              "exercise_id": "shoulder_press",
+              "weight_kg": null,
+              "medal": "gold",
+              "end_reason": "still",
+              "partial_reps": 3,
+              "frame_count": 364,
+              "reps": [
+                {
+                  "rep_index": 0,
+                  "start_ms": 1000,
+                  "end_ms": 2800,
+                  "tempo_ms": 1800,
+                  "range_deg": 78.2,
+                  "quality": null,
+                  "lowering_ms": 667,
+                  "rising_ms": 1133,
+                  "flags": []
+                },
+                {
+                  "rep_index": 1,
+                  "start_ms": 3733,
+                  "end_ms": 5533,
+                  "tempo_ms": 1800,
+                  "range_deg": 75.7,
+                  "quality": null,
+                  "lowering_ms": 667,
+                  "rising_ms": 1133,
+                  "flags": []
+                },
+                {
+                  "rep_index": 2,
+                  "start_ms": 6467,
+                  "end_ms": 8267,
+                  "tempo_ms": 1800,
+                  "range_deg": 76,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 1067,
+                  "flags": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

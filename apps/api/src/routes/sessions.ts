@@ -11,7 +11,7 @@ import { parse, send, userId } from "../http.js";
 import { JOINT_COUNT, VALUES_PER_JOINT } from "../integrations/databricks/upload.js";
 import { RestNoteWriter } from "../services/restNote.js";
 import { restTimeResult } from "../services/restTime.js";
-import { addSet, finishSession, type FinishDeps } from "../services/sessions.js";
+import { addSet, finishSession, sessionSummary, type FinishDeps } from "../services/sessions.js";
 
 const noLlmNotes = new RestNoteWriter(null); // fixed notes when no LLM is configured
 
@@ -143,11 +143,13 @@ export function sessionsRouter(db: Db, deps: FinishDeps): Router {
       reps: input.reps.map((r) => ({
         rangeDeg: r.range_deg,
         tempoMs: r.tempo_ms,
-        quality: r.quality,
         loweringMs: r.lowering_ms,
-        risingMs: r.rising_ms,
+        quality: r.quality,
+        startMs: r.start_ms,
+        endMs: r.end_ms,
         flags: r.flags.map((f) => ({ ruleId: f.rule_id })),
       })),
+      frames: input.frames,
     });
     deps.log?.info(
       {
@@ -170,6 +172,11 @@ export function sessionsRouter(db: Db, deps: FinishDeps): Router {
       },
       201,
     );
+  });
+
+  router.get("/sessions/:id/summary", async (req, res) => {
+    const sessionId = parse(z.string().uuid(), req.params.id);
+    send(res, await sessionSummary(db, userId(req), sessionId));
   });
 
   router.post("/sessions/:id/finish", async (req, res) => {

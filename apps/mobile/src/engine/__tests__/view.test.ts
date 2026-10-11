@@ -22,6 +22,15 @@ const torso = (sw: number, hw: number) =>
   });
 
 describe('viewRatio', () => {
+  it('excludes low-confidence held torso points', () => {
+    const f = torso(0.3, 0.2);
+    f.joints = f.joints.map((j, i) => j && JOINT_NAMES[i].startsWith('right_') ? { ...j, c: 0.1 } : j);
+    expect(viewRatio(f, 1)).toBe(0);
+    expect(detectView([f, f, f], 1)).toBe('side');
+    f.joints = f.joints.map((j) => j ? { ...j, c: 0.1 } : null);
+    expect(viewRatio(f, 1)).toBeNull();
+    expect(detectView([f, f, f], 1)).toBe('unknown');
+  });
   it('compares the torso width with its height', () => {
     expect(viewRatio(torso(0.2, 0.16), 1)).toBeCloseTo((0.2 + 0.16) / (2 * 0.3));
   });

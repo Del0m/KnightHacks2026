@@ -2,11 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { PoseDetection } from '../pose/types';
 import { createFormEngine } from './engine';
 import { createPoseClock } from './poseClock';
+import { useStableSpec } from './useStableSpec';
 import type { EngineEvent, EngineOptions, EngineUpdate, ExerciseSpec, MetricSide, RepState } from './types';
 
 const PRIMARY_INTERVAL_MS = 250;
 
 export interface FormEngineState {
+  /** Invalid effective spec: evaluation is disabled until a valid spec is supplied. */
+  error: Error | null;
   /** Pass to `usePoseOutput({ onPose })`. */
   onPose: (d: PoseDetection) => void;
   state: RepState;
@@ -36,12 +39,20 @@ export function useFormEngine(
   } = {},
 ): FormEngineState {
   const { imageAspect } = opts;
+  const prepared = useStableSpec(spec);
   const optsRef = useRef(opts);
   useLayoutEffect(() => { optsRef.current = opts; }, [opts]);
 
   // Configuration is captured when the spec changes; imageAspect updates the active engine below.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const engine = useMemo(() => (spec ? createFormEngine(spec, opts) : null), [spec]);
+  const { engine, error } = useMemo(() => {
+    try {
+      if (prepared.error) return { engine: null, error: prepared.error };
+      return { engine: prepared.spec ? createFormEngine(prepared.spec, opts) : null, error: null };
+    } catch (cause) {
+      return { engine: null, error: cause instanceof Error ? cause : new Error(String(cause)) };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prepared]);
 
   useEffect(() => {
     engine?.setImageAspect(imageAspect);
@@ -101,5 +112,5 @@ export function useFormEngine(
     setPrimary({ value: null, side: null });
   }, [engine]);
 
-  return { onPose, state, repCount, ended, primary: primary.value, primarySide: primary.side, endSet, reset };
+  return { error, onPose, state, repCount, ended, primary: primary.value, primarySide: primary.side, endSet, reset };
 }

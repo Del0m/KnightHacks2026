@@ -97,7 +97,7 @@ start ──past start_exit──▶ outbound ──past count_min──▶ peak
 - **The `side` of each frame** is reported alongside its metrics. `most_visible` keeps one side for the whole rep.
 - **Only reliable primary angles count.** A frame where any joint of the primary angle is low-confidence, or where the angle jumps faster than a person can move (over 720°/s), doesn't move the counter.
 
-**`gate` (optional):** `{ metric, op, value }`, where `metric` is another `angles` key. A rep can only reach `peak` on a frame where `metric op value` holds. Use it when a rest position matches the primary angle. The shoulder press's straight elbow reads the same with arms hanging down as overhead, so it gates on `arm_raise <= 60` (wrists above the shoulders):
+**`gate` (optional):** `{ metric, op, value }`, where `metric` is another `angles` key. A rep must pass `count_min` on a frame where `metric op value` also holds, and can only reach `peak` while the gate passes. Range reached with a passing gate is remembered through the minimum state time. Use it when a rest position matches the primary angle. The shoulder press's straight elbow reads the same with arms hanging down as overhead, so it gates on `arm_raise <= 60` (wrists above the shoulders):
 
 ```json
 "angles": { "arm_raise": { "type": "segment_tilt", "from": "shoulder", "to": "wrist", "side": "max" } },
@@ -123,7 +123,7 @@ Required order:
 | `view` | `front`, `side` or `any`. The rule is skipped when the detected camera view differs. |
 | `check` | `{ metric, reduce, op, value }`. `reduce` is `min`, `max`, `mean`, `first` or `last`, and is omitted for `duration_ms`. `op` is `<=`, `>=`, `<` or `>`. `value` is a number or a threshold name (`start_exit`, `count_min`, `target`, `start_enter`). |
 | `severity` | `form` or `safety`. Only `safety` may use the optional haptic. |
-| `priority` | Unique integer, where 1 is most important. The rest note covers only the top flagged rule. |
+| `priority` | Unique integer, where 1 is most important within a severity. The rest note prefers safety flags, then lowest priority. |
 | `label` | Form-model label (Architecture §6.3) |
 | `joints` | COCO joints that tint amber when the rule flags |
 | `rest_note` | Fixed note, shown when the LLM's version fails the tone check |
@@ -134,10 +134,15 @@ Required order:
 
 - **`view`:** the camera view is detected per rep from how far apart the shoulders and hips are across the image, relative to torso length. When it's unclear, only `any` rules run. The app can also pass the view in, for example from the setup screen, and that takes priority.
 - **Missing data:** the check reduces over the frames where the metric could be measured. If that's under half the phase's frames, the rule is skipped for that rep (no flag).
+- **Primary-angle depth and lockout:** a `peak` check using `min` for a decreasing primary angle or `max` for an increasing one reads the whole movement through the rep count. This keeps a fast turn that happened before the minimum state time, while excluding the settle tail. For gated specs, only gate-passing frames supply the extreme, primary-angle depth/lockout values and the turn used for phase durations; an arms-down rest cannot supply an overhead lockout. Other checks read their phase's frames.
 - **`mid_` points:** within a phase, the check uses only frames where the midpoint was taken the same way as in most of them (from both sides, or from one), so a hip dropping out mid-rep can't add a jump.
 - **Rules not in the file** (such as physio limits) are evaluated the same way.
 
 Full behaviour: [form rules design](../superpowers/specs/2026-10-10-form-rules-design.md).
+
+**Runtime validation:** `createFormEngine` and `createSetRules` reject invalid evaluation settings with an `Invalid exercise spec` error before starting a set. Checks cover finite phase thresholds and their order, primary-angle and gate references, rule metric references, comparisons, reductions and threshold values. `evaluateRule` also checks its rule and resolves only finite thresholds before view gating or comparison, so a missing `target` cannot become a form flag. Callers receiving server or generated effective specs can call `assertEvaluationSpec` before activating them and handle the error as a spec-loading failure. These runtime checks complement the full schema, override and note checks in `node specs/validate.mjs`; they do not replace them.
+
+`useFormEngine` and `useFormRules` catch construction failures and return `error: Error | null`. With an error, their input callbacks do nothing and their published state is empty; supplying a valid spec clears the error and starts fresh evaluation. They never substitute an unrestricted bundled spec for invalid injury or physio limits. The spec-loading UI can offer a retry or a validated fallback that retains those limits. The debug screen displays the error instead of crashing.
 
 Placeholders in `rest_note`:
 

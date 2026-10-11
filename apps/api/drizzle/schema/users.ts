@@ -27,6 +27,9 @@ export const bodyPart = pgEnum("body_part", [
   "other",
 ]);
 export const injurySeverity = pgEnum("injury_severity", ["mild", "moderate", "severe"]);
+// DB-12: which side is injured, so range-of-motion trends can compare it with the healthy side.
+// "n/a" for body parts without a side (neck, lower back) and for injuries entered before DB-12.
+export const injurySide = pgEnum("injury_side", ["left", "right", "both", "n/a"]);
 
 export const EMBEDDING_DIMENSIONS = 384; // BAAI/bge-small-en-v1.5
 
@@ -97,6 +100,7 @@ export const injuries = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     bodyPart: bodyPart().notNull(),
     severity: injurySeverity().notNull().default("mild"),
+    side: injurySide().notNull().default("n/a"),
     since: date(),
     notes: text(),
     isPrivate: boolean().notNull().default(true),

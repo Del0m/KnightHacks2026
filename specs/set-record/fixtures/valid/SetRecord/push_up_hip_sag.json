@@ -1006,35 +1006,24 @@
       "start_ms": 1000,
       "end_ms": 2867,
       "tempo_ms": 1867,
-      "range_deg": 81.4,
+      "range_deg": 69.5,
       "quality": null,
-      "lowering_ms": 800,
-      "rising_ms": 1067,
-      "flags": [
-        {
-          "rule_id": "tempo",
-          "severity": "form",
-          "rep_index": 0
-        }
-      ]
+      "lowering_ms": 734,
+      "rising_ms": 1133,
+      "flags": []
     },
     {
       "rep_index": 1,
       "start_ms": 4067,
       "end_ms": 5934,
       "tempo_ms": 1867,
-      "range_deg": 77.5,
+      "range_deg": 69.2,
       "quality": null,
       "lowering_ms": 667,
       "rising_ms": 1200,
       "flags": [
         {
           "rule_id": "hip_sag",
-          "severity": "form",
-          "rep_index": 1
-        },
-        {
-          "rule_id": "tempo",
           "severity": "form",
           "rep_index": 1
         }
@@ -1045,35 +1034,24 @@
       "start_ms": 7134,
       "end_ms": 9000,
       "tempo_ms": 1866,
-      "range_deg": 81.3,
+      "range_deg": 70.8,
       "quality": null,
-      "lowering_ms": 733,
-      "rising_ms": 1133,
-      "flags": [
-        {
-          "rule_id": "tempo",
-          "severity": "form",
-          "rep_index": 2
-        }
-      ]
+      "lowering_ms": 600,
+      "rising_ms": 1266,
+      "flags": []
     },
     {
       "rep_index": 3,
       "start_ms": 10134,
       "end_ms": 12000,
       "tempo_ms": 1866,
-      "range_deg": 79.6,
+      "range_deg": 68.5,
       "quality": null,
-      "lowering_ms": 800,
-      "rising_ms": 1066,
+      "lowering_ms": 666,
+      "rising_ms": 1200,
       "flags": [
         {
           "rule_id": "hip_sag",
-          "severity": "form",
-          "rep_index": 3
-        },
-        {
-          "rule_id": "tempo",
           "severity": "form",
           "rep_index": 3
         }
@@ -1084,17 +1062,11 @@
       "start_ms": 13200,
       "end_ms": 15134,
       "tempo_ms": 1934,
-      "range_deg": 83.1,
+      "range_deg": 72.7,
       "quality": null,
       "lowering_ms": 734,
       "rising_ms": 1200,
-      "flags": [
-        {
-          "rule_id": "tempo",
-          "severity": "form",
-          "rep_index": 4
-        }
-      ]
+      "flags": []
     }
   ]
 }

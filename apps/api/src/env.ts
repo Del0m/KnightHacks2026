@@ -56,6 +56,17 @@ export const envSchema = z.object({
   HF_GUARD_MODEL: optional,
   HF_GUARD_PROVIDER: optional,
   HF_GUARD_TIMEOUT_MS: optionalInt,
+  // INT-04: the insight sync runs only where this is "true", so exactly one instance runs it.
+  INSIGHT_SYNC_ENABLED: z
+    .enum(["true", "false", ""])
+    .optional()
+    .transform((v) => v === "true"),
+
+  // Script-only (not read by the server): db:seed:demo, ml/space/publish_dataset.py, CONN-10.
+  DEMO_DATABASE_URL: optional,
+  DEMO_PRESENTER_USER_ID: optional,
+  HF_WRITE_TOKEN: optional,
+
   // CONN-11: cloud pose endpoint (ml/cloud_endpoint). Without it, /pose/stream isn't served.
   POSE_ENDPOINT_URL: optional.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https URL"),
   POSE_ENDPOINT_TIMEOUT_MS: optionalInt,
@@ -83,4 +94,9 @@ export function databricksConfigured(env: Env): boolean {
 
 export function insightSyncConfigured(env: Env): boolean {
   return databricksConfigured(env) && Boolean(env.DATABRICKS_WAREHOUSE_ID);
+}
+
+/** The sync also needs INSIGHT_SYNC_ENABLED=true, so only one instance runs it. */
+export function insightSyncEnabled(env: Env): boolean {
+  return insightSyncConfigured(env) && env.INSIGHT_SYNC_ENABLED;
 }

@@ -145,6 +145,19 @@ describe('phaseDuration', () => {
       expect(evaluateRule(spec, r, rep, 'side')).toEqual({ rule_id: 'tempo', status: ms >= 800 ? 'pass' : 'flag', value: ms, threshold: 800 });
     }
   });
+
+  it('ignores gate-failing frames even when they match the qualified extreme', () => {
+    const gated = { ...spec, primary_angle: { ...spec.primary_angle, gate: { metric: 'trunk', op: '<=' as const, value: 45 } } };
+    const rep = makeRep([
+      { t: 0, phase: 'outbound', m: { knee: 150, trunk: 60 } },
+      { t: 100, phase: 'outbound', m: { knee: 90, trunk: 60 } },
+      { t: 1000, phase: 'peak', m: { knee: 90, trunk: 10 } },
+      { t: 2000, phase: 'return', m: { knee: 166, trunk: 10 } },
+    ]);
+    expect(phaseDuration(gated, rep, 'outbound')).toBe(1000);
+    expect(phaseDuration(gated, rep, 'peak')).toBe(0);
+    expect(phaseDuration(gated, rep, 'return')).toBe(1000);
+  });
 });
 
 describe('evaluateRule', () => {
@@ -198,6 +211,24 @@ describe('evaluateRule', () => {
     ]);
     const min = (phase: Rule['phase']) => evaluateRule(spec, rule('r', { phase }), rep, 'side').value;
     expect([min('outbound'), min('peak'), min('return'), min('rep')]).toEqual([150, 90, 140, 90]);
+  });
+
+  it.each(['decreasing', 'increasing'] as const)('includes the early %s extreme without the settle tail', (direction) => {
+    const increasing = direction === 'increasing';
+    const extreme = increasing ? 160 : 90;
+    const peak = increasing ? 140 : 110;
+    const tail = increasing ? 175 : 75;
+    const spec = { ...makeSpec([]), primary_angle: { name: 'knee', direction } };
+    const rep = makeRep([
+      { t: 0, phase: 'outbound', m: { knee: extreme } },
+      { t: 100, phase: 'peak', m: { knee: peak } },
+      { t: 200, phase: 'return', m: { knee: 150 } },
+      { t: 300, phase: 'return', m: { knee: tail } },
+    ], { countedAt: 200, extreme });
+    const check = { reduce: increasing ? 'max' as const : 'min' as const, op: increasing ? '>=' as const : '<=' as const, value: increasing ? 150 : 95 };
+    expect(evaluateRule(spec, rule('depth', { check }), rep, 'side')).toMatchObject({ status: 'pass', value: extreme });
+    // Other reductions still describe the actual peak window.
+    expect(evaluateRule(spec, rule('mean', { check: { reduce: 'mean' } }), rep, 'side').value).toBe(peak);
   });
 
   it('is unmeasured below half coverage', () => {
@@ -357,6 +388,18 @@ describe('the set', () => {
     ]);
     expect(set.top).toBe(set.rules[1]);
     expect(restNote(spec, set)).toBe('About 0.8 s per rep.');
+  });
+
+  it('selects safety before form priority, then priority among safety flags', () => {
+    const safetySpec = makeSpec([
+      rule('form', { priority: 1 }),
+      rule('safety_later', { priority: 4, severity: 'safety' }),
+      rule('safety_first', { priority: 3, severity: 'safety', rest_note: 'Safety first.' }),
+    ]);
+    const results = [evaluateRep(safetySpec, peakRep([110]), { view: 'side' })];
+    const set = summarizeSet(safetySpec, results, 'manual');
+    expect(set.top?.rule_id).toBe('safety_first');
+    expect(restNote(safetySpec, set)).toBe('Safety first.');
   });
 
   it('carries the injury notes of an effective spec', () => {

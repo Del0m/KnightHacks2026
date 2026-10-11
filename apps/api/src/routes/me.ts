@@ -4,8 +4,9 @@ import { Router } from "express";
 import { z } from "zod";
 import type { Db } from "../db.js";
 import { schema } from "../db.js";
-import { conflict, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
+import { conflict, isoDate, isUniqueViolation, notFound, parse, send, userId } from "../http.js";
 import { deleteAccount } from "../services/accountDeletion.js";
+import type { ProfileEmbeddings } from "../services/profileEmbeddings.js";
 
 const { users, profiles, injuries } = schema;
 const onboardingGoals = new Set([
@@ -111,12 +112,12 @@ export const profileUpdate = z
     }
   });
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "use YYYY-MM-DD");
-
 export const injuryInput = z
   .object({
     body_part: z.enum(["knee", "shoulder", "lower_back", "hip", "ankle", "wrist", "elbow", "neck", "other"]),
     severity: z.enum(["mild", "moderate", "severe"]).default("mild"),
+    // DB-12: lets range-of-motion trends compare the injured side with the healthy one.
+    side: z.enum(["left", "right", "both", "n/a"]).default("n/a"),
     since: isoDate.nullable().optional(),
     notes: z.string().max(500).nullable().optional(),
     is_private: z.boolean().default(true),
@@ -158,6 +159,8 @@ export async function getProfile(db: Db, id: string) {
 export interface MeRouterOptions {
   pseudonymSecret?: string;
   onAccountDeleted?: (userId: string) => void;
+  // CONN-08: re-embeds the profile for buddy matching when goals or bio change.
+  profileEmbeddings?: ProfileEmbeddings;
 }
 
 export function meRouter(db: Db, options: MeRouterOptions = {}): Router {
@@ -239,6 +242,12 @@ export function meRouter(db: Db, options: MeRouterOptions = {}): Router {
       throw err;
     }
     send(res, await getProfile(db, id));
+    // After the response: a slow or failed embedding never holds up the edit.
+    if (options.profileEmbeddings && (rest.goals !== undefined || rest.bio !== undefined)) {
+      options.profileEmbeddings
+        .refresh(id)
+        .catch((err) => req.log?.warn({ err }, "couldn't refresh profile embedding"));
+    }
   });
 
   router.get("/me/injuries", async (req, res) => {
@@ -258,6 +267,7 @@ export function meRouter(db: Db, options: MeRouterOptions = {}): Router {
         userId: userId(req),
         bodyPart: input.body_part,
         severity: input.severity,
+        side: input.side,
         since: input.since ?? null,
         notes: input.notes ?? null,
         isPrivate: input.is_private,

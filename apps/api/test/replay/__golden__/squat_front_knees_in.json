@@ -1,0 +1,682 @@
+{
+  "clip": {
+    "name": "squat_front_knees_in",
+    "exercise": "squat",
+    "source": "synthetic",
+    "frames": 272
+  },
+  "engine": {
+    "reps": 6,
+    "partials": 0,
+    "set_end": null,
+    "per_rep": [
+      {
+        "index": 1,
+        "side": "right",
+        "extreme_deg": 112.5,
+        "durations_ms": {
+          "outbound": 333,
+          "peak": 667,
+          "return": 533,
+          "rep": 1533
+        }
+      },
+      {
+        "index": 2,
+        "side": "right",
+        "extreme_deg": 103,
+        "durations_ms": {
+          "outbound": 267,
+          "peak": 800,
+          "return": 533,
+          "rep": 1600
+        }
+      },
+      {
+        "index": 3,
+        "side": "right",
+        "extreme_deg": 115.8,
+        "durations_ms": {
+          "outbound": 267,
+          "peak": 733,
+          "return": 534,
+          "rep": 1534
+        }
+      },
+      {
+        "index": 4,
+        "side": "right",
+        "extreme_deg": 104.7,
+        "durations_ms": {
+          "outbound": 267,
+          "peak": 733,
+          "return": 600,
+          "rep": 1600
+        }
+      },
+      {
+        "index": 5,
+        "side": "right",
+        "extreme_deg": 113.9,
+        "durations_ms": {
+          "outbound": 333,
+          "peak": 667,
+          "return": 533,
+          "rep": 1533
+        }
+      },
+      {
+        "index": 6,
+        "side": "right",
+        "extreme_deg": 104.5,
+        "durations_ms": {
+          "outbound": 267,
+          "peak": 800,
+          "return": 533,
+          "rep": 1600
+        }
+      }
+    ]
+  },
+  "set_payload": {
+    "schema_version": 1,
+    "set_index": 0,
+    "exercise_id": "squat",
+    "weight_kg": null,
+    "end_reason": "manual",
+    "partial_reps": 0,
+    "fps": 15,
+    "frames": {
+      "count": 257,
+      "sha256": "a9a9a8a5cc4601bf"
+    },
+    "reps": [
+      {
+        "rep_index": 0,
+        "start_ms": 1000,
+        "end_ms": 2533,
+        "tempo_ms": 1533,
+        "range_deg": 54,
+        "quality": null,
+        "lowering_ms": 667,
+        "rising_ms": 866,
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 0
+          }
+        ]
+      },
+      {
+        "rep_index": 1,
+        "start_ms": 3600,
+        "end_ms": 5200,
+        "tempo_ms": 1600,
+        "range_deg": 63.3,
+        "quality": null,
+        "lowering_ms": 733,
+        "rising_ms": 867,
+        "flags": [
+          {
+            "rule_id": "knee_tracking",
+            "severity": "form",
+            "rep_index": 1
+          },
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 1
+          }
+        ]
+      },
+      {
+        "rep_index": 2,
+        "start_ms": 6333,
+        "end_ms": 7867,
+        "tempo_ms": 1534,
+        "range_deg": 53,
+        "quality": null,
+        "lowering_ms": 600,
+        "rising_ms": 934,
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 2
+          }
+        ]
+      },
+      {
+        "rep_index": 3,
+        "start_ms": 8933,
+        "end_ms": 10533,
+        "tempo_ms": 1600,
+        "range_deg": 63.4,
+        "quality": null,
+        "lowering_ms": 734,
+        "rising_ms": 866,
+        "flags": [
+          {
+            "rule_id": "knee_tracking",
+            "severity": "form",
+            "rep_index": 3
+          },
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 3
+          }
+        ]
+      },
+      {
+        "rep_index": 4,
+        "start_ms": 11600,
+        "end_ms": 13133,
+        "tempo_ms": 1533,
+        "range_deg": 52.8,
+        "quality": null,
+        "lowering_ms": 667,
+        "rising_ms": 866,
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 4
+          }
+        ]
+      },
+      {
+        "rep_index": 5,
+        "start_ms": 14200,
+        "end_ms": 15800,
+        "tempo_ms": 1600,
+        "range_deg": 62,
+        "quality": null,
+        "lowering_ms": 667,
+        "rising_ms": 933,
+        "flags": [
+          {
+            "rule_id": "knee_tracking",
+            "severity": "form",
+            "rep_index": 5
+          },
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 5
+          }
+        ]
+      }
+    ]
+  },
+  "api": {
+    "set_response": {
+      "id": "<id 1>",
+      "session_id": "<id 2>",
+      "position": 0,
+      "exercise_id": "squat",
+      "reps": 6,
+      "weight_kg": null,
+      "end_reason": "manual",
+      "partial_reps": 0,
+      "medal": "bronze",
+      "clean_share": 0,
+      "score_source": "databricks",
+      "score": {
+        "source": "databricks",
+        "medal": "bronze",
+        "clean_share": 0,
+        "reps": [
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
+          },
+          {
+            "quality": 0.8,
+            "label": "clean",
+            "clean": false
+          }
+        ]
+      },
+      "rest_note": {
+        "text": "6 reps done. Your knees drifted inward on 3 reps. Pointing them over your toes keeps them comfortable.",
+        "source": "fixed",
+        "rule_id": "knee_tracking"
+      },
+      "created_at": "<time>",
+      "clean_reps": 0,
+      "set_id": "<id 1>"
+    },
+    "finish_response": {
+      "session_id": "<id 2>",
+      "finished_at": "2026-10-10T15:05:00.000Z",
+      "medal": "bronze",
+      "form_score": 0,
+      "baseline_share": 0.7,
+      "total_reps": 6,
+      "clean_reps": 0,
+      "personal_records": [
+        {
+          "exercise_id": "squat",
+          "metric": "max_reps",
+          "value": 6,
+          "previous_value": null
+        }
+      ],
+      "posts": []
+    },
+    "llm_called": true,
+    "rows": {
+      "session": {
+        "id": "<id 2>",
+        "userId": "replay-squat_front_knees_in",
+        "startedAt": "2026-10-10T15:00:00.000Z",
+        "finishedAt": "2026-10-10T15:05:00.000Z",
+        "device": "replay",
+        "inferenceMode": "coreml",
+        "medal": "bronze",
+        "formScore": 0,
+        "exportStatus": "exported",
+        "exportError": null,
+        "exportAttempts": 1,
+        "exportStartedAt": "<time>",
+        "exportedAt": "<time>"
+      },
+      "sets": [
+        {
+          "id": "<id 1>",
+          "sessionId": "<id 2>",
+          "position": 0,
+          "exerciseId": "squat",
+          "reps": 6,
+          "weightKg": null,
+          "endReason": "manual",
+          "partialReps": 0,
+          "medal": "bronze",
+          "cleanShare": 0,
+          "scoreSource": "databricks",
+          "score": {
+            "reps": [
+              {
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              },
+              {
+                "clean": false,
+                "label": "clean",
+                "quality": 0.8
+              }
+            ],
+            "medal": "bronze",
+            "source": "databricks",
+            "clean_share": 0
+          },
+          "restNote": {
+            "text": "6 reps done. Your knees drifted inward on 3 reps. Pointing them over your toes keeps them comfortable.",
+            "source": "fixed",
+            "rule_id": "knee_tracking"
+          },
+          "createdAt": "<time>"
+        }
+      ],
+      "reps": [
+        {
+          "id": "<id 3>",
+          "setId": "<id 1>",
+          "position": 0,
+          "startMs": 1000,
+          "endMs": 2533,
+          "loweringMs": 667,
+          "risingMs": 866,
+          "tempoMs": 1533,
+          "rangeDeg": 54,
+          "quality": null,
+          "clean": false
+        },
+        {
+          "id": "<id 4>",
+          "setId": "<id 1>",
+          "position": 1,
+          "startMs": 3600,
+          "endMs": 5200,
+          "loweringMs": 733,
+          "risingMs": 867,
+          "tempoMs": 1600,
+          "rangeDeg": 63.3,
+          "quality": null,
+          "clean": false
+        },
+        {
+          "id": "<id 5>",
+          "setId": "<id 1>",
+          "position": 2,
+          "startMs": 6333,
+          "endMs": 7867,
+          "loweringMs": 600,
+          "risingMs": 934,
+          "tempoMs": 1534,
+          "rangeDeg": 53,
+          "quality": null,
+          "clean": false
+        },
+        {
+          "id": "<id 6>",
+          "setId": "<id 1>",
+          "position": 3,
+          "startMs": 8933,
+          "endMs": 10533,
+          "loweringMs": 734,
+          "risingMs": 866,
+          "tempoMs": 1600,
+          "rangeDeg": 63.4,
+          "quality": null,
+          "clean": false
+        },
+        {
+          "id": "<id 7>",
+          "setId": "<id 1>",
+          "position": 4,
+          "startMs": 11600,
+          "endMs": 13133,
+          "loweringMs": 667,
+          "risingMs": 866,
+          "tempoMs": 1533,
+          "rangeDeg": 52.8,
+          "quality": null,
+          "clean": false
+        },
+        {
+          "id": "<id 8>",
+          "setId": "<id 1>",
+          "position": 5,
+          "startMs": 14200,
+          "endMs": 15800,
+          "loweringMs": 667,
+          "risingMs": 933,
+          "tempoMs": 1600,
+          "rangeDeg": 62,
+          "quality": null,
+          "clean": false
+        }
+      ],
+      "form_flags": [
+        {
+          "id": "<id 9>",
+          "repId": "<id 3>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 10>",
+          "repId": "<id 4>",
+          "ruleId": "knee_tracking",
+          "severity": "form"
+        },
+        {
+          "id": "<id 11>",
+          "repId": "<id 4>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 12>",
+          "repId": "<id 5>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 13>",
+          "repId": "<id 6>",
+          "ruleId": "knee_tracking",
+          "severity": "form"
+        },
+        {
+          "id": "<id 14>",
+          "repId": "<id 6>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 15>",
+          "repId": "<id 7>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 16>",
+          "repId": "<id 8>",
+          "ruleId": "knee_tracking",
+          "severity": "form"
+        },
+        {
+          "id": "<id 17>",
+          "repId": "<id 8>",
+          "ruleId": "tempo",
+          "severity": "form"
+        }
+      ],
+      "medals": [
+        {
+          "id": "<id 18>",
+          "userId": "replay-squat_front_knees_in",
+          "sessionId": "<id 2>",
+          "tier": "bronze",
+          "formScore": 0,
+          "baselineShare": 0.7,
+          "awardedAt": "2026-10-10T15:05:00.000Z"
+        }
+      ]
+    }
+  },
+  "upload": {
+    "export_status": "exported",
+    "files": [
+      {
+        "path": "/Volumes/steadyforum/raw/sessions/joints/2026-10-10/<id 2>.ndjson.gz",
+        "sets": [
+          {
+            "set_index": 0,
+            "exercise_id": "squat",
+            "fps": 15,
+            "frame_count": 257,
+            "first_t_ms": 0,
+            "last_t_ms": 17067,
+            "frames_sha256": "a9a9a8a5cc4601bf"
+          }
+        ]
+      },
+      {
+        "path": "/Volumes/steadyforum/raw/sessions/meta/2026-10-10/<id 2>.json",
+        "metadata": {
+          "schema_version": 1,
+          "session_id": "<id 2>",
+          "user_id": "7befa69daf350e81a0c20e9f86c0c702",
+          "started_at": "2026-10-10T15:00:00.000Z",
+          "finished_at": "2026-10-10T15:05:00.000Z",
+          "device": "replay",
+          "inference_mode": "coreml",
+          "medal": "bronze",
+          "form_score": 0,
+          "experience_level": "beginner",
+          "injury_groups": [],
+          "rehab_start_on": null,
+          "joints_path": "/Volumes/steadyforum/raw/sessions/joints/2026-10-10/<id 2>.ndjson.gz",
+          "exported_at": "<time>",
+          "sets": [
+            {
+              "set_index": 0,
+              "exercise_id": "squat",
+              "weight_kg": null,
+              "medal": "bronze",
+              "end_reason": "manual",
+              "partial_reps": 0,
+              "frame_count": 257,
+              "reps": [
+                {
+                  "rep_index": 0,
+                  "start_ms": 1000,
+                  "end_ms": 2533,
+                  "tempo_ms": 1533,
+                  "range_deg": 54,
+                  "quality": null,
+                  "lowering_ms": 667,
+                  "rising_ms": 866,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 0
+                    }
+                  ]
+                },
+                {
+                  "rep_index": 1,
+                  "start_ms": 3600,
+                  "end_ms": 5200,
+                  "tempo_ms": 1600,
+                  "range_deg": 63.3,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 867,
+                  "flags": [
+                    {
+                      "rule_id": "knee_tracking",
+                      "severity": "form",
+                      "rep_index": 1
+                    },
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 1
+                    }
+                  ]
+                },
+                {
+                  "rep_index": 2,
+                  "start_ms": 6333,
+                  "end_ms": 7867,
+                  "tempo_ms": 1534,
+                  "range_deg": 53,
+                  "quality": null,
+                  "lowering_ms": 600,
+                  "rising_ms": 934,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 2
+                    }
+                  ]
+                },
+                {
+                  "rep_index": 3,
+                  "start_ms": 8933,
+                  "end_ms": 10533,
+                  "tempo_ms": 1600,
+                  "range_deg": 63.4,
+                  "quality": null,
+                  "lowering_ms": 734,
+                  "rising_ms": 866,
+                  "flags": [
+                    {
+                      "rule_id": "knee_tracking",
+                      "severity": "form",
+                      "rep_index": 3
+                    },
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 3
+                    }
+                  ]
+                },
+                {
+                  "rep_index": 4,
+                  "start_ms": 11600,
+                  "end_ms": 13133,
+                  "tempo_ms": 1533,
+                  "range_deg": 52.8,
+                  "quality": null,
+                  "lowering_ms": 667,
+                  "rising_ms": 866,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 4
+                    }
+                  ]
+                },
+                {
+                  "rep_index": 5,
+                  "start_ms": 14200,
+                  "end_ms": 15800,
+                  "tempo_ms": 1600,
+                  "range_deg": 62,
+                  "quality": null,
+                  "lowering_ms": 667,
+                  "rising_ms": 933,
+                  "flags": [
+                    {
+                      "rule_id": "knee_tracking",
+                      "severity": "form",
+                      "rep_index": 5
+                    },
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 5
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

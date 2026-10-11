@@ -1,0 +1,71 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Existing React renderer convention. */
+import React from 'react';
+import { FlatList, Text } from 'react-native';
+import FeedScreen, { FeedCard } from '../index';
+import { useAuth } from '@/screens/Auth/session';
+const { act, create } = require('react-test-renderer');
+jest.mock('expo-router', () => ({ useFocusEffect: (callback: () => void) => require('react').useEffect(callback, [callback]) }));
+jest.mock('@/screens/Auth/session', () => ({ useAuth: jest.fn() }));
+jest.mock('@/components/AppPage', () => ({ AppPage: ({ children }: React.PropsWithChildren) => children, Action: 'Action', pageStyles: () => ({}) }));
+jest.mock('@/components/GlassSurface', () => ({ GlassSurface: () => null }));
+jest.mock('@/components/PolishedPressable', () => ({ PolishedPressable: 'Button' }));
+const post = (id: string) => ({ id, kind: 'session', body: `Workout ${id}`, created_at: '2026-10-10T12:00:00Z', author: { id: 'sam', handle: 'sam' }, data: { tier: 'gold' }, kudos_count: 1, comment_count: 2, viewer_gave_kudos: false });
+it('renders a shared workout with the author, medal, exercises and positive highlight', () => {
+ let screen: ReturnType<typeof create>;
+ const workout = { date: '2026-10-10', exercises: [{ id: 'squat', name: 'Squat', sets: 3, reps: 30 }], highlights: ['Squat: new rep best of 12 reps.'] };
+ act(() => { screen = create(<FeedCard post={{ ...post('summary'), author: { id: 'sam', handle: 'sam', display_name: 'Sam' }, data: { tier: 'gold', workout } }} pending={false} onKudos={jest.fn()} />); });
+ const text = screen.root.findAllByType(Text).map((n: any) => JSON.stringify(n.props.children)).join(' ');
+ expect(text).toContain('Sam'); expect(text).toContain('Gold'); expect(text).toContain('Squat'); expect(text).toContain('30'); expect(text).toContain('new rep best');
+ expect(text).not.toContain('Workout summary');
+ act(() => screen.unmount());
+});
+it('loads cursor pages once, deduplicates overlapping posts, and refreshes from the beginning', async () => {
+ const apiFetch = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('a')], next_cursor: 'next' }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('a'), post('b')], next_cursor: null }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('c')], next_cursor: null }) });
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<FeedScreen />); });
+ await act(async () => { const list = screen.root.findByType(FlatList); list.props.onEndReached(); list.props.onEndReached(); });
+ expect(apiFetch).toHaveBeenCalledTimes(2);
+ expect(apiFetch.mock.calls[1][0]).toBe('/feed?cursor=next');
+ expect(screen.root.findByType(FlatList).props.data.map((p: { id: string }) => p.id)).toEqual(['a', 'b']);
+ await act(async () => { screen.root.findByType(FlatList).props.onRefresh(); });
+ expect(screen.root.findByType(FlatList).props.data.map((p: { id: string }) => p.id)).toEqual(['c']);
+ act(() => screen.unmount());
+});
+it('keeps loaded posts and offers retry when the next page fails', async () => {
+ const apiFetch = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ posts: [post('a')], next_cursor: 'next' }) }).mockRejectedValueOnce(new Error('Offline'));
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<FeedScreen />); });
+ await act(async () => { screen.root.findByType(FlatList).props.onEndReached(); });
+ expect(screen.root.findByType(FlatList).props.data).toHaveLength(1);
+ expect(screen.root.findAllByType(Text).some((n: { props: { children: unknown } }) => n.props.children === 'Offline')).toBe(true);
+ act(() => screen.unmount());
+});
+it('discards an old account response when the feed account changes', async () => {
+ let resolve!: (value: unknown) => void;
+ const oldRequest = jest.fn().mockReturnValue(new Promise(r => { resolve = r; }));
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'old' }, apiFetch: oldRequest } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<FeedScreen />); });
+ const newRequest = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ posts: [post('new')], next_cursor: null }) });
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'new' }, apiFetch: newRequest } as never);
+ await act(async () => { screen.update(<FeedScreen />); });
+ await act(async () => { resolve({ ok: true, json: async () => ({ posts: [post('private-old')], next_cursor: null }) }); });
+ expect(screen.root.findByType(FlatList).props.data.map((p: { id: string }) => p.id)).toEqual(['new']);
+ act(() => screen.unmount());
+});
+it('does not double-count kudos already included by a concurrent refresh', async () => {
+ let release!: (value: unknown) => void;
+ let page = post('a');
+ const apiFetch = jest.fn().mockImplementation((path: string) => path.endsWith('/kudos') ? new Promise(r => { release = r; }) : Promise.resolve({ ok: true, json: async () => ({ posts: [page], next_cursor: null }) }));
+ jest.mocked(useAuth).mockReturnValue({ user: { id: 'one' }, apiFetch } as never);
+ let screen: ReturnType<typeof create>;
+ await act(async () => { screen = create(<FeedScreen />); });
+ act(() => screen.root.findByType('Button').props.onPress());
+ page = { ...page, kudos_count: 2, viewer_gave_kudos: true };
+ await act(async () => { screen.root.findByType(FlatList).props.onRefresh(); });
+ await act(async () => { release({ ok: true }); });
+ expect(screen.root.findByType(FlatList).props.data[0].kudos_count).toBe(2);
+ act(() => screen.unmount());
+});

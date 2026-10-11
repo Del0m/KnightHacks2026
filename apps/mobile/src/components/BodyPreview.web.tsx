@@ -4,18 +4,20 @@ import { Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { colors, typography } from '@/theme/tokens';
 import type { ExerciseId } from '@/data/workout';
-export function BodyPreview({ selected, playing, height = 300 }: { selected: ExerciseId | null; playing: boolean; height?: number }) {
+export function BodyPreview({ selected, playing, height = 300, rotation = 0 }: { rotation?: number; selected: ExerciseId | null; playing: boolean; height?: number }) {
   const frame = useRef<HTMLIFrameElement>(null), [ready, setReady] = useState(false), [failed, setFailed] = useState(false), [attempt, setAttempt] = useState(0);
+  const rotationSent = useRef(0);
   function send(data: object) { frame.current?.contentWindow?.postMessage(data, window.location.origin); }
   const onMessage = useEffectEvent((event: MessageEvent) => {
     if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow) return;
-    if (event.data?.type === 'steadyforum:model-ready') { setReady(true); setFailed(false); send({ type: 'steadyforum:select', id: selected }); send({ type: 'steadyforum:pause', playing }); }
+    if (event.data?.type === 'steadyforum:model-ready') { setReady(true); setFailed(false); send({ type: 'steadyforum:select', id: selected }); rotationSent.current = rotation; if (rotation) send({ type: 'steadyforum:rotate', degrees: rotation }); send({ type: 'steadyforum:pause', playing }); }
     if (event.data?.type === 'steadyforum:model-error') setFailed(true);
   });
   useEffect(() => { const handle = (e: MessageEvent) => onMessage(e); window.addEventListener('message', handle); return () => window.removeEventListener('message', handle); }, []);
-  const syncSelection = useEffectEvent(() => { send({ type: 'steadyforum:select', id: selected }); send({ type: 'steadyforum:pause', playing }); });
+  const syncSelection = useEffectEvent(() => { send({ type: 'steadyforum:select', id: selected }); rotationSent.current = rotation; if (rotation) send({ type: 'steadyforum:rotate', degrees: rotation }); send({ type: 'steadyforum:pause', playing }); });
   useEffect(() => { if (ready) syncSelection(); }, [selected, ready]); // Selection starts a new exercise; play changes preserve its position.
   useEffect(() => { if (ready) send({ type: 'steadyforum:pause', playing }); }, [playing, ready]);
+  useEffect(() => { if (ready && rotation !== rotationSent.current) { send({ type: 'steadyforum:rotate', degrees: rotation }); rotationSent.current = rotation; } }, [rotation, ready]);
   useFocusEffect(() => { if (ready) send({ type: 'steadyforum:pause', playing }); return () => send({ type: 'steadyforum:pause', playing: false }); });
   useEffect(() => { if (ready || failed) return; const timer = setTimeout(() => setFailed(true), 20000); return () => clearTimeout(timer); }, [ready, failed, attempt]);
   return <View style={{ height, marginHorizontal: -12 }}>

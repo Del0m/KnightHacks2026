@@ -6,7 +6,7 @@
 
 | Job | Checks | Runtime |
 | --- | --- | --- |
-| API | Typecheck, ESLint, all Vitest tests using in-memory PGlite and local HTTP sockets; installs RAG dependencies for integration tests | Ubuntu 24.04, Node 22, npm |
+| API | Typecheck, ESLint, all Vitest tests using in-memory PGlite and local HTTP sockets; installs RAG and mobile dependencies for integration imports | Ubuntu 24.04, Node 22, npm |
 | Mobile | Typecheck, Expo lint, all Jest tests | Ubuntu 24.04, Node 22, pnpm version from `apps/mobile/package.json` |
 | Contracts | Exercise validation, shared schema tests, all labelling tests | Ubuntu 24.04, Node 22 |
 | Python | Export contract checks, real YOLO cloud pose inference, synthetic session contracts | macOS 15, Python 3.11, locked uv dependencies |

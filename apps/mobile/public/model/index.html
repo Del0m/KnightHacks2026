@@ -1,5 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#stage{height:100%;width:100%;margin:0;overflow:hidden;background:transparent}canvas{display:block;touch-action:none;opacity:0;transition:opacity .6s ease;mask-image:linear-gradient(to bottom,transparent,#000 14px,#000 calc(100% - 14px),transparent),linear-gradient(to right,transparent,#000 14px,#000 calc(100% - 14px),transparent);mask-composite:intersect;-webkit-mask-composite:source-in}body.ready canvas{opacity:1}body.ready #status{display:none}#status{position:absolute;bottom:0;font:14px sans-serif;color:#4e6c7e}#pause{display:none}@media(prefers-reduced-motion:reduce){canvas{transition:none}}</style><script type="importmap">{"imports":{"three":"./three.module.js"}}</script></head><body><div id="stage"></div><div id="status" role="status">Loading figure…</div><button id="pause" hidden></button><script type="module">
 import * as THREE from 'three';import{OrbitControls}from'./OrbitControls.js';import{GLTFLoader}from'./GLTFLoader.js';import{createMovement}from'./movement.js';
+const native=Boolean(window.ReactNativeWebView);
 const stage=document.querySelector('#stage'),status=document.querySelector('#status'),buttons=[],pauseButton=document.querySelector('#pause');
 const scene=new THREE.Scene();
 // The refraction pass needs a backdrop; match the page's white-to-blue atmosphere.
@@ -8,7 +9,7 @@ const paint=backdrop.getContext('2d'),wash=paint.createLinearGradient(0,0,0,128)
 const backdropTexture=new THREE.CanvasTexture(backdrop);backdropTexture.colorSpace=THREE.SRGBColorSpace;scene.background=backdropTexture;
 const camera=new THREE.PerspectiveCamera(38,1,.01,20);camera.position.set(.52,1.3,2.03);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0xffffff,0);stage.prepend(renderer.domElement);
-const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(.12,1.22,.08);controls.enableDamping=true;controls.dampingFactor=.08;controls.minDistance=.25;controls.maxDistance=5;
+const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(.12,1.22,.08);controls.enableDamping=true;controls.dampingFactor=.08;controls.minDistance=.25;controls.maxDistance=5;controls.touches.ONE=THREE.TOUCH.ROTATE;controls.touches.TWO=THREE.TOUCH.DOLLY_PAN;
 scene.add(new THREE.HemisphereLight(0xeef8ff,0x617888,1.5));const key=new THREE.DirectionalLight(0xffffff,1.8);key.position.set(-2,3,4);scene.add(key);const rim=new THREE.DirectionalLight(0x8ed6ff,.9);rim.position.set(3,2,-2);scene.add(rim);
 // Capture opaque depth so foreground weights cannot leak into glass transmission.
 const bodyMeshes=[],depthTarget=new THREE.WebGLRenderTarget(1,1,{depthTexture:new THREE.DepthTexture(1,1),minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter}),depthMaterial=new THREE.MeshDepthMaterial(),bufferSize=new THREE.Vector2();
@@ -17,7 +18,7 @@ const shimmerUniform={value:0},glowUniform={value:0},armStart={value:new THREE.V
 const envScene=new THREE.Scene();envScene.background=new THREE.Color(0x263d4c);
 for(const [x,y,z,w,h,color] of [[-3,2,2,2,5,0xffffff],[3,2,1,2,4,0xffffff],[0,4,-2,5,2,0xffffff],[-2,1,-1,.65,4,0x263d4c],[2,1,-2,.5,4,0x3b5363]]){const panel=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color,side:THREE.DoubleSide}));panel.position.set(x,y,z);panel.lookAt(0,1,0);envScene.add(panel);}const pmrem=new THREE.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(envScene,.02).texture;pmrem.dispose();
 // Transmission retains reflections; lowering opacity alone would wash out the glass.
-const glass=new THREE.MeshPhysicalMaterial({color:0xf3faff,metalness:0,roughness:.035,transmission:1,thickness:.12,ior:1.46,attenuationColor:0xe2f3ff,attenuationDistance:3,clearcoat:1,clearcoatRoughness:.04,envMapIntensity:1.2});
+const glass=new THREE.MeshPhysicalMaterial({color:0xf3faff,metalness:0,roughness:.035,transmission:native?0:1,thickness:.12,ior:1.46,attenuationColor:0xe2f3ff,attenuationDistance:3,clearcoat:1,clearcoatRoughness:.04,envMapIntensity:1.2});
 glass.onBeforeCompile=shader=>{
  shader.uniforms.opaqueDepth={value:depthTarget.depthTexture};shader.uniforms.glassBackdrop={value:backdropTexture};
  const transmission=THREE.ShaderChunk.transmission_pars_fragment.replace('transmittedLight = getTransmissionSample( refractionCoords, roughness, ior );',`transmittedLight = getTransmissionSample( refractionCoords, roughness, ior );
@@ -28,10 +29,55 @@ glass.onBeforeCompile=shader=>{
      transmittedLight = vec4( texture2D( glassBackdrop, refractionCoords ).rgb, 1.0 );
    }`);
  shader.fragmentShader='uniform sampler2D opaqueDepth; uniform sampler2D glassBackdrop;\n'+shader.fragmentShader.replace('#include <transmission_pars_fragment>',transmission);
+ if(native){
+  // Sample an ordinary, single-pass RGBA8 scene target instead of Three's
+  // internal transmission pass. Keep Snell refraction and exclude foreground
+  // weights using opaque depth; the body itself never enters this target.
+  shader.uniforms.nativeScene={value:depthTarget.texture};shader.uniforms.nativeProjection={value:camera.projectionMatrix};
+  shader.fragmentShader='uniform sampler2D nativeScene; uniform mat4 nativeProjection;\n'+shader.fragmentShader.replace('#include <opaque_fragment>',`
+   vec3 worldNormal = inverseTransformDirection( normal, viewMatrix );
+   vec3 incident = normalize( surfacePosition - cameraPosition );
+   vec3 ray = refract( incident, worldNormal, 1.0 / 1.46 );
+   vec4 refractedClip = nativeProjection * viewMatrix * vec4( surfacePosition + ray * 0.12, 1.0 );
+   vec2 refractionUV = clamp( refractedClip.xy / refractedClip.w * 0.5 + 0.5, vec2(0.001), vec2(0.999) );
+   vec4 surfaceClip = nativeProjection * viewMatrix * vec4( surfacePosition, 1.0 );
+   float surfaceDepth = surfaceClip.z / surfaceClip.w * 0.5 + 0.5;
+   vec3 refractedColor = texture2D( nativeScene, refractionUV ).rgb;
+   if ( texture2D( opaqueDepth, refractionUV ).r < surfaceDepth - 0.00001 ) refractedColor = texture2D( glassBackdrop, refractionUV ).rgb;
+   float fresnel = pow( 1.0 - clamp( dot( -incident, worldNormal ), 0.0, 1.0 ), 5.0 );
+   float edge = pow( 1.0 - clamp( dot( -incident, worldNormal ), 0.0, 1.0 ), 2.0 );
+   vec3 spectrum = vec3(0.65) + 0.35 * cos( 6.28318 * (worldNormal.y * 0.7 + worldNormal.x * 0.3 + vec3(0.0,0.3333,0.6667)) );
+   vec3 edgeTint = mix( vec3(0.98,0.99,1.0), spectrum, edge * 0.55 );
+   outgoingLight = mix( refractedColor * edgeTint, outgoingLight - totalEmissiveRadiance, 0.06 + 0.22 * fresnel ) + totalEmissiveRadiance;
+   // Tint the transmitted glass as well as emitting red light. Additive red on
+   // a near-white backdrop alone clips to white and makes strain hard to see.
+   float strain = clamp( heat * 3.5 * (wave + 0.22 * sheen), 0.0, 1.0 );
+   outgoingLight = mix( outgoingLight, outgoingLight * vec3(1.0,0.22,0.12) + vec3(0.16,0.0,0.0), strain * 0.82 );
+   #include <opaque_fragment>`);
+ }
+
 shader.uniforms.focusAmount=glowUniform;shader.uniforms.shimmerTime=shimmerUniform;shader.uniforms.armStart=armStart;shader.uniforms.armEnd=armEnd;shader.uniforms.armStartR=armStartR;shader.uniforms.armEndR=armEndR;shader.vertexShader='varying vec3 surfacePosition;\n'+shader.vertexShader.replace('#include <project_vertex>','surfacePosition = (modelMatrix * vec4(transformed,1.0)).xyz;\n#include <project_vertex>');shader.fragmentShader='varying vec3 surfacePosition; uniform float focusAmount; uniform float shimmerTime; uniform vec3 armStart; uniform vec3 armEnd; uniform vec3 armStartR; uniform vec3 armEndR;\n'+shader.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\nvec3 ab=armEnd-armStart;float along=clamp(dot(surfacePosition-armStart,ab)/max(dot(ab,ab),0.0001),0.0,1.0);vec3 offset=surfacePosition-(armStart+along*ab);float heat=exp(-dot(offset,offset)/0.004)*sin(along*3.14159)*focusAmount;vec3 abr=armEndR-armStartR;float ar=clamp(dot(surfacePosition-armStartR,abr)/max(dot(abr,abr),0.0001),0.0,1.0);vec3 offr=surfacePosition-(armStartR+ar*abr);heat+=exp(-dot(offr,offr)/0.004)*sin(ar*3.14159)*focusAmount;float wave=0.86+0.14*sin(shimmerTime*2.4+along*11.0);float sheen=exp(-pow((along-fract(shimmerTime*0.24))/0.16,2.0));totalEmissiveRadiance+=vec3(2.3,0.012,0.006)*heat*(wave+0.22*sheen);');};
-const focusBounds=new THREE.Box3();let animation=null,selected=null,movement=null;const reduce=matchMedia('(prefers-reduced-motion: reduce)');
+const focusBounds=new THREE.Box3();let animation=null,selected=null,movement=null;const systemMotion=matchMedia('(prefers-reduced-motion: reduce)'),reduce={get matches(){return nativeReduced??systemMotion.matches}};let nativeReduced=null,active=true;
+function notify(type,data={}){const message={type,...data};if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(message));else parent.postMessage(message,location.origin);}
 function resize(){const{width,height}=stage.getBoundingClientRect();renderer.setSize(width,height);renderer.getDrawingBufferSize(bufferSize);depthTarget.setSize(Math.max(1,bufferSize.x),Math.max(1,bufferSize.y));camera.aspect=width/height;camera.updateProjectionMatrix()}new ResizeObserver(resize).observe(stage);resize();
 controls.addEventListener('start',()=>{if(animation)animation.cameraCancelled=true});
+// Native scroll gestures belong to the page; the React Native wrapper sends pinch zoom.
+if(native)controls.enabled=false;
+function zoom(factor){
+ if(typeof factor!=='number'||!Number.isFinite(factor)||factor<.5||factor>2)return;
+ if(animation)animation.cameraCancelled=true;
+ const offset=camera.position.clone().sub(controls.target);
+ offset.setLength(THREE.MathUtils.clamp(offset.length()*factor,controls.minDistance,controls.maxDistance));
+ camera.position.copy(controls.target).add(offset);controls.update();
+}
+let rotationBase=new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)).theta;
+function rotate(degrees){
+ if(typeof degrees!=='number'||!Number.isFinite(degrees))return;
+ if(animation)animation.cameraCancelled=true;
+ const offset=camera.position.clone().sub(controls.target),orbit=new THREE.Spherical().setFromVector3(offset);
+ orbit.theta=rotationBase+THREE.MathUtils.degToRad(THREE.MathUtils.clamp(degrees,-180,180));
+ camera.position.copy(controls.target).add(offset.setFromSpherical(orbit));controls.update();
+}
 let statusMotion=null;
 function updateStatus(text){status.textContent=text;if(reduce.matches)return;statusMotion?.cancel();statusMotion=status.animate([{opacity:.3,transform:'translateY(3px)'},{opacity:1,transform:'translateY(0)'}],{duration:260,easing:'ease-out'});}
 function select(id){
@@ -39,25 +85,27 @@ function select(id){
  buttons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.exercise===id)));
  pauseButton.hidden=!focus;pauseButton.textContent=reduce.matches?'Play movement':'Pause movement';
  if(reduce.matches&&movement.playing)movement.pause();
- const target=id==='curl'?new THREE.Vector3(.12,1.22,.08):id==='press'?new THREE.Vector3(0,1.35,0):new THREE.Vector3(0,.8,0);
+ const target=id==='curl'?new THREE.Vector3(.12,1.22,.08):id==='press'?new THREE.Vector3(0,1.35,0):id==='push_up'?new THREE.Vector3(0,.29,-.06):new THREE.Vector3(0,.8,0);
  focusBounds.setFromCenterAndSize(target,new THREE.Vector3(.3,.3,.3));
  const toTarget=focus?focusBounds.getCenter(new THREE.Vector3()):new THREE.Vector3(0,.84,0);
- const toPosition=focus?toTarget.clone().add(new THREE.Vector3(id==='curl'?.4:.65,.08,id==='curl'?1.95:2.9)):new THREE.Vector3(0,.93,2.9);
+ const toPosition=focus?toTarget.clone().add(new THREE.Vector3(id==='push_up'?2.2:id==='lunge'?1.55:id==='curl'?.4:.65,id==='push_up'?.72:.08,id==='curl'?1.95:id==='push_up'?2.3:2.9)):new THREE.Vector3(0,.93,2.9);
  const fromOrbit=new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
  const toOrbit=new THREE.Spherical().setFromVector3(toPosition.clone().sub(toTarget));
+ rotationBase=toOrbit.theta;
  // Follow the shorter arc, including when the user manually rotated the body.
  toOrbit.theta=fromOrbit.theta+Math.atan2(Math.sin(toOrbit.theta-fromOrbit.theta),Math.cos(toOrbit.theta-fromOrbit.theta));
  animation={started:performance.now(),duration:focus?900:720,fromTarget:controls.target.clone(),toTarget,fromOrbit,toOrbit,fromGlow:glowUniform.value,toGlow:focus?1:0,cameraCancelled:false};
- updateStatus(focus?({curl:'Bicep curl',squat:'Squat',press:'Shoulder press'}[id]+' — movement preview'):'Whole body — drag to explore');
+ updateStatus(focus?({curl:'Bicep curl',squat:'Squat',press:'Shoulder press',push_up:'Push-up',lunge:'Lunge'}[id]+' — movement preview'):'Whole body — drag to explore');
 }
 buttons.forEach(button=>button.onclick=()=>select(button.dataset.exercise));
 pauseButton.onclick=()=>{const playing=movement.pause();pauseButton.textContent=playing?'Pause movement':'Resume movement';};
-try{const [gltf,dumbbell]=await Promise.all([new GLTFLoader().loadAsync('./rigged-human.glb'),new GLTFLoader().loadAsync('./dumbbell.glb')]);gltf.scene.traverse(o=>{if(o.isMesh){o.material=glass;o.frustumCulled=false;bodyMeshes.push(o);}});scene.add(gltf.scene);movement=createMovement(gltf.scene,dumbbell.scene);buttons.forEach(b=>b.disabled=false);document.body.classList.add('ready');status.textContent='';parent.postMessage({type:'steadyforum:model-ready'},location.origin);}catch(error){status.textContent='Model could not load. Please reload the preview.';parent.postMessage({type:'steadyforum:model-error'},location.origin);console.error(error)}
+try{const [gltf,dumbbell]=await Promise.all([new GLTFLoader().loadAsync('./rigged-human.glb'),new GLTFLoader().loadAsync('./dumbbell.glb')]);gltf.scene.traverse(o=>{if(o.isMesh){o.material=glass;o.frustumCulled=false;bodyMeshes.push(o);}});scene.add(gltf.scene);movement=createMovement(gltf.scene,dumbbell.scene);buttons.forEach(b=>b.disabled=false);document.body.classList.add('ready');status.textContent='';notify('steadyforum:model-ready');}catch(error){status.textContent='Model could not load. Please reload the preview.';notify('steadyforum:model-error');console.error(error)}
 let previous=performance.now();
 const orbit=new THREE.Spherical(),offset=new THREE.Vector3();
 renderer.setAnimationLoop(()=>{
+ if(!active){previous=performance.now();return;}
  const now=performance.now(),dt=Math.min((now-previous)/1000,.05);previous=now;
- if(movement){movement.update(dt,reduce.matches&& !movement.playing);const bones=movement.bones;const start=selected==='squat'?'upperleg01.L':'upperarm01.L',end=selected==='squat'?'lowerleg01.L':'lowerarm01.L';bones[start].getWorldPosition(armStart.value);bones[end].getWorldPosition(armEnd.value);bones[start.replace('.L','.R')].getWorldPosition(armStartR.value);bones[end.replace('.L','.R')].getWorldPosition(armEndR.value);if(selected==='press'){armEnd.value.lerp(armStart.value,.65);armEndR.value.lerp(armStartR.value,.65);}}
+ if(movement){movement.update(dt,reduce.matches&& !movement.playing);const bones=movement.bones;const legs=selected==='squat'||selected==='lunge';const start=legs?'upperleg01.L':'upperarm01.L',end=legs?'lowerleg01.L':'lowerarm01.L';bones[start].getWorldPosition(armStart.value);bones[end].getWorldPosition(armEnd.value);bones[start.replace('.L','.R')].getWorldPosition(armStartR.value);bones[end.replace('.L','.R')].getWorldPosition(armEndR.value);if(selected==='press'){armEnd.value.lerp(armStart.value,.65);armEndR.value.lerp(armStartR.value,.65);}if(selected==='push_up'){bones['spine03'].getWorldPosition(armStart.value);bones['spine01'].getWorldPosition(armEnd.value);armStartR.value.copy(armStart.value);armEndR.value.copy(armEnd.value);armStart.value.x=.11;armEnd.value.x=.11;armStartR.value.x=-.11;armEndR.value.x=-.11;}}
  shimmerUniform.value=reduce.matches?0:now/1000;
  if(animation){
   const t=reduce.matches?1:Math.min((now-animation.started)/animation.duration,1);
@@ -74,11 +122,21 @@ renderer.setAnimationLoop(()=>{
  }
  controls.update();
  // Hide only the body mesh; weights attached to the skeleton still participate.
- bodyMeshes.forEach(mesh=>{mesh.visible=false;});scene.overrideMaterial=depthMaterial;
+ bodyMeshes.forEach(mesh=>{mesh.visible=false;});scene.overrideMaterial=native?null:depthMaterial;
  renderer.setRenderTarget(depthTarget);renderer.render(scene,camera);
  renderer.setRenderTarget(null);scene.overrideMaterial=null;bodyMeshes.forEach(mesh=>{mesh.visible=true;});
  renderer.render(scene,camera);
 });
 
-window.addEventListener('message',event=>{if(event.origin!==location.origin||event.source!==parent||!movement)return;const data=event.data;if(data?.type==='steadyforum:select'&&[null,'curl','squat','press'].includes(data.id))select(data.id);if(data?.type==='steadyforum:pause'){if(movement.playing!==data.playing)movement.pause();}if(data?.type==='steadyforum:active'){if(!data.active&&movement.playing)movement.pause();}});
+function receive(data){
+ if(!movement)return;
+ if(data?.type==='steadyforum:select'&&[null,'curl','squat','press','push_up','lunge'].includes(data.id))select(data.id);
+ if(data?.type==='steadyforum:zoom')zoom(data.factor);
+ if(data?.type==='steadyforum:rotate')rotate(data.degrees);
+ if(data?.type==='steadyforum:pause'&&typeof data.playing==='boolean'&&movement.playing!==data.playing)movement.pause();
+ if(data?.type==='steadyforum:active'&&typeof data.active==='boolean'){active=data.active;if(!active&&movement.playing)movement.pause();}
+ if(data?.type==='steadyforum:motion'&&typeof data.reduced==='boolean')nativeReduced=data.reduced;
+}
+if(window.ReactNativeWebView)window.steadyforumNativeReceive=receive;
+window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===parent)receive(event.data);});
 </script></body></html>

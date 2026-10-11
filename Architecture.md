@@ -76,7 +76,7 @@ AI rep counters are a common hackathon project. Leading with injury recovery mak
 
 | Challenge | How SteadyForum delivers it | Owner |
 |---|---|---|
-| **Hugging Face: Best Use of Open Source AI** | Our YOLOv8 pose and form models live on the Hub and are downloaded by every phone. gpt-oss on Inference Providers writes rest notes and plans. RAG uses BGE embeddings, Llama Guard moderates the feed, an HF GPU endpoint can re-check flagged sets, and we publish **our own labelled form dataset** with a Gradio Space. | AI eng B |
+| **Hugging Face: Best Use of Open Source AI** | Our YOLOv8 pose and form models live on the Hub and are downloaded by every phone. gpt-oss on Inference Providers writes rest notes and plans. RAG uses BGE embeddings, Llama Guard moderates the feed, an HF GPU endpoint can re-check flagged sets, and, if the data checks pass, we publish our form-quality model with a model card and a Gradio Space. | AI eng B |
 | **Databricks: Best Use of Databricks** | Medallion pipeline (bronze, silver, gold) over session data. An MLflow form-quality model on Model Serving scores each set during rest. A risk model, AI/BI dashboard and Genie. Retrained models are published back to the Hub for the app. | AI eng A |
 | **Neon: Best Use of Neon** | Neon is the system of record: Neon Auth, the social graph, pgvector for RAG and buddy matching, branches per developer and for the demo, and the serving store for Databricks insights. | Back-end |
 | **Best AI Hack** | On-device pose estimation, a learned form scorer, an LLM with RAG and a risk model. Qualifies automatically. | Everyone |
@@ -373,11 +373,12 @@ Each rule has a `rest_note` that the LLM may rephrase. Notes describe the moveme
 
 - **Input:** one rep's joints, normalised and resampled to 32 frames × 17 joints × 2.
 - **Model:** a small GRU, or gradient-boosted trees on rep features (range, tempo, symmetry, knee tracking). Output: quality 0–1 plus a label: `clean`, or one of the rule labels in the specs (`partial_range`, `knees_in`, `forward_lean`, `fast_lowering`, `hip_sag`, `incomplete_lockout`, `elbow_drift`, `torso_swing`, `back_arch`, `wrists_off_stack`).
-- **Data:**
-  1. Bootstrap with public landmark data such as `Cuong2004/gym-exercise-landmarks` (check its license; convert MediaPipe 33-point data to the 17 COCO joints).
-  2. **Record and label our own clips at the hackathon**: teammates doing deliberate clean and off-form reps, filmed on a phone.
-  3. Keep only joints, then publish to the Hub as a dataset with a card. No clean public dataset of form-error labels exists on the Hub today, which makes this a genuine contribution.
-- **Train and serve in Databricks** (MLflow tracking, Unity Catalog registry, Model Serving). **Publish to the Hub** (ONNX plus model card) with a **Gradio Space** where judges upload a clip and see per-rep scores.
+- **Data (no new capture at the hackathon):**
+  1. **Public landmark data** such as `Cuong2004/gym-exercise-landmarks`. Check its license first, and whether it has any form-error labels (see the note below). Convert MediaPipe 33-point data to the 17 COCO joints.
+  2. **The AI-09 pilot** (`Downloads/ai09-pilot-2026-10-10/`): owner-consented, joint-only reps with boundaries and human labels. The cumulative export has 35 reps (squat, push-up and shoulder press), so it is the first labelled set, but still too small to be the main training source. Checked against the rules (`apps/mobile/scripts/check-rule-labels.ts`), the labels mostly disagree with the flags. The owner disregarded the export's `fast_lowering` labels for the rule check; baseline training retains them. Leave-one-clip-out evaluation scores only the two squat clips (10 reps): pose accuracy 0.40, macro-F1 0.22, majority accuracy 0.70, and position-only accuracy 0.40. Push-up and press are unscored because each has only one clip. Label coverage, imbalance and clip/position confounds are documented in `Markdown/AI-10-Handoff.md`. The owner set a one-second push-up as normal pace, so the push-up `tempo` threshold is now 250 ms (see `Markdown/AI-10-Handoff.md`).
+  3. **Labels.** Where a rep has no human label, the target is the phone's rule flags (`clean`, or the first failing rule). A model trained this way learns to reproduce the rules from joint data. That is still useful as an advisory second opinion, but it is not an independent judgement of form, and the docs and demo must not describe it as one.
+- **Scope:** the model is trained only on joint data that is already on disk or public. Video is not used for training (see [§13](#13-privacy-and-video-lifecycle)). Exercises without enough labelled reps are reported as such in the model card, not padded with rule-derived labels.
+- **Train and serve in Databricks** (MLflow tracking, Unity Catalog registry, Model Serving). **Publish to the Hub** (ONNX plus model card) only if the license and labelled-data check passes. The Gradio Space lets judges upload joints (or a pilot clip) and see per-rep scores.
 
 ---
 
@@ -487,13 +488,16 @@ erDiagram
     USER ||--o{ PLAN : "has"
     PLAN ||--o{ PLAN_ITEM : "lists"
     EXERCISE ||--o{ PLAN_ITEM : "used in"
+    USER ||--o{ EXERCISE_PREFERENCE : "rates"
+    EXERCISE ||--o{ EXERCISE_PREFERENCE : "rated in"
     USER ||--o{ REHAB_PLAN : "enters from physio"
     REHAB_PLAN ||--o{ REHAB_LIMIT : "sets"
     REHAB_PLAN { uuid id string from_physio date start date review_on }
     REHAB_LIMIT { string exercise_id string joint float max_range_deg int sets int reps }
     INJURY { uuid id string body_part date since }
-    PLAN { uuid id date week_of jsonb ai_sources }
-    PLAN_ITEM { uuid id int sets int reps text swap_note }
+    PLAN { uuid id date week_of string source jsonb ai_sources jsonb notes }
+    PLAN_ITEM { uuid id int sets int reps text reason text swap_note text safety_note }
+    EXERCISE_PREFERENCE { string exercise_id string rating }
     EXERCISE { string id string name jsonb form_spec }
 ```
 
@@ -535,8 +539,11 @@ erDiagram
 | `GET /sets/:id/rest-note` | Rest note for the last set |
 | `GET /me/progress` · `GET /me/insights` | Progress and risk insights (read from Neon) |
 | `POST /plans/generate` · `GET /plans/current` | Planner (see [§10](#10-workout-planner-and-advice)) |
+| `PUT /me/exercise-preferences/:exerciseId` · `GET /me/exercise-preferences` | Thumbs up/down on an exercise, from any screen; feeds the planner |
 | `GET /feed` · `POST /posts` · `POST /posts/:id/kudos` · `POST /posts/:id/comments` | Social |
 | `POST /advice` | Ask the community; an AI-suggested first answer is attached |
+| `GET /me/rom-trend` · `GET /me/physio-report` · `POST /me/physio-report/share` · `GET /reports/:token` | Range-of-motion trend and the physio report; a report is only public through a link the user makes, which expires and can be revoked |
+| `GET /me/milestones` · `POST /me/milestones/:id/accept` · `POST /me/milestones/:id/dismiss` | Back-to-gym suggestion; the user always decides |
 | `GET /buddies/suggestions` · `POST /buddies/:id/request` | Buddy matching |
 | `GET /exercises` · `GET /exercises/:id/spec` | Exercise library and form specs |
 
@@ -570,15 +577,36 @@ flowchart LR
     V -- "closest matches" --> F
 ```
 
-- **Sources:** [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (800+ exercises, public domain) and short injury-modification notes written by the team, citing public guidelines (CDC/NIH). Don't scrape ExRx.
+- **Sources:** [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (800+ exercises, public domain) and short injury-modification notes written by the team (`rag/notes`). Each section names the pages that support it: public health bodies, national professional bodies and major academic medical centres only (NHS, MedlinePlus/NIH, AAOS OrthoInfo, ChoosePT, Cleveland Clinic, Harvard Health). Programming tips no such page states are marked as team guidance. A rewritten note stays out of the index until a person reviews it. Don't scrape ExRx.
 - **Safety check:** drops anything contraindicated for a reported injury, caps weekly volume increases at 10%, puts compound and machine work first for beginners, and adds "check with your physio" notes. Every plan item stores the chunks it came from, so the app can show "why this exercise".
+- **Exercises:** the five camera-tracked exercises come first. Library exercises can be planned too; they're added to `exercises` on first use without a form spec (`has_spec: false`), so the app shows them as logged by hand. A library exercise that loads an injured joint is filtered out in the vector search and again in code. A tracked exercise whose spec has an `injury_override` for that joint stays, with the spec's note, unless the injury is severe.
+- **Looking back (temporal history):** the last six weeks, with recent weeks counting more (a set's weight halves every two weeks). Per exercise: sessions, sets and reps, clean share and its trend, medals, PRs, and whether it was done when planned. Plus the range-of-motion trend and how much of the last plan was done. These set each item's sets and reps (up when work is clean and medalled, down when form or range dips) and the weekly cap: total reps at most 10% over the last week with training.
+- **Likes and dislikes (vector store):** thumbs up/down per exercise, plus habits from the same history (done often, completed rather than skipped, clean form). They give each exercise a score and, folded together, one taste vector per user in the exercise-embedding space (`exercise_taste`). Liked exercises rank higher, and the taste vector pulls similar library exercises up. A disliked one is swapped for a safe exercise of the same kind when there is one. Preferences only re-rank exercises that already passed the safety check.
+- **Week and schedule:** a plan covers the current week from Monday in the user's time zone, on the days from their onboarding schedule, 3 to 5 exercises a day. Regenerating makes a new plan for the week, keeps the days already past, and leaves the old plan as history. Plans give sets and reps, not weights.
+- **Without the LLM:** with no `HF_TOKEN`, or if gpt-oss fails or is slow, a rule-based plan is built from the same history, preferences, search and safety check (`source: "rules"`).
+- **Rehab first:** while a rehab plan from a physio is active, `POST /plans/generate` returns 409. The physio's plan is the plan.
 
 ### 10.2 Advice questions
 
 1. Moderate with Llama Guard.
 2. Find similar answered questions with pgvector.
 3. Draft a short, sourced answer with gpt-oss, labelled **"AI suggestion"**, posted as the first comment. Community answers follow.
-4. Questions mentioning acute pain get a fixed "please see a medical professional" reply instead of an LLM answer.
+4. Questions mentioning pain get a fixed "please see a medical professional" reply instead of an LLM answer.
+
+**Answer writer (AI-13):** `apps/api/src/services/advice.ts`, called by BE-11 with the question and the sources it retrieved:
+- **Pain:** following §1.1, a check in code returns the fixed reply for any pain word that isn't negated, and for acute signs (a pop or tear, swelling, numbness, can't bear weight, chest pain or dizziness, a fresh injury). The model never sees the question. Soreness, stiffness and tightness still get an answer, and so does a past or recovering injury with no pain or acute sign: training again after an injury is what SteadyForum is for.
+- **Sources:** the question and up to 6 sources go to gpt-oss as data. The answer is at most 3 sentences and cites 1 to 3 of them by id.
+- **Reputable sources only:** library sources reach the model only from the allow-listed sites above, plus free-exercise-db for technique. Team-guidance sections are never cited. Community answers can be cited and are labelled as community.
+- **Guard:** the answer is shown only when every cited id was given, every number in it comes from a cited source, it passes the §7 tone check (no commands or banned phrases), and it names no condition, cause, medication or guaranteed outcome, and carries no links or promotions.
+- **Claim check:** a second gpt-oss call checks each sentence against the text of the sources it cites. Any added fact, benefit or cause means no answer. Both calls share one time budget.
+- **Disclaimer:** every AI answer ends with "This is general information, not medical advice. Always consult a doctor before acting on it." It is part of the answer text, so it shows wherever the answer does.
+- **Fallback:** anything else (nothing to cite, a slow or failed model, a rejected answer) means no AI comment; community answers carry the thread.
+
+**Endpoint (BE-11):** `POST /advice` in `apps/api/src/routes/advice.ts`, with retrieval in `services/adviceThread.ts`:
+- **Moderation:** the question is moderated like a post, including the threats and harassment check, because it appears in the feed and other members answer it.
+- **Retrieval:** the question's bge-small embedding (stored on the post) finds the nearest injury-note sections and exercises in `doc_chunks`. It also finds similar advice questions the asker can see in the feed (cosine 0.75 or more), and uses their community answers. Earlier AI answers and blocked users' comments are never used.
+- **Storage:** the AI answer is the first comment, with `ai_suggested: true` and the sources it cites. The fixed pain reply is a comment with `ai_suggested: false`. Neither has an author: SteadyForum posts them.
+- **Failures:** if embedding, retrieval or the model fails, the question still posts.
 
 ---
 
@@ -694,7 +722,7 @@ flowchart LR
 
 - **Pseudonymous IDs** in Databricks, never email or handle.
 - **Injury data** is private by default and only used for buddy matching if the user opts in.
-- **No medical claims.** Every injury-related screen shows a disclaimer.
+- **No medical claims.** Every injury-related screen shows a disclaimer, and anything built from the injury notes (AI advice answers, the planner's sources) carries "always consult a doctor" (`ADVICE_DISCLAIMER` in `apps/api/src/services/advice.ts`).
 - **Account deletion** cascades in Neon and queues a delete job in Databricks.
 
 ---
@@ -826,7 +854,7 @@ About 4 minutes, adjusted per judging room. Lead with that room's challenge.
 4. **On-device proof (20 s):** show the live fps and latency readout from the phone's neural processor.
 5. **Recovery (30 s):** open a demo user's physio plan and range-of-motion chart: "knee range up 18° in three weeks, now within 5° of the healthy side". Show the one-page physio report and a recovery-buddy match. The same squat set, judged against the physio's limits, earns gold.
 6. **Plan (30 s):** generate a week. Show "why this exercise" sources and the lunge swapped for a glute bridge.
-   - *Hugging Face:* "gpt-oss on Inference Providers, RAG with BGE embeddings, Llama Guard, and our own labelled form dataset and model on the Hub." Show the Space.
+   - *Hugging Face:* "gpt-oss on Inference Providers, RAG with BGE embeddings, Llama Guard, and our form-quality model on the Hub." Show the Space. Only say "trained on our own labelled data" if the AI-09 pilot has grown past the validation stage.
 7. **Social (30 s):** "Finished a gold-level workout" posts to the feed; a buddy suggestion appears ("same gym, both beginners, both train mornings").
    - *Neon:* "Auth, the social graph, vectors and the serving layer for Databricks insights all live in Neon. We develop on branches and demo off a seeded branch."
 8. **Close (10 s):** "SteadyForum: a quiet coach for every rep, and a community for every beginner."
@@ -844,7 +872,7 @@ About 4 minutes, adjusted per judging room. Lead with that room's challenge.
 | Databricks quota or cold warehouse during the demo | Medium | The app reads synced Neon tables only. Pre-run jobs before judging. |
 | HF custom model hosting costs | Medium | Scale the endpoint to zero between workouts. Cloud mode is required on Android, so keep a Gradio Space API as a slower backup |
 | LLM rest note uses a banned phrase or a commanding tone | Medium | Banned-phrase check, then fall back to the rule's fixed `rest_note` |
-| Not enough labelled form data | High | Rules carry the demo. Present the model as a prototype trained on our own clips plus a public landmark set. |
+| Not enough labelled form data (no hackathon capture) | High | Rules carry the demo. Present the model as a prototype trained on public landmark joints, with rule-derived labels where no human label exists. Say so on the card and the slide. |
 | AGPL-3.0 on YOLOv8 | Known | Keep the repo public; note MediaPipe or MoveNet as the commercial path |
 | Expo iOS build issues | Medium | Browser demo with ONNX Runtime Web on a laptop webcam |
 | Dataset licenses (Fitness-AQA, QEVD research-only) | Medium | Use only for internal evaluation, or skip. Publish only our own clips' joints. |

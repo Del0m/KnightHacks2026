@@ -9,7 +9,7 @@
 # MAGIC **Stub until AI-10 lands:** `train_models` is a gradient-boosted baseline on rep features
 # MAGIC (one of the two options in Architecture §6.3). AI-10 replaces that one function; the
 # MAGIC tracking, evaluation and registration around it stay as they are. Labels come from the
-# MAGIC phone's rule flags until AI-09's hand-labelled clips exist.
+# MAGIC phone's rule flags until AI-10's labelled training set (landmark data plus the AI-09 pilot) is loaded.
 # MAGIC
 # MAGIC Run on serverless compute. Re-run any time to log a new run and register a new version.
 

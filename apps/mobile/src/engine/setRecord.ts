@@ -1,5 +1,7 @@
 import type { Flag, JointFrame, Rep, SetRecord } from '../../../../specs/set-record/types';
 import { isPoseResult, type PoseResult } from '../pose/types';
+import { gatePasses } from './gate';
+import { phaseDuration } from './rules';
 import type { EngineEvent, ExerciseSpec, RepRecord, SetEndReason, SetFlags } from './types';
 
 export type { SetRecord };
@@ -43,7 +45,7 @@ interface RepSummary {
   index: number;
   startedAt: number;
   countedAt: number;
-  bottomAt: number | null;
+  turnAt: number;
   range: number;
 }
 
@@ -58,10 +60,9 @@ function summarizeRep(spec: ExerciseSpec, rep: RepRecord, position: number): Rep
     Number.isFinite(rep.durations.rep) && Math.abs(rep.durations.rep - (rep.countedAt - rep.startedAt)) < 0.000001,
     'rep duration disagrees with startedAt/countedAt',
   );
+  // Range uses the frames AI-07 measures: gated, up to the count, never the settle tail.
   let minimum = Infinity;
   let maximum = -Infinity;
-  let bottomAt: number | null = null;
-  let bottomValue = Infinity;
   let previous = -Infinity;
   for (const frame of rep.windows.rep) {
     requireContract(Number.isFinite(frame.t) && frame.t >= previous, 'rep window timestamps must be finite and ordered');
@@ -69,16 +70,16 @@ function summarizeRep(spec: ExerciseSpec, rep: RepRecord, position: number): Rep
     const value = frame.metrics[spec.primary_angle.name];
     if (value == null) continue;
     requireContract(Number.isFinite(value), 'non-finite primary angle');
+    if (frame.t > rep.countedAt || !gatePasses(spec.primary_angle.gate, frame.metrics)) continue;
     minimum = Math.min(minimum, value);
     maximum = Math.max(maximum, value);
-    if (frame.t >= rep.startedAt && frame.t <= rep.countedAt && value < bottomValue) {
-      bottomValue = value;
-      bottomAt = frame.t;
-    }
   }
   const range = maximum >= minimum ? maximum - minimum : 0;
   requireContract(range <= 180, 'primary angle range exceeds 180 degrees');
-  return { index: rep.index, startedAt: rep.startedAt, countedAt: rep.countedAt, bottomAt, range: round(range, 1) };
+  // The turn is the first frame at the direction-aware extreme, as in AI-07's phase timing.
+  const turnAt = rep.startedAt + phaseDuration(spec, rep, 'outbound');
+  requireContract(turnAt >= rep.startedAt && turnAt <= rep.countedAt, 'rep turn is outside start-to-count');
+  return { index: rep.index, startedAt: rep.startedAt, countedAt: rep.countedAt, turnAt, range: round(range, 1) };
 }
 
 function frameOf(pose: PoseResult, origin: number): JointFrame {
@@ -94,7 +95,7 @@ function repOf(rep: RepSummary, origin: number, flags: Flag[]): Rep {
   const start_ms = Math.round(rep.startedAt - origin);
   const end_ms = Math.round(rep.countedAt - origin);
   const tempo_ms = end_ms - start_ms;
-  const lowering_ms = rep.bottomAt === null ? null : Math.round(rep.bottomAt - origin) - start_ms;
+  const lowering_ms = Math.round(rep.turnAt - origin) - start_ms;
   requireContract(integerInRange(start_ms) && integerInRange(end_ms), 'rep time is outside the set clock');
   requireContract(integerInRange(tempo_ms, 120000), 'rep tempo exceeds 120000 ms');
   return {
@@ -105,7 +106,7 @@ function repOf(rep: RepSummary, origin: number, flags: Flag[]): Rep {
     range_deg: rep.range,
     quality: null,
     lowering_ms,
-    rising_ms: lowering_ms === null ? null : tempo_ms - lowering_ms,
+    rising_ms: tempo_ms - lowering_ms,
     flags: flags.map((flag) => ({ rule_id: flag.rule_id, severity: flag.severity, rep_index: flag.rep_index })),
   };
 }

@@ -45,10 +45,10 @@
         "start_ms": { "description": "When the rep left the start position, ms since set start.", "type": ["integer", "null"], "minimum": 0 },
         "end_ms": { "description": "When the rep was counted, ms since set start.", "type": ["integer", "null"], "minimum": 0 },
         "tempo_ms": { "description": "Rep duration, start to count.", "type": "integer", "minimum": 0, "maximum": 120000 },
-        "range_deg": { "description": "Movement range: max minus min of the primary angle over the rep.", "type": "number", "minimum": 0, "maximum": 180 },
+        "range_deg": { "description": "Movement range: max minus min of the primary angle over the rep's gated frames up to the count.", "type": "number", "minimum": 0, "maximum": 180 },
         "quality": { "description": "Form-quality model score, advisory only (INT-06). Null from the phone.", "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-        "lowering_ms": { "description": "Start to the frame with the smallest primary angle.", "type": ["integer", "null"], "minimum": 0 },
-        "rising_ms": { "description": "tempo_ms minus lowering_ms.", "type": ["integer", "null"], "minimum": 0 },
+        "lowering_ms": { "description": "Start to the turn: the first frame at the rep's direction-aware extreme. The lowering only for eccentric-first exercises.", "type": ["integer", "null"], "minimum": 0 },
+        "rising_ms": { "description": "Turn to count: tempo_ms minus lowering_ms.", "type": ["integer", "null"], "minimum": 0 },
         "flags": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/Flag" } }
       }
     },

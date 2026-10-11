@@ -35,6 +35,7 @@ test('a body too small in the preview gets a closer-phone hint', () => {
 test('readiness stabilizes over time and drops immediately on lost tracking', () => {
   const start = updateStability(null, true, now);
   expect(start.ready).toBe(false);
-  expect(updateStability(start.since, true, now + 800).ready).toBe(true);
+  expect(updateStability(start.since, true, now + 999).ready).toBe(false);
+  expect(updateStability(start.since, true, now + 1000).ready).toBe(true);
   expect(updateStability(start.since, false, now + 900)).toEqual({ since: null, ready: false });
 });
