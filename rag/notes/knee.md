@@ -2,26 +2,32 @@
 body_part: knee
 title: Training around an injured or recovering knee
 reviewed: true
-sources: ["https://www.campbellclinic.com/active-knee-injury/", "https://orthosportsmed.com/exercising-after-knee-injury-dos-and-donts/"]
 ---
 
-## Limit or avoid
-High-impact work such as running and jumping until the knee is ready, and full-depth squats early on. Carrying free weights around the gym can also be risky with an injured knee, so seated machines are a safer way to load the upper body. The knee is more vulnerable to stress, poor movement and overuse after an injury.
+## Easing a sore knee
+Sources: https://www.nhs.uk/conditions/knee-pain/, https://www.health.harvard.edu/pain/protecting-your-joints
+Ice for up to 20 minutes every 2 to 3 hours can help a sore knee. Resting an aching joint, and seeking a doctor's advice if the pain doesn't improve, is the usual approach.
 
-## Strength swaps
-Keep base fitness by training the parts of the body that don't rely on leg strength: push-ups, pull-ups, planks, bicep curls, sit-ups and shoulder presses. Seated upper-body machines are a good alternative to free weights.
+## Limit or avoid
+Sources: https://www.health.harvard.edu/pain/protecting-your-joints, https://www.orthoinfo.org/en/recovery/knee-conditioning-program/
+People with arthritis or injuries are usually steered toward low-impact activities, which keep fitness up with less pain. A starting squat is a half squat, lowering the hips only about 10 inches, as if sitting down into a chair.
 
 ## Cardio swaps
-Low-impact options that keep the heart rate up without stressing the knee: swimming or water aerobics, where the water supports the body, and a stationary bike starting at low resistance. Depending on how severe the injury is, walking, cycling or kayaking may also be possible. Warm up with a 10-minute walk or swim. A circuit a few times a week could include push-ups, bicycle crunches, side-lying leg raises (10 per leg), overhead dumbbell presses and seated Russian twists.
+Sources: https://www.health.harvard.edu/pain/protecting-your-joints, https://www.health.harvard.edu/pain/exercising-with-knee-or-hip-pain
+Low-impact options include swimming, stationary or level cycling, an elliptical at low resistance, walking on level ground, and rowing. In water exercise the water supports your weight, reducing stress on the joints.
 
 ## Rebuilding knee strength
-The quads and hamstrings support the knee, so strengthening them takes strain off it. Good starting exercises: lying leg raises with the injured leg, step-ups onto a low platform, and partial squats with a smaller bend of about 45 degrees.
+Sources: https://www.health.harvard.edu/pain/exercising-with-knee-or-hip-pain, https://www.orthoinfo.org/en/recovery/knee-conditioning-program/
+Strong muscles around a damaged knee can help support the joint by taking over some of its work, and leg resistance exercises two to three times a week are a common target. Two starting exercises: a straight-leg raise, lying down and slowly raising the straight leg 6 to 10 inches off the floor; and a half squat, slowly lowering the hips about 10 inches, as if sitting down into a chair.
 
-## Signs it may be safe to train again
-The knee bends, straightens and rotates without pain; it fully straightens and bends without stiffness; the knee and the muscles around it feel strong enough for activity; and a doctor or physical therapist has given the go-ahead, especially after a serious injury.
+## Warming up and progressing
+Sources: https://www.orthoinfo.org/en/recovery/knee-conditioning-program/, https://www.health.harvard.edu/pain/protecting-your-joints
+A warm-up of 5 to 10 minutes of low-impact activity, like walking or riding a stationary bike, comes before the exercises. An exercise shouldn't cause pain. A lighter weight that allows a greater number of reps is gentler on the joint than a heavy one.
 
-## Progressing without re-injury
-Always warm up. Build up slowly, adding weight or resistance only once low-impact work feels comfortable, and hold off on running and jumping. Keep good form, with the knee tracking straight during squats and lunges. Alternate harder and easier days, take rest days, and stop if anything hurts: pushing through pain can make the injury worse.
+## Training the rest of the body
+Sources: team guidance
+While the knee recovers, upper-body and core work that doesn't load the knee keeps fitness up: push-ups, pull-ups, planks, bicep curls, sit-ups and shoulder presses, or seated machines. A circuit a few times a week could include push-ups, bicycle crunches, side-lying leg raises, overhead dumbbell presses and seated Russian twists. When squats and lunges come back, keeping the knee tracking straight, alternating harder and easier days, and taking rest days all help. A return to full training usually waits until the knee moves through its full range without pain and a doctor or physical therapist has cleared it.
 
-## When to check with a professional
-Before starting any activity on an injured knee, to confirm what is safe for that injury, and before returning to full training after a serious injury.
+## When to get checked
+Sources: https://www.nhs.uk/conditions/sprains-and-strains/, https://www.nhs.uk/conditions/knee-pain/
+Get emergency care straight away after an injury if you heard a crack, the knee looks misshapen, it is numb or tingling, or the skin is blue, grey or cold. Get urgent medical advice if the knee is very painful, you can't move it or put any weight on it, it is badly swollen or has changed shape, it locks, gives way or clicks painfully (painless clicking is normal), or you have a very high temperature or feel hot, cold or shivery and there's redness or heat around the knee. See a doctor if knee pain does not improve within a few weeks.

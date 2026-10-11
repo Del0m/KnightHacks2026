@@ -33,7 +33,9 @@ export function loadSpecs() {
 const typeOf = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
 
 function matchesType(value, type) {
+  if (Array.isArray(type)) return type.some((t) => matchesType(value, t));
   if (type === 'integer') return Number.isInteger(value);
+  if (type === 'number') return typeof value === 'number' && Number.isFinite(value);
   return typeOf(value) === type;
 }
 
@@ -58,7 +60,7 @@ export function validateSchema(value, schema, root = schema, path = '') {
     errors.push(`${at}: must be one of ${schema.enum.join(', ')}`);
   }
   if (schema.type && !matchesType(value, schema.type)) {
-    errors.push(`${at}: must be ${schema.type}`);
+    errors.push(`${at}: must be ${[].concat(schema.type).join(' or ')}`);
     return errors;
   }
   if (schema.oneOf) {
@@ -131,7 +133,9 @@ export function validateSchema(value, schema, root = schema, path = '') {
 // Tone rules (Architecture §7)
 
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const normalize = (text) => text.replace(/[‘’]/g, "'");
+// Curly apostrophes become straight ones, and Unicode hyphens (U+2010, U+2011) become "-", so
+// "push\u2011ups" reads as one word, not the imperative "push".
+const normalize = (text) => text.replace(/[‘’]/g, "'").replace(/[\u2010\u2011]/g, '-');
 
 /**
  * Problems with a note's phrasing, or [] if it reads as a description rather than a command.

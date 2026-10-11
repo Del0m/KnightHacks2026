@@ -1,8 +1,9 @@
+import type { SessionStart } from '../../../../specs/set-record/types';
 import { readFinishResult, type FinishResult } from '@/screens/Summary/summary';
 import { Platform } from 'react-native';
 import type { MMKV } from 'react-native-mmkv';
-import { isPermanentUploadFailure, uploadWorkout, type ApiRequest, type UploadCheckpoint, type WorkoutSet } from './workoutApi';
-type Pending = { id: string; startedAt: string; sets: WorkoutSet[]; checkpoint: UploadCheckpoint };
+import { WorkoutUploadError, isPermanentUploadFailure, uploadWorkout, type ApiRequest, type UploadCheckpoint, type WorkoutSet } from './workoutApi';
+type Pending = { sessionStart?: SessionStart; id: string; startedAt: string; sets: WorkoutSet[]; checkpoint: UploadCheckpoint };
 let storage: MMKV | undefined;
 const key = (account: string) => `workout-queue:${encodeURIComponent(account)}`;
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Do not load native Nitro modules during web SSR.
@@ -35,7 +36,9 @@ export function syncWorkouts(account: string, request: ApiRequest): Promise<void
     let rejected: unknown = null;
     for (;;) {
       const next = read(account)[0]; if (!next || blocked.has(`${account}/${next.id}`)) { if (rejected) throw rejected; return; }
-      try { await uploadWorkout(request, next.checkpoint, next.startedAt, next.sets, () => queueWorkout(account, next)); }
+      try {
+        if (!next.sessionStart && !next.checkpoint.sessionId) throw new WorkoutUploadError(400, 'Workout retained locally: its original inference mode is unavailable.');
+        await uploadWorkout(request, next.checkpoint, next.sessionStart ?? { started_at: next.startedAt, device: 'phone', inference_mode: 'coreml' }, next.sets, () => queueWorkout(account, next)); }
       catch (error) {
         if (!isPermanentUploadFailure(error)) { queueWorkout(account, next); throw error; }
         retainFailedWorkout(account, next, error.status);

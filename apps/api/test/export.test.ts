@@ -13,7 +13,7 @@ import {
   type UploadConfig,
 } from "../src/integrations/databricks/upload.js";
 import { databricksExportQueue, drizzleExportStatusStore } from "../src/services/exportQueue.js";
-import { createTestDb, frames, rep, setup } from "./helpers.js";
+import { createTestDb, frames, rep, setup, setRecord } from "./helpers.js";
 
 const config: UploadConfig = {
   host: "https://dbc.example.cloud.databricks.com",
@@ -61,14 +61,17 @@ describe("Databricks export on finish", () => {
   it("uploads joints then metadata with a pseudonymous id and marks the session exported", async () => {
     const api = await t.as("export-user");
     await api.post("/me/injuries", { body_part: "knee", notes: "private note" });
-    const { id } = (await api.post("/sessions", { device: "iPhone" })).body;
-    await api.post(`/sessions/${id}/sets`, {
-      exercise_id: "squat",
-      weight_kg: 40,
-      fps: 30,
-      frames: frames(3),
-      reps: [rep(), rep(["depth"], { start_ms: 0, end_ms: 2000 })],
-    });
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml", device: "iPhone" })).body;
+    await api.post(
+      `/sessions/${id}/sets`,
+      setRecord({
+        exercise_id: "squat",
+        weight_kg: 40,
+        fps: 30,
+        frames: frames(3),
+        reps: [rep(), rep(["depth"], { start_ms: 0, end_ms: 2000 })],
+      }),
+    );
     await api.post(`/sessions/${id}/finish`);
 
     const session = await waitForStatus(id, "exported");
@@ -80,7 +83,7 @@ describe("Databricks export on finish", () => {
     expect(JSON.stringify(meta)).not.toContain("export-user");
     expect(JSON.stringify(meta)).not.toContain("private note");
     expect(meta.sets[0].reps).toHaveLength(2);
-    expect(meta.sets[0].reps[1].flags).toEqual([{ rule_id: "depth", severity: "warn" }]);
+    expect(meta.sets[0].reps[1].flags).toEqual([{ rule_id: "depth", severity: "form", rep_index: 1 }]);
     // Unknown rep boundaries go out as null, not 0..0, which the pipeline's bounds check would drop.
     expect(meta.sets[0].reps[0]).toMatchObject({ start_ms: null, end_ms: null });
     expect(meta.sets[0].reps[1]).toMatchObject({ start_ms: 0, end_ms: 2000 });
@@ -101,8 +104,8 @@ describe("Databricks export on finish", () => {
   it("marks the session failed when Databricks stays down, without failing the request", async () => {
     failPuts = true;
     const api = await t.as("export-user-2");
-    const { id } = (await api.post("/sessions")).body;
-    await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] });
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
+    await api.post(`/sessions/${id}/sets`, setRecord({ exercise_id: "squat", reps: [rep()] }));
     const res = await api.post(`/sessions/${id}/finish`);
     expect(res.status).toBe(200);
     const session = await waitForStatus(id, "failed");
@@ -120,8 +123,8 @@ describe("Databricks export on finish", () => {
   });
   it("rebuilds stale sessions after restart, skips active leases, and retries beyond ten attempts", async () => {
     const api = await t.as("restart-user");
-    const { id } = (await api.post("/sessions")).body;
-    await api.post(`/sessions/${id}/sets`, { exercise_id: "squat", reps: [rep()] });
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
+    await api.post(`/sessions/${id}/sets`, setRecord({ exercise_id: "squat", reps: [rep()] }));
     await api.post(`/sessions/${id}/finish`);
     await waitForStatus(id, "exported");
     await t.db
@@ -147,7 +150,7 @@ describe("Databricks export on finish", () => {
   });
   it("claims a finished session atomically so two workers cannot upload it", async () => {
     const api = await t.as("claim-user");
-    const { id } = (await api.post("/sessions")).body;
+    const { id } = (await api.post("/sessions", { inference_mode: "coreml" })).body;
     await api.post(`/sessions/${id}/finish`);
     await waitForStatus(id, "exported");
     await t.db.update(schema.sessions).set({ exportStatus: "failed" }).where(eq(schema.sessions.id, id));

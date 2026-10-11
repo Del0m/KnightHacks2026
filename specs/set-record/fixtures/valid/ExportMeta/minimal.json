@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "session_id": "6f1c2d3e-0000-4000-8000-000000000001",
+  "user_id": "0123456789abcdef0123456789abcdef",
+  "started_at": "2026-10-10T10:00:00.000Z",
+  "finished_at": "2026-10-10T10:30:00.000Z",
+  "device": "iPhone 15",
+  "inference_mode": "vision",
+  "medal": null,
+  "form_score": null,
+  "experience_level": null,
+  "injury_groups": [],
+  "rehab_start_on": null,
+  "joints_path": "/Volumes/spotter/raw/sessions/joints/2026-10-10/6f1c2d3e-0000-4000-8000-000000000001.ndjson.gz",
+  "exported_at": "2026-10-10T10:30:05.000Z",
+  "sets": [
+    {
+      "set_index": 0,
+      "exercise_id": "squat",
+      "weight_kg": 20,
+      "medal": null,
+      "end_reason": "manual",
+      "partial_reps": 0,
+      "frame_count": 3,
+      "reps": [
+        {
+          "rep_index": 0,
+          "start_ms": 20,
+          "end_ms": 1820,
+          "tempo_ms": 1800,
+          "range_deg": 78.4,
+          "quality": null,
+          "lowering_ms": 900,
+          "rising_ms": 900,
+          "flags": []
+        },
+        {
+          "rep_index": 1,
+          "start_ms": 2400,
+          "end_ms": 4300,
+          "tempo_ms": 1900,
+          "range_deg": 52.1,
+          "quality": null,
+          "lowering_ms": 1000,
+          "rising_ms": 900,
+          "flags": [
+            {
+              "rule_id": "depth",
+              "severity": "form",
+              "rep_index": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

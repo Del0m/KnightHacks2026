@@ -10,10 +10,15 @@
 // users) are skipped. Only the last LOOKBACK_DAYS are re-read each run; upserts make re-runs
 // and overlapping windows harmless.
 //
+// Each gold table is read on its own: one that's missing or failing (e.g. gold_rom_trend before
+// the pipeline is updated) is logged and left as it was in Neon, and the others still sync.
+//
 // Tables: progress_daily and risk_insights in drizzle/schema/progress.ts (DB-07, migration 0001).
 // Started from src/index.ts when insightSyncConfigured(env); run it on one API instance only.
 
 import { DBSQLClient } from "@databricks/sql";
+import type { Env } from "../env.js";
+import { reasonOf, type IntegrationStatus } from "../services/integrationStatus.js";
 import { pseudonymize } from "../integrations/databricks/upload";
 
 export const SYNC_INTERVAL_MS = 15 * 60 * 1000;
@@ -32,7 +37,19 @@ export interface SyncConfig {
   lookbackDays: number;
 }
 
-export function syncConfigFromEnv(env = process.env): SyncConfig {
+type SyncEnv = Pick<
+  Env,
+  | "DATABRICKS_HOST"
+  | "DATABRICKS_CLIENT_ID"
+  | "DATABRICKS_CLIENT_SECRET"
+  | "DATABRICKS_OAUTH_SCOPES"
+  | "DATABRICKS_WAREHOUSE_ID"
+  | "SPOTTER_PSEUDONYM_SECRET"
+  | "SYNC_LOOKBACK_DAYS"
+>;
+
+/** From the validated env (src/env.ts); scripts can pass process.env. */
+export function syncConfigFromEnv(env: SyncEnv = process.env): SyncConfig {
   const required = [
     "DATABRICKS_HOST",
     "DATABRICKS_CLIENT_ID",
@@ -104,10 +121,12 @@ export interface RomRow {
   change_deg: number | null;
 }
 
+// Null when that table couldn't be read this run; `failed` says which and why.
 export interface GoldSnapshot {
-  progress: ProgressRow[];
-  risk: RiskRow[];
-  rom?: RomRow[];
+  progress: ProgressRow[] | null;
+  risk: RiskRow[] | null;
+  rom?: RomRow[] | null;
+  failed?: { table: string; error: string }[];
 }
 
 // Plain-language reasons for the app (Architecture §11.2). A trend, never a diagnosis.
@@ -163,24 +182,34 @@ export async function readGold(cfg: SyncConfig, log: LogLike = console): Promise
     }
   };
 
+  const failed: { table: string; error: string }[] = [];
+  const read = async <T>(table: string, statement: string): Promise<T[] | null> => {
+    try {
+      return await run<T>(statement);
+    } catch (err) {
+      failed.push({ table, error: err instanceof Error ? err.message.split("\n")[0]! : String(err) });
+      return null;
+    }
+  };
+
   try {
-    const progress = await run<ProgressRow>(`
+    const progress = await read<ProgressRow>("gold_user_progress_daily", `
       SELECT user_id, CAST(session_date AS STRING) AS date, exercise_id,
              sets, reps, clean_reps, clean_share, volume_kg,
              avg_range_deg, avg_quality, est_1rm_kg, is_pr
       FROM spotter.gold.gold_user_progress_daily
       WHERE session_date >= date_sub(current_date(), ${days})`);
-    const risk = await run<RiskRow>(`
+    const risk = await read<RiskRow>("gold_injury_risk_scores", `
       SELECT user_id, body_part, CAST(date AS STRING) AS date, score, top_features
       FROM spotter.gold.gold_injury_risk_scores
       WHERE date >= date_sub(current_date(), ${days}) AND score IS NOT NULL`);
     // Range of motion is charted from the start of a rehab plan, so it looks further back.
-    const rom = await run<RomRow>(`
+    const rom = await read<RomRow>("gold_rom_trend", `
       SELECT user_id, angle, side, CAST(week AS STRING) AS week, peak_range_deg,
              baseline_range_deg, healthy_side_range_deg, change_deg
       FROM spotter.gold.gold_rom_trend
       WHERE week >= date_sub(current_date(), ${Math.max(days, ROM_LOOKBACK_DAYS)})`);
-    return { progress, risk, rom };
+    return { progress, risk, rom, failed };
   } finally {
     await session.close();
     await client.close();
@@ -291,12 +320,14 @@ export interface SyncDeps {
   config: SyncConfig;
   read?: (cfg: SyncConfig, log: LogLike) => Promise<GoldSnapshot>; // injectable for tests
   log?: LogLike;
+  status?: IntegrationStatus; // INT-04: /health shows the last run's outcome
 }
 
 export interface SyncResult {
   progress: number;
   risk: number;
   rom: number;
+  failed: { table: string; error: string }[]; // tables left as they were in Neon this run
   skipped_unknown_users: number;
   ms: number;
 }
@@ -326,17 +357,18 @@ export async function runInsightSync({
       return [{ ...r, neon_user_id: id }];
     });
 
-  const progress = resolve(gold.progress);
-  const risk = resolve(gold.risk);
+  const progress = resolve(gold.progress ?? []);
+  const risk = resolve(gold.risk ?? []);
   const rom = resolve(gold.rom ?? []);
-  await upsertProgress(db, progress);
-  await upsertRisk(db, risk);
-  await upsertRom(db, rom);
+  if (gold.progress) await upsertProgress(db, progress);
+  if (gold.risk) await upsertRisk(db, risk);
+  if (gold.rom) await upsertRom(db, rom);
 
   return {
     progress: progress.length,
     risk: risk.length,
     rom: rom.length,
+    failed: gold.failed ?? [],
     skipped_unknown_users: skipped,
     ms: Date.now() - started,
   };
@@ -351,12 +383,16 @@ export function startInsightSync(deps: SyncDeps, intervalMs = SYNC_INTERVAL_MS):
     running = true;
     try {
       const r = await runInsightSync(deps);
+      for (const f of r.failed) log.error(`[insights] couldn't read ${f.table}, left as it was: ${f.error}`);
+      if (r.failed.length) deps.status?.fail("insight_sync", "partial");
+      else deps.status?.ok("insight_sync");
       log.info(
         `[insights] synced ${r.progress} progress, ${r.risk} risk, ${r.rom} range-of-motion rows` +
           ` (${r.skipped_unknown_users} rows for unknown users) in ${r.ms} ms`,
       );
     } catch (err) {
       // Leave Neon as it was; the next tick retries.
+      deps.status?.fail("insight_sync", reasonOf(err));
       log.error(`[insights] sync failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       running = false;

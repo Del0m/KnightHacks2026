@@ -23,10 +23,9 @@
 //
 // If either check can't be reached the content is allowed with checked: false, so posting keeps
 // working during an outage; callers should store that flag and re-check or review later.
-//
-// Stub until BE-01: env is read directly; move to the Zod env.
 
 import { InferenceClient } from "@huggingface/inference";
+import type { Env } from "../../env.js";
 import type { HfLlm } from "./llm.js";
 
 export type ContentKind = "post" | "comment" | "advice";
@@ -92,7 +91,10 @@ export interface ModerationConfig {
   attempts: number;
 }
 
-export function moderationConfigFromEnv(env = process.env): ModerationConfig {
+type ModerationEnv = Pick<Env, "HF_TOKEN" | "HF_GUARD_MODEL" | "HF_GUARD_PROVIDER" | "HF_GUARD_TIMEOUT_MS">;
+
+/** From the validated env (src/env.ts); scripts can pass process.env. */
+export function moderationConfigFromEnv(env: ModerationEnv = process.env): ModerationConfig {
   if (!env.HF_TOKEN) throw new Error("Missing env for Hugging Face: HF_TOKEN");
   return {
     token: env.HF_TOKEN,

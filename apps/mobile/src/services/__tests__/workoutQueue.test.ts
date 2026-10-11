@@ -1,10 +1,12 @@
 import { queueWorkout, syncWorkouts, readFailedWorkouts, readWorkoutResult } from '../workoutQueue';
+const sessionStart = { inference_mode: 'coreml' as const };
+const measured = { schema_version: 1 as const, set_index: 0, exercise_id: 'squat', weight_kg: null, end_reason: 'manual' as const, partial_reps: 0, fps: null, frames: [], reps: [] };
 const mockData = new Map<string, string>();
 jest.mock('react-native-mmkv', () => ({ createMMKV: () => ({ getString: (k: string) => mockData.get(k), set: (k: string, v: string) => mockData.set(k, v) }) }));
 const response = (status: number, body: object = { session_id: 'existing', medal: 'bronze', form_score: 0, baseline_share: .7, total_reps: 0, clean_reps: 0, personal_records: [] }) => ({ ok: status < 400, status, json: async () => body }) as Response;
 beforeEach(() => mockData.clear());
 it('retains failed saves and retries their original session without crossing accounts', async () => {
-  queueWorkout('a', { id: 'local', startedAt: '2026-10-10T12:00:00Z', sets: [{ exercise_id: 'squat', reps: [] }], checkpoint: {} });
+  queueWorkout('a', { id: 'local', startedAt: '2026-10-10T12:00:00Z', sets: [measured], sessionStart, checkpoint: {} });
   const request = jest.fn().mockResolvedValueOnce(response(201, { id: 'existing' })).mockRejectedValueOnce(new Error('offline'));
   await expect(syncWorkouts('a', request)).rejects.toThrow('offline');
   await syncWorkouts('b', request);
@@ -36,7 +38,7 @@ it('retains the authoritative finish result after the queued workout is removed'
 });
 
 it.each([400, 404, 422])('preserves an HTTP %s rejection separately and continues later workouts', async status => {
-  queueWorkout('a', { id: 'bad', startedAt: '2026-10-10T12:00:00Z', sets: [{ exercise_id: 'squat', reps: [] }], checkpoint: { sessionId: 'bad-session' } });
+  queueWorkout('a', { id: 'bad', startedAt: '2026-10-10T12:00:00Z', sets: [measured], sessionStart, checkpoint: { sessionId: 'bad-session' } });
   queueWorkout('a', { id: 'good', startedAt: '2026-10-10T12:00:00Z', sets: [], checkpoint: { sessionId: 'good-session' } });
   const request = jest.fn().mockImplementation((path: string) => Promise.resolve(response(path.includes('bad-session') ? status : 200)));
   await expect(syncWorkouts('a', request)).rejects.toThrow();

@@ -20,7 +20,7 @@ export function phoneSummary(sets: WorkoutSet[], history: Workout[], now: number
   return [details.reduce((n, s) => n + s.goodReps!, 0) / w.reps];
  });
  const baseline = previous.length ? previous.reduce((a, b) => a + b, 0) / previous.length : .7;
- const reps = sets.flatMap(s => s.reps), clean = reps.filter(r => r.flags.length === 0).length;
+ const reps = sets.flatMap<WorkoutSet['reps'][number]>(s => s.reps), clean = reps.filter(r => r.flags.length === 0).length;
  const measured = reps.length > 0 && !reps.some(r => r.flags.some(f => f.rule_id === 'manual_unscored'));
  const score = measured ? clean / reps.length : null;
  const medal = score === 1 ? 'gold' : score !== null && Math.round(score * 10000) >= Math.round(baseline * 10000) ? 'silver' : 'bronze';

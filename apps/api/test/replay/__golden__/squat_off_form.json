@@ -79,61 +79,129 @@
     ]
   },
   "set_payload": {
+    "schema_version": 1,
+    "set_index": 0,
     "exercise_id": "squat",
     "weight_kg": null,
+    "end_reason": "manual",
+    "partial_reps": 0,
     "fps": 15,
     "frames": {
-      "count": 272,
-      "sha256": "5b1179ecb86d82b5"
+      "count": 259,
+      "sha256": "d1c62ee52010b369"
     },
     "reps": [
       {
+        "rep_index": 0,
+        "start_ms": 1000,
+        "end_ms": 2800,
         "tempo_ms": 1800,
-        "range_deg": 81.3,
+        "range_deg": 76.9,
         "quality": null,
-        "start_ms": 1867,
-        "end_ms": 4133,
-        "flags": []
+        "lowering_ms": 733,
+        "rising_ms": 1067,
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 0
+          }
+        ]
       },
       {
+        "rep_index": 1,
+        "start_ms": 3733,
+        "end_ms": 5400,
         "tempo_ms": 1667,
-        "range_deg": 61.6,
+        "range_deg": 55.1,
         "quality": null,
-        "start_ms": 4600,
-        "end_ms": 6733,
-        "flags": []
+        "lowering_ms": 733,
+        "rising_ms": 934,
+        "flags": [
+          {
+            "rule_id": "depth",
+            "severity": "form",
+            "rep_index": 1
+          },
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 1
+          }
+        ]
       },
       {
+        "rep_index": 2,
+        "start_ms": 6333,
+        "end_ms": 8066,
         "tempo_ms": 1733,
-        "range_deg": 83.4,
+        "range_deg": 77.3,
         "quality": null,
-        "start_ms": 7200,
-        "end_ms": 9467,
-        "flags": []
+        "lowering_ms": 800,
+        "rising_ms": 933,
+        "flags": [
+          {
+            "rule_id": "trunk_lean",
+            "severity": "form",
+            "rep_index": 2
+          }
+        ]
       },
       {
+        "rep_index": 3,
+        "start_ms": 9000,
+        "end_ms": 10733,
         "tempo_ms": 1733,
-        "range_deg": 59.3,
+        "range_deg": 55.2,
         "quality": null,
-        "start_ms": 9867,
-        "end_ms": 12000,
-        "flags": []
+        "lowering_ms": 733,
+        "rising_ms": 1000,
+        "flags": [
+          {
+            "rule_id": "depth",
+            "severity": "form",
+            "rep_index": 3
+          },
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 3
+          }
+        ]
       },
       {
+        "rep_index": 4,
+        "start_ms": 11600,
+        "end_ms": 13400,
         "tempo_ms": 1800,
-        "range_deg": 80.7,
+        "range_deg": 76.2,
         "quality": null,
-        "start_ms": 12467,
-        "end_ms": 14867,
-        "flags": []
+        "lowering_ms": 800,
+        "rising_ms": 1000,
+        "flags": [
+          {
+            "rule_id": "trunk_lean",
+            "severity": "form",
+            "rep_index": 4
+          }
+        ]
       },
       {
+        "rep_index": 5,
+        "start_ms": 14266,
+        "end_ms": 16066,
         "tempo_ms": 1800,
-        "range_deg": 82,
+        "range_deg": 78.3,
         "quality": null,
-        "start_ms": 15133,
-        "end_ms": 17333,
-        "flags": []
+        "lowering_ms": 734,
+        "rising_ms": 1066,
+        "flags": [
+          {
+            "rule_id": "tempo",
+            "severity": "form",
+            "rep_index": 5
+          }
+        ]
       }
     ]
   },
@@ -145,63 +213,65 @@
       "exercise_id": "squat",
       "reps": 6,
       "weight_kg": null,
-      "medal": "gold",
-      "clean_share": 1,
+      "end_reason": "manual",
+      "partial_reps": 0,
+      "medal": "bronze",
+      "clean_share": 0,
       "score_source": "databricks",
       "score": {
         "source": "databricks",
-        "medal": "gold",
-        "clean_share": 1,
+        "medal": "bronze",
+        "clean_share": 0,
         "reps": [
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           },
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           },
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           },
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           },
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           },
           {
             "quality": 0.8,
             "label": "clean",
-            "clean": true
+            "clean": false
           }
         ]
       },
       "rest_note": {
-        "text": "6 of 6 reps were clean.",
+        "text": "6 reps done. Next set, try lowering until your hips are level with your knees.",
         "source": "fixed",
-        "rule_id": null
+        "rule_id": "depth"
       },
       "created_at": "<time>",
-      "clean_reps": 6,
+      "clean_reps": 0,
       "set_id": "<id 1>"
     },
     "finish_response": {
       "session_id": "<id 2>",
       "finished_at": "2026-10-10T15:05:00.000Z",
-      "medal": "gold",
-      "form_score": 1,
+      "medal": "bronze",
+      "form_score": 0,
       "baseline_share": 0.7,
       "total_reps": 6,
-      "clean_reps": 6,
+      "clean_reps": 0,
       "personal_records": [
         {
           "exercise_id": "squat",
@@ -212,7 +282,7 @@
       ],
       "posts": []
     },
-    "llm_called": false,
+    "llm_called": true,
     "rows": {
       "session": {
         "id": "<id 2>",
@@ -220,9 +290,9 @@
         "startedAt": "2026-10-10T15:00:00.000Z",
         "finishedAt": "2026-10-10T15:05:00.000Z",
         "device": "replay",
-        "inferenceMode": "on_device",
-        "medal": "gold",
-        "formScore": 1,
+        "inferenceMode": "coreml",
+        "medal": "bronze",
+        "formScore": 0,
         "exportStatus": "exported",
         "exportError": null,
         "exportAttempts": 1,
@@ -237,50 +307,52 @@
           "exerciseId": "squat",
           "reps": 6,
           "weightKg": null,
-          "medal": "gold",
-          "cleanShare": 1,
+          "endReason": "manual",
+          "partialReps": 0,
+          "medal": "bronze",
+          "cleanShare": 0,
           "scoreSource": "databricks",
           "score": {
             "reps": [
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               },
               {
-                "clean": true,
+                "clean": false,
                 "label": "clean",
                 "quality": 0.8
               }
             ],
-            "medal": "gold",
+            "medal": "bronze",
             "source": "databricks",
-            "clean_share": 1
+            "clean_share": 0
           },
           "restNote": {
-            "text": "6 of 6 reps were clean.",
+            "text": "6 reps done. Next set, try lowering until your hips are level with your knees.",
             "source": "fixed",
-            "rule_id": null
+            "rule_id": "depth"
           },
           "createdAt": "<time>"
         }
@@ -290,77 +362,138 @@
           "id": "<id 3>",
           "setId": "<id 1>",
           "position": 0,
-          "startMs": 1867,
-          "endMs": 4133,
+          "startMs": 1000,
+          "endMs": 2800,
+          "loweringMs": 733,
+          "risingMs": 1067,
           "tempoMs": 1800,
-          "rangeDeg": 81.3,
+          "rangeDeg": 76.9,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 4>",
           "setId": "<id 1>",
           "position": 1,
-          "startMs": 4600,
-          "endMs": 6733,
+          "startMs": 3733,
+          "endMs": 5400,
+          "loweringMs": 733,
+          "risingMs": 934,
           "tempoMs": 1667,
-          "rangeDeg": 61.6,
+          "rangeDeg": 55.1,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 5>",
           "setId": "<id 1>",
           "position": 2,
-          "startMs": 7200,
-          "endMs": 9467,
+          "startMs": 6333,
+          "endMs": 8066,
+          "loweringMs": 800,
+          "risingMs": 933,
           "tempoMs": 1733,
-          "rangeDeg": 83.4,
+          "rangeDeg": 77.3,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 6>",
           "setId": "<id 1>",
           "position": 3,
-          "startMs": 9867,
-          "endMs": 12000,
+          "startMs": 9000,
+          "endMs": 10733,
+          "loweringMs": 733,
+          "risingMs": 1000,
           "tempoMs": 1733,
-          "rangeDeg": 59.3,
+          "rangeDeg": 55.2,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 7>",
           "setId": "<id 1>",
           "position": 4,
-          "startMs": 12467,
-          "endMs": 14867,
+          "startMs": 11600,
+          "endMs": 13400,
+          "loweringMs": 800,
+          "risingMs": 1000,
           "tempoMs": 1800,
-          "rangeDeg": 80.7,
+          "rangeDeg": 76.2,
           "quality": null,
-          "clean": true
+          "clean": false
         },
         {
           "id": "<id 8>",
           "setId": "<id 1>",
           "position": 5,
-          "startMs": 15133,
-          "endMs": 17333,
+          "startMs": 14266,
+          "endMs": 16066,
+          "loweringMs": 734,
+          "risingMs": 1066,
           "tempoMs": 1800,
-          "rangeDeg": 82,
+          "rangeDeg": 78.3,
           "quality": null,
-          "clean": true
+          "clean": false
         }
       ],
-      "form_flags": [],
-      "medals": [
+      "form_flags": [
         {
           "id": "<id 9>",
+          "repId": "<id 3>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 10>",
+          "repId": "<id 4>",
+          "ruleId": "depth",
+          "severity": "form"
+        },
+        {
+          "id": "<id 11>",
+          "repId": "<id 4>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 12>",
+          "repId": "<id 5>",
+          "ruleId": "trunk_lean",
+          "severity": "form"
+        },
+        {
+          "id": "<id 13>",
+          "repId": "<id 6>",
+          "ruleId": "depth",
+          "severity": "form"
+        },
+        {
+          "id": "<id 14>",
+          "repId": "<id 6>",
+          "ruleId": "tempo",
+          "severity": "form"
+        },
+        {
+          "id": "<id 15>",
+          "repId": "<id 7>",
+          "ruleId": "trunk_lean",
+          "severity": "form"
+        },
+        {
+          "id": "<id 16>",
+          "repId": "<id 8>",
+          "ruleId": "tempo",
+          "severity": "form"
+        }
+      ],
+      "medals": [
+        {
+          "id": "<id 17>",
           "userId": "replay-squat_off_form",
           "sessionId": "<id 2>",
-          "tier": "gold",
-          "formScore": 1,
+          "tier": "bronze",
+          "formScore": 0,
           "baselineShare": 0.7,
           "awardedAt": "2026-10-10T15:05:00.000Z"
         }
@@ -377,10 +510,10 @@
             "set_index": 0,
             "exercise_id": "squat",
             "fps": 15,
-            "frame_count": 272,
+            "frame_count": 259,
             "first_t_ms": 0,
-            "last_t_ms": 18067,
-            "frames_sha256": "5b1179ecb86d82b5"
+            "last_t_ms": 17200,
+            "frames_sha256": "d1c62ee52010b369"
           }
         ]
       },
@@ -393,9 +526,9 @@
           "started_at": "2026-10-10T15:00:00.000Z",
           "finished_at": "2026-10-10T15:05:00.000Z",
           "device": "replay",
-          "inference_mode": "on_device",
-          "medal": "gold",
-          "form_score": 1,
+          "inference_mode": "coreml",
+          "medal": "bronze",
+          "form_score": 0,
           "experience_level": "beginner",
           "injury_groups": [],
           "rehab_start_on": null,
@@ -406,62 +539,122 @@
               "set_index": 0,
               "exercise_id": "squat",
               "weight_kg": null,
-              "medal": "gold",
-              "frame_count": 272,
+              "medal": "bronze",
+              "end_reason": "manual",
+              "partial_reps": 0,
+              "frame_count": 259,
               "reps": [
                 {
                   "rep_index": 0,
-                  "start_ms": 1867,
-                  "end_ms": 4133,
+                  "start_ms": 1000,
+                  "end_ms": 2800,
                   "tempo_ms": 1800,
-                  "range_deg": 81.3,
-                  "quality": 1,
-                  "flags": []
+                  "range_deg": 76.9,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 1067,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 0
+                    }
+                  ]
                 },
                 {
                   "rep_index": 1,
-                  "start_ms": 4600,
-                  "end_ms": 6733,
+                  "start_ms": 3733,
+                  "end_ms": 5400,
                   "tempo_ms": 1667,
-                  "range_deg": 61.6,
-                  "quality": 1,
-                  "flags": []
+                  "range_deg": 55.1,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 934,
+                  "flags": [
+                    {
+                      "rule_id": "depth",
+                      "severity": "form",
+                      "rep_index": 1
+                    },
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 1
+                    }
+                  ]
                 },
                 {
                   "rep_index": 2,
-                  "start_ms": 7200,
-                  "end_ms": 9467,
+                  "start_ms": 6333,
+                  "end_ms": 8066,
                   "tempo_ms": 1733,
-                  "range_deg": 83.4,
-                  "quality": 1,
-                  "flags": []
+                  "range_deg": 77.3,
+                  "quality": null,
+                  "lowering_ms": 800,
+                  "rising_ms": 933,
+                  "flags": [
+                    {
+                      "rule_id": "trunk_lean",
+                      "severity": "form",
+                      "rep_index": 2
+                    }
+                  ]
                 },
                 {
                   "rep_index": 3,
-                  "start_ms": 9867,
-                  "end_ms": 12000,
+                  "start_ms": 9000,
+                  "end_ms": 10733,
                   "tempo_ms": 1733,
-                  "range_deg": 59.3,
-                  "quality": 1,
-                  "flags": []
+                  "range_deg": 55.2,
+                  "quality": null,
+                  "lowering_ms": 733,
+                  "rising_ms": 1000,
+                  "flags": [
+                    {
+                      "rule_id": "depth",
+                      "severity": "form",
+                      "rep_index": 3
+                    },
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 3
+                    }
+                  ]
                 },
                 {
                   "rep_index": 4,
-                  "start_ms": 12467,
-                  "end_ms": 14867,
+                  "start_ms": 11600,
+                  "end_ms": 13400,
                   "tempo_ms": 1800,
-                  "range_deg": 80.7,
-                  "quality": 1,
-                  "flags": []
+                  "range_deg": 76.2,
+                  "quality": null,
+                  "lowering_ms": 800,
+                  "rising_ms": 1000,
+                  "flags": [
+                    {
+                      "rule_id": "trunk_lean",
+                      "severity": "form",
+                      "rep_index": 4
+                    }
+                  ]
                 },
                 {
                   "rep_index": 5,
-                  "start_ms": 15133,
-                  "end_ms": 17333,
+                  "start_ms": 14266,
+                  "end_ms": 16066,
                   "tempo_ms": 1800,
-                  "range_deg": 82,
-                  "quality": 1,
-                  "flags": []
+                  "range_deg": 78.3,
+                  "quality": null,
+                  "lowering_ms": 734,
+                  "rising_ms": 1066,
+                  "flags": [
+                    {
+                      "rule_id": "tempo",
+                      "severity": "form",
+                      "rep_index": 5
+                    }
+                  ]
                 }
               ]
             }

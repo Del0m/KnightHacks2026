@@ -11,12 +11,12 @@ import type { WorkoutSet } from '@/services/workoutApi';
 import { calendarDay, type Workout } from '@/data/workout';
 import { MEDAL_LABEL } from '@/screens/LiveSet/restCardContent';
 import { exerciseName, medalExplanation, phoneSummary } from './summary';
-type Props = { workoutId: string; records: WorkoutSet[]; history: Workout[]; syncStatus: string };
+type Props = { onUndo?: () => void; workoutId: string; records: WorkoutSet[]; history: Workout[]; syncStatus: string };
 export function WorkoutSummary(props: Props) {
  const { user } = useAuth();
  return <SummarySession key={`${user?.id ?? 'guest'}/${props.workoutId}`} {...props} />;
 }
-function SummarySession({ workoutId, records, history, syncStatus }: Props) {
+function SummarySession({ workoutId, records, history, syncStatus, onUndo }: Props) {
  const auth = useAuth(), account = auth.user?.id;
  const server = useSyncExternalStore(subscribeWorkoutResults, () => account ? readWorkoutResult(account, workoutId) : null, () => null);
  const [share, setShare] = useState(false), [shared, setShared] = useState(() => account ? workoutShared(account, workoutId) : false), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
@@ -60,5 +60,6 @@ function SummarySession({ workoutId, records, history, syncStatus }: Props) {
   {error && <Text accessibilityRole="alert" style={ui.muted}>{error}</Text>}
   <Action onPress={() => router.replace('/')}>Back to Train</Action>
   <Action secondary onPress={() => router.replace('/me')}>View my history</Action>
+  {onUndo && <Action secondary onPress={onUndo}>Undo save</Action>}
  </AppPage>;
 }

@@ -3,9 +3,10 @@
 Replays every clip in `apps/mobile/src/engine/__fixtures__/` through the set path and compares the result with a golden file per clip in `__golden__/`.
 
 1. **Engine (AI-06).** The mobile form engine, imported from `apps/mobile`.
-2. **Rules (AI-07) and set record (AI-08).** Not on main yet. `toSetPayload` in `pipeline.ts` stands in: reps go out with no rule flags and no quality.
-3. **API.** The real Express app on PGlite with the real migrations and exercise specs: `POST /sessions`, `POST /sessions/:id/sets`, `POST /sessions/:id/finish`.
-4. **Databricks upload.** The real uploader writes both files to a faked volume.
+2. **Rules (AI-07).** The mobile form rules run on the engine's events, and each rep goes out with its flags. Where a clip lists `expected.flags`, the replay checks that exactly those flags reach the API.
+3. **Set record (AI-08).** The phone's set recorder (`apps/mobile/src/engine/setRecord.ts`), fed every pose and engine event the way the phone feeds it. `toSetPayload` in `pipeline.ts` wires it up. The session's `inference_mode` is the clip's pose source.
+4. **API.** The real Express app on PGlite with the real migrations and exercise specs: `POST /sessions`, `POST /sessions/:id/sets`, `POST /sessions/:id/finish`.
+5. **Databricks upload.** The real uploader writes both files to a faked volume.
 
 Databricks (token, scoring, file upload) and Hugging Face (rest notes) run their real clients with `fetch` faked. Any other outbound request fails the replay.
 
@@ -41,9 +42,3 @@ This rewrites the golden files. Review `git diff test/replay/__golden__` before 
 ## Adding a recorded clip
 
 Record a set with the PoseDebugScreen recorder and save the clip JSON to `apps/mobile/src/engine/__fixtures__/`. Fill in `expected` by hand: `reps`, `partials` and `set_end`. The replay checks those numbers on every run. Run `npm run test:replay -- -u` once to write the new clip's golden file.
-
-## When AI-07 and AI-08 land
-
-1. Replace `toSetPayload` with AI-07's rule evaluation and AI-08's set record builder.
-2. Regenerate the golden files. Flags per rep will appear in them, and flagged sets will start calling the faked LLM for rest notes.
-3. Add at least one clean and one off-form clip per exercise. Off-form clips need AI-07's flags.

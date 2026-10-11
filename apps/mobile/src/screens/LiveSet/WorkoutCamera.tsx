@@ -1,3 +1,4 @@
+import { createSetRecorder } from '@/engine/setRecord';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -13,9 +14,9 @@ import type { WorkoutSet } from '@/services/workoutApi';
 import { GlassChoice } from '@/components/GlassChoice';
 import { ui } from '@/components/AppPage';
 import { useTorchPulse } from './useTorchPulse';
-import { createSetCapture, setFeedback, type SetFeedback } from './setRecord';
+import { setFeedback, type SetFeedback } from './setRecord';
 
-type Props = { onFinishing?: () => void; manualLabel?: string; initialPosition?: 'front' | 'back'; spec: ExerciseSpec; onComplete: (record: WorkoutSet, feedback: SetFeedback) => void; onManual: () => void; baseline: number };
+type Props = { setIndex?: number; onFinishing?: () => void; manualLabel?: string; initialPosition?: 'front' | 'back'; spec: ExerciseSpec; onComplete: (record: WorkoutSet, feedback: SetFeedback, inferenceMode: PoseEngine) => void; onManual: () => void; baseline: number };
 export default function WorkoutCamera(props: Props) {
   if (Platform.OS !== 'ios') return <Fallback label={props.manualLabel} onManual={props.onManual} message="Camera rep tracking is available in the iPhone app." />;
   return <PermissionCamera {...props} />;
@@ -31,7 +32,7 @@ function PermissionCamera(props: Props) {
   return <TrackedCamera {...props} engine={mode.mode} size={mode.size} />;
 }
 function Fallback({ message, onManual, label = 'Track manually' }: { message: string; onManual: () => void; label?: string }) { return <View style={s.group}><Text style={ui.muted}>{message}</Text><GlassChoice compact label={label} onPress={onManual} /></View>; }
-function TrackedCamera({ spec, engine, size, onComplete, onManual, onFinishing, baseline, initialPosition, manualLabel = 'Track manually' }: Props & { engine: PoseEngine; size: 320 | 256 }) {
+function TrackedCamera({ spec, engine, size, onComplete, onManual, onFinishing, baseline, initialPosition, setIndex = 0, manualLabel = 'Track manually' }: Props & { engine: PoseEngine; size: 320 | 256 }) {
   const [position, setPosition] = useState<'front' | 'back'>(initialPosition ?? 'front');
   const device = useCameraDevice(position);
   const [detection, setDetection] = useState<PoseDetection | null>(null);
@@ -39,14 +40,14 @@ function TrackedCamera({ spec, engine, size, onComplete, onManual, onFinishing, 
   const [active, setActive] = useState(AppState.currentState === 'active'), [focused, setFocused] = useState(true), [cameraError, setCameraError] = useState(false);
   const pulse = useTorchPulse(position === 'back' && Boolean(device?.hasTorch) && active && focused && !cameraError);
   const completed = useRef(false), lastFrame = useRef(0), resolution = useRef<{ currentResolution?: { width: number; height: number } } | null>(null);
-  const capture = useMemo(() => createSetCapture(spec), [spec]);
+  const capture = useMemo(() => createSetRecorder(spec, { setIndex }), [spec, setIndex]);
   const rules = useFormRules(spec, { onSetFlags: summary => {
     if (completed.current || summary.total_reps === 0) return;
     completed.current = true; onFinishing?.();
     const record = capture.finish(summary), feedback = setFeedback(spec, summary, baseline);
-    pulse.signal(() => onComplete(record, feedback));
+    pulse.signal(() => onComplete(record, feedback, engine));
   } });
-  const form = useFormEngine(spec, { imageAspect: image ? image.width / image.height : undefined, onEvent: event => { capture.onEvent(event); rules.onEvent(event); } });
+  const form = useFormEngine(spec, { imageAspect: image ? image.width / image.height : undefined, onEvent: event => { capture.event(event); rules.onEvent(event); } });
   useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
   useEffect(() => { const subscription = AppState.addEventListener('change', state => setActive(state === 'active')); return () => subscription.remove(); }, []);
   const running = active && focused && (!form.ended || pulse.flashing) && !cameraError;
@@ -55,6 +56,7 @@ function TrackedCamera({ spec, engine, size, onComplete, onManual, onFinishing, 
     lastFrame.current = Date.now(); setDetection(d);
     const r = resolution.current?.currentResolution;
     if (r && !image) setImage({ width: Math.min(r.width, r.height), height: Math.max(r.width, r.height) });
+    if (d.result) capture.pose(d.result);
     form.onPose(d);
   } });
   useLayoutEffect(() => { resolution.current = output.frameOutput; }, [output.frameOutput]);
@@ -75,7 +77,7 @@ function TrackedCamera({ spec, engine, size, onComplete, onManual, onFinishing, 
     {!!interrupted && <Text style={ui.muted}>Tracking interrupted. Finish your counted reps or switch to manual tracking.</Text>}
     {!interrupted && (!detection?.result || stale) && <Text style={ui.muted}>Keep your whole body in view.</Text>}
     <GlassChoice primary label="Done with set" disabled={form.repCount === 0 || form.ended} onPress={form.endSet} />
-    {form.repCount === 0 && <GlassChoice compact label={position === 'front' ? 'Use back camera' : 'Use front camera'} onPress={() => { setPosition(p => p === 'front' ? 'back' : 'front'); setDetection(null); setImage(null); lastFrame.current = 0; setCameraError(false); form.reset(); rules.reset(); }} />}
+    {form.repCount === 0 && <GlassChoice compact label={position === 'front' ? 'Use back camera' : 'Use front camera'} onPress={() => { setPosition(p => p === 'front' ? 'back' : 'front'); setDetection(null); setImage(null); lastFrame.current = 0; setCameraError(false); capture.reset(); form.reset(); rules.reset(); }} />}
     <GlassChoice compact label={manualLabel} disabled={form.ended || pulse.flashing} onPress={() => { if (!completed.current) onManual(); }} />
   </View>;
 }

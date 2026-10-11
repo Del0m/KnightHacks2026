@@ -20,17 +20,19 @@
 // here from the set's joints, the same way the pipeline computes them for training (features.ts).
 // Endpoint setup: databricks/notebooks/serving_endpoint.py, runbook docs/runbooks/set-scoring.md.
 
+import type { Flag, JointFrame, Rep } from "../../../../../specs/set-record/types.js";
+export type { Medal } from "../../../../../specs/set-record/types.js";
+import type { Medal } from "../../../../../specs/set-record/types.js";
 import type { Env } from "../../env.js";
 import { repFeatures } from "./features.js";
-import type { FinishedRep, JointFrame } from "./upload.js";
 
 // ---- Input / output ----
 
 // A rep of the AI-08 set record. Boundaries are optional: without them the model gets null
 // features for that rep, which it handles.
-export type ScoreRep = Pick<FinishedRep, "range_deg" | "tempo_ms"> &
-  Partial<Pick<FinishedRep, "start_ms" | "end_ms" | "quality">> & {
-    flags: Pick<FinishedRep["flags"][number], "rule_id">[]; // the phone's rule result
+export type ScoreRep = Pick<Rep, "range_deg" | "tempo_ms"> &
+  Partial<Pick<Rep, "start_ms" | "end_ms" | "quality">> & {
+    flags: Pick<Flag, "rule_id">[]; // the phone's rule result
   };
 
 export interface ScoreSetInput {
@@ -40,8 +42,6 @@ export interface ScoreSetInput {
   frames?: JointFrame[]; // the set's joints, on the same clock as the rep boundaries
   baseline_share?: number | null; // lifter's 4-week clean share; defaults to the beginner baseline
 }
-
-export type Medal = "gold" | "silver" | "bronze";
 
 export interface SetScore {
   source: "databricks" | "phone";
@@ -110,7 +110,10 @@ export function phoneScore(input: ScoreSetInput, startedAt: number, reason: stri
   const baseline = input.baseline_share ?? BEGINNER_BASELINE;
   return {
     source: "phone",
-    ...pickMedal(reps.map((r) => r.clean), baseline),
+    ...pickMedal(
+      reps.map((r) => r.clean),
+      baseline,
+    ),
     reps,
     latency_ms: Date.now() - startedAt,
     fallback_reason: reason,
@@ -153,14 +156,19 @@ export class DatabricksScorer {
       }));
       return {
         source: "databricks",
-        ...pickMedal(reps.map((r) => r.clean), input.baseline_share ?? BEGINNER_BASELINE),
+        ...pickMedal(
+          reps.map((r) => r.clean),
+          input.baseline_share ?? BEGINNER_BASELINE,
+        ),
         reps,
         latency_ms: Date.now() - startedAt,
       };
     } catch (err) {
       const reason = signal.aborted
         ? `timed out after ${this.config.timeoutMs} ms`
-        : err instanceof Error ? err.message : String(err);
+        : err instanceof Error
+          ? err.message
+          : String(err);
       if (/HTTP 401|HTTP 403/.test(reason)) this.token = null;
       this.log.warn(`[databricks] scoring fell back to phone score: ${reason}`);
       return phoneScore(input, startedAt, reason);
