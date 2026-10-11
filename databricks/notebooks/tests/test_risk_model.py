@@ -493,5 +493,43 @@ class ReviewFixes(unittest.TestCase):
         self.assertEqual(frame["label"].tolist(), t["label"].astype(int).tolist())
 
 
+
+class ChampionRun(unittest.TestCase):
+    """Free Edition: the model stays an MLflow run artifact; the champion is the run tagged champion=true."""
+
+    def test_choose_champion_promotes_when_no_champion(self):
+        choose = ns["choose_champion"]
+        self.assertTrue(choose(None, 0.1))
+        self.assertTrue(choose({}, 0.1))  # champion run without a test_pr_auc metric
+
+    def test_choose_champion_compares_test_pr_auc(self):
+        choose = ns["choose_champion"]
+        self.assertTrue(choose({"test_pr_auc": 0.5}, 0.6))
+        self.assertTrue(choose({"test_pr_auc": 0.5}, 0.5))  # ties promote
+        self.assertFalse(choose({"test_pr_auc": 0.5}, 0.49))
+        self.assertFalse(choose({"test_pr_auc": 0.5, "test_roc_auc": 0.1}, 0.4))
+
+    def test_champion_tag_constants(self):
+        self.assertEqual(ns["CHAMPION_TAG"], "champion")
+        self.assertEqual(ns["MODEL_ARTIFACT_PATH"], "model")
+
+    def test_registration_skip_reason_is_first_line(self):
+        reason = ns["registration_skip_reason"]
+        exc = Exception("S3UploadFailedError: AccessDenied PutObject\nTraceback (most recent call last):\n  ...")
+        self.assertEqual(reason(exc), "S3UploadFailedError: AccessDenied PutObject")
+        self.assertEqual(reason(Exception("")), "Exception")
+        self.assertEqual(reason(ValueError("\n  \nsecond")), "second")  # first non-blank line
+        self.assertLessEqual(len(reason(Exception("x" * 10000))), 500)
+
+    def test_notebook_logs_run_artifact_and_scores_from_run(self):
+        text = NOTEBOOK.read_text()
+        run_part = text.split(RUN_MARKER, 1)[1]
+        self.assertNotIn("registered_model_name", run_part)
+        self.assertIn("mlflow.register_model(", run_part)
+        self.assertIn("uc_registration", run_part)
+        self.assertIn('f"runs:/{', run_part)
+        self.assertNotIn("models:/", run_part)
+        self.assertIn("free edition", text.lower())
+
 if __name__ == "__main__":
     unittest.main()
