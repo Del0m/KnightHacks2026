@@ -264,6 +264,29 @@ describe('readBundle', () => {
   });
 });
 
+describe('ignored labels', () => {
+  const labelled = () => {
+    const data = offForm();
+    const reps = engineReps(data);
+    data.annotations = reps.map((r, i) => annotation(`a${i}`, r.start_frame, r.end_frame, i === 0 ? ['fast_lowering', 'partial_range'] : i === 5 ? ['fast_lowering'] : ['clean']));
+    return data;
+  };
+
+  it('drops the label from each rep and keeps the rep for the other rules', () => {
+    const rows = checkClip(labelled(), { ignoreLabels: ['fast_lowering'] }).rows;
+    expect(rows).toHaveLength(6);
+    expect(rows[0].human_labels).toEqual(['partial_range']);
+    expect(rows[5].human_labels).toEqual([]);
+  });
+
+  it('reports the rule for an ignored label as not scored, with its flag count', () => {
+    const md = renderReport([checkClip(labelled(), { ignoreLabels: ['fast_lowering'] })], { ignoreLabels: ['fast_lowering'] });
+    expect(md).toMatch(/\| tempo \| fast_lowering \| labels disregarded \| — \| 4 \|/);
+    expect(md).toMatch(/fast_lowering labels are disregarded/);
+    expect(md).not.toMatch(/- tempo: /);
+  });
+});
+
 describe('renderReport', () => {
   it('writes counts as fractions and says when an exercise has a single clip', () => {
     const data = offForm();
