@@ -101,6 +101,8 @@ describe('PoseDebugScreen', () => {
     saveBenchmark({ modelId: 'model-a', size: 320, fps: 60, meanMs: 9, p95Ms: 10, ranAt: 1, error: null });
     saveCloudConsent('user-1', true);
     __resetPoseModeForTests();
+    mockAuth.user = { id: 'user-1' };
+    Object.defineProperty(AppState, 'currentState', { value: 'active', configurable: true });
     act(() => { renderer = create(React.createElement(PoseDebugScreen)); });
     const last = () => jest.mocked(usePoseOutput).mock.calls.at(-1)![0];
     expect(last().engine).toBe('coreml');
