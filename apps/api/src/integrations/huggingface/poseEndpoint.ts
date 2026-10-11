@@ -5,6 +5,8 @@
 // answers 503, which comes back here as { status: "warming" } so the phone can show its quiet
 // "reconnecting" state instead of an error. Frames are only held in memory for the request.
 
+import type { Env } from "../../env.js";
+
 export interface Joint {
   x: number;
   y: number;
@@ -31,7 +33,10 @@ export interface PoseEndpointConfig {
   timeoutMs: number;
 }
 
-export function poseEndpointConfigFromEnv(env = process.env): PoseEndpointConfig | null {
+type PoseEnv = Pick<Env, "POSE_ENDPOINT_URL" | "HF_TOKEN" | "POSE_ENDPOINT_TIMEOUT_MS">;
+
+/** From the validated env (src/env.ts); scripts can pass process.env. */
+export function poseEndpointConfigFromEnv(env: PoseEnv = process.env): PoseEndpointConfig | null {
   if (!env.POSE_ENDPOINT_URL || !env.HF_TOKEN) return null;
   return {
     url: env.POSE_ENDPOINT_URL,
