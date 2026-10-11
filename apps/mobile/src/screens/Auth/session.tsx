@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
-import { authClient, apiUrl, authConfigured } from './client';
+import { authClient, apiUrl, authConfigured, googleSignInEnabled } from './client';
 import { createAuthenticatedFetch } from './api';
 import type { Credentials, AuthMode } from './validation';
 
@@ -9,6 +9,10 @@ type AuthState = { user: User | null; loading: boolean; error: string | null };
 type AuthContextValue = AuthState & {
   configured: boolean; refresh: () => Promise<void>; logout: () => Promise<void>;
   authenticate: (mode: AuthMode, fields: Credentials) => Promise<boolean>;
+  /** Whether "Continue with Google" is offered (EXPO_PUBLIC_GOOGLE_SIGN_IN). */
+  googleEnabled: boolean;
+  /** True once signed in. On web the page leaves for Google and this resolves false. */
+  signInWithGoogle: () => Promise<boolean>;
   resendVerification: (email: string) => Promise<void>;
   apiFetch: ReturnType<typeof createAuthenticatedFetch>;
   /** A fresh API token for connections fetch can't make (the cloud pose WebSocket, AI-17); null when signed out. */
@@ -61,6 +65,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return Boolean(data?.user);
     } finally { mutating.current = false; }
   }
+  async function signInWithGoogle() {
+    if (!authClient || !googleSignInEnabled) throw new Error('Google sign-in is not available yet.');
+    if (mutating.current) throw new Error('Please wait for the current sign-in request.');
+    mutating.current = true;
+    const current = ++generation.current;
+    try {
+      // Web comes back to this site (a trusted domain in Neon Auth); the native app comes back
+      // through its steadyforum:// scheme, which the Expo plugin builds from these paths.
+      const web = Platform.OS === 'web';
+      const origin = web ? window.location.origin : '';
+      const result = await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: `${origin}/`,
+        errorCallbackURL: `${origin}/login`,
+      });
+      if (result.error) throw new Error(result.error.message || 'Could not sign in with Google. Please try again.');
+      if (web) return false; // the browser is on its way to Google
+      const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } });
+      if (error) throw new Error('Could not confirm your session. Please try again.');
+      if (current !== generation.current) return false;
+      commit({ user: data?.user ?? null, loading: false, error: null });
+      return Boolean(data?.user);
+    } finally { mutating.current = false; }
+  }
   async function logout() {
     if (!authClient) return;
     if (mutating.current) throw new Error('Please wait for the current sign-in request.');
@@ -104,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (requestGeneration !== generation.current) throw new Error('Your account changed. Please try again.');
     return response;
   }
-  return <AuthContext.Provider value={{ ...state, configured: authConfigured, refresh, authenticate, logout, resendVerification, apiFetch, getApiToken }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ ...state, configured: authConfigured, googleEnabled: googleSignInEnabled, signInWithGoogle, refresh, authenticate, logout, resendVerification, apiFetch, getApiToken }}>{children}</AuthContext.Provider>;
 }
 export function useAuth() {
   const value = useContext(AuthContext);
