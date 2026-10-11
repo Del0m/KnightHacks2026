@@ -91,7 +91,7 @@ AI rep counters are a common hackathon project. Leading with injury recovery mak
 
 ## 3. System overview
 
-Four parts. Video never leaves the phone; everything that goes to the cloud is numbers.
+Four parts. Video stays on the phone and everything that goes to the cloud is numbers, except in cloud pose mode ([§4.1](#41-pose-modes-on-device-cloud-and-basic)), where the user consents to send camera frames for pose detection. Those frames are processed in memory and never stored.
 
 ```mermaid
 flowchart LR

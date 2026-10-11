@@ -136,6 +136,11 @@ Not measured on the phone (accepted by the owner; covered only by tests):
 
 **Hugging Face token:** the endpoint belongs to the `bubblesmal` account. A personal fine-grained token gets **403** (`missing permissions: inference.endpoints.infer.write`), even when it has that permission for its own account. The API's `HF_TOKEN` must be `bubblesmal`'s token (as `docs/runbooks/demo-checklist.md` says), or the endpoint has to move into a shared organisation.
 
+## Deploying
+
+- **Hosted API (`https://knighthacks2026.onrender.com`):** `/health` currently reports `cloud_pose: disabled`. Set `POSE_ENDPOINT_URL` there, and make `HF_TOKEN` the `bubblesmal` token, before cloud mode can connect from a phone. Phones need an HTTPS API, so this hosted one, not a laptop on `http`.
+- **Phones:** this adds a native module (the encoder), so test phones need a fresh native build. A JavaScript-only update to an older build fails when it encodes the first cloud frame.
+
 ## Not included
 
 - Android, web, and cloud in the workout screen (INT-11, #109). WorkoutCamera is unchanged.
@@ -144,11 +149,11 @@ Not measured on the phone (accepted by the owner; covered only by tests):
 
 ## Honest notes
 
-- **Not run on a device yet.** The orientation tests run in PoseCore on macOS with BGRA buffers. The camera's YUV-to-RGB step goes through `CIImage(cvPixelBuffer:)` and has only been compiled, not checked on a phone.
+- **Device coverage.** The encoder has now run on a phone (iPhone 17 Pro Max): cloud tracking worked and frames arrived upright, so the camera's YUV-to-RGB step through `CIImage(cvPixelBuffer:)` is confirmed there. The automated orientation tests still use BGRA buffers on macOS. The fps gate wasn't measured (see Device check).
 - **`cloudReachable` isn't reset when a screen closes its stream.** The next camera screen can briefly show `cloud` rather than `paused`. Both modes run the same transport, so nothing visible changes.
 - **A fast phone that prefers cloud but hasn't consented still uses Core ML**, as `selectPoseMode` already did. Asking that user for consent belongs to the FE-15 toggle.
 - **Every failure, including a single stale result, raises the recovery panel.** The panel hides on the next fresh pose. On a jittery connection it may flicker, so judge that on the device.
 - **Two existing tests changed:**
   - In `cloud.test.ts`, one warming test was retimed. It had encoded the original spec's wording (2 s from the last send), but the relay holds for 2 s from its warming reply, so the first probe was being dropped unanswered.
   - In `PoseDebugScreen.test.tsx`, "toggles between YOLOv8 and Apple Vision" now saves a fast benchmark first. It relied on the old behaviour where a `pending` mode meant Core ML.
-- **`Architecture.md` §3 still says "Video never leaves the phone".** That has been out of date since cloud mode was designed, and this PR leaves it alone.
+- **`Architecture.md` §3** used to say "Video never leaves the phone". It now names cloud mode as the exception, after review.
