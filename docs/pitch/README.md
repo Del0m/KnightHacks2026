@@ -8,8 +8,9 @@ Everything for the Knight Hacks judging: the deck, the printed architecture hand
 | [deck/](deck/) | Slide source: `deck.json` sets the order, one HTML file per slide, speaker notes in each `<aside>` |
 | [architecture-handout.pdf](architecture-handout.pdf) | One US Letter page to print and hand to judges (PITCH-02). Reads in black and white. Source: [architecture-handout.html](architecture-handout.html), preview: [architecture-handout-preview.png](architecture-handout-preview.png) |
 | [judges-faq.md](judges-faq.md) | Crib sheet for Q&A. Answers marked **(check)** depend on open issues |
+| [video/](video/) | Remotion project: the animated architecture on the deck's `how` slide, plus the clips and rough cut for the Devpost video |
 
-**Live deck:** https://claude.ai/artifact/RMBHctMbtjeYUZmxRio6hB. It's private until its owner shares it from the deck's Share menu, and it downloads as PowerPoint or PDF. The files in `deck/` are a snapshot of it for review; images are hosted with the live deck, so `src="/_blob/…"` paths don't resolve here.
+**Live deck:** https://claude.ai/artifact/RMBHctMbtjeYUZmxRio6hB. Anyone with the link can view it, and it downloads as PowerPoint or PDF. The files in `deck/` are a snapshot of it for review; images are hosted with the live deck, so `src="/_blob/…"` paths don't resolve here.
 
 ## Rebuilding the handout PDF
 

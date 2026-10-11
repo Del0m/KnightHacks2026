@@ -1,42 +1,4 @@
-<section id="how" hidden data-transition="fade" style="background:#F5F9FD;color:#10233F;font-family:'Barlow', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:32px">
-<p style="font-size:28px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#1F64C8">How it works</p>
-<h2 style="font-family:'Barlow Condensed', Arial, sans-serif;font-size:72px;font-weight:700;line-height:1.05;color:#10233F">Five parts, each doing the job it's fastest at.</h2>
-<!-- Phone 0,0,420,580  API 620,120,420,200  Neon 620,400,420,180  DBX 1244,0,420,220  HF 1244,270,420,310 -->
-<div style="position:relative;width:1664px;height:580px">
-<div style="position:absolute;left:0;top:0;width:420px;height:580px;background:#FFFFFF;border:3px solid #1F64C8;border-radius:28px;padding:32px;display:flex;flex-direction:column;gap:14px">
-<h3 style="font-size:36px;font-weight:700;color:#1F64C8">1 · Your phone</h3>
-<p style="font-size:26px;line-height:1.35;color:#10233F">Camera, pose AI, form engine, silent screen.</p>
-<p style="font-size:26px;line-height:1.35;color:#44546A">YOLOv8n-pose on the Neural Engine, 17 joints per frame.</p>
-<p style="font-size:26px;line-height:1.35;color:#8A4F00">Too slow, or Android? Frames go to the cloud, with consent.</p>
-</div>
-<div style="position:absolute;left:620px;top:120px;width:420px;height:200px;background:#FFFFFF;border:3px solid #4B5650;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:10px">
-<h3 style="font-size:36px;font-weight:700;color:#4B5650">2 · Spotter API</h3>
-<p style="font-size:26px;line-height:1.35;color:#44546A">Node + Express. Sessions, plans, feed, rehab. Relays cloud pose.</p>
-</div>
-<div style="position:absolute;left:620px;top:400px;width:420px;height:180px;background:#FFFFFF;border:3px solid #0A7D55;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:10px">
-<h3 style="font-size:36px;font-weight:700;color:#0A7D55">3 · Neon Postgres</h3>
-<p style="font-size:26px;line-height:1.35;color:#44546A">Accounts, social, pgvector, rehab limits.</p>
-</div>
-<div style="position:absolute;left:1244px;top:0;width:420px;height:220px;background:#FFFFFF;border:3px solid #C8322B;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:10px">
-<h3 style="font-size:36px;font-weight:700;color:#C8322B">4 · Databricks</h3>
-<p style="font-size:26px;line-height:1.35;color:#44546A">Bronze, silver, gold. MLflow form model scores each set. Syncs trends to Neon.</p>
-</div>
-<div style="position:absolute;left:1244px;top:270px;width:420px;height:310px;background:#FFFFFF;border:3px solid #8A6500;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:10px">
-<h3 style="font-size:36px;font-weight:700;color:#8A6500">5 · Hugging Face</h3>
-<p style="font-size:26px;line-height:1.35;color:#44546A">Cloud pose endpoint for slower phones. gpt-oss notes and plans, bge-small retrieval, Llama Guard. Hub hosts our models.</p>
-</div>
-<x-connector x1="420" y1="170" x2="620" y2="170" style="color:#10233F;border-width:3px"></x-connector>
-<x-connector x1="420" y1="240" x2="620" y2="240" style="color:#B86A00;border-width:3px;border-style:dashed"></x-connector>
-<x-connector x1="620" y1="300" x2="420" y2="300" style="color:#10233F;border-width:3px"></x-connector>
-<x-connector x1="830" y1="320" x2="830" y2="400" head="both" style="color:#10233F;border-width:3px"></x-connector>
-<x-connector x1="1040" y1="160" x2="1244" y2="110" head="both" style="color:#10233F;border-width:3px"></x-connector>
-<x-connector x1="1040" y1="300" x2="1244" y2="300" head="both" style="color:#10233F;border-width:3px"></x-connector>
-<p style="position:absolute;left:432px;top:128px;width:180px;font-size:24px;font-style:italic;color:#10233F">finished set</p>
-<p style="position:absolute;left:432px;top:190px;width:180px;font-size:24px;font-style:italic;font-weight:700;color:#8A4F00">live frames</p>
-<p style="position:absolute;left:432px;top:310px;width:186px;font-size:24px;font-style:italic;color:#10233F">notes, medals</p>
-<p style="position:absolute;left:1052px;top:36px;width:186px;font-size:24px;line-height:1.2;font-style:italic;color:#10233F">joints out,<br>scores back</p>
-<p style="position:absolute;left:1052px;top:230px;width:186px;font-size:24px;line-height:1.2;font-style:italic;color:#10233F">prompts,<br>frames</p>
-<p style="position:absolute;left:1052px;top:312px;width:186px;font-size:24px;line-height:1.2;font-style:italic;color:#10233F">text,<br>joints</p>
-</div>
-<aside>The amber dashed line is the only path video ever takes: live frames, only in cloud mode, only with consent, relayed by our API to the Hugging Face pose endpoint. Every other arrow carries numbers. Hand out the printed architecture sheet here.</aside>
+<section id="how" hidden data-transition="fade" style="background:#F5F9FD;color:#10233F;font-family:'Barlow', Arial, sans-serif;padding:0px">
+<img src="/_blob/1a4f4515ec220767904da5ee3ca30c79" data-video="/_blob/bf078850feb33453c70b3abb85d18582" alt="Animated architecture: the phone runs pose on device, the finished set goes to the Spotter API, Databricks scores it, gpt-oss on Hugging Face words the rest note, Neon stores history and buddies, then the amber offload path sends live frames through the API to the Hugging Face pose endpoint" style="position:absolute;left:0px;top:0px;width:1920px;height:1080px;object-fit:cover">
+<aside>A 25-second Remotion clip that builds the architecture one part at a time and loops while the slide is up. Talk over it: pose runs on the phone, only the finished set's joints go to our API, Databricks scores it, gpt-oss words the rest note, Neon keeps history and buddies. The last beat is the amber offload path: Android or a slower iPhone, with consent, sends live frames through our API to the Hugging Face pose endpoint, and they are never stored. Source: docs/pitch/video in the repo. Hand out the printed architecture sheet here.</aside>
 </section>

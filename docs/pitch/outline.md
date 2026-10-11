@@ -24,7 +24,7 @@ About 3:00 including the live demo. Visible slides only; everything else in the 
 | 5 | One of `hf`, `dbx`, `neon`, `bestai`, `presage` | 0:25 | Unhide only the slide for the judge's track (PITCH-03, #70). Hugging Face is visible by default |
 | 6 | `close` | 0:10 | Closing line and repo link |
 
-**Hidden backup slides, for Q&A or if the live demo fails:** `how` (architecture), `meet`, `liveset`, `cue`, `rest`, `recovery`, `plan`, `offload` (on-device vs cloud pose), `different`, `safety`.
+**Hidden backup slides, for Q&A or if the live demo fails:** `how` (animated architecture, a looping Remotion clip from `video/`), `meet`, `liveset`, `cue`, `rest`, `recovery`, `plan`, `offload` (on-device vs cloud pose), `different`, `safety`.
 
 ## Problem stats and sources
 

@@ -1,0 +1,13 @@
+{
+  "comment": "Devpost cut, about 2:30. Times in seconds. clips name files in public/clips/ (V numbers match the deck's video slots); until a clip exists the rough cut shows a slate. captions are the voiceover, burned in.",
+  "beats": [
+    { "id": "hook", "from": 0, "to": 15, "clips": ["V1", "V2"], "caption": "This is Spotter. It watched every one of those reps, and said nothing until it mattered." },
+    { "id": "problem", "from": 15, "to": 35, "remotion": "ProblemStats" },
+    { "id": "set", "from": 35, "to": 65, "clips": ["V1", "V2", "V3"], "caption": "No voice talking over you mid-set. One kind note while you rest, and a medal that compares you only to yourself." },
+    { "id": "plans", "from": 65, "to": 85, "clips": ["V5", "V4"], "caption": "New? A balanced week that works every muscle group. Recovering? Your range coming back, week by week, in a report you choose to share." },
+    { "id": "buddies", "from": 85, "to": 105, "clips": ["V9", "moderation"], "caption": "Gym buddies and recovery buddies at your level, with every post checked before anyone sees it." },
+    { "id": "how", "from": 105, "to": 130, "remotion": "ArchitectureFlow" },
+    { "id": "sponsors", "from": 130, "to": 145, "remotion": "SponsorCards" },
+    { "id": "close", "from": 145, "to": 150, "remotion": "CloseCard" }
+  ]
+}
