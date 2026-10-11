@@ -13,6 +13,7 @@ import {
   MAX_PROMPT_SOURCES,
   PAIN_REPLY,
   REPUTABLE_SOURCE_HOSTS,
+  ADVICE_DISCLAIMER,
   acuteSignals,
   answerProblems,
   isReputableUrl,
@@ -96,6 +97,9 @@ function fakeLlm(reply: unknown, verify: unknown = allSupported) {
     },
   };
 }
+
+/** What a shown AI answer reads: the model's words, then the fixed disclaimer. */
+const withDisclaimer = (answer: string) => `${answer} ${ADVICE_DISCLAIMER}`;
 
 const answered = (source_ids: string[], answer = GOOD_ANSWER) => ({ answerable: true, answer, source_ids });
 
@@ -260,7 +264,11 @@ describe("AdviceWriter", () => {
   it("answers with only the sources the model cited, in the order they were retrieved", async () => {
     const { llm, calls } = fakeLlm(answered(["c", "a"]));
     const result = await new AdviceWriter(llm).answer({ question: "Sore legs after squats?", sources }, 2000);
-    expect(result).toEqual({ kind: "ai", text: GOOD_ANSWER, sources: [sources[0], sources[2]] });
+    expect(result).toEqual({
+      kind: "ai",
+      text: withDisclaimer(GOOD_ANSWER),
+      sources: [sources[0], sources[2]],
+    });
     expect(calls.filter((c) => c.schemaName === "advice_answer")).toHaveLength(1);
   });
 
@@ -287,7 +295,7 @@ describe("AdviceWriter", () => {
       { question: "Sore legs?", sources: [sources[0]!, sources[0]!] },
       2000,
     );
-    expect(result).toEqual({ kind: "ai", text: GOOD_ANSWER, sources: [sources[0]] });
+    expect(result).toEqual({ kind: "ai", text: withDisclaimer(GOOD_ANSWER), sources: [sources[0]] });
   });
 
   it("keeps numbers that come from a cited source", async () => {
@@ -299,7 +307,7 @@ describe("AdviceWriter", () => {
     expect(await new AdviceWriter(llm).answer({ question: "Easier squats?", sources: [knee] }, 2000)).toEqual(
       {
         kind: "ai",
-        text,
+        text: withDisclaimer(text),
         sources: [knee],
       },
     );
@@ -313,10 +321,25 @@ describe("AdviceWriter", () => {
     });
   });
 
+  it("ends every AI answer with the disclaimer to consult a doctor", async () => {
+    expect(ADVICE_DISCLAIMER).toMatch(/always consult a doctor/i);
+    expect(ADVICE_DISCLAIMER).toMatch(/not medical advice/i);
+    const { llm } = fakeLlm(answered(["a"]));
+    const result = await new AdviceWriter(llm).answer({ question: "Sore legs?", sources }, 2000);
+    expect(result.kind === "ai" && result.text.endsWith(ADVICE_DISCLAIMER)).toBe(true);
+  });
+
+  it("checks only the model's words, not the disclaimer", async () => {
+    const { llm, verifyCalls } = fakeLlm(answered(["a"]));
+    await new AdviceWriter(llm).answer({ question: "Sore legs?", sources }, 2000);
+    const user = JSON.parse(verifyCalls()[0]!.user) as { sentences: string[] };
+    expect(user.sentences.join(" ")).not.toContain(ADVICE_DISCLAIMER);
+  });
+
   it("trims the answer and ignores a repeated citation", async () => {
     const { llm } = fakeLlm(answered(["b", "b"], `  ${GOOD_ANSWER}  `));
     const result = await new AdviceWriter(llm).answer({ question: "Sore legs?", sources }, 2000);
-    expect(result).toEqual({ kind: "ai", text: GOOD_ANSWER, sources: [sources[1]] });
+    expect(result).toEqual({ kind: "ai", text: withDisclaimer(GOOD_ANSWER), sources: [sources[1]] });
   });
 
   it("returns no answer for a blank question", async () => {
@@ -494,7 +517,7 @@ describe("reputable sources", () => {
     );
     const user = JSON.parse(calls[0]!.user) as { sources: { id: string }[] };
     expect(user.sources.map((s) => s.id)).toEqual(["nhs", "member"]);
-    expect(result).toEqual({ kind: "ai", text: GOOD_ANSWER, sources: [nhs] });
+    expect(result).toEqual({ kind: "ai", text: withDisclaimer(GOOD_ANSWER), sources: [nhs] });
   });
 
   it("returns no answer, without a model call, when no source is from an allowed site", async () => {
