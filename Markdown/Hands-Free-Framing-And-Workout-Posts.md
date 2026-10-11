@@ -21,3 +21,5 @@ All five bundled exercise specs now use 4,000 ms for set-ending stillness (and t
 Regression checks cover the four-second boundary, all five specs, next-set countdown/early start, timer cleanup, and final-set expiry. Exercise-spec validation and all 62 validator tests passed; mobile typecheck/lint passed (eight existing lint warnings).
 
 Full mobile suite after this change: 67 suites / 659 tests passed.
+
+PR #121 update verification: API typecheck and all 21 files / 147 tests passed, including replay checks against the four-second specs. The sandboxed integration run was stopped and rerun with local socket access. Main merge preflight passed. Outgoing commits contain no private credentials or tracked private env files; the Databricks volume path appears in main’s existing replay fixtures and is not a credential.
