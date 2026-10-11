@@ -1,4 +1,4 @@
-Refs #108. Cloud tracking works on a physical iPhone, but the 8 fps / 60 s numbers haven't been recorded yet, so this PR doesn't close the issue (see Device check).
+Closes #108. Cloud tracking works on a physical iPhone; the owner accepted the device check without recording the 8 fps / 60 s numbers (see Device check).
 
 This adds cloud pose tracking on iPhone. It runs in the camera check and the pose debug screen, through the authenticated `/pose/stream` relay that's already in place. The pose output and the relay protocol are unchanged. What's new:
 
@@ -129,10 +129,10 @@ Done:
 - [x] Recovery behaved as intended while the endpoint was rejecting calls (HTTP 403, see below): the client backed off and showed "Reconnecting…".
 - [x] **Endpoint timing**, measured from the laptop with a warm endpoint over keep-alive: round trip **79 ms median** (64–290 ms), endpoint inference **12 ms**. That allows about 12 fps with one frame in flight.
 
-Still to do:
+Not measured on the phone (accepted by the owner; covered only by tests):
 
-- [ ] **The gate:** at least 8 fresh pose responses per second for 60 s, each fresh to within 1 s, with capture-to-result latency, fps and drops from the debug screen.
-- [ ] Explicit **Use local tracking**, consent revocation mid-stream, and switching cameras during cloud tracking.
+- The 8 fps / 60 s gate. The laptop timing above suggests about 12 fps is possible, but no phone numbers were recorded.
+- Explicit **Use local tracking**, consent revocation mid-stream, and switching cameras during cloud tracking.
 
 **Hugging Face token:** the endpoint belongs to the `bubblesmal` account. A personal fine-grained token gets **403** (`missing permissions: inference.endpoints.infer.write`), even when it has that permission for its own account. The API's `HF_TOKEN` must be `bubblesmal`'s token (as `docs/runbooks/demo-checklist.md` says), or the endpoint has to move into a shared organisation.
 
