@@ -166,6 +166,35 @@ def _trainable(df: pd.DataFrame) -> pd.DataFrame:
     return df.loc[df["trainable"].astype(bool)]
 
 
+def dataset_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Trainable rows' model inputs plus the integer label (what MLflow logs as the input dataset)."""
+    rows = _trainable(df)
+    return pd.concat([build_features(rows), rows[["label"]].astype(int)], axis=1)
+
+
+def training_status(counts: dict):
+    """None when both splits hold both classes; otherwise why training is skipped."""
+    for split in ("train", "test"):
+        c = counts[split]
+        if c["positives"] == 0 or c["positives"] == c["trainable"]:
+            return (f"{split} split has a single class ({c['positives']} positive of {c['trainable']} "
+                    "trainable rows); not training or registering a model")
+    return None
+
+
+def prior_correct(p, scale_pos_weight) -> np.ndarray:
+    """Undo scale_pos_weight's shift of the predicted odds: p' = p / (p + (1 - p) * spw)."""
+    p = np.asarray(p, dtype="float64")
+    spw = float(scale_pos_weight) if scale_pos_weight else 1.0
+    return p / (p + (1.0 - p) * spw)
+
+
+def predict_scores(model: xgboost.XGBClassifier, X: pd.DataFrame) -> np.ndarray:
+    """Probabilities at the training data's real class prior (training upweights positives)."""
+    raw = model.predict_proba(X[FEATURE_COLUMNS])[:, 1]
+    return np.clip(prior_correct(raw, model.get_params().get("scale_pos_weight")), 0.0, 1.0)
+
+
 def train(train_df: pd.DataFrame, params: dict = None) -> xgboost.XGBClassifier:
     rows = _trainable(train_df)
     y = rows["label"].astype(bool).astype(int)
@@ -196,7 +225,7 @@ def evaluate(model: xgboost.XGBClassifier, test_df: pd.DataFrame) -> dict:
     y = rows["label"].astype(bool).astype(int)
     if y.nunique() < 2:
         raise ValueError(f"Test rows need both classes to evaluate: {int(y.sum())} positive of {len(y)}")
-    p_model = model.predict_proba(build_features(rows))[:, 1]
+    p_model = predict_scores(model, build_features(rows))
     p_rule = pd.to_numeric(rows["score"], errors="coerce").fillna(0.0).clip(0, 1)
     return {"model": _metrics(y, p_model), "heuristic": _metrics(y, p_rule)}
 
@@ -249,12 +278,26 @@ def score_rows(model: xgboost.XGBClassifier, df: pd.DataFrame, model_version, sc
         "user_id": df["user_id"].to_numpy(),
         "body_part": df["body_part"].to_numpy(),
         "date": df["date"].to_numpy(),
-        "score": np.clip(model.predict_proba(X)[:, 1].astype("float64"), 0.0, 1.0),
+        "score": predict_scores(model, X),
         "top_features": contribs["top_features"].tolist(),
         "model_version": str(model_version),
         "scored_at": [scored_at] * len(df),
     })
     return out[OUTPUT_COLUMNS]
+
+
+def comment_sql(table: str, comment: str) -> str:
+    """COMMENT ON TABLE with the comment as a safely escaped string literal."""
+    literal = comment.replace("\\", "\\\\").replace("'", "\\'")
+    return f"COMMENT ON TABLE {table} IS '{literal}'"
+
+
+NOT_FOUND_CODES = {"RESOURCE_DOES_NOT_EXIST", "NOT_FOUND"}
+
+
+def is_not_found(exc: BaseException) -> bool:
+    """True only for a missing model or alias (MLflow error code), so other errors still raise."""
+    return getattr(exc, "error_code", None) in NOT_FOUND_CODES
 
 
 # COMMAND ----------
@@ -295,13 +338,20 @@ for name, c in counts.items():
           f"({c['positive_rate']:.1%})")
 if counts["all"]["positive_rate"] < 0.05:
     print("Warning: forecast positives are under 5%; keeping scale_pos_weight, metrics will be noisy.")
+status = training_status(counts)  # None, or why training is skipped
+if status:
+    print(f"Skipping training: {status}. The existing champion (if any) still scores today's rows.")
 
 # COMMAND ----------
 
 # MAGIC %md ### Train, evaluate, log and register
+# MAGIC
+# MAGIC Skipped (with an `insufficient_labels` tag) when either split lacks a class, so no model is
+# MAGIC registered that can't be trained or measured.
 
 # COMMAND ----------
 
+info, metrics = None, None
 with mlflow.start_run(run_name="injury_risk_xgboost") as run:
     mlflow.log_params(PARAMS)
     mlflow.log_params({
@@ -312,98 +362,92 @@ with mlflow.start_run(run_name="injury_risk_xgboost") as run:
         "seed": SEED,
         "labels_from": "heuristic_weak_label_forecast",
         "features": ",".join(FEATURE_COLUMNS),
+        "scores": "prior_corrected",
         "xgboost_version": xgboost.__version__,
     })
     mlflow.log_metrics({f"{name}_{k}": float(v) for name, c in counts.items() for k, v in c.items()})
     mlflow.log_metrics({"lifters_train": train_df["user_id"].nunique(), "lifters_test": test_df["user_id"].nunique()})
-    mlflow.log_input(
-        mlflow.data.from_pandas(
-            pd.concat([build_features(trainable), trainable[["label"]].astype(int)], axis=1),
-            name=SOURCE_TABLE,
-        ),
-        context="training",
-    )
+    mlflow.log_input(mlflow.data.from_pandas(dataset_frame(train_df), name=f"{SOURCE_TABLE}:train"),
+                     context="training")
+    mlflow.log_input(mlflow.data.from_pandas(dataset_frame(test_df), name=f"{SOURCE_TABLE}:test"),
+                     context="test")
 
-    # Fail clearly instead of registering a model that can't be trained or measured.
-    if counts["train"]["positives"] == 0 or counts["train"]["positives"] == counts["train"]["trainable"]:
+    if status:
         mlflow.set_tag("status", "insufficient_labels")
-        raise RuntimeError(f"Training split has no usable class balance: {counts['train']}. "
-                           "Not training; check gold_injury_risk_scores and the heuristic flag rate.")
-    test_pos = counts["test"]["positives"]
-    if test_pos == 0 or test_pos == counts["test"]["trainable"]:
-        mlflow.set_tag("status", "insufficient_labels")
-        raise RuntimeError(f"Test split has a single class: {counts['test']}. "
-                           "PR-AUC is undefined; not registering a model.")
+        mlflow.set_tag("skip_reason", status)
+    else:
+        model = train(train_df)
+        metrics = evaluate(model, test_df)  # model probabilities are prior-corrected
+        mlflow.log_metrics({f"test_{k}": v for k, v in metrics["model"].items()})
+        mlflow.log_metrics({f"heuristic_{k}": v for k, v in metrics["heuristic"].items()})
+        lift = metrics["model"]["pr_auc"] - metrics["heuristic"]["pr_auc"]
+        mlflow.log_metric("pr_auc_lift_over_heuristic", lift)
 
-    model = train(train_df)
-    metrics = evaluate(model, test_df)
-    mlflow.log_metrics({f"test_{k}": v for k, v in metrics["model"].items()})
-    mlflow.log_metrics({f"heuristic_{k}": v for k, v in metrics["heuristic"].items()})
-    mlflow.log_metric("pr_auc_lift_over_heuristic", metrics["model"]["pr_auc"] - metrics["heuristic"]["pr_auc"])
+        per_feature, per_family = importance(model)
+        mlflow.log_text(per_feature.to_csv(index=False), "importance/per_feature.csv")
+        mlflow.log_text(per_family.to_csv(index=False), "importance/per_family.csv")
 
-    per_feature, per_family = importance(model)
-    mlflow.log_text(per_feature.to_csv(index=False), "importance/per_feature.csv")
-    mlflow.log_text(per_family.to_csv(index=False), "importance/per_family.csv")
+        example = build_features(_trainable(test_df)).head(5)
+        info = mlflow.xgboost.log_model(
+            xgb_model=model,
+            name="model",
+            signature=infer_signature(example, model.predict_proba(example)[:, 1]),
+            input_example=example,
+            pip_requirements=[f"xgboost=={xgboost.__version__}", f"pandas=={pd.__version__}",
+                              f"numpy=={np.__version__}", f"mlflow=={mlflow.__version__}"],
+            registered_model_name=MODEL_NAME,
+        )
+        mlflow.set_tag("status", "trained")
 
-    example = build_features(_trainable(test_df)).head(5)
-    info = mlflow.xgboost.log_model(
-        xgb_model=model,
-        name="model",
-        signature=infer_signature(example, model.predict_proba(example)[:, 1]),
-        input_example=example,
-        pip_requirements=[f"xgboost=={xgboost.__version__}", f"pandas=={pd.__version__}",
-                          f"numpy=={np.__version__}", f"mlflow=={mlflow.__version__}"],
-        registered_model_name=MODEL_NAME,
-    )
-
-print(f"Run {run.info.run_id}: model {metrics['model']}, heuristic {metrics['heuristic']}")
-print(f"Registered {MODEL_NAME} version {info.registered_model_version}")
-display(per_family)
+if info:
+    print(f"Run {run.info.run_id}: model {metrics['model']}, heuristic {metrics['heuristic']}")
+    print(f"PR-AUC lift over the heuristic: {lift:+.3f}")
+    print(f"Registered {MODEL_NAME} version {info.registered_model_version}")
+    display(per_family)
 
 # COMMAND ----------
 
 # MAGIC %md ### Promote
 # MAGIC
 # MAGIC Move `champion` to the new version only if its held-out PR-AUC is at least the champion's.
+# MAGIC The lift over the heuristic is printed alongside as context.
 
 # COMMAND ----------
 
 client = MlflowClient()
-new_version = info.registered_model_version
-new_pr_auc = metrics["model"]["pr_auc"]
 
-try:
-    current = client.get_model_version_by_alias(MODEL_NAME, ALIAS)
-    current_pr_auc = client.get_run(current.run_id).data.metrics.get("test_pr_auc", -1.0)
-except Exception:  # no champion yet
-    current, current_pr_auc = None, -1.0
 
-if new_pr_auc >= current_pr_auc:
-    client.set_registered_model_alias(MODEL_NAME, ALIAS, new_version)
-    print(f"{ALIAS} -> version {new_version} (PR-AUC {new_pr_auc:.3f} vs {current_pr_auc:.3f})")
-else:
-    print(f"Kept {ALIAS} on version {current.version} (PR-AUC {current_pr_auc:.3f} > {new_pr_auc:.3f})")
+def get_champion():
+    """The champion model version, or None when the model or alias doesn't exist yet."""
+    try:
+        return client.get_model_version_by_alias(MODEL_NAME, ALIAS)
+    except Exception as exc:
+        if is_not_found(exc):
+            return None
+        raise
+
+
+if info:
+    new_version = info.registered_model_version
+    new_pr_auc = metrics["model"]["pr_auc"]
+    current = get_champion()
+    current_pr_auc = (client.get_run(current.run_id).data.metrics.get("test_pr_auc", -1.0)
+                      if current else -1.0)
+    context = f"PR-AUC {new_pr_auc:.3f} vs champion {current_pr_auc:.3f}; lift over heuristic {lift:+.3f}"
+    if new_pr_auc >= current_pr_auc:
+        client.set_registered_model_alias(MODEL_NAME, ALIAS, new_version)
+        print(f"{ALIAS} -> version {new_version} ({context})")
+    else:
+        print(f"Kept {ALIAS} on version {current.version} ({context})")
 
 # COMMAND ----------
 
 # MAGIC %md ### Score with the champion
 # MAGIC
-# MAGIC Each lifter and body part's latest day, so the app gets the current state.
+# MAGIC Each lifter and body part's latest day, so the app gets the current state. Runs even when
+# MAGIC training was skipped, as long as a champion exists. Scores are prior-corrected probabilities.
 
 # COMMAND ----------
-
-champion = client.get_model_version_by_alias(MODEL_NAME, ALIAS)
-champion_model = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}@{ALIAS}")
-trained_at = datetime.fromtimestamp(int(champion.creation_timestamp) / 1000, tz=timezone.utc)
-scored_at = datetime.now(timezone.utc)
-
-latest = (source.assign(_day=_day_numbers(source["date"]))
-          .sort_values("_day", kind="mergesort")
-          .groupby(["user_id", "body_part"], sort=False).tail(1)
-          .drop(columns="_day"))
-scores = score_rows(champion_model, latest, champion.version, scored_at)
-scores["date"] = pd.to_datetime(scores["date"]).dt.date
-scores["top_features"] = scores["top_features"].map(list)
 
 SCORES_SCHEMA = T.StructType([
     T.StructField("user_id", T.StringType()),
@@ -423,21 +467,44 @@ IMPORTANCE_SCHEMA = T.StructType([
     T.StructField("trained_at", T.TimestampType()),
 ])
 
-champion_importance, _ = importance(champion_model)
-importance_rows = [
-    (str(champion.version), r.feature, r.family, float(r.gain), int(r.rank), trained_at)
-    for r in champion_importance.itertuples(index=False)
-]
-score_records = [tuple(r) for r in scores[OUTPUT_COLUMNS].itertuples(index=False, name=None)]
-
 
 def overwrite(rows, schema, table, comment):
     (spark.createDataFrame(rows, schema).write.mode("overwrite")
      .option("overwriteSchema", "true").saveAsTable(table))
-    spark.sql(f"COMMENT ON TABLE {table} IS '{comment}'")
+    spark.sql(comment_sql(table, comment))
     print(f"Wrote {len(rows):,} rows to {table}")
 
 
-overwrite(score_records, SCORES_SCHEMA, MODEL_SCORES_TABLE, MODEL_TABLE_COMMENT)
-overwrite(importance_rows, IMPORTANCE_SCHEMA, IMPORTANCE_TABLE, IMPORTANCE_TABLE_COMMENT)
-display(spark.read.table(MODEL_SCORES_TABLE).orderBy("score", ascending=False).limit(20))
+champion = get_champion()
+if champion is None:
+    print(f"No {ALIAS} for {MODEL_NAME}; nothing scored. The Neon sync falls back to {SOURCE_TABLE}.")
+else:
+    champion_model = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}@{ALIAS}")
+    trained_at = datetime.fromtimestamp(int(champion.creation_timestamp) / 1000, tz=timezone.utc)
+    scored_at = datetime.now(timezone.utc)
+
+    latest = (source.assign(_day=_day_numbers(source["date"]))
+              .sort_values("_day", kind="mergesort")
+              .groupby(["user_id", "body_part"], sort=False).tail(1)
+              .drop(columns="_day"))
+    scores = score_rows(champion_model, latest, champion.version, scored_at)
+    scores["date"] = pd.to_datetime(scores["date"]).dt.date
+    scores["top_features"] = scores["top_features"].map(list)
+
+    champion_importance, _ = importance(champion_model)
+    importance_rows = [
+        (str(champion.version), r.feature, r.family, float(r.gain), int(r.rank), trained_at)
+        for r in champion_importance.itertuples(index=False)
+    ]
+    score_records = [tuple(r) for r in scores[OUTPUT_COLUMNS].itertuples(index=False, name=None)]
+
+    overwrite(score_records, SCORES_SCHEMA, MODEL_SCORES_TABLE, MODEL_TABLE_COMMENT)
+    overwrite(importance_rows, IMPORTANCE_SCHEMA, IMPORTANCE_TABLE, IMPORTANCE_TABLE_COMMENT)
+    display(spark.read.table(MODEL_SCORES_TABLE).orderBy("score", ascending=False).limit(20))
+
+# COMMAND ----------
+
+# Fail the run after scoring, so a skipped training shows up in the job's status.
+if status:
+    scored = f"scored with {ALIAS} version {champion.version}" if champion else "nothing scored"
+    raise RuntimeError(f"Training skipped: {status}; {scored}. Check {SOURCE_TABLE} and the heuristic flag rate.")
